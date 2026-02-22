@@ -17,7 +17,7 @@ if (packageDir.includes(`${sep}node_modules${sep}`)) {
   const tempDir = resolve(tmpdir(), "ai-workspace-v2-app");
 
   // Reuse existing temp dir if it has a valid .next build
-  if (existsSync(resolve(tempDir, ".next"))) {
+  if (existsSync(resolve(tempDir, ".next", "BUILD_ID"))) {
     console.log("Using cached build...");
     packageDir = tempDir;
   } else {
