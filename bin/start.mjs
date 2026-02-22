@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, cpSync, symlinkSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, rmSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { resolve, dirname, sep } from "node:path";
@@ -12,28 +12,37 @@ let packageDir = resolve(__dirname, "..");
 
 // When run via bunx, the package lives inside node_modules/ which breaks
 // Next.js TypeScript compilation (SWC skips TS for node_modules files).
-// Copy the project to a temp directory so Next.js treats it normally.
+// Copy the project to a temp directory and install deps fresh.
 if (packageDir.includes(`${sep}node_modules${sep}`)) {
   const tempDir = resolve(tmpdir(), "ai-workspace-v2-app");
-  if (existsSync(tempDir)) rmSync(tempDir, { recursive: true });
 
-  // Copy project files (exclude node_modules and .next)
-  cpSync(packageDir, tempDir, {
-    recursive: true,
-    filter: (src) => {
-      const rel = src.slice(packageDir.length);
-      return (
-        !rel.startsWith(`${sep}node_modules`) &&
-        !rel.startsWith(`${sep}.next`)
-      );
-    },
-  });
+  // Reuse existing temp dir if it has a valid .next build
+  if (existsSync(resolve(tempDir, ".next"))) {
+    console.log("Using cached build...");
+    packageDir = tempDir;
+  } else {
+    if (existsSync(tempDir)) rmSync(tempDir, { recursive: true });
 
-  // Symlink node_modules from the bunx temp root so dependencies resolve
-  const bunxNodeModules = resolve(packageDir, "..");
-  symlinkSync(bunxNodeModules, resolve(tempDir, "node_modules"));
+    // Copy project files (exclude node_modules and .next)
+    cpSync(packageDir, tempDir, {
+      recursive: true,
+      filter: (src) => {
+        const rel = src.slice(packageDir.length);
+        return (
+          !rel.startsWith(`${sep}node_modules`) &&
+          !rel.startsWith(`${sep}.next`)
+        );
+      },
+    });
 
-  packageDir = tempDir;
+    console.log("Installing dependencies...");
+    execFileSync("bun", ["install"], {
+      cwd: tempDir,
+      stdio: "inherit",
+    });
+
+    packageDir = tempDir;
+  }
 }
 
 // Resolve AI_WORKSPACE_ROOT: args > env > cwd
