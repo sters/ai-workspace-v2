@@ -1,9 +1,11 @@
 import type { NextConfig } from "next";
+import { execFileSync } from "node:child_process";
 
 function getGitHash(): string {
   try {
-    const result = Bun.spawnSync(["git", "rev-parse", "--short", "HEAD"]);
-    return result.success ? result.stdout.toString().trim() : "unknown";
+    return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
+      encoding: "utf-8",
+    }).trim();
   } catch {
     return "unknown";
   }
