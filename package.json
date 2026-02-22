@@ -1,9 +1,9 @@
 {
-  "name": "ai-workspace-ui",
+  "name": "ai-workspace-v2",
   "version": "0.1.0",
   "private": true,
   "bin": {
-    "ai-workspace-ui": "./bin/start.mjs"
+    "ai-workspace-v2": "./bin/start.mjs"
   },
   "scripts": {
     "dev": "bun next build && bun next start -p 3741",

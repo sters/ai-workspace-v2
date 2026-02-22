@@ -4,25 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-This is the Web UI dashboard for [ai-workspace](../), a multi-repository workspace manager for Claude Code. It provides a browser interface on `localhost:3741` to view workspace status, TODO progress, reviews, git history, and trigger operations (init, execute, review, create-pr, etc.) that run Claude Code via the `@anthropic-ai/claude-agent-sdk`.
+Web UI dashboard for [ai-workspace](https://github.com/sters/ai-workspace), a multi-repository workspace manager for Claude Code. Provides a browser interface on `localhost:3741` to view workspace status, TODO progress, reviews, git history, and trigger operations (init, execute, review, create-pr, etc.) that run Claude Code via the `@anthropic-ai/claude-agent-sdk`.
 
 ## Commands
 
 ```bash
-# Install dependencies (uses bun)
+# Run via bunx (from ai-workspace root, or specify path)
+bunx ai-workspace-v2 [/path/to/ai-workspace]
+
+# Install dependencies
 bun install
 
 # Development with hot reload
 bun run dev:hot
 
-# Production build + start (what bin/start.mjs does)
+# Production build + start
 bun run build && bun run start
 
 # Type checking
 bunx tsc --noEmit
 ```
 
-The app runs on port 3741. Set `AI_WORKSPACE_ROOT` env var to point to the ai-workspace root directory; defaults to `..` relative to this directory.
+The app runs on port 3741. Set `AI_WORKSPACE_ROOT` env var to point to the ai-workspace root directory (containing `workspace/` and `repositories/`). When running via `bunx`, it can also be passed as a CLI argument or defaults to the current working directory.
 
 ## Architecture
 
@@ -33,7 +36,7 @@ The app runs on port 3741. Set `AI_WORKSPACE_ROOT` env var to point to the ai-wo
 API routes under `src/app/api/` read workspace data directly from the filesystem (`workspace/` directory in ai-workspace root):
 
 - **`src/lib/workspace.ts`** — Core functions that scan `WORKSPACE_DIR` to list workspaces, read README.md, TODO files, review artifacts, and git history. All filesystem access happens here.
-- **`src/lib/config.ts`** — Resolves `AI_WORKSPACE_ROOT` and `WORKSPACE_DIR` paths.
+- **`src/lib/config.ts`** — Resolves `AI_WORKSPACE_ROOT` (from env or `..` fallback) and `WORKSPACE_DIR` paths.
 - **Parsers** (`src/lib/todo-parser.ts`, `readme-parser.ts`, `review-parser.ts`) — Extract structured data from markdown files using regex. TODO items use checkbox syntax: `[x]` completed, `[ ]` pending, `[!]` blocked, `[~]` in-progress.
 
 ### Server-side: Running Claude Code operations
