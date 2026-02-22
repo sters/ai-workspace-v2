@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { existsSync, mkdirSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -51,19 +52,15 @@ const cmd = isDev ? "dev" : "start";
 // For production mode, build first if needed
 if (!isDev && !existsSync(resolve(packageDir, ".next"))) {
   console.log("Building...");
-  Bun.spawnSync(["bun", "run", "build"], {
+  execFileSync("bun", ["run", "build"], {
     cwd: packageDir,
-    stdout: "inherit",
-    stderr: "inherit",
-    stdin: "inherit",
+    stdio: "inherit",
   });
 }
 
-const child = Bun.spawn(["bun", "run", cmd], {
+const child = spawn("bun", ["run", cmd], {
   cwd: packageDir,
-  stdout: "inherit",
-  stderr: "inherit",
-  stdin: "inherit",
+  stdio: "inherit",
   env: {
     ...process.env,
     AI_WORKSPACE_ROOT: root,
@@ -73,4 +70,4 @@ const child = Bun.spawn(["bun", "run", cmd], {
 
 process.on("SIGINT", () => child.kill());
 process.on("SIGTERM", () => child.kill());
-await child.exited.then((code) => process.exit(code ?? 0));
+child.on("exit", (code) => process.exit(code ?? 0));
