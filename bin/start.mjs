@@ -1,16 +1,44 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, symlinkSync, rmSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
-import { resolve, dirname } from "node:path";
+import { resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { tmpdir } from "node:os";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const packageDir = resolve(__dirname, "..");
+let packageDir = resolve(__dirname, "..");
+
+// When run via bunx, the package lives inside node_modules/ which breaks
+// Next.js TypeScript compilation (SWC skips TS for node_modules files).
+// Copy the project to a temp directory so Next.js treats it normally.
+if (packageDir.includes(`${sep}node_modules${sep}`)) {
+  const tempDir = resolve(tmpdir(), "ai-workspace-v2-app");
+  if (existsSync(tempDir)) rmSync(tempDir, { recursive: true });
+
+  // Copy project files (exclude node_modules and .next)
+  cpSync(packageDir, tempDir, {
+    recursive: true,
+    filter: (src) => {
+      const rel = src.slice(packageDir.length);
+      return (
+        !rel.startsWith(`${sep}node_modules`) &&
+        !rel.startsWith(`${sep}.next`)
+      );
+    },
+  });
+
+  // Symlink node_modules from the bunx temp root so dependencies resolve
+  const bunxNodeModules = resolve(packageDir, "..");
+  symlinkSync(bunxNodeModules, resolve(tempDir, "node_modules"));
+
+  packageDir = tempDir;
+}
 
 // Resolve AI_WORKSPACE_ROOT: args > env > cwd
-let root = process.argv[2] || process.env.AI_WORKSPACE_ROOT || process.cwd();
+const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
+let root = args[0] || process.env.AI_WORKSPACE_ROOT || process.cwd();
 root = resolve(root);
 
 const workspaceDir = resolve(root, "workspace");
