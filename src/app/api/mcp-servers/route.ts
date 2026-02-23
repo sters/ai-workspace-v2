@@ -34,14 +34,14 @@ type McpServerEntry = {
   config: McpServerConfig;
 };
 
-async function readMcpServers(
+async function readMcpServersFromFile(
   filePath: string,
   scope: McpServerEntry["scope"]
 ): Promise<McpServerEntry[]> {
   try {
     const content = await fs.readFile(filePath, "utf-8");
-    const settings = JSON.parse(content);
-    const mcpServers = settings.mcpServers;
+    const data = JSON.parse(content);
+    const mcpServers = data.mcpServers;
     if (!mcpServers || typeof mcpServers !== "object") return [];
 
     return Object.entries(mcpServers).map(([name, config]) => ({
@@ -54,25 +54,46 @@ async function readMcpServers(
   }
 }
 
+async function readLocalMcpServers(): Promise<McpServerEntry[]> {
+  // Claude Code stores per-project local MCP servers in
+  // ~/.claude.json under projects[projectPath].mcpServers
+  try {
+    const content = await fs.readFile(
+      path.join(os.homedir(), ".claude.json"),
+      "utf-8"
+    );
+    const data = JSON.parse(content);
+    const projects = data.projects;
+    if (!projects || typeof projects !== "object") return [];
+
+    // AI_WORKSPACE_ROOT may be relative; resolve to absolute to match the key
+    const absRoot = path.resolve(AI_WORKSPACE_ROOT);
+    const projectConfig = projects[absRoot];
+    if (!projectConfig?.mcpServers) return [];
+
+    const mcpServers = projectConfig.mcpServers;
+    return Object.entries(mcpServers).map(([name, config]) => ({
+      name,
+      scope: "local" as const,
+      config: config as McpServerConfig,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 export async function GET() {
-  const sources: { path: string; scope: McpServerEntry["scope"] }[] = [
-    {
-      path: path.join(os.homedir(), ".claude", "settings.json"),
-      scope: "user",
-    },
-    {
-      path: path.join(AI_WORKSPACE_ROOT, ".claude", "settings.json"),
-      scope: "project",
-    },
-    {
-      path: path.join(AI_WORKSPACE_ROOT, ".claude", "settings.local.json"),
-      scope: "local",
-    },
-  ];
+  const [projectServers, localServers] = await Promise.all([
+    // Project scope: .mcp.json at project root
+    readMcpServersFromFile(
+      path.join(AI_WORKSPACE_ROOT, ".mcp.json"),
+      "project"
+    ),
+    // Local scope: ~/.claude.json projects[path].mcpServers
+    readLocalMcpServers(),
+  ]);
 
-  const results = await Promise.all(
-    sources.map((s) => readMcpServers(s.path, s.scope))
-  );
-
-  return NextResponse.json({ servers: results.flat() });
+  return NextResponse.json({
+    servers: [...projectServers, ...localServers],
+  });
 }
