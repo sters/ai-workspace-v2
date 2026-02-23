@@ -23,11 +23,13 @@ if (packageDir.includes(`${sep}node_modules${sep}`)) {
     if (match) resolvedGitHash = match[1];
   } catch {}
 
-  const tempDir = resolve(tmpdir(), "ai-workspace-v2-app");
+  // Include git hash in cache dir name so version changes trigger rebuild
+  const cacheKey = resolvedGitHash || "latest";
+  const tempDir = resolve(tmpdir(), `ai-workspace-v2-app-${cacheKey}`);
 
-  // Reuse existing temp dir if it has a valid .next build
+  // Reuse existing temp dir if it has a valid .next build for this version
   if (existsSync(resolve(tempDir, ".next", "BUILD_ID"))) {
-    console.log("Using cached build...");
+    console.log(`Using cached build (${cacheKey})...`);
     packageDir = tempDir;
   } else {
     if (existsSync(tempDir)) rmSync(tempDir, { recursive: true });
