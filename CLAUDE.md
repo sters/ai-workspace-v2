@@ -94,6 +94,11 @@ Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes 
 
 Uses Tailwind with a shadcn/ui-style CSS variable theme system (`hsl(var(--primary))`, etc.) defined in `globals.css`. The `cn()` utility from `src/lib/utils.ts` merges Tailwind classes via `clsx` + `tailwind-merge`. Dark mode is configured via the `class` strategy but not currently toggled.
 
+## Development Rules
+
+- **TDD (Test-Driven Development)**: Write or update tests before implementing production code. When adding a new feature or fixing a bug, first write a failing test that defines the expected behavior, then implement the code to make it pass.
+- **Pre-commit checks**: Always run `bun run lint` and `bun run test` before creating a git commit. Both must pass with zero errors.
+
 ## Conventions
 
 - Path alias: `@/*` maps to `./src/*` (configured in `tsconfig.json`).

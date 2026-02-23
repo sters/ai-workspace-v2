@@ -10,11 +10,11 @@ export function WorkspaceList() {
 
   if (isLoading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="space-y-3">
         {[...Array(3)].map((_, i) => (
           <div
             key={i}
-            className="h-36 animate-pulse rounded-lg border bg-muted"
+            className="h-28 animate-pulse rounded-lg border bg-muted"
           />
         ))}
       </div>
@@ -39,7 +39,7 @@ export function WorkspaceList() {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="space-y-3">
       {workspaces.map((ws) => (
         <WorkspaceCard
           key={ws.name}
