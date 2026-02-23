@@ -1,7 +1,11 @@
 import useSWR from "swr";
 import type { WorkspaceDetail, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+const fetcher = async (url: string) => {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+};
 
 export function useWorkspace(name: string) {
   const { data, error, isLoading, mutate } = useSWR<WorkspaceDetail>(

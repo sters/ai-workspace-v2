@@ -422,9 +422,23 @@ export function setupRepository(
   }
 
   emit(`Creating worktree: branch ${branchName} from origin/${baseBranch}`);
-  exec(
+  const worktreeOutput = exec(
     `git -C "${repoAbsPath}" worktree add -b "${branchName}" "${worktreePath}" "origin/${baseBranch}"`,
   );
+  if (worktreeOutput) {
+    emit(`git worktree add: ${worktreeOutput}`);
+  }
+
+  // Verify the worktree was actually created
+  if (!fs.existsSync(path.join(worktreePath, ".git"))) {
+    // Log diagnostic info
+    const list = exec(`git -C "${repoAbsPath}" worktree list`);
+    emit(`Worktree list after add: ${list}`);
+    throw new Error(
+      `git worktree add returned successfully but ${worktreePath}/.git does not exist. ` +
+      `repoAbsPath=${repoAbsPath}, branchName=${branchName}, baseBranch=origin/${baseBranch}`,
+    );
+  }
   emit(`Worktree ready at ${repoPathInput}`);
 
   return {

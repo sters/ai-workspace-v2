@@ -51,6 +51,7 @@ Your job:
 4. If anything else is unclear, use AskUserQuestion to ask the user
 
 ### Important Notes
+- **Do NOT browse, read, or analyze source code in the repositories.** Your sole input is the user's description (and ticket URL if provided). Repository code analysis happens in a later planning phase — not here.
 - Use the file path \`${input.workspacePath}/README.md\` for edits
 - Keep the template structure, just fill in the placeholder sections
 - The README should give clear context for agents that will work on this task later
