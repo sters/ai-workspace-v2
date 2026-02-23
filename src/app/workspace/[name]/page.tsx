@@ -38,7 +38,7 @@ function WorkspaceDetailContent({
 }) {
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
-  const { workspace, isLoading } = useWorkspace(decodedName);
+  const { workspace, isLoading, error } = useWorkspace(decodedName);
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -60,6 +60,13 @@ function WorkspaceDetailContent({
     setAutoAction(undefined);
   }, []);
 
+  // Redirect to dashboard when workspace disappears (e.g. after deletion)
+  useEffect(() => {
+    if (!isLoading && (!workspace || error)) {
+      router.replace("/");
+    }
+  }, [isLoading, workspace, error, router]);
+
   if (isLoading) {
     return <div className="animate-pulse space-y-4">
       <div className="h-8 w-1/3 rounded bg-muted" />
@@ -70,10 +77,7 @@ function WorkspaceDetailContent({
   if (!workspace) {
     return (
       <div>
-        <p className="mb-4 text-muted-foreground">Workspace not found.</p>
-        <Link href="/" className="text-sm underline">
-          Back to dashboard
-        </Link>
+        <p className="mb-4 text-muted-foreground">Workspace not found. Redirecting…</p>
       </div>
     );
   }

@@ -51,6 +51,12 @@ export default function RootLayout({
                     >
                       Workspace Prune
                     </Link>
+                    <Link
+                      href="/utilities/mcp-servers"
+                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                    >
+                      MCP Servers
+                    </Link>
                   </div>
                 </div>
               </nav>

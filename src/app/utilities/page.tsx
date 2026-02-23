@@ -7,6 +7,12 @@ const tools = [
     description:
       "Delete workspaces not modified within the specified number of days.",
   },
+  {
+    href: "/utilities/mcp-servers",
+    name: "MCP Servers",
+    description:
+      "View MCP servers configured for Claude Code across user, project, and local scopes.",
+  },
 ];
 
 export default function UtilitiesPage() {

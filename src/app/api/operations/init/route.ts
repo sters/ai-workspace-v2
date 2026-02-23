@@ -294,6 +294,6 @@ export async function POST(request: Request) {
     },
   ];
 
-  const operation = startOperationPipeline("init", description, phases);
+  const operation = startOperationPipeline("init", "", phases);
   return NextResponse.json(operation);
 }
