@@ -5,6 +5,10 @@ import { fileURLToPath } from "node:url";
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 function getGitHash() {
+  // When run via bunx, bin/start.mjs sets this from bun.lock
+  if (process.env.NEXT_PUBLIC_GIT_HASH) {
+    return process.env.NEXT_PUBLIC_GIT_HASH;
+  }
   try {
     return execFileSync("git", ["rev-parse", "--short", "HEAD"], {
       encoding: "utf-8",
