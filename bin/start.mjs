@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { existsSync, mkdirSync, cpSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, rmSync, readFileSync } from "node:fs";
 import { execFileSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { resolve, dirname, sep } from "node:path";
@@ -13,7 +13,16 @@ let packageDir = resolve(__dirname, "..");
 // When run via bunx, the package lives inside node_modules/ which breaks
 // Next.js TypeScript compilation (SWC skips TS for node_modules files).
 // Copy the project to a temp directory and install deps fresh.
+let resolvedGitHash = "";
 if (packageDir.includes(`${sep}node_modules${sep}`)) {
+  // Extract git hash from bunx temp bun.lock (e.g. "...#abc1234")
+  try {
+    const lockPath = resolve(packageDir, "..", "..", "bun.lock");
+    const lock = readFileSync(lockPath, "utf-8");
+    const match = lock.match(/ai-workspace-v2#([a-f0-9]+)/);
+    if (match) resolvedGitHash = match[1];
+  } catch {}
+
   const tempDir = resolve(tmpdir(), "ai-workspace-v2-app");
 
   // Reuse existing temp dir if it has a valid .next build
@@ -92,6 +101,10 @@ if (!isDev && !existsSync(resolve(packageDir, ".next"))) {
   execFileSync("bun", ["run", "build"], {
     cwd: packageDir,
     stdio: "inherit",
+    env: {
+      ...process.env,
+      ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
+    },
   });
 }
 
@@ -102,6 +115,7 @@ const child = spawn("bun", ["run", cmd], {
     ...process.env,
     AI_WORKSPACE_ROOT: root,
     PORT: "3741",
+    ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
   },
 });
 
