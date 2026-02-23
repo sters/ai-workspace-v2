@@ -23,13 +23,25 @@ bun run build && bun run start
 
 # Type checking
 bunx tsc --noEmit
+
+# Lint
+bun run lint
+
+# Run all tests
+bun run test
+
+# Run tests in watch mode
+bun run test:watch
+
+# Run a single test file
+bunx vitest run src/__tests__/lib/todo-parser.test.ts
 ```
 
 The app runs on port 3741. Set `AI_WORKSPACE_ROOT` env var to point to the ai-workspace root directory (containing `workspace/` and `repositories/`). When running via `bunx`, it can also be passed as a CLI argument or defaults to the current working directory.
 
 ## Architecture
 
-**Next.js 15 App Router** with React 19, TypeScript strict mode, Tailwind CSS 3, and SWR for data fetching. Uses `output: "standalone"` in next.config.ts. No testing framework is configured.
+**Next.js 15 App Router** with React 19, TypeScript strict mode, Tailwind CSS 3, and SWR for data fetching.
 
 ### Server-side: Reading workspace state from disk
 
@@ -87,7 +99,12 @@ Uses Tailwind with a shadcn/ui-style CSS variable theme system (`hsl(var(--prima
 - Path alias: `@/*` maps to `./src/*` (configured in `tsconfig.json`).
 - Types live in `src/types/` — `operation.ts` (Operation, OperationEvent, OperationType, OperationPhaseInfo) and `workspace.ts` (TodoItem, TodoFile, WorkspaceMeta, WorkspaceSummary, WorkspaceDetail, ReviewSession, HistoryEntry).
 - `bin/start.mjs` is the CLI entry point. Resolves `AI_WORKSPACE_ROOT` from args/env/cwd, validates workspace directory exists, then spawns `bun run dev` or `bun run start`.
-- `NEXT_PUBLIC_GIT_HASH` is injected at build time by `next.config.ts` for display in the sidebar.
+- `NEXT_PUBLIC_GIT_HASH` is injected at build time by `next.config.mjs` for display in the sidebar.
+- ESLint uses flat config (`eslint.config.mjs`) with typescript-eslint. Unused vars must be prefixed with `_` (both args and vars).
+
+## Testing
+
+Tests use **Vitest** with jsdom environment, `@testing-library/react`, and `@testing-library/jest-dom` matchers. Test files live in `src/__tests__/` mirroring the `src/` structure (e.g., `src/__tests__/lib/todo-parser.test.ts`). Vitest globals are enabled (no need to import `describe`/`it`/`expect`).
 
 ## Key Dependencies
 
