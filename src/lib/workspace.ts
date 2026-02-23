@@ -1,3 +1,4 @@
+import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR } from "./config";
@@ -173,7 +174,6 @@ export function getCommitDiff(name: string, hash: string): string | null {
   if (!/^[0-9a-f]{4,40}$/i.test(hash)) return null;
 
   try {
-    const { execSync } = require("node:child_process");
     return execSync(`git -C "${wsPath}" show ${hash} --format="" --patch`, {
       encoding: "utf-8",
       maxBuffer: 1024 * 1024,
@@ -188,7 +188,6 @@ export function getHistory(name: string): HistoryEntry[] {
   if (!fs.existsSync(path.join(wsPath, ".git"))) return [];
 
   try {
-    const { execSync } = require("node:child_process");
     const output = execSync(
       `git -C "${wsPath}" log --format="%H|%aI|%s|%an" -30`,
       { encoding: "utf-8" }

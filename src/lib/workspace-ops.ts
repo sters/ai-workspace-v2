@@ -384,8 +384,9 @@ export function setupRepository(
       : `${taskType}/${description}-${date}`;
   }
 
-  // Create worktree
-  const worktreePath = path.join(wsPath, repoPathInput);
+  // Create worktree — use absolute path so git -C doesn't resolve it
+  // relative to the repository directory
+  const worktreePath = path.resolve(path.join(wsPath, repoPathInput));
   fs.mkdirSync(path.dirname(worktreePath), { recursive: true });
 
   // If the branch already exists, resolve the conflict
@@ -419,6 +420,14 @@ export function setupRepository(
     }
   } catch {
     // Branch doesn't exist — good
+  }
+
+  // If the target directory already exists (e.g. from a previous failed attempt),
+  // remove it before creating the worktree
+  if (fs.existsSync(worktreePath)) {
+    emit(`Target directory already exists, removing: ${repoPathInput}`);
+    fs.rmSync(worktreePath, { recursive: true, force: true });
+    try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
   }
 
   emit(`Creating worktree: branch ${branchName} from origin/${baseBranch}`);
