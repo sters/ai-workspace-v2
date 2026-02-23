@@ -20,8 +20,6 @@ function getGitHash() {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "standalone",
-  outputFileTracingRoot: projectRoot,
   serverExternalPackages: ["@anthropic-ai/claude-agent-sdk"],
   env: {
     NEXT_PUBLIC_GIT_HASH: getGitHash(),
