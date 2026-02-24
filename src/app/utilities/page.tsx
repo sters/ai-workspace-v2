@@ -13,6 +13,18 @@ const tools = [
     description:
       "View MCP servers configured for Claude Code across user, project, and local scopes.",
   },
+  {
+    href: "/utilities/claude-version",
+    name: "Claude Version",
+    description:
+      "Display the currently installed Claude Code CLI version.",
+  },
+  {
+    href: "/utilities/claude-settings",
+    name: "Claude Settings",
+    description:
+      "View and edit .claude/settings*.json files across project, local, and user scopes.",
+  },
 ];
 
 export default function UtilitiesPage() {
