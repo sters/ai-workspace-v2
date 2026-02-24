@@ -35,7 +35,8 @@ Write the research report to: ${input.reportPath}
 
 ## Report Template
 
-${RESEARCH_REPORT_TEMPLATE}
+Read the research report template file at: workspace/${input.workspaceName}/research-report-template.md
+Use it as the base structure for the report.
 
 ## Instructions
 
@@ -86,40 +87,4 @@ const RESEARCHER_INSTRUCTIONS = `You are a specialized agent for performing cros
 - Be specific: reference exact file paths and line numbers
 - Be objective: report findings without bias
 - Be actionable: recommendations should be concrete
-`;
-
-const RESEARCH_REPORT_TEMPLATE = `# Research Report
-
-**Workspace**: {workspace_name}
-**Date**: {date}
-
-## Research Objectives
-
-{Objectives from README}
-
-## Repositories Analyzed
-
-| Repository | Path | Description |
-|------------|------|-------------|
-
-## Findings
-
-### {Repository Name}
-
-**Overview**: {Brief description}
-
-#### Structure
-#### Relevant Code
-#### Issues / Observations
-
-## Cross-Repository Analysis
-
-### Dependencies
-### Integration Points
-### Common Patterns
-### Gaps
-
-## Recommendations
-
-## Next Steps
 `;

@@ -6,10 +6,10 @@
     "ai-workspace-v2": "./bin/start.mjs"
   },
   "scripts": {
-    "dev": "bun next build && bun next start -p 3741",
-    "dev:hot": "bun next dev -p 3741",
-    "build": "bun next build",
-    "start": "bun next start -p 3741",
+    "dev": "bun --bun next build && bun --bun next start -p 3741",
+    "dev:hot": "bun --bun next dev -p 3741",
+    "build": "bun --bun next build",
+    "start": "bun --bun next start -p 3741",
     "lint": "eslint src/",
     "test": "vitest run",
     "test:watch": "vitest"

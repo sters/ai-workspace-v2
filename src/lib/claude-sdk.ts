@@ -21,6 +21,8 @@ try {
   cliPath = "claude";
 }
 
+export { cliPath };
+
 export interface ClaudeProcess {
   id: string;
   onEvent: (handler: (event: OperationEvent) => void) => void;

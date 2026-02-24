@@ -10,6 +10,7 @@ import {
   detectBaseBranch,
   getRepoChanges,
   prepareReviewDir,
+  writeReportTemplates,
 } from "@/lib/workspace-ops";
 import {
   buildCodeReviewerPrompt,
@@ -40,6 +41,9 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  // Write report templates (idempotent — ensures templates exist for older workspaces)
+  writeReportTemplates(wsPath);
 
   const reviewTimestamp = prepareReviewDir(workspace);
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);

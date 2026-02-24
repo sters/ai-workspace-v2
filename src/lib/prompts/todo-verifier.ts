@@ -31,9 +31,8 @@ ${input.todoContent}
 
 Write the verification report to: ${input.verifyFilePath}
 
-Use this template:
-
-${VERIFICATION_REPORT_TEMPLATE}
+Read the verification report template file at: workspace/${input.workspaceName}/verification-report-template.md
+Use it as the base structure for the report.
 
 ## Instructions
 
@@ -81,42 +80,3 @@ function verifierInstructions(worktreePath: string, baseBranch: string): string 
 4. Stay in scope: only verify completion status, never comment on code quality
 `;
 }
-
-const VERIFICATION_REPORT_TEMPLATE = `# TODO Verification: {repository_name}
-
-**Task**: {task_name}
-**Repository**: {repository_path}
-**Base Branch**: {base_branch}
-**Verification Date**: {timestamp}
-
-## Summary
-
-| Status | Count |
-|--------|-------|
-| Verified | {count} |
-| Unverified | {count} |
-| Partial | {count} |
-| Incomplete | {count} |
-| Unmarked | {count} |
-| Skipped | {count} |
-
-**Completion Rate**: {pct}% ({completed} / {total})
-
-## Verified Items
-
-## Partial Items
-
-## Issues Found
-
-### Unverified (marked done, no evidence)
-
-### Incomplete (not done)
-
-### Unmarked (done but not checked)
-
-## Skipped Items
-
-## Changed Files Reference
-
-## Recommendations
-`;

@@ -30,7 +30,8 @@ ${input.verifyFiles.map((f) => `- ${f}`).join("\n") || "(none)"}
 
 Write the summary to: ${input.reviewDir}/SUMMARY.md
 
-${SUMMARY_REPORT_TEMPLATE}
+Read the summary report template file at: workspace/${input.workspaceName}/summary-report-template.md
+Use it as the base structure for the report.
 
 ## Instructions
 
@@ -65,37 +66,4 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
 - Extract counts from patterns like "Critical Issues: X"
 - Prioritize critical issues in top priority list
 - Use relative paths in SUMMARY.md for markdown links
-`;
-
-const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
-
-**Workspace**: {workspace-name}
-**Review Date**: {timestamp}
-**Repositories Reviewed**: {count}
-
-## Overview
-
-{Brief overview}
-
-## Summary by Repository
-
-### {Repository Name}
-
-- **Review File**: [{filename}](./{filename})
-- **Overall Assessment**: {assessment}
-- **Critical Issues**: {count}
-- **Warnings**: {count}
-- **Suggestions**: {count}
-
-## Aggregate Statistics
-
-- **Total Critical Issues**: {sum}
-- **Total Warnings**: {sum}
-- **Total Suggestions**: {sum}
-
-## Top Priority Issues
-
-## Overall Recommendations
-
-## Conclusion
 `;

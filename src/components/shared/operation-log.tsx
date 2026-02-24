@@ -187,7 +187,7 @@ export function OperationLog({
       )}
 
       <div
-        className="max-h-[500px] overflow-auto rounded-lg border bg-card p-3 text-sm"
+        className="max-h-[500px] overflow-y-auto overflow-x-hidden rounded-lg border bg-card p-3 text-sm"
       >
         <div className="space-y-1.5">
           {nodes.map((node, i) =>
@@ -777,7 +777,7 @@ function EntryRow({ entry }: { entry: LogEntry }) {
       );
     case "system":
       return (
-        <div className="text-xs text-muted-foreground italic">
+        <div className="whitespace-pre-wrap break-words text-xs text-muted-foreground italic">
           {entry.content}
         </div>
       );

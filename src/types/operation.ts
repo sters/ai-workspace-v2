@@ -5,7 +5,8 @@ export type OperationType =
   | "create-pr"
   | "update-todo"
   | "delete"
-  | "workspace-prune";
+  | "workspace-prune"
+  | "mcp-auth";
 
 export interface OperationChild {
   id: string;

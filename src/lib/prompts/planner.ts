@@ -28,27 +28,13 @@ ${input.readmeContent}
 
 ## TODO Template
 
-${selectTemplate(input.taskType)}
+Read the TODO template file at: workspace/${input.workspaceName}/TODO-template.md
+Use it as the base structure for the TODO file. Replace \`{{REPOSITORY_NAME}}\` with the actual repository name.
 
 ## Instructions
 
 ${PLANNER_INSTRUCTIONS}
 `;
-}
-
-function selectTemplate(taskType: string): string {
-  switch (taskType.toLowerCase()) {
-    case "feature":
-    case "implementation":
-      return TODO_FEATURE_TEMPLATE;
-    case "bugfix":
-    case "bug":
-      return TODO_BUGFIX_TEMPLATE;
-    case "research":
-      return TODO_RESEARCH_TEMPLATE;
-    default:
-      return TODO_DEFAULT_TEMPLATE;
-  }
 }
 
 const PLANNER_INSTRUCTIONS = `You are a specialized agent for creating TODO items. Your role is to understand the workspace objectives, assess how much repository analysis is needed, and create actionable TODO items that guide the executor.
@@ -61,7 +47,8 @@ const PLANNER_INSTRUCTIONS = `You are a specialized agent for creating TODO item
    - Understand what task needs to be accomplished
    - Identify task type, requirements, and acceptance criteria
 
-2. **Use the TODO Template** (provided above):
+2. **Use the TODO Template**:
+   - Read the TODO template file specified above
    - Write the template to the workspace as the TODO file
    - Replace \`{{REPOSITORY_NAME}}\` with the actual repository name
 
@@ -114,171 +101,4 @@ Each TODO item MUST follow this structured format:
 If Mode is "interactive", pause at two checkpoints:
 1. After analysis, present findings and proposed approach (ask user before creating TODOs)
 2. After creating draft TODOs, present for review (ask user before finalizing)
-`;
-
-const TODO_FEATURE_TEMPLATE = `# TODO: {{REPOSITORY_NAME}}
-
-## Initialize
-
-- [ ] **[README.md]** Read repository documentation
-  - Target: \`README.md\`
-  - Action: Understand project overview, setup, and development workflow
-
-- [ ] **[CLAUDE.md]** Read AI-specific instructions (if exists)
-  - Target: \`CLAUDE.md\`
-  - Action: Identify build/test/lint commands and coding conventions
-
-- [ ] **[CONTRIBUTING.md]** Read contribution guidelines (if exists)
-  - Target: \`CONTRIBUTING.md\`
-  - Action: Understand PR process and code style requirements
-
-## Implementation Tasks
-
-- [ ] **[TBD]** (Replace with specific implementation tasks)
-  - Target: (Specify exact file path)
-  - Action: (Describe exactly what to add/modify)
-  - Pattern: (Reference existing similar code if applicable)
-
-- [ ] **[TBD]** (Replace with specific test tasks)
-  - Target: (Specify test file path)
-  - Action: (Describe test cases to add)
-  - Verify: (Specify test command)
-
-## Verification
-
-- [ ] **[Repository]** Run test suite
-  - Target: Repository root
-  - Action: Execute test command from CLAUDE.md/README.md or \`make test\`
-  - Verify: All tests pass
-
-- [ ] **[Repository]** Run linter
-  - Target: Repository root
-  - Action: Execute lint command from CLAUDE.md/README.md or \`make lint\`
-  - Verify: No lint errors
-
-## Finalize
-
-- [ ] **[Git]** Commit changes
-  - Target: Git repository
-  - Action: Review \`git log\` for commit message style, then commit with descriptive message
-
-## Notes
-
-<!-- Add any notes, blockers, dependencies, or additional context here -->
-`;
-
-const TODO_BUGFIX_TEMPLATE = `# TODO: {{REPOSITORY_NAME}}
-
-## Initialize
-
-- [ ] **[README.md]** Read repository documentation
-  - Target: \`README.md\`
-  - Action: Understand project overview, setup, and development workflow
-
-- [ ] **[CLAUDE.md]** Read AI-specific instructions (if exists)
-  - Target: \`CLAUDE.md\`
-  - Action: Identify build/test/lint commands and coding conventions
-
-## Bug Investigation
-
-- [ ] **[TBD]** Reproduce the bug locally
-  - Target: (Specify file/endpoint/component where bug occurs)
-  - Action: (Describe exact steps to reproduce)
-  - Verify: (Describe expected vs actual behavior)
-
-- [ ] **[TBD]** Identify root cause
-  - Target: (Specify suspected file/function)
-  - Action: (Describe what to investigate)
-
-## Bug Fix Tasks
-
-- [ ] **[TBD]** (Replace with specific fix implementation)
-  - Target: (Specify exact file path)
-  - Action: (Describe exactly what to change and why)
-
-- [ ] **[TBD]** Add regression test
-  - Target: (Specify test file path)
-  - Action: (Describe test case that would have caught this bug)
-  - Verify: Test fails without fix, passes with fix
-
-## Verification
-
-- [ ] **[Repository]** Run test suite
-  - Target: Repository root
-  - Action: Execute test command from CLAUDE.md/README.md or \`make test\`
-  - Verify: All tests pass (including new regression test)
-
-- [ ] **[Repository]** Run linter
-  - Target: Repository root
-  - Action: Execute lint command from CLAUDE.md/README.md or \`make lint\`
-  - Verify: No lint errors
-
-## Finalize
-
-- [ ] **[Git]** Commit changes
-  - Target: Git repository
-  - Action: Review \`git log\` for commit message style, then commit with descriptive message
-
-## Notes
-
-<!-- Add any notes, blockers, dependencies, or additional context here -->
-`;
-
-const TODO_RESEARCH_TEMPLATE = `# TODO: {{REPOSITORY_NAME}}
-
-## Initialize
-
-- [ ] **[README.md]** Read repository documentation
-  - Target: \`README.md\`
-  - Action: Understand project overview and architecture
-
-- [ ] **[CLAUDE.md]** Read AI-specific instructions (if exists)
-  - Target: \`CLAUDE.md\`
-  - Action: Identify project conventions and tooling
-
-## Research Tasks
-
-- [ ] **[TBD]** (Replace with specific investigation task)
-  - Target: (Specify files/docs to analyze)
-  - Action: (Describe what to find out)
-
-## Documentation
-
-- [ ] **[Workspace README.md]** Document findings
-  - Target: Workspace README.md
-  - Action: Add research findings under a Findings section
-
-## Notes
-
-<!-- Add any notes, blockers, or additional context here -->
-`;
-
-const TODO_DEFAULT_TEMPLATE = `# TODO: {{REPOSITORY_NAME}}
-
-## Initialize
-
-- [ ] **[README.md]** Read repository documentation
-  - Target: \`README.md\`
-  - Action: Understand project overview, setup, and development workflow
-
-- [ ] **[CLAUDE.md]** Read AI-specific instructions (if exists)
-  - Target: \`CLAUDE.md\`
-  - Action: Identify build/test/lint commands and coding conventions
-
-## Tasks
-
-- [ ] **[TBD]** (Replace with specific task)
-  - Target: (Specify exact file/component)
-  - Action: (Describe exactly what to do)
-
-## Verification
-
-- [ ] **[Repository]** Run test suite (if applicable)
-  - Target: Repository root
-  - Action: Execute test command from CLAUDE.md/README.md
-  - Verify: All tests pass
-
-## Notes
-
-<!-- Add any notes, blockers, dependencies, or additional context here -->
 `;
