@@ -3,20 +3,42 @@
 import { useState, useCallback, useEffect } from "react";
 import type { HistoryEntry } from "@/types/workspace";
 import { useHistory } from "@/hooks/use-workspace";
+import { MonacoEditorLazy } from "@/components/shared/monaco-editor-lazy";
+import type { BeforeMount } from "@monaco-editor/react";
 
-function DiffLine({ line }: { line: string }) {
-  let className = "whitespace-pre-wrap break-all";
-  if (line.startsWith("+")) {
-    className += " text-green-600 bg-green-50 dark:text-green-400 dark:bg-green-950";
-  } else if (line.startsWith("-")) {
-    className += " text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-950";
-  } else if (line.startsWith("@@")) {
-    className += " text-blue-600 dark:text-blue-400";
-  } else if (line.startsWith("diff ")) {
-    className += " font-bold text-muted-foreground";
+const DIFF_THEME = "unified-diff-theme";
+const DIFF_LANG = "unified-diff";
+
+const handleBeforeMount: BeforeMount = (monaco) => {
+  if (!monaco.languages.getLanguages().some((l: { id: string }) => l.id === DIFF_LANG)) {
+    monaco.languages.register({ id: DIFF_LANG });
+    monaco.languages.setMonarchTokensProvider(DIFF_LANG, {
+      tokenizer: {
+        root: [
+          [/^diff .*$/, "diff-meta"],
+          [/^index .*$/, "diff-meta"],
+          [/^---.*$/, "diff-meta"],
+          [/^\+\+\+.*$/, "diff-meta"],
+          [/^@@.*@@.*$/, "diff-hunk"],
+          [/^\+.*$/, "diff-added"],
+          [/^-.*$/, "diff-removed"],
+        ],
+      },
+    });
   }
-  return <div className={className}>{line}</div>;
-}
+
+  monaco.editor.defineTheme(DIFF_THEME, {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "diff-added", foreground: "4EC969" },
+      { token: "diff-removed", foreground: "F85149" },
+      { token: "diff-hunk", foreground: "79C0FF" },
+      { token: "diff-meta", foreground: "8B949E", fontStyle: "bold" },
+    ],
+    colors: {},
+  });
+};
 
 function CommitDiff({
   workspaceName,
@@ -65,14 +87,28 @@ function CommitDiff({
     );
   }
 
-  const lines = diff.split("\n");
+  return <DiffViewer diff={diff} />;
+}
+
+function DiffViewer({ diff }: { diff: string }) {
+  const lineCount = diff.split("\n").length;
+  const height = Math.min(384, Math.max(100, lineCount * 18));
 
   return (
-    <pre className="mt-2 max-h-96 overflow-auto rounded border border-border bg-muted/50 p-2 text-xs leading-relaxed">
-      {lines.map((line, i) => (
-        <DiffLine key={i} line={line} />
-      ))}
-    </pre>
+    <div className="mt-2 rounded border border-border" style={{ height }}>
+      <MonacoEditorLazy
+        language={DIFF_LANG}
+        value={diff}
+        theme={DIFF_THEME}
+        beforeMount={handleBeforeMount}
+        options={{
+          readOnly: true,
+          lineNumbers: "on",
+          renderLineHighlight: "none",
+          folding: false,
+        }}
+      />
+    </div>
   );
 }
 

@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import useSWR from "swr";
+import { MonacoEditorLazy } from "@/components/shared/monaco-editor-lazy";
+import type { editor } from "monaco-editor";
 
 type SettingsEntry = {
   scope: string;
@@ -43,6 +45,7 @@ function EditorCard({
   const [value, setValue] = useState(entry.content ?? "");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   useEffect(() => {
     setValue(entry.content ?? "");
@@ -97,15 +100,18 @@ function EditorCard({
         <p className="mb-2 text-xs text-destructive">{entry.error}</p>
       )}
 
-      <textarea
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        className={`w-full rounded-md border bg-background p-3 font-mono text-sm ${
-          value.trim() && !valid ? "border-red-500" : ""
-        }`}
-        rows={16}
-        placeholder="{}"
-      />
+      <div className={`h-80 rounded-md border ${value.trim() && !valid ? "border-red-500" : ""}`}>
+        <MonacoEditorLazy
+          language="json"
+          value={value}
+          onChange={(v) => setValue(v ?? "")}
+          onEditorReady={(ed) => { editorRef.current = ed; }}
+          options={{
+            renderLineHighlight: "none",
+            folding: false,
+          }}
+        />
+      </div>
 
       {saveError && (
         <p className="mt-1 text-xs text-destructive">{saveError}</p>
