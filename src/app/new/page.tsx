@@ -60,7 +60,7 @@ function InitNextActions({ workspace }: { workspace: string }) {
       <p className="mb-2 text-sm font-medium text-foreground">Next steps</p>
       <div className="flex flex-wrap gap-2">
         <Link
-          href={`/workspace/${encodeURIComponent(workspace)}?action=execute`}
+          href={`/workspace/${encodeURIComponent(workspace)}/operations?action=execute`}
           className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           Execute

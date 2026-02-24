@@ -93,9 +93,10 @@ export function NextActionSuggestions({
 
   const handleClick = (action: NextAction) => {
     if (useNavigation && OPERATIONS_TAB_ACTIONS.has(action.type)) {
-      // Navigate to the workspace page with ?action= to auto-trigger in Operations tab
-      // pathname is already /workspace/[name], just append the query param
-      router.push(`${pathname}?action=${action.type}`);
+      // Navigate to the operations sub-route with ?action= to auto-trigger
+      // pathname may be /workspace/[name] or /workspace/[name]/todo etc.
+      const basePath = pathname.split("/").slice(0, 3).join("/");
+      router.push(`${basePath}/operations?action=${action.type}`);
     } else {
       onStart(action.type, action.body);
     }

@@ -2,9 +2,9 @@
 
 import { use } from "react";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { ReadmeViewer } from "@/components/workspace/readme-viewer";
+import { ReviewViewer } from "@/components/workspace/review-viewer";
 
-export default function WorkspaceOverviewPage({
+export default function WorkspaceReviewPage({
   params,
 }: {
   params: Promise<{ name: string }>;
@@ -15,5 +15,7 @@ export default function WorkspaceOverviewPage({
 
   if (!workspace) return null;
 
-  return <ReadmeViewer content={workspace.readme} />;
+  return (
+    <ReviewViewer workspaceName={decodedName} reviews={workspace.reviews} />
+  );
 }

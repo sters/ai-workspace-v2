@@ -2,9 +2,9 @@
 
 import { use } from "react";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { ReadmeViewer } from "@/components/workspace/readme-viewer";
+import { TodoUpdater } from "@/components/workspace/todo-updater";
 
-export default function WorkspaceOverviewPage({
+export default function WorkspaceTodoPage({
   params,
 }: {
   params: Promise<{ name: string }>;
@@ -15,5 +15,11 @@ export default function WorkspaceOverviewPage({
 
   if (!workspace) return null;
 
-  return <ReadmeViewer content={workspace.readme} />;
+  return (
+    <TodoUpdater
+      todos={workspace.todos}
+      workspacePath={workspace.path}
+      workspaceName={decodedName}
+    />
+  );
 }
