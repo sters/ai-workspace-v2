@@ -57,6 +57,18 @@ export default function RootLayout({
                     >
                       MCP Servers
                     </Link>
+                    <Link
+                      href="/utilities/claude-version"
+                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                    >
+                      Claude Version
+                    </Link>
+                    <Link
+                      href="/utilities/claude-settings"
+                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                    >
+                      Claude Settings
+                    </Link>
                   </div>
                 </div>
               </nav>
