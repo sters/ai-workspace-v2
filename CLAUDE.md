@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Web UI dashboard for [ai-workspace](https://github.com/sters/ai-workspace), a multi-repository workspace manager for Claude Code. Provides a browser interface on `localhost:3741` to view workspace status, TODO progress, reviews, git history, and trigger operations (init, execute, review, create-pr, etc.) that run Claude Code via the `@anthropic-ai/claude-agent-sdk`.
+Web UI dashboard for [ai-workspace](https://github.com/sters/ai-workspace), a multi-repository workspace manager for Claude Code. Provides a browser interface on `localhost:3741` to view workspace status, TODO progress, reviews, git history, and trigger operations (init, execute, review, create-pr, etc.) that run Claude Code via `Bun.spawn` + `claude -p --output-format stream-json` (with SDK fallback via `CLAUDE_USE_CLI=false`).
 
 ## Commands
 
@@ -53,9 +53,11 @@ API routes under `src/app/api/` read workspace data directly from the filesystem
 
 ### Server-side: Running Claude Code operations
 
-Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes via the SDK:
+Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes via `Bun.spawn`:
 
-- **`src/lib/claude-sdk.ts`** — Wraps `@anthropic-ai/claude-agent-sdk`'s `query()` function. Resolves the `claude` CLI path, auto-approves all tools via `canUseTool`, and handles `AskUserQuestion` interactively by blocking until the browser user answers.
+- **`src/lib/claude-cli.ts`** — Spawns `claude -p` with `--output-format stream-json` via `Bun.spawn`. Streams events in the same format as the SDK. Handles `AskUserQuestion` by detecting permission denials and using `--resume {session_id}` to inject answers and continue.
+- **`src/lib/claude.ts`** — Facade that delegates to CLI (`claude-cli.ts`, default) or SDK (`claude-sdk.ts`, set `CLAUDE_USE_CLI=false`).
+- **`src/lib/claude-sdk.ts`** — Legacy SDK wrapper using `@anthropic-ai/claude-agent-sdk`'s `query()` function. Resolves the `claude` CLI path, auto-approves all tools via `canUseTool`, and handles `AskUserQuestion` interactively by blocking until the browser user answers.
 - **`src/lib/process-manager.ts`** — Pipeline orchestration engine. Each operation is a sequence of `PipelinePhase`s (single child, parallel group, or TypeScript function). Function phases get a rich context (`ctx`) with helpers: `emitStatus`, `emitResult`, `emitAsk` (prompt user and await answer), `runChild`, `runChildGroup`, `setWorkspace`. Stores all state (`ManagedOperation` map, counter) on `globalThis` to survive HMR in dev.
 - **`src/lib/workspace-ops.ts`** — TypeScript equivalents of shell scripts: task analysis, workspace/repo setup (git clone, worktree creation), workspace snapshot commits. All paths relative to `AI_WORKSPACE_ROOT`.
 - **`src/lib/prompts/`** — Prompt builder functions for each agent type (planner, executor, coordinator, reviewer, code-reviewer, todo-verifier, pr-creator, researcher, updater, collector, init-readme). Each exports a `build*Prompt(input)` function.
@@ -66,7 +68,7 @@ Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes 
 - **`src/hooks/use-workspaces.ts`** / **`use-workspace.ts`** — SWR hooks with auto-refresh (10s list, 5s detail) for workspace data.
 - **`src/hooks/use-operation.ts`** — Operation lifecycle hook. Persists active operation ID to localStorage (`aiw-op:{key}`) so navigating away and returning reconnects to the SSE stream. Detects `__setWorkspace:` and `__phaseUpdate:` control events from the server.
 - **`src/hooks/use-sse.ts`** — EventSource hook for streaming operation output from `/api/events`.
-- **`src/lib/stream-parser.ts`** — Converts raw SDK messages into typed `LogEntry` objects for rendering (text, thinking, tool calls, tool results, ask prompts, system events, etc.).
+- **`src/lib/stream-parser.ts`** — Converts raw `stream-json` messages (from CLI or SDK) into typed `LogEntry` objects for rendering (text, thinking, tool calls, tool results, ask prompts, system events, etc.).
 - **Components** — `workspace-list.tsx` (dashboard), `workspace-card.tsx` (summary card), `operation-panel.tsx` / `operation-log.tsx` / `claude-operation.tsx` (operation UI with log streaming and render-prop pattern), `init-dialog.tsx` (new workspace form).
 
 ### Pages
@@ -113,7 +115,7 @@ Tests use **Vitest** with jsdom environment, `@testing-library/react`, and `@tes
 
 ## Key Dependencies
 
-- `@anthropic-ai/claude-agent-sdk` — Runs Claude Code headlessly; marked as `serverExternalPackages` in next.config.ts
+- `@anthropic-ai/claude-agent-sdk` — Legacy SDK for running Claude Code headlessly (used when `CLAUDE_USE_CLI=false`); marked as `serverExternalPackages` in next.config.ts
 - `swr` — Client-side data fetching with automatic revalidation
 - `react-markdown` + `remark-gfm` — Markdown rendering
 - `lucide-react` — Icons

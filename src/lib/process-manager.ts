@@ -4,7 +4,7 @@ import type {
   OperationPhaseInfo,
   OperationType,
 } from "@/types/operation";
-import { runClaude, type ClaudeProcess } from "./claude-sdk";
+import { runClaude, type ClaudeProcess } from "./claude";
 
 // ---------------------------------------------------------------------------
 // Internal types
