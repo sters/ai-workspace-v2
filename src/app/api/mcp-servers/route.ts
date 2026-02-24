@@ -4,6 +4,8 @@ import path from "node:path";
 import os from "node:os";
 import { AI_WORKSPACE_ROOT } from "@/lib/config";
 
+export const dynamic = "force-dynamic";
+
 type McpStdioServerConfig = {
   type?: "stdio";
   command: string;

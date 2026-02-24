@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { execSync } from "node:child_process";
 import { AI_WORKSPACE_ROOT } from "@/lib/config";
 
+export const dynamic = "force-dynamic";
+
 export type McpConnectionStatus = {
   name: string;
   status: "ok" | "needs_auth" | "error" | "unknown";
