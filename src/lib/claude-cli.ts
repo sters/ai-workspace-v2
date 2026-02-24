@@ -10,6 +10,10 @@ import type { OperationEvent } from "@/types/operation";
 // Maximum argument length before falling back to stdin (ARG_MAX safety margin)
 const MAX_PROMPT_ARG_LENGTH = 200_000;
 
+// Minimal shape of a stream-json event for internal inspection
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type StreamEvent = Record<string, any>;
+
 function log(operationId: string, ...args: unknown[]) {
   console.log(`[claude-cli][${operationId}]`, ...args);
 }
@@ -87,65 +91,60 @@ export function runClaude(
 
           buffer += decoder.decode(value, { stream: true });
 
-          // Process complete lines
-          let newlineIndex: number;
-          while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
-            const line = buffer.slice(0, newlineIndex).trim();
-            buffer = buffer.slice(newlineIndex + 1);
-            if (!line) continue;
+          // Use Bun.JSONL.parseChunk for incremental JSONL parsing
+          const result = Bun.JSONL.parseChunk(buffer);
+          if (result.read > 0) {
+            buffer = buffer.slice(result.read);
+          }
 
-            // Parse JSON to extract session_id and detect AskUserQuestion
-            try {
-              const parsed = JSON.parse(line);
+          for (const parsed of result.values as StreamEvent[]) {
+            // Record session_id from system/init event
+            if (parsed.type === "system" && parsed.session_id) {
+              sessionId = parsed.session_id;
+              log(operationId, "session_id:", sessionId);
+            }
 
-              // Record session_id from system/init event
-              if (parsed.type === "system" && parsed.session_id) {
-                sessionId = parsed.session_id;
-                log(operationId, "session_id:", sessionId);
-              }
-
-              // Detect AskUserQuestion tool_use in assistant messages
-              if (parsed.type === "assistant" && parsed.message?.content) {
-                for (const block of parsed.message.content) {
-                  if (block.type === "tool_use" && block.name === "AskUserQuestion") {
-                    pendingAskToolUseId = block.id;
-                    log(operationId, "AskUserQuestion detected, toolUseId:", block.id);
-                  }
+            // Detect AskUserQuestion tool_use in assistant messages
+            if (parsed.type === "assistant" && parsed.message?.content) {
+              for (const block of parsed.message.content) {
+                if (block.type === "tool_use" && block.name === "AskUserQuestion") {
+                  pendingAskToolUseId = block.id;
+                  log(operationId, "AskUserQuestion detected, toolUseId:", block.id);
                 }
               }
+            }
 
-              // Check result for AskUserQuestion permission denial
-              if (parsed.type === "result" && pendingAskToolUseId) {
-                const hasAskDenial = parsed.permission_denials?.some(
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (d: any) => d.tool_name === "AskUserQuestion"
-                );
-                if (hasAskDenial) {
-                  log(operationId, "AskUserQuestion permission denied, will wait for answer");
-                }
+            // Check result for AskUserQuestion permission denial
+            if (parsed.type === "result" && pendingAskToolUseId) {
+              const hasAskDenial = parsed.permission_denials?.some(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (d: any) => d.tool_name === "AskUserQuestion"
+              );
+              if (hasAskDenial) {
+                log(operationId, "AskUserQuestion permission denied, will wait for answer");
               }
-            } catch {
-              // Not valid JSON — emit as raw
             }
 
             emit({
               type: "output",
               operationId,
-              data: line,
+              data: JSON.stringify(parsed),
               timestamp: new Date().toISOString(),
             });
           }
         }
 
         // Flush remaining buffer
-        const remaining = buffer.trim();
-        if (remaining) {
-          emit({
-            type: "output",
-            operationId,
-            data: remaining,
-            timestamp: new Date().toISOString(),
-          });
+        if (buffer.trim()) {
+          const final = Bun.JSONL.parseChunk(buffer);
+          for (const parsed of final.values as StreamEvent[]) {
+            emit({
+              type: "output",
+              operationId,
+              data: JSON.stringify(parsed),
+              timestamp: new Date().toISOString(),
+            });
+          }
         }
       } catch (err) {
         if (!killed) {
