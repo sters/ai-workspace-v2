@@ -122,7 +122,7 @@ export async function POST(request: Request) {
           })),
         });
 
-        return ctx.runChild("Fill README", prompt, { cwd: wsPath });
+        return ctx.runChild("Fill README", prompt);
       },
     },
     // Phase D: Detect task type and setup any additional repos from README
@@ -188,7 +188,6 @@ export async function POST(request: Request) {
             worktreePath: repo.worktreePath,
             taskType: meta.taskType,
           }),
-          options: { cwd: wsPath },
         }));
 
         ctx.emitStatus(`Planning TODOs for ${children.length} repositories`);
@@ -237,7 +236,7 @@ export async function POST(request: Request) {
         });
 
         ctx.emitStatus("Coordinating TODOs across repositories");
-        return ctx.runChild("Coordinate TODOs", prompt, { cwd: wsPath });
+        return ctx.runChild("Coordinate TODOs", prompt);
       },
     },
     // Phase G: Review TODOs (parallel, per repo)
@@ -267,7 +266,6 @@ export async function POST(request: Request) {
                 todoContent,
                 worktreePath: repo.worktreePath,
               }),
-              options: { cwd: wsPath },
             };
           })
           .filter((c): c is NonNullable<typeof c> => c !== null);

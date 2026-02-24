@@ -80,7 +80,6 @@ export async function POST(request: Request) {
         repoChanges: `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`,
         reviewFilePath: path.join(reviewDir, reviewFileName),
       }),
-      options: { cwd: repo.worktreePath },
     });
 
     // TODO verifier
@@ -102,7 +101,6 @@ export async function POST(request: Request) {
         worktreePath: repo.worktreePath,
         verifyFilePath: path.join(reviewDir, verifyFileName),
       }),
-      options: { cwd: repo.worktreePath },
     });
   }
 
@@ -130,7 +128,7 @@ export async function POST(request: Request) {
           verifyFiles: actualVerifyFiles.map((f) => path.join(reviewDir, f)),
         });
 
-        return ctx.runChild("Collect reviews", prompt, { cwd: wsPath });
+        return ctx.runChild("Collect reviews", prompt);
       },
     },
   ];

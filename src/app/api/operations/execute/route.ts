@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     });
 
     const operation = startOperationPipeline("execute", workspace, [
-      { kind: "single", label: "Research", prompt, options: { cwd: wsPath } },
+      { kind: "single", label: "Research", prompt },
     ]);
     return NextResponse.json(operation);
   }
@@ -77,7 +77,6 @@ export async function POST(request: Request) {
     return {
       label: repo.repoName,
       prompt,
-      options: { cwd: repo.worktreePath },
     };
   });
 

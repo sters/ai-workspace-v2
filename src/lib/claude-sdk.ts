@@ -30,11 +30,6 @@ export interface ClaudeProcess {
   submitAnswer: (toolUseId: string, answers: Record<string, string>) => boolean;
 }
 
-export interface RunClaudeOptions {
-  /** Working directory override. Defaults to AI_WORKSPACE_ROOT. */
-  cwd?: string;
-}
-
 function log(operationId: string, ...args: unknown[]) {
   console.log(`[claude-sdk][${operationId}]`, ...args);
 }
@@ -42,7 +37,6 @@ function log(operationId: string, ...args: unknown[]) {
 export function runClaude(
   operationId: string,
   prompt: string,
-  options?: RunClaudeOptions
 ): ClaudeProcess {
   const handlers: ((event: OperationEvent) => void)[] = [];
   const earlyEvents: OperationEvent[] = [];
@@ -62,7 +56,7 @@ export function runClaude(
     }
   };
 
-  const cwd = options?.cwd ?? AI_WORKSPACE_ROOT;
+  const cwd = AI_WORKSPACE_ROOT;
 
   log(operationId, "starting SDK query");
   log(operationId, "cwd:", cwd);
