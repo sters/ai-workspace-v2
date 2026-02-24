@@ -10,7 +10,7 @@
     "dev:hot": "bun --bun next dev -p 3741",
     "build": "bun --bun next build",
     "start": "bun --bun next start -p 3741",
-    "lint": "eslint src/",
+    "lint": "tsc --noEmit && eslint src/",
     "test": "vitest run",
     "test:watch": "vitest"
   },
