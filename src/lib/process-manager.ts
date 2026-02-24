@@ -4,7 +4,7 @@ import type {
   OperationPhaseInfo,
   OperationType,
 } from "@/types/operation";
-import { runClaude, type ClaudeProcess, type RunClaudeOptions } from "./claude-sdk";
+import { runClaude, type ClaudeProcess } from "./claude-sdk";
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -149,14 +149,12 @@ function emitPhaseUpdate(
 export interface GroupChild {
   label: string;
   prompt: string;
-  options?: RunClaudeOptions;
 }
 
 export interface PipelinePhaseSingle {
   kind: "single";
   label: string;
   prompt: string;
-  options?: RunClaudeOptions;
 }
 
 export interface PipelinePhaseGroup {
@@ -185,7 +183,7 @@ export interface PhaseFunctionContext {
   /** Update the operation's workspace identifier. Notifies the FE via a special event. */
   setWorkspace: (workspace: string) => void;
   /** Run a single Claude child query and wait for completion. */
-  runChild: (label: string, prompt: string, options?: RunClaudeOptions) => Promise<boolean>;
+  runChild: (label: string, prompt: string) => Promise<boolean>;
   /** Run multiple Claude child queries in parallel and wait for all to complete. */
   runChildGroup: (children: GroupChild[]) => Promise<boolean[]>;
 }
@@ -331,17 +329,17 @@ export function startOperationPipeline(
                 });
               });
             },
-            runChild: (label, prompt, opts) => {
+            runChild: (label, prompt) => {
               const cid = `${id}-phase-${i}-fn-${childCounter++}`;
               operation.children!.push({ id: cid, label, status: "running" });
-              const proc = runClaude(cid, prompt, opts);
+              const proc = runClaude(cid, prompt);
               return wireChild(managed, cid, label, proc, phaseExtra);
             },
             runChildGroup: (children) => {
               const promises = children.map((child) => {
                 const cid = `${id}-phase-${i}-fn-${childCounter++}`;
                 operation.children!.push({ id: cid, label: child.label, status: "running" });
-                const proc = runClaude(cid, child.prompt, child.options);
+                const proc = runClaude(cid, child.prompt);
                 return wireChild(managed, cid, child.label, proc, phaseExtra);
               });
               return Promise.all(promises);
@@ -359,7 +357,7 @@ export function startOperationPipeline(
         emitStatus(managed, `Phase ${phaseNum}/${phases.length}: ${phase.label}`, phaseExtra);
         const childId = `${id}-phase-${i}`;
         operation.children!.push({ id: childId, label: phase.label, status: "running" });
-        const process = runClaude(childId, phase.prompt, phase.options);
+        const process = runClaude(childId, phase.prompt);
         phaseSuccess = await wireChild(managed, childId, phase.label, process, phaseExtra);
 
       } else {
@@ -370,7 +368,7 @@ export function startOperationPipeline(
         const groupPromises = phase.children.map((child, j) => {
           const childId = `${id}-phase-${i}-child-${j}`;
           operation.children!.push({ id: childId, label: child.label, status: "running" });
-          const process = runClaude(childId, child.prompt, child.options);
+          const process = runClaude(childId, child.prompt);
           return wireChild(managed, childId, child.label, process, phaseExtra);
         });
 

@@ -60,7 +60,6 @@ export async function POST(request: Request) {
     return {
       label: repo.repoName,
       prompt,
-      options: { cwd: repo.worktreePath },
     };
   });
 
