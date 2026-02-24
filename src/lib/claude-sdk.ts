@@ -78,8 +78,8 @@ export function runClaude(
           abortController,
           cwd,
           pathToClaudeCodeExecutable: cliPath,
-          // Only use user settings — no .claude/ project settings needed
-          settingSources: ["user"],
+          // Load user settings and project settings (CLAUDE.md, .mcp.json, .claude/settings.json)
+          settingSources: ["user", "project"],
           // Use canUseTool to auto-approve all tools and handle AskUserQuestion interactively
           canUseTool: async (toolName, input, options) => {
             if (toolName === "AskUserQuestion") {

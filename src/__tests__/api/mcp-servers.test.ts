@@ -14,10 +14,11 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 vi.mock("node:os", async () => {
-  const actual = await vi.importActual<typeof import("node:os")>("node:os");
+  const actual = await vi.importActual("node:os");
   return {
-    ...actual,
-    default: { ...actual.default, homedir: () => "/mock-home" },
+    ...(actual as Record<string, unknown>),
+    default: { ...(actual as Record<string, unknown>), homedir: () => "/mock-home" },
+    homedir: () => "/mock-home",
   };
 });
 
