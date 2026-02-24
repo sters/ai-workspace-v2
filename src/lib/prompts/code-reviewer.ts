@@ -36,9 +36,8 @@ ${input.repoChanges}
 
 Write the review report to: ${input.reviewFilePath}
 
-Use this template structure:
-
-${REVIEW_REPORT_TEMPLATE}
+Read the review report template file at: workspace/${input.workspaceName}/review-report-template.md
+Use it as the base structure for the report.
 
 ## Instructions
 
@@ -86,53 +85,4 @@ const CODE_REVIEWER_INSTRUCTIONS = `You are a specialized agent for reviewing co
 - Be thorough: read full context
 - Be specific: reference exact line numbers
 - Consider context: understand task requirements
-`;
-
-const REVIEW_REPORT_TEMPLATE = `# Code Review: {repository_name}
-
-**Task**: {task_name}
-**Repository**: {repository_path}
-**Base Branch**: {base_branch}
-**Review Date**: {timestamp}
-
-## Summary
-
-{Brief overview of changes}
-
-## Changed Files
-
-{List of changed files}
-
-## Detailed Review
-
-### {File Path}
-
-**Change Type**: Added/Modified/Deleted
-**Summary**: {What changed}
-
-#### Critical Issues
-- {Issue description}
-
-#### Warnings
-- {Warning description}
-
-#### Suggestions
-- {Suggestion}
-
-#### Positive Feedback
-- {Good practice}
-
-## Overall Assessment
-
-**Code Quality**: {Rating}
-**Test Coverage**: {Assessment}
-**Security**: {Assessment}
-
-## Recommendations
-
-1. {Recommendation}
-
-## Conclusion
-
-{Final assessment}
 `;

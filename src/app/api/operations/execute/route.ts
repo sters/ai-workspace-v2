@@ -5,7 +5,7 @@ import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline } from "@/lib/process-manager";
 import { getReadme } from "@/lib/workspace";
 import { parseReadmeMeta } from "@/lib/readme-parser";
-import { listWorkspaceRepos } from "@/lib/workspace-ops";
+import { listWorkspaceRepos, writeReportTemplates } from "@/lib/workspace-ops";
 import { buildExecutorPrompt, buildResearcherPrompt } from "@/lib/prompts";
 
 export async function POST(request: Request) {
@@ -35,6 +35,9 @@ export async function POST(request: Request) {
     meta.taskType === "research" || meta.taskType === "investigation";
 
   if (isResearch) {
+    // Write report templates (idempotent — ensures templates exist for older workspaces)
+    writeReportTemplates(wsPath);
+
     const reportPath = path.join(wsPath, "artifacts", "research-report.md");
     const prompt = buildResearcherPrompt({
       workspaceName: workspace,

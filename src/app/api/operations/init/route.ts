@@ -10,6 +10,8 @@ import {
   setupWorkspace,
   setupRepository,
   commitWorkspaceSnapshot,
+  writeTodoTemplate,
+  writeReportTemplates,
   type SetupRepositoryResult,
 } from "@/lib/workspace-ops";
 import {
@@ -76,6 +78,10 @@ export async function POST(request: Request) {
         wsPath = result.workspacePath;
         ctx.setWorkspace(wsName);
         ctx.emitStatus(`Workspace created: ${wsName}`);
+
+        // Write template files for agents to reference
+        writeTodoTemplate(wsPath, analysis.taskType);
+        writeReportTemplates(wsPath);
 
         if (analysis.repositories.length > 0) {
           for (const repoPath of analysis.repositories) {
