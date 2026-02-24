@@ -1,4 +1,3 @@
-import { query } from "@anthropic-ai/claude-agent-sdk";
 import { cliPath } from "./claude-sdk";
 import { AI_WORKSPACE_ROOT } from "./config";
 
@@ -130,44 +129,33 @@ async function analyzeOutput(
     `- Do NOT use any tools. Respond with ONLY one line.`,
   ].join("\n");
 
-  const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), 60_000);
+  const env: Record<string, string | undefined> = { ...process.env, CLAUDECODE: undefined };
 
   let result = "";
   try {
-    const conversation = query({
-      prompt,
-      options: {
-        abortController,
+    const proc = Bun.spawn(
+      [cliPath, "-p", prompt, "--output-format", "json"],
+      {
         cwd: AI_WORKSPACE_ROOT,
-        pathToClaudeCodeExecutable: cliPath,
-        settingSources: ["user"],
-        canUseTool: async (_name, input) => ({
-          behavior: "allow" as const,
-          updatedInput: input,
-        }),
-      },
-    });
-
-    for await (const msg of conversation) {
-      const m = msg as Record<string, unknown>;
-      if (m.type === "assistant") {
-        const message = m.message as {
-          content?: Array<{ type: string; text?: string }>;
-        };
-        if (message?.content) {
-          for (const block of message.content) {
-            if (block.type === "text" && block.text) {
-              result += block.text;
-            }
-          }
-        }
+        stdout: "pipe",
+        stderr: "pipe",
+        env,
       }
+    );
+
+    const output = await new Response(proc.stdout).text();
+    await proc.exited;
+
+    // --output-format json returns a JSON object with a result field
+    try {
+      const parsed = JSON.parse(output);
+      result = parsed.result ?? "";
+    } catch {
+      // Fallback: use raw output
+      result = output;
     }
   } catch (err) {
-    return { action: "error", value: `SDK analysis failed: ${err}` };
-  } finally {
-    clearTimeout(timeout);
+    return { action: "error", value: `CLI analysis failed: ${err}` };
   }
 
   const line = result.trim().split("\n")[0].trim();

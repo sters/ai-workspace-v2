@@ -1,4 +1,4 @@
-// Parse SDK messages from @anthropic-ai/claude-agent-sdk into displayable log entries.
+// Parse stream-json messages from `claude -p --output-format stream-json` (or SDK) into displayable log entries.
 
 export type LogEntryBase = {
   /** Non-null when the entry originates from a sub-agent (Task tool). */
