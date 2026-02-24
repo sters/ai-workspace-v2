@@ -40,14 +40,14 @@ export function runClaude(
   log(operationId, "cliPath:", cliPath);
 
   function spawnAndStream(promptOrAnswer: string, resumeSessionId?: string) {
-    const args = [cliPath, "-p", promptOrAnswer, "--output-format", "stream-json"];
+    const args = [cliPath, "-p", promptOrAnswer, "--output-format", "stream-json", "--verbose"];
     if (resumeSessionId) {
       args.push("--resume", resumeSessionId);
     }
 
     const useStdin = promptOrAnswer.length > MAX_PROMPT_ARG_LENGTH;
     const spawnArgs = useStdin
-      ? [cliPath, "-p", "-", "--output-format", "stream-json", ...(resumeSessionId ? ["--resume", resumeSessionId] : [])]
+      ? [cliPath, "-p", "-", "--output-format", "stream-json", "--verbose", ...(resumeSessionId ? ["--resume", resumeSessionId] : [])]
       : args;
 
     const env: Record<string, string | undefined> = { ...process.env, CLAUDECODE: undefined };
