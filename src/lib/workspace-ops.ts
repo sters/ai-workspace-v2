@@ -33,7 +33,7 @@ function repoDir(): string {
  * - Truncates to maxLength (default 50)
  * - Falls back to "workspace" if result is empty (e.g., pure non-ASCII input)
  */
-function sanitizeSlug(input: string, maxLength = 50): string {
+export function sanitizeSlug(input: string, maxLength = 50): string {
   let slug = input
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "-")  // Replace non-ASCII, spaces, special chars with hyphens
@@ -117,7 +117,7 @@ export function parseAnalysisResult(filePath: string, fallbackDescription: strin
 // README Template
 // ---------------------------------------------------------------------------
 
-const README_TEMPLATE = `# Task: {{DESCRIPTION}}
+export const README_TEMPLATE = `# Task: {{DESCRIPTION}}
 
 ## Overview
 
