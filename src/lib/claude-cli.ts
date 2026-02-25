@@ -215,10 +215,7 @@ export function runClaude(
   };
 }
 
-// TODO: Interactive mode (non -p)
-// When -p cannot be used, we need:
-// - xterm.js in the browser for terminal rendering
-// - WebSocket endpoint for bidirectional stdin/stdout piping
-// - Bun.spawn with PTY (terminal option) for the claude process
-// - stdin pipe from browser → WebSocket → process.stdin
-// - stdout pipe from process → WebSocket → xterm.js
+// Interactive mode (non -p) is implemented via:
+// - src/lib/chat-server.ts — WebSocket server (port 3742) with PTY-backed Claude sessions
+// - src/components/workspace/chat-terminal.tsx — xterm.js frontend component
+// - src/lib/pty.ts — shared PTY spawn/collect utilities

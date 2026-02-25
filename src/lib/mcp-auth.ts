@@ -1,5 +1,11 @@
 import { cliPath } from "./claude-sdk";
 import { AI_WORKSPACE_ROOT } from "./config";
+import {
+  spawnTerminal,
+  collectOutput,
+  type DataListener,
+  type TerminalSubprocess,
+} from "./pty";
 
 function stripAnsi(text: string): string {
   return text.replace(
@@ -7,73 +13,6 @@ function stripAnsi(text: string): string {
     /[\u001B\u009B][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><~]/g,
     ""
   );
-}
-
-type DataListener = (data: string) => void;
-
-/**
- * Bun.spawn with terminal option returns a subprocess with PTY control.
- * Type definitions may lag behind runtime support, so we define our own interface.
- */
-interface TerminalSubprocess {
-  terminal: { write(data: string): void };
-  kill(): void;
-  exited: Promise<number>;
-}
-
-function spawnTerminal(
-  cmd: string[],
-  options: { cwd: string; env: Record<string, string | undefined> },
-  listeners: Set<DataListener>
-): TerminalSubprocess {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (Bun.spawn as any)(cmd, {
-    cwd: options.cwd,
-    env: options.env,
-    terminal: {
-      cols: 120,
-      rows: 40,
-      data(_terminal: unknown, rawData: Uint8Array) {
-        const text = new TextDecoder().decode(rawData);
-        for (const fn of listeners) fn(text);
-      },
-    },
-  }) as TerminalSubprocess;
-}
-
-/**
- * Collect output from the terminal, waiting until output stabilizes
- * (no new data for `settleMs`) or `maxMs` elapses.
- */
-function collectOutput(
-  listeners: Set<DataListener>,
-  settleMs = 2000,
-  maxMs = 30000
-): Promise<string> {
-  return new Promise((resolve) => {
-    let buffer = "";
-    let settleTimer: ReturnType<typeof setTimeout> | undefined;
-
-    const finish = () => {
-      clearTimeout(settleTimer);
-      clearTimeout(maxTimer);
-      listeners.delete(listener);
-      resolve(buffer);
-    };
-
-    const listener: DataListener = (data: string) => {
-      buffer += data;
-      clearTimeout(settleTimer);
-      settleTimer = setTimeout(finish, settleMs);
-    };
-
-    listeners.add(listener);
-
-    // If no data arrives at all, resolve after settleMs
-    settleTimer = setTimeout(finish, settleMs);
-    // Absolute max timeout
-    const maxTimer = setTimeout(finish, maxMs);
-  });
 }
 
 // Escape sequences for terminal navigation keys
