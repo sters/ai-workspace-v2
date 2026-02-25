@@ -31,17 +31,53 @@ type AuthAction =
   | { action: "wait_browser"; value: string }
   | { action: "error"; value: string };
 
+/** JSON Schema for structured output from the analyzer. */
+const AUTH_ACTION_SCHEMA = {
+  type: "object",
+  properties: {
+    action: {
+      type: "string",
+      enum: ["type", "key", "done", "wait_browser", "error"],
+      description: "The action to take next.",
+    },
+    value: {
+      type: "string",
+      description:
+        "For 'type': the exact text to type (Enter is sent automatically). " +
+        "For 'key': one of ENTER, ARROW_DOWN, ARROW_UP, ESCAPE, TAB. " +
+        "For 'done': a short description of the outcome. " +
+        "For 'wait_browser': a short description. " +
+        "For 'error': the error description.",
+    },
+  },
+  required: ["action", "value"],
+  additionalProperties: false,
+};
+
 /**
- * Use a separate Claude SDK session to analyze CLI output
+ * Use a separate Claude session to analyze CLI output
  * and determine what key input to send next.
+ * Returns structured JSON via --json-schema.
  */
 async function analyzeOutput(
   cliOutput: string,
-  serverName: string
+  serverName: string,
+  forceReauth: boolean,
 ): Promise<AuthAction> {
+  const doneRule = forceReauth
+    ? [
+        `- Do NOT respond with action "done" just because the server shows as "connected" in the server list. You must actually trigger re-authentication.`,
+        `- After selecting the server "${serverName}", look for an "Authenticate" option in the submenu and select it.`,
+        `- Only respond with action "done" after the re-authentication flow has been completed (e.g. browser OAuth succeeded, token was accepted, or the auth process explicitly finished).`,
+      ]
+    : [
+        `- If the authentication flow completed successfully (e.g. browser OAuth succeeded, token accepted), respond with action "done".`,
+        `- If the server shows as needing auth, navigate to it and start the auth flow.`,
+      ];
+
   const prompt = [
     `You are analyzing output from an interactive Claude Code CLI session.`,
-    `The goal is to authenticate with the MCP server named "${serverName}".`,
+    `The goal is to ${forceReauth ? "re-authenticate" : "authenticate"} with the MCP server named "${serverName}".`,
     `The CLI uses a TUI (terminal UI) with interactive menus navigated by arrow keys and Enter.`,
     ``,
     `Here is the current CLI output (ANSI codes stripped):`,
@@ -49,31 +85,29 @@ async function analyzeOutput(
     stripAnsi(cliOutput),
     `---`,
     ``,
-    `Determine what action to take next. Respond with EXACTLY one line in one of these formats:`,
-    `TYPE:<exact text to type followed by Enter, e.g. a slash command or text input>`,
-    `KEY:<key name: ENTER, ARROW_DOWN, ARROW_UP, ESCAPE, TAB>`,
-    `DONE`,
-    `WAIT_BROWSER`,
-    `ERROR:<description>`,
+    `Determine what action to take next. Respond with a JSON object matching the provided schema.`,
     ``,
     `Rules:`,
     `- The /mcp command opens a TUI menu with selectable items. Do NOT type numbers.`,
-    `- To navigate a TUI list/selector, use KEY:ARROW_DOWN or KEY:ARROW_UP to move between items.`,
-    `- To select the currently highlighted item, use KEY:ENTER.`,
+    `- To navigate a TUI list/selector, use action "key" with value "ARROW_DOWN" or "ARROW_UP" to move between items.`,
+    `- To select the currently highlighted item, use action "key" with value "ENTER".`,
     `- If the server "${serverName}" appears in a list, navigate to it with ARROW_DOWN/ARROW_UP, then select with ENTER.`,
-    `- If a text input prompt is shown (asking for a URL, token, etc.), use TYPE: with the required text.`,
-    `- If authentication completed or the server shows as connected, respond DONE.`,
-    `- If a browser was opened for OAuth, respond WAIT_BROWSER.`,
-    `- If there is an error, respond ERROR: with a description.`,
-    `- Do NOT use any tools. Respond with ONLY one line.`,
+    `- If a text input prompt is shown (asking for a URL, token, etc.), use action "type" with value set to the required text.`,
+    ...doneRule,
+    `- If a browser was opened for OAuth, respond with action "wait_browser".`,
+    `- If there is an error, respond with action "error" and describe the error in value.`,
+    `- Do NOT use any tools.`,
   ].join("\n");
 
   const env: Record<string, string | undefined> = { ...process.env, CLAUDECODE: undefined };
 
-  let result = "";
   try {
     const proc = Bun.spawn(
-      [cliPath, "-p", prompt, "--output-format", "json"],
+      [
+        cliPath, "-p", prompt,
+        "--output-format", "json",
+        "--json-schema", JSON.stringify(AUTH_ACTION_SCHEMA),
+      ],
       {
         cwd: AI_WORKSPACE_ROOT,
         stdout: "pipe",
@@ -85,40 +119,31 @@ async function analyzeOutput(
     const output = await new Response(proc.stdout).text();
     await proc.exited;
 
-    // --output-format json returns a JSON object with a result field
-    try {
-      const parsed = JSON.parse(output);
-      result = parsed.result ?? "";
-    } catch {
-      // Fallback: use raw output
-      result = output;
+    const parsed = JSON.parse(output);
+    const resultText: string = parsed.result ?? output;
+
+    // The result is a JSON string from structured output
+    const actionObj = JSON.parse(resultText);
+    const action = String(actionObj.action ?? "");
+    const value = String(actionObj.value ?? "");
+
+    if (action === "key" && !KEY_MAP[value]) {
+      return { action: "error", value: `Unknown key name: ${value}` };
     }
+
+    if (["type", "key", "done", "wait_browser", "error"].includes(action)) {
+      return { action, value } as AuthAction;
+    }
+
+    return { action: "error", value: `Unexpected action: ${action}` };
   } catch (err) {
     return { action: "error", value: `CLI analysis failed: ${err}` };
   }
-
-  const line = result.trim().split("\n")[0].trim();
-  if (line.startsWith("TYPE:"))
-    return { action: "type", value: line.slice(5).trim() };
-  if (line.startsWith("KEY:")) {
-    const keyName = line.slice(4).trim();
-    if (KEY_MAP[keyName]) {
-      return { action: "key", value: keyName };
-    }
-    return { action: "error", value: `Unknown key name: ${keyName}` };
-  }
-  if (line === "DONE")
-    return { action: "done", value: "Authentication completed" };
-  if (line === "WAIT_BROWSER")
-    return { action: "wait_browser", value: "Waiting for browser auth" };
-  if (line.startsWith("ERROR:"))
-    return { action: "error", value: line.slice(6).trim() };
-
-  return { action: "error", value: `Unexpected analyzer response: ${line}` };
 }
 
 export interface McpAuthCallbacks {
   emitStatus: (message: string) => void;
+  emitTerminal: (data: string) => void;
 }
 
 /**
@@ -130,9 +155,11 @@ export interface McpAuthCallbacks {
  */
 export async function runMcpAuthSession(
   serverName: string,
-  callbacks: McpAuthCallbacks
+  callbacks: McpAuthCallbacks,
+  options?: { forceReauth?: boolean },
 ): Promise<boolean> {
-  const { emitStatus } = callbacks;
+  const { emitStatus, emitTerminal } = callbacks;
+  const forceReauth = options?.forceReauth ?? false;
 
   const claudeCmd = "claude";
   const env = { ...process.env };
@@ -163,6 +190,9 @@ export async function runMcpAuthSession(
   }
   emitStatus("PTY spawned successfully");
 
+  // Forward raw PTY output to the client for xterm.js rendering
+  listeners.add((data) => emitTerminal(data));
+
   let exited = false;
   let exitCode: number | null = null;
   proc.exited.then((code) => {
@@ -173,7 +203,7 @@ export async function runMcpAuthSession(
 
   try {
     // Wait for initial prompt
-    let output = await collectOutput(listeners, 3000, 15000);
+    let output = await collectOutput(listeners, 2000, 15000);
     const cleaned = stripAnsi(output).trim();
     emitStatus(`CLI output (${cleaned.length} chars): ${cleaned.slice(0, 500)}`);
 
@@ -187,7 +217,7 @@ export async function runMcpAuthSession(
     // Send /mcp
     emitStatus("Sending /mcp command...");
     proc.terminal.write("/mcp\r");
-    output = await collectOutput(listeners, 3000, 15000);
+    output = await collectOutput(listeners, 1500, 15000);
     emitStatus(`/mcp output:\n${stripAnsi(output)}`);
 
     if (exited) return false;
@@ -199,7 +229,7 @@ export async function runMcpAuthSession(
       if (exited) break;
 
       emitStatus(`Analyzing output (step ${i + 1})...`);
-      const action = await analyzeOutput(allOutput, serverName);
+      const action = await analyzeOutput(allOutput, serverName, forceReauth);
       emitStatus(`Analyzer: ${action.action} → ${action.value}`);
 
       switch (action.action) {
@@ -221,7 +251,7 @@ export async function runMcpAuthSession(
           emitStatus(
             "Browser opened for OAuth. Polling for completion..."
           );
-          output = await collectOutput(listeners, 3000, 15000);
+          output = await collectOutput(listeners, 2000, 15000);
           allOutput += "\n" + output;
           if (output.length > 0) {
             emitStatus(`Browser auth update:\n${stripAnsi(output)}`);
@@ -233,7 +263,7 @@ export async function runMcpAuthSession(
         case "key":
           emitStatus(`Sending key: ${action.value}`);
           proc.terminal.write(KEY_MAP[action.value]);
-          output = await collectOutput(listeners, 3000, 15000);
+          output = await collectOutput(listeners, 1000, 10000);
           allOutput += "\n" + output;
           emitStatus(`Response:\n${stripAnsi(output)}`);
           break;
@@ -241,7 +271,7 @@ export async function runMcpAuthSession(
         case "type":
           emitStatus(`Typing: ${action.value}`);
           proc.terminal.write(action.value + "\r");
-          output = await collectOutput(listeners, 3000, 15000);
+          output = await collectOutput(listeners, 1500, 10000);
           allOutput += "\n" + output;
           emitStatus(`Response:\n${stripAnsi(output)}`);
           break;

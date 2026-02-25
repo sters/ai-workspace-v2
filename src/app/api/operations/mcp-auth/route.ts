@@ -4,7 +4,11 @@ import { runMcpAuthSession } from "@/lib/mcp-auth";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { serverName } = body as { serverName: string };
+  const { serverName, forceReauth } = body as {
+    serverName: string;
+    forceReauth?: boolean | string;
+  };
+  const isReauth = forceReauth === true || forceReauth === "true";
 
   if (!serverName) {
     return NextResponse.json(
@@ -18,9 +22,14 @@ export async function POST(request: Request) {
       kind: "function",
       label: `Authenticate ${serverName}`,
       fn: async (ctx) => {
-        return runMcpAuthSession(serverName, {
-          emitStatus: ctx.emitStatus,
-        });
+        return runMcpAuthSession(
+          serverName,
+          {
+            emitStatus: ctx.emitStatus,
+            emitTerminal: ctx.emitTerminal,
+          },
+          { forceReauth: isReauth },
+        );
       },
     },
   ]);

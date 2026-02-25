@@ -198,6 +198,8 @@ export interface PhaseFunctionContext {
   runChild: (label: string, prompt: string, options?: RunChildOptions) => Promise<boolean>;
   /** Run multiple Claude child queries in parallel and wait for all to complete. */
   runChildGroup: (children: GroupChild[]) => Promise<boolean[]>;
+  /** Emit raw terminal (PTY) output for xterm.js rendering on the client. */
+  emitTerminal: (data: string) => void;
 }
 
 export interface PipelinePhaseFunction {
@@ -353,6 +355,15 @@ export function startOperationPipeline(
                 childOptions.onResultText(result.resultText);
               }
               return result.success;
+            },
+            emitTerminal: (data) => {
+              emitEvent(managed, {
+                type: "terminal",
+                operationId: managed.operation.id,
+                data,
+                timestamp: new Date().toISOString(),
+                ...phaseExtra,
+              });
             },
             runChildGroup: (children) => {
               const promises = children.map(async (child) => {
