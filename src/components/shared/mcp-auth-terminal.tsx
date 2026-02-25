@@ -142,9 +142,10 @@ export function McpAuthTerminal({
       </div>
 
       {/* Terminal */}
+      <style>{`.mcp-auth-term, .mcp-auth-term * { cursor: default !important; }`}</style>
       <div
         ref={containerRef}
-        className="min-h-[200px] cursor-default bg-[#1a1b26] p-1"
+        className="mcp-auth-term min-h-[200px] bg-[#1a1b26] p-1"
       />
 
       {/* Completion status */}
