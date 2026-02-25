@@ -1,7 +1,6 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { existsSync, mkdirSync, cpSync, rmSync, readFileSync } from "node:fs";
-import { execFileSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -47,9 +46,9 @@ if (packageDir.includes(`${sep}node_modules${sep}`)) {
     });
 
     console.log("Installing dependencies...");
-    execFileSync("bun", ["install"], {
+    Bun.spawnSync(["bun", "install"], {
       cwd: tempDir,
-      stdio: "inherit",
+      stdio: ["inherit", "inherit", "inherit"],
     });
 
     packageDir = tempDir;
@@ -64,7 +63,7 @@ root = resolve(root);
 const workspaceDir = resolve(root, "workspace");
 const repositoriesDir = resolve(root, "repositories");
 
-const missingDirs = [];
+const missingDirs: string[] = [];
 if (!existsSync(workspaceDir)) missingDirs.push(workspaceDir);
 if (!existsSync(repositoriesDir)) missingDirs.push(repositoriesDir);
 
@@ -75,7 +74,7 @@ if (missingDirs.length > 0) {
   }
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
-  const answer = await new Promise((resolve) => {
+  const answer = await new Promise<string>((resolve) => {
     rl.question("Create them? [y/N] ", resolve);
   });
   rl.close();
@@ -95,32 +94,38 @@ console.log(`ai-workspace root: ${root}`);
 console.log(`Starting on http://localhost:3741`);
 
 const isDev = process.argv.includes("--dev");
-const cmd = isDev ? "dev" : "start";
+const isHot = process.argv.includes("--hot");
 
-// For production mode, build first if needed
-if (!isDev && !existsSync(resolve(packageDir, ".next"))) {
-  console.log("Building...");
-  execFileSync("bun", ["run", "build"], {
-    cwd: packageDir,
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
-    },
-  });
-}
+const sharedEnv = {
+  ...process.env,
+  AI_WORKSPACE_ROOT: root,
+  ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
+};
 
-const child = spawn("bun", ["run", cmd], {
+// Start Next.js server
+const nextFlags = isHot ? ["--hot"] : isDev ? ["--dev"] : [];
+const nextServer = Bun.spawn(["bun", "run", "bin/next-server.ts", ...nextFlags], {
   cwd: packageDir,
-  stdio: "inherit",
-  env: {
-    ...process.env,
-    AI_WORKSPACE_ROOT: root,
-    PORT: "3741",
-    ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
-  },
+  stdio: ["inherit", "inherit", "inherit"],
+  env: sharedEnv,
 });
 
-process.on("SIGINT", () => child.kill());
-process.on("SIGTERM", () => child.kill());
-child.on("exit", (code) => process.exit(code ?? 0));
+// Start WebSocket chat server
+const chatServer = Bun.spawn(["bun", "run", "bin/chat-server.ts"], {
+  cwd: packageDir,
+  stdio: ["inherit", "inherit", "inherit"],
+  env: sharedEnv,
+});
+
+function killAll() {
+  nextServer.kill();
+  chatServer.kill();
+}
+
+process.on("SIGINT", killAll);
+process.on("SIGTERM", killAll);
+
+// Wait for Next.js to exit, then clean up chat server
+const nextExitCode = await nextServer.exited;
+chatServer.kill();
+process.exit(nextExitCode ?? 0);

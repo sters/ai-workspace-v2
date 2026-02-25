@@ -14,6 +14,7 @@ const TABS = [
   { label: "Reviews", segment: "review" },
   { label: "History", segment: "history" },
   { label: "Operations", segment: "operations" },
+  { label: "Chat", segment: "chat" },
 ] as const;
 
 export default function WorkspaceLayout({
