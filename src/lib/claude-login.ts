@@ -1,24 +1,45 @@
-import { execFile } from "node:child_process";
+import { spawnClaudeAuth } from "./spawn-claude-auth";
 
 export interface ClaudeLoginCallbacks {
   emitStatus: (message: string) => void;
   signal?: AbortSignal;
 }
 
+async function readStream(stream: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(
+    chunks.reduce((acc, chunk) => {
+      const merged = new Uint8Array(acc.length + chunk.length);
+      merged.set(acc);
+      merged.set(chunk, acc.length);
+      return merged;
+    }, new Uint8Array()),
+  );
+}
+
 /**
  * Check current auth status via `claude auth status`.
  * Returns the trimmed stdout output.
  */
-export function checkAuthStatus(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile("claude", ["auth", "status"], { timeout: 15_000 }, (err, stdout, stderr) => {
-      if (err) {
-        reject(new Error(stderr || err.message));
-      } else {
-        resolve(stdout.trim());
-      }
-    });
-  });
+export async function checkAuthStatus(): Promise<string> {
+  const proc = spawnClaudeAuth("status");
+
+  const [stdout, stderr, exitCode] = await Promise.all([
+    readStream(proc.stdout),
+    readStream(proc.stderr),
+    proc.exited,
+  ]);
+
+  if (exitCode !== 0) {
+    throw new Error(stderr.trim() || `Exit code ${exitCode}`);
+  }
+  return stdout.trim();
 }
 
 /**
@@ -42,34 +63,43 @@ export async function runClaudeLogin(
   // Step 2: Run claude auth login
   emitStatus("Running claude auth login...");
 
-  return new Promise<boolean>((resolve) => {
-    const child = execFile(
-      "claude",
-      ["auth", "login"],
-      { timeout: 120_000 },
-      (err, stdout, stderr) => {
-        if (err) {
-          emitStatus(`Login failed: ${stderr || err.message}`);
-          resolve(false);
-        } else {
-          const output = stdout.trim();
-          if (output) emitStatus(output);
-          emitStatus("Login completed successfully!");
-          resolve(true);
-        }
-      },
-    );
+  const proc = spawnClaudeAuth("login");
 
+  const aborted = new Promise<"aborted">((resolve) => {
     if (signal) {
       signal.addEventListener(
         "abort",
         () => {
           emitStatus("Operation cancelled");
-          child.kill();
-          resolve(false);
+          proc.kill();
+          resolve("aborted");
         },
         { once: true },
       );
     }
   });
+
+  const completed = Promise.all([
+    readStream(proc.stdout),
+    readStream(proc.stderr),
+    proc.exited,
+  ]);
+
+  const result = await Promise.race([completed, aborted]);
+
+  if (result === "aborted") {
+    return false;
+  }
+
+  const [stdout, stderr, exitCode] = result;
+
+  if (exitCode !== 0) {
+    emitStatus(`Login failed: ${stderr.trim() || `Exit code ${exitCode}`}`);
+    return false;
+  }
+
+  const output = stdout.trim();
+  if (output) emitStatus(output);
+  emitStatus("Login completed successfully!");
+  return true;
 }

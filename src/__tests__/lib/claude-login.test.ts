@@ -1,76 +1,79 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// Mock node:child_process
+// Mock spawn-claude-auth (separate module so internal refs are replaced)
 // ---------------------------------------------------------------------------
 
-type ExecFileCallback = (
-  err: Error | null,
-  stdout: string,
-  stderr: string,
-) => void;
+const mockSpawnClaudeAuth = vi.fn();
 
-const mockExecFile = vi.fn();
-
-vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...(actual as Record<string, unknown>),
-    default: {
-      ...(actual as Record<string, unknown>),
-      execFile: (...args: unknown[]) => mockExecFile(...args),
-    },
-    execFile: (...args: unknown[]) => mockExecFile(...args),
-  };
-});
+vi.mock("@/lib/spawn-claude-auth", () => ({
+  spawnClaudeAuth: (...args: unknown[]) => mockSpawnClaudeAuth(...args),
+}));
 
 import { runClaudeLogin, checkAuthStatus } from "@/lib/claude-login";
 
-describe("checkAuthStatus", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
+function makeStream(content: string): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      if (content) controller.enqueue(new TextEncoder().encode(content));
+      controller.close();
+    },
   });
+}
 
+function mockProc(
+  stdout: string,
+  stderr: string,
+  exitCode: number,
+  extra?: { kill?: ReturnType<typeof vi.fn> },
+) {
+  return {
+    stdout: makeStream(stdout),
+    stderr: makeStream(stderr),
+    exited: Promise.resolve(exitCode),
+    kill: extra?.kill ?? vi.fn(),
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+});
+
+describe("checkAuthStatus", () => {
   it("returns trimmed stdout on success", async () => {
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-        cb(null, "  Logged in as user@example.com  \n", "");
-      },
+    mockSpawnClaudeAuth.mockReturnValue(
+      mockProc('  {"loggedIn":true}  \n', "", 0),
     );
 
     const result = await checkAuthStatus();
-    expect(result).toBe("Logged in as user@example.com");
+    expect(result).toBe('{"loggedIn":true}');
+    expect(mockSpawnClaudeAuth).toHaveBeenCalledWith("status");
   });
 
   it("rejects with stderr on failure", async () => {
-    mockExecFile.mockImplementation(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-        cb(new Error("exit code 1"), "", "Not authenticated");
-      },
+    mockSpawnClaudeAuth.mockReturnValue(
+      mockProc("", "Not authenticated", 1),
     );
 
     await expect(checkAuthStatus()).rejects.toThrow("Not authenticated");
   });
+
+  it("rejects with exit code when stderr is empty", async () => {
+    mockSpawnClaudeAuth.mockReturnValue(mockProc("", "", 1));
+
+    await expect(checkAuthStatus()).rejects.toThrow("Exit code 1");
+  });
 });
 
 describe("runClaudeLogin", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it("returns true on successful login", async () => {
-    // First call: auth status check
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-        cb(null, "Not authenticated", "");
-      },
+    // First call: auth status
+    mockSpawnClaudeAuth.mockReturnValueOnce(
+      mockProc('{"loggedIn":false}', "", 0),
     );
     // Second call: auth login
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-        cb(null, "Login successful!", "");
-        return { kill: vi.fn() };
-      },
+    mockSpawnClaudeAuth.mockReturnValueOnce(
+      mockProc("Login successful!", "", 0),
     );
 
     const emitStatus = vi.fn();
@@ -78,21 +81,15 @@ describe("runClaudeLogin", () => {
 
     expect(result).toBe(true);
     expect(emitStatus).toHaveBeenCalledWith("Login completed successfully!");
+    expect(mockSpawnClaudeAuth).toHaveBeenCalledWith("login");
   });
 
   it("returns false when login fails", async () => {
-    // Status check
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-        cb(null, "Not authenticated", "");
-      },
+    mockSpawnClaudeAuth.mockReturnValueOnce(
+      mockProc('{"loggedIn":false}', "", 0),
     );
-    // Login failure
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-        cb(new Error("auth failed"), "", "Authentication error");
-        return { kill: vi.fn() };
-      },
+    mockSpawnClaudeAuth.mockReturnValueOnce(
+      mockProc("", "Authentication error", 1),
     );
 
     const emitStatus = vi.fn();
@@ -105,18 +102,11 @@ describe("runClaudeLogin", () => {
   });
 
   it("handles auth status check failure gracefully", async () => {
-    // Status check fails
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-        cb(new Error("not found"), "", "command not found");
-      },
+    mockSpawnClaudeAuth.mockReturnValueOnce(
+      mockProc("", "command not found", 127),
     );
-    // Login succeeds
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-        cb(null, "Logged in", "");
-        return { kill: vi.fn() };
-      },
+    mockSpawnClaudeAuth.mockReturnValueOnce(
+      mockProc("Logged in", "", 0),
     );
 
     const emitStatus = vi.fn();
@@ -130,27 +120,27 @@ describe("runClaudeLogin", () => {
 
   it("kills process when abort signal fires", async () => {
     const controller = new AbortController();
-    const mockKill = vi.fn();
+    const killFn = vi.fn();
 
-    // Status check
-    mockExecFile.mockImplementationOnce(
-      (_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
-        cb(null, "Not authenticated", "");
-      },
+    mockSpawnClaudeAuth.mockReturnValueOnce(
+      mockProc('{"loggedIn":false}', "", 0),
     );
-    // Login — simulate long-running process
-    mockExecFile.mockImplementationOnce(() => {
-      // Abort immediately
-      setTimeout(() => controller.abort(), 10);
-      return { kill: mockKill };
+    mockSpawnClaudeAuth.mockReturnValueOnce({
+      stdout: makeStream(""),
+      stderr: makeStream(""),
+      exited: new Promise<number>(() => {}),
+      kill: killFn,
     });
 
+    setTimeout(() => controller.abort(), 50);
+
+    const emitStatus = vi.fn();
     const result = await runClaudeLogin({
-      emitStatus: vi.fn(),
+      emitStatus,
       signal: controller.signal,
     });
 
     expect(result).toBe(false);
-    expect(mockKill).toHaveBeenCalled();
+    expect(killFn).toHaveBeenCalled();
   });
 });
