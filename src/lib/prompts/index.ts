@@ -8,4 +8,4 @@ export { buildPRCreatorPrompt, type PRCreatorInput } from "./pr-creator";
 export { buildResearcherPrompt, type ResearcherInput } from "./researcher";
 export { buildUpdaterPrompt, type UpdaterInput } from "./updater";
 export { buildCollectorPrompt, type CollectorInput } from "./collector";
-export { buildInitReadmePrompt, type InitReadmeInput } from "./init-readme";
+export { buildInitAnalyzeAndReadmePrompt, type InitAnalyzeAndReadmeInput } from "./init-readme";

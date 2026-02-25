@@ -1,59 +1,63 @@
 /**
- * Prompt template for the init operation's README editing phase.
- * Claude fills in the workspace README.md with task details.
+ * Prompt template for the merged init operation: analyze task + draft README.
+ * Claude analyzes the description, writes analysis JSON, and fills in the README template.
  */
 
-export interface InitReadmeInput {
-  workspaceName: string;
-  workspacePath: string;
-  readmeContent: string;
+export interface InitAnalyzeAndReadmeInput {
   description: string;
-  repos: { repoPath: string; repoName: string; baseBranch: string; branchName: string }[];
+  analysisPath: string;
+  readmePath: string;
 }
 
-export function buildInitReadmePrompt(input: InitReadmeInput): string {
-  const repoList = input.repos
-    .map(
-      (r) =>
-        `- **${r.repoName}**: \`${r.repoPath}\` (base: \`${r.baseBranch}\`, branch: \`${r.branchName}\`)`,
-    )
-    .join("\n");
-
-  return `# Task: Fill in workspace README
-
-## Workspace: ${input.workspaceName}
-## Workspace Path: ${input.workspacePath}
+export function buildInitAnalyzeAndReadmePrompt(input: InitAnalyzeAndReadmeInput): string {
+  return `# Task: Analyze description and draft workspace README
 
 ## User's Description
 
 ${input.description}
 
-## Repositories
-
-${repoList}
-
-## Current README.md
-
-${input.readmeContent}
-
 ## Instructions
 
-You are setting up a new workspace. The README.md above is a template that needs to be filled in with task details.
+You have two jobs:
 
-Your job:
-1. Read the user's description above
-2. Edit the README.md file at \`${input.workspacePath}/README.md\` to fill in:
-   - Update the Repositories section with the actual repositories listed above
-   - Fill in Objective, Context, Requirements, and Related Resources based on the user's description
-   - If the description is a ticket URL, fetch it and extract details
-   - If the task type is research/investigation, note that in the README
-3. If no repositories were specified above, you MUST identify the target repositories from the description and add them to the Repositories section. Use the format: \`| \`github.com/org/repo\` | Description | \`main\` |\`. If you cannot determine the target repositories from the description, use AskUserQuestion to ask the user which repositories to work on.
-4. If anything else is unclear, use AskUserQuestion to ask the user
+### 1. Write analysis JSON
+
+Analyze the task description above and write a JSON object to \`${input.analysisPath}\` using the Write tool. No explanation, no markdown fences — just the JSON.
+
+JSON schema:
+{
+  "taskType": "feature" | "bugfix" | "research" | "investigation",
+  "slug": "short-english-slug (2-5 lowercase words, hyphen-separated)",
+  "ticketId": "ticket ID if found (e.g. PROJ-123, #456), or empty string",
+  "repositories": ["github.com/org/repo", ...] (full paths found in description, or empty array)
+}
+
+Rules:
+- taskType: infer from context. Default to "feature" if unclear.
+- slug: concise English directory name for the workspace. Do NOT include the ticket ID in the slug.
+- ticketId: extract Jira IDs (XX-123), GitHub issue refs (#123 or org/repo#123), Linear IDs, etc. Empty string if none.
+- repositories: extract repository paths like "github.com/org/repo". Include the host. Empty array if none mentioned.
+
+### 2. Edit the README template
+
+A README template has been written at \`${input.readmePath}\`. Edit it to fill in the workspace details:
+
+1. **Rewrite the \`# Task:\` heading** to a concise, descriptive title (not the raw URL or description). Under 80 characters, natural language. For example: \`# Task: Add pagination to user search API\`
+2. **Update \`**Task Type**\` and \`**Ticket ID**\`** fields based on your analysis
+3. **Fill in** Objective, Context, Requirements, and Related Resources based on the description
+4. **If the description is a URL**, fetch it and extract details to populate the README sections
+5. **List repositories** in the Repositories section using the format:
+   \`- **repoName**: \\\`repoPath\\\` (base: \\\`main\\\`)\`
+   (Use \`main\` as default base branch since repos aren't set up yet)
+6. If no repositories can be determined from the description, use AskUserQuestion to ask the user which repositories to work on
+7. If anything else is unclear, use AskUserQuestion to ask the user
 
 ### Important Notes
-- **Do NOT browse, read, or analyze source code in the repositories.** Your sole input is the user's description (and ticket URL if provided). Repository code analysis happens in a later planning phase — not here.
-- Use the file path \`${input.workspacePath}/README.md\` for edits
+
+- **Do NOT browse, read, or analyze source code in repositories.** Your sole input is the user's description (and ticket URL if provided). Repository code analysis happens in a later planning phase — not here.
+- Use the file path \`${input.readmePath}\` for README edits
 - Keep the template structure, just fill in the placeholder sections
 - The README should give clear context for agents that will work on this task later
+- Write the analysis JSON file FIRST, then edit the README
 `;
 }

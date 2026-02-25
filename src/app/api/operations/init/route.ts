@@ -5,17 +5,17 @@ import path from "node:path";
 import { startOperationPipeline } from "@/lib/process-manager";
 import { readWorkspaceReadme } from "@/lib/readme-parser";
 import {
-  buildAnalysisPrompt,
   parseAnalysisResult,
   setupWorkspace,
   setupRepository,
   commitWorkspaceSnapshot,
   writeTodoTemplate,
   writeReportTemplates,
+  README_TEMPLATE,
   type SetupRepositoryResult,
 } from "@/lib/workspace-ops";
 import {
-  buildInitReadmePrompt,
+  buildInitAnalyzeAndReadmePrompt,
   buildPlannerPrompt,
   buildCoordinatorPrompt,
   buildReviewerPrompt,
@@ -32,8 +32,10 @@ export async function POST(request: Request) {
     );
   }
 
-  // Temp file for analysis result (unique per request)
-  const analysisPath = path.join(os.tmpdir(), `ai-ws-analysis-${Date.now()}.json`);
+  // Temp dir for analysis result and draft README
+  const tmpDir = path.join(os.tmpdir(), `ai-ws-init-${Date.now()}`);
+  const analysisPath = path.join(tmpDir, "analysis.json");
+  const tempReadmePath = path.join(tmpDir, "README.md");
 
   // Shared mutable state across pipeline phases
   let wsName = "";
@@ -41,23 +43,36 @@ export async function POST(request: Request) {
   const repoResults: SetupRepositoryResult[] = [];
 
   const phases: PipelinePhase[] = [
-    // Phase A: Claude analyzes the task description (visible in FE logs)
+    // Phase A: Claude analyzes the task and drafts README (merged analysis + README fill)
     {
       kind: "function",
-      label: "Analyze task description",
+      label: "Analyze & draft README",
       fn: async (ctx) => {
-        const prompt = buildAnalysisPrompt(description, analysisPath);
-        return ctx.runChild("Analyze task", prompt);
+        // Create temp dir and write README template for Claude to edit
+        fs.mkdirSync(tmpDir, { recursive: true });
+        const today = new Date().toISOString().slice(0, 10);
+        const readme = README_TEMPLATE
+          .replace(/\{\{DESCRIPTION\}\}/g, description)
+          .replace(/\{\{TASK_TYPE\}\}/g, "TBD")
+          .replace(/\{\{TICKET_ID\}\}/g, "TBD")
+          .replace(/\{\{DATE\}\}/g, today);
+        fs.writeFileSync(tempReadmePath, readme);
+
+        const prompt = buildInitAnalyzeAndReadmePrompt({
+          description,
+          analysisPath,
+          readmePath: tempReadmePath,
+        });
+
+        return ctx.runChild("Analyze & draft README", prompt);
       },
     },
-    // Phase B: Read analysis result, create workspace, setup repos
+    // Phase B: Read analysis result, create workspace, copy README, setup repos
     {
       kind: "function",
       label: "Setup workspace",
       fn: async (ctx) => {
         const analysis = parseAnalysisResult(analysisPath, description);
-        // Clean up temp file
-        try { fs.unlinkSync(analysisPath); } catch { /* ignore */ }
 
         ctx.emitStatus(
           `Detected: type=${analysis.taskType}, slug=${analysis.slug}` +
@@ -79,6 +94,14 @@ export async function POST(request: Request) {
         ctx.setWorkspace(wsName);
         ctx.emitStatus(`Workspace created: ${wsName}`);
 
+        // Copy the Claude-edited README over the template README
+        if (fs.existsSync(tempReadmePath)) {
+          fs.copyFileSync(tempReadmePath, path.join(wsPath, "README.md"));
+        }
+
+        // Clean up temp dir
+        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+
         // Write template files for agents to reference
         writeTodoTemplate(wsPath, analysis.taskType);
         writeReportTemplates(wsPath);
@@ -96,6 +119,9 @@ export async function POST(request: Request) {
           }
         }
 
+        // Re-commit with the edited README
+        commitWorkspaceSnapshot(wsName, "Init: workspace created with README");
+
         const repoSummary = repoResults.length > 0
           ? `\nRepositories: ${repoResults.map((r) => `${r.repoName} (${r.branchName})`).join(", ")}`
           : "";
@@ -103,29 +129,7 @@ export async function POST(request: Request) {
         return true;
       },
     },
-    // Phase C: Claude fills in README (may ask user for clarification)
-    {
-      kind: "function",
-      label: "Fill in README",
-      fn: async (ctx) => {
-        const { content: readmeContent } = readWorkspaceReadme(wsPath);
-        const prompt = buildInitReadmePrompt({
-          workspaceName: wsName,
-          workspacePath: wsPath,
-          readmeContent,
-          description,
-          repos: repoResults.map((r) => ({
-            repoPath: r.repoPath,
-            repoName: r.repoName,
-            baseBranch: r.baseBranch,
-            branchName: r.branchName,
-          })),
-        });
-
-        return ctx.runChild("Fill README", prompt);
-      },
-    },
-    // Phase D: Detect task type and setup any additional repos from README
+    // Phase C: Detect task type and setup any additional repos from README
     {
       kind: "function",
       label: "Prepare for planning",
@@ -165,7 +169,7 @@ export async function POST(request: Request) {
         return true;
       },
     },
-    // Phase E: Plan TODOs for each repo (parallel)
+    // Phase D: Plan TODOs for each repo (parallel)
     {
       kind: "function",
       label: "Plan TODO items",
@@ -200,7 +204,7 @@ export async function POST(request: Request) {
         return allSuccess;
       },
     },
-    // Phase F: Coordinate TODOs across repos (single, skip for single repo)
+    // Phase E: Coordinate TODOs across repos (single, skip for single repo)
     {
       kind: "function",
       label: "Coordinate TODOs",
@@ -239,7 +243,7 @@ export async function POST(request: Request) {
         return ctx.runChild("Coordinate TODOs", prompt);
       },
     },
-    // Phase G: Review TODOs (parallel, per repo)
+    // Phase F: Review TODOs (parallel, per repo)
     {
       kind: "function",
       label: "Review TODOs",
@@ -285,7 +289,7 @@ export async function POST(request: Request) {
         return allSuccess;
       },
     },
-    // Phase H: Commit workspace snapshot
+    // Phase G: Commit workspace snapshot
     {
       kind: "function",
       label: "Commit snapshot",
