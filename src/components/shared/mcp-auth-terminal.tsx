@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import type { OperationEvent } from "@/types/operation";
 import "@xterm/xterm/css/xterm.css";
 
@@ -44,6 +44,8 @@ export function McpAuthTerminal({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fitAddonRef = useRef<any>(null);
   const writtenCountRef = useRef(0);
+  const [logsOpen, setLogsOpen] = useState(false);
+  const logEndRef = useRef<HTMLDivElement>(null);
 
   // Initialize xterm on mount
   useEffect(() => {
@@ -109,41 +111,42 @@ export function McpAuthTerminal({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Write terminal and status events to xterm
+  // Write only terminal (PTY) events to xterm
   useEffect(() => {
     const term = xtermRef.current;
     if (!term) return;
 
-    const displayEvents = events.filter(
-      (e) => e.type === "terminal" || e.type === "status",
-    );
+    const terminalEvents = events.filter((e) => e.type === "terminal");
     const alreadyWritten = writtenCountRef.current;
 
-    for (let i = alreadyWritten; i < displayEvents.length; i++) {
-      const ev = displayEvents[i];
-      if (ev.type === "terminal") {
-        term.write(ev.data);
-      } else {
-        // Status messages: dim gray with prefix, skip internal control events
-        const msg = ev.data;
-        if (msg.startsWith("__")) continue;
-        term.write(`\x1b[2m[status] ${msg}\x1b[0m\r\n`);
-      }
+    for (let i = alreadyWritten; i < terminalEvents.length; i++) {
+      term.write(terminalEvents[i].data);
     }
 
-    writtenCountRef.current = displayEvents.length;
+    writtenCountRef.current = terminalEvents.length;
   }, [events]);
+
+  // Status log messages (debug info)
+  const statusLogs = useMemo(
+    () =>
+      events
+        .filter((e) => e.type === "status" && !e.data.startsWith("__"))
+        .map((e) => e.data),
+    [events],
+  );
+
+  // Auto-scroll logs when open
+  useEffect(() => {
+    if (logsOpen && logEndRef.current) {
+      logEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [logsOpen, statusLogs.length]);
 
   const finished = !isRunning && operationStatus;
   const succeeded = operationStatus === "completed";
 
-  // Extract the last meaningful status message for the failure banner
-  const lastStatusMsg = !succeeded && finished
-    ? events
-        .filter((e) => e.type === "status" && !e.data.startsWith("__"))
-        .map((e) => e.data)
-        .pop()
-    : undefined;
+  const lastStatusMsg =
+    !succeeded && finished ? statusLogs[statusLogs.length - 1] : undefined;
 
   return (
     <div>
@@ -169,7 +172,7 @@ export function McpAuthTerminal({
       {/* Completion status */}
       {finished && (
         <div
-          className={`mt-1 rounded-b px-3 py-1.5 text-xs font-medium ${
+          className={`mt-1 px-3 py-1.5 text-xs font-medium ${
             succeeded
               ? "bg-emerald-50 text-emerald-700"
               : "bg-red-50 text-red-700"
@@ -178,6 +181,29 @@ export function McpAuthTerminal({
           {succeeded
             ? "Authentication completed successfully."
             : `Authentication failed.${lastStatusMsg ? ` ${lastStatusMsg}` : ""}`}
+        </div>
+      )}
+
+      {/* Debug logs */}
+      {statusLogs.length > 0 && (
+        <div className="mt-1 rounded-b border border-t-0">
+          <button
+            onClick={() => setLogsOpen((v) => !v)}
+            className="flex w-full items-center gap-1 px-3 py-1 text-left text-xs text-muted-foreground hover:bg-muted/40"
+          >
+            <span className={`transition-transform ${logsOpen ? "rotate-90" : ""}`}>
+              &#9654;
+            </span>
+            Debug logs ({statusLogs.length})
+          </button>
+          {logsOpen && (
+            <div className="max-h-48 overflow-y-auto border-t px-3 py-1.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
+              {statusLogs.map((msg, i) => (
+                <div key={i}>{msg}</div>
+              ))}
+              <div ref={logEndRef} />
+            </div>
+          )}
         </div>
       )}
     </div>

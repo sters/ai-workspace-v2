@@ -116,14 +116,42 @@ async function analyzeOutput(
       }
     );
 
-    const output = await new Response(proc.stdout).text();
-    await proc.exited;
+    const [output, stderrText, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
 
-    const parsed = JSON.parse(output);
-    const resultText: string = parsed.result ?? output;
+    if (!output.trim()) {
+      const detail = stderrText.trim()
+        ? `stderr: ${stderrText.trim().slice(0, 300)}`
+        : `exit code ${exitCode}`;
+      return { action: "error", value: `CLI returned empty output (${detail})` };
+    }
 
-    // The result is a JSON string from structured output
-    const actionObj = JSON.parse(resultText);
+    // --output-format json wraps in {"result":"...",...}
+    // --json-schema makes result a JSON string like '{"action":"key","value":"ENTER"}'
+    let actionObj: Record<string, unknown>;
+    try {
+      const parsed = JSON.parse(output);
+      const resultText: string = typeof parsed.result === "string"
+        ? parsed.result
+        : typeof parsed.result === "object" && parsed.result !== null
+          ? JSON.stringify(parsed.result)
+          : output;
+      actionObj = typeof resultText === "string" ? JSON.parse(resultText) : resultText;
+    } catch (parseErr) {
+      // Fallback: try parsing the raw output directly as JSON
+      try {
+        actionObj = JSON.parse(output);
+      } catch {
+        return {
+          action: "error",
+          value: `JSON parse failed: ${parseErr}. Raw output: ${output.slice(0, 300)}`,
+        };
+      }
+    }
+
     const action = String(actionObj.action ?? "");
     const value = String(actionObj.value ?? "");
 

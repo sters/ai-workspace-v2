@@ -62,7 +62,7 @@ describe("McpAuthTerminal", () => {
     });
   });
 
-  it("writes terminal events as raw data and status events as dim lines", async () => {
+  it("writes only terminal events to xterm (not status events)", async () => {
     const events: OperationEvent[] = [
       makeEvent("status", "Starting..."),
       makeEvent("terminal", "hello pty"),
@@ -78,17 +78,34 @@ describe("McpAuthTerminal", () => {
 
     rerender(<McpAuthTerminal {...defaultProps} events={events} />);
 
-    // 1 status + 2 terminal = 3 writes
-    expect(mockWrite).toHaveBeenCalledTimes(3);
-    // Status event is written with dim ANSI prefix
-    expect(mockWrite).toHaveBeenCalledWith(
-      expect.stringContaining("[status] Starting..."),
-    );
+    // Only 2 terminal events are written to xterm (status goes to debug logs)
+    expect(mockWrite).toHaveBeenCalledTimes(2);
     expect(mockWrite).toHaveBeenCalledWith("hello pty");
     expect(mockWrite).toHaveBeenCalledWith(" world");
   });
 
-  it("skips internal __ status events", async () => {
+  it("shows status events in debug logs section", async () => {
+    const events: OperationEvent[] = [
+      makeEvent("status", "Starting..."),
+      makeEvent("status", "Step 2"),
+    ];
+
+    const { rerender } = render(<McpAuthTerminal {...defaultProps} />);
+
+    await vi.waitFor(() => {
+      expect(mockOpen).toHaveBeenCalled();
+    });
+
+    rerender(<McpAuthTerminal {...defaultProps} events={events} />);
+
+    // Status events should NOT be written to xterm
+    expect(mockWrite).not.toHaveBeenCalled();
+
+    // Debug logs button should show count
+    expect(screen.getByText(/Debug logs \(2\)/)).toBeInTheDocument();
+  });
+
+  it("skips internal __ status events from debug logs", async () => {
     const events: OperationEvent[] = [
       makeEvent("status", "__setWorkspace:test"),
       makeEvent("status", "__phaseUpdate:{}"),
@@ -103,10 +120,10 @@ describe("McpAuthTerminal", () => {
 
     rerender(<McpAuthTerminal {...defaultProps} events={events} />);
 
-    expect(mockWrite).toHaveBeenCalledTimes(1);
-    expect(mockWrite).toHaveBeenCalledWith(
-      expect.stringContaining("Visible message"),
-    );
+    // Only 1 non-internal status event in debug logs
+    expect(screen.getByText(/Debug logs \(1\)/)).toBeInTheDocument();
+    // xterm should not have any writes
+    expect(mockWrite).not.toHaveBeenCalled();
   });
 
   it("writes only new events on re-render (delta tracking)", async () => {
