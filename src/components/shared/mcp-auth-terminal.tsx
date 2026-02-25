@@ -109,23 +109,41 @@ export function McpAuthTerminal({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Write new terminal events to xterm
+  // Write terminal and status events to xterm
   useEffect(() => {
     const term = xtermRef.current;
     if (!term) return;
 
-    const terminalEvents = events.filter((e) => e.type === "terminal");
+    const displayEvents = events.filter(
+      (e) => e.type === "terminal" || e.type === "status",
+    );
     const alreadyWritten = writtenCountRef.current;
 
-    for (let i = alreadyWritten; i < terminalEvents.length; i++) {
-      term.write(terminalEvents[i].data);
+    for (let i = alreadyWritten; i < displayEvents.length; i++) {
+      const ev = displayEvents[i];
+      if (ev.type === "terminal") {
+        term.write(ev.data);
+      } else {
+        // Status messages: dim gray with prefix, skip internal control events
+        const msg = ev.data;
+        if (msg.startsWith("__")) continue;
+        term.write(`\x1b[2m[status] ${msg}\x1b[0m\r\n`);
+      }
     }
 
-    writtenCountRef.current = terminalEvents.length;
+    writtenCountRef.current = displayEvents.length;
   }, [events]);
 
   const finished = !isRunning && operationStatus;
   const succeeded = operationStatus === "completed";
+
+  // Extract the last meaningful status message for the failure banner
+  const lastStatusMsg = !succeeded && finished
+    ? events
+        .filter((e) => e.type === "status" && !e.data.startsWith("__"))
+        .map((e) => e.data)
+        .pop()
+    : undefined;
 
   return (
     <div>
@@ -159,7 +177,7 @@ export function McpAuthTerminal({
         >
           {succeeded
             ? "Authentication completed successfully."
-            : "Authentication failed. Check the terminal output for details."}
+            : `Authentication failed.${lastStatusMsg ? ` ${lastStatusMsg}` : ""}`}
         </div>
       )}
     </div>
