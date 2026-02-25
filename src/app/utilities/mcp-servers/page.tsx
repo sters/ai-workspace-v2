@@ -1,21 +1,14 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { useOperation } from "@/hooks/use-operation";
-import { OperationLog } from "@/components/shared/operation-log";
-
-type AuthStatus = {
-  hasAuth: boolean;
-  authType: "env" | "headers" | "none";
-  keyCount: number;
-};
+import { McpAuthTerminal } from "@/components/shared/mcp-auth-terminal";
 
 type McpServerEntry = {
   name: string;
   scope: "user" | "project" | "local";
   config: Record<string, unknown>;
-  authStatus: AuthStatus;
 };
 
 type McpConnectionStatus = {
@@ -25,37 +18,6 @@ type McpConnectionStatus = {
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
-
-const scopeColors: Record<string, string> = {
-  user: "bg-blue-100 text-blue-800",
-  project: "bg-green-100 text-green-800",
-  local: "bg-yellow-100 text-yellow-800",
-};
-
-function getServerType(config: Record<string, unknown>): string {
-  if (config.type === "sse") return "sse";
-  if (config.type === "http") return "http";
-  return "stdio";
-}
-
-function AuthBadge({ authStatus }: { authStatus: AuthStatus }) {
-  if (authStatus.hasAuth) {
-    const label =
-      authStatus.authType === "env"
-        ? `${authStatus.keyCount} env key${authStatus.keyCount !== 1 ? "s" : ""}`
-        : `${authStatus.keyCount} header${authStatus.keyCount !== 1 ? "s" : ""}`;
-    return (
-      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-800">
-        {label}
-      </span>
-    );
-  }
-  return (
-    <span className="rounded bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-800">
-      not configured
-    </span>
-  );
-}
 
 function ConnectionBadge({
   connectionStatus,
@@ -93,135 +55,6 @@ function ConnectionBadge({
     <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
       {statusText}
     </span>
-  );
-}
-
-function KeyValueEditor({
-  pairs,
-  onChange,
-  keyLabel,
-}: {
-  pairs: [string, string][];
-  onChange: (pairs: [string, string][]) => void;
-  keyLabel: string;
-}) {
-  const addRow = () => onChange([...pairs, ["", ""]]);
-  const removeRow = (idx: number) =>
-    onChange(pairs.filter((_, i) => i !== idx));
-  const updateRow = (idx: number, field: 0 | 1, value: string) => {
-    const next = pairs.map((p, i) =>
-      i === idx
-        ? ([field === 0 ? value : p[0], field === 1 ? value : p[1]] as [
-            string,
-            string,
-          ])
-        : p
-    );
-    onChange(next);
-  };
-
-  return (
-    <div className="space-y-2">
-      {pairs.map(([k, v], i) => (
-        <div key={i} className="flex items-center gap-2">
-          <input
-            type="text"
-            value={k}
-            onChange={(e) => updateRow(i, 0, e.target.value)}
-            placeholder={keyLabel}
-            className="w-40 rounded-md border bg-background px-2 py-1 text-sm placeholder:text-muted-foreground"
-          />
-          <input
-            type="password"
-            value={v}
-            onChange={(e) => updateRow(i, 1, e.target.value)}
-            placeholder="Value"
-            className="flex-1 rounded-md border bg-background px-2 py-1 text-sm placeholder:text-muted-foreground"
-          />
-          <button
-            onClick={() => removeRow(i)}
-            className="rounded px-2 py-1 text-sm text-destructive hover:bg-destructive/10"
-          >
-            Remove
-          </button>
-        </div>
-      ))}
-      <button
-        onClick={addRow}
-        className="rounded-md border border-dashed px-2 py-1 text-xs text-muted-foreground hover:bg-muted"
-      >
-        + Add {keyLabel.toLowerCase()}
-      </button>
-    </div>
-  );
-}
-
-function AuthConfigForm({
-  server,
-  onSaved,
-}: {
-  server: McpServerEntry;
-  onSaved: () => void;
-}) {
-  const type = getServerType(server.config);
-  const isStdio = type === "stdio";
-  const fieldKey = isStdio ? "env" : "headers";
-  const keyLabel = isStdio ? "Variable" : "Header";
-
-  const existing = (server.config[fieldKey] as Record<string, string>) ?? {};
-  const [pairs, setPairs] = useState<[string, string][]>(
-    Object.entries(existing).length > 0
-      ? Object.entries(existing)
-      : [["", ""]]
-  );
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSave = useCallback(async () => {
-    setError(null);
-    setSaving(true);
-    try {
-      const filtered = pairs.filter(([k]) => k.trim() !== "");
-      const record = Object.fromEntries(filtered);
-      const res = await fetch("/api/mcp-servers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          serverName: server.name,
-          scope: server.scope,
-          updates: { [fieldKey]: record },
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Failed to save");
-        return;
-      }
-      onSaved();
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setSaving(false);
-    }
-  }, [pairs, server.name, server.scope, fieldKey, onSaved]);
-
-  return (
-    <div className="mt-3 rounded-md border border-dashed p-3">
-      <p className="mb-2 text-xs font-medium text-muted-foreground">
-        {isStdio ? "Environment Variables" : "HTTP Headers"}
-      </p>
-      <KeyValueEditor pairs={pairs} onChange={setPairs} keyLabel={keyLabel} />
-      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
-      <div className="mt-3 flex gap-2">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Save"}
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -308,12 +141,6 @@ function ServerCard({
   connectionStatus?: McpConnectionStatus;
   onSaved: () => void;
 }) {
-  const [showForm, setShowForm] = useState(false);
-  const type = getServerType(server.config);
-  const env = server.config.env as Record<string, string> | undefined;
-  const headers = server.config.headers as Record<string, string> | undefined;
-
-  const canConfigure = server.scope === "project" || server.scope === "local";
   const needsAuth = connectionStatus?.status === "needs_auth";
 
   // MCP auth operation — single click login
@@ -324,11 +151,15 @@ function ServerCard({
     if (authStartedRef.current || mcpAuth.isRunning) return;
     authStartedRef.current = true;
     try {
-      await mcpAuth.start("mcp-auth", { serverName: server.name });
+      const body: Record<string, string> = { serverName: server.name };
+      if (!needsAuth) {
+        body.forceReauth = "true";
+      }
+      await mcpAuth.start("mcp-auth", body);
     } catch (err) {
       console.error("MCP auth failed to start:", err);
     }
-  }, [mcpAuth, server.name]);
+  }, [mcpAuth, server.name, needsAuth]);
 
   // Reset the started ref when operation finishes
   useEffect(() => {
@@ -349,21 +180,18 @@ function ServerCard({
     <div className="rounded-lg border p-4">
       <div className="flex items-center gap-2">
         <h2 className="font-semibold">{server.name}</h2>
-        <span
-          className={`rounded px-1.5 py-0.5 text-xs font-medium ${scopeColors[server.scope] ?? ""}`}
-        >
-          {server.scope}
-        </span>
-        <span className="rounded bg-muted px-1.5 py-0.5 text-xs">{type}</span>
-        <AuthBadge authStatus={server.authStatus} />
         <ConnectionBadge connectionStatus={connectionStatus} />
         <div className="ml-auto flex items-center gap-2">
-          {needsAuth && !mcpAuth.isRunning && !mcpAuth.operation && (
+          {!mcpAuth.isRunning && !mcpAuth.operation && (
             <button
               onClick={handleLogin}
-              className="rounded-md border border-blue-300 px-2 py-0.5 text-xs font-medium text-blue-700 hover:bg-blue-50"
+              className={`rounded-md border px-2 py-0.5 text-xs font-medium ${
+                needsAuth
+                  ? "border-blue-300 text-blue-700 hover:bg-blue-50"
+                  : "border-gray-300 text-gray-600 hover:bg-gray-50"
+              }`}
             >
-              Login
+              {needsAuth ? "Login" : "Reauth"}
             </button>
           )}
           {mcpAuth.isRunning && (
@@ -382,81 +210,40 @@ function ServerCard({
               Clear
             </button>
           )}
-          {canConfigure && (
-            <button
-              onClick={() => setShowForm((v) => !v)}
-              className="rounded-md border px-2 py-0.5 text-xs font-medium hover:bg-muted"
-            >
-              {showForm ? "Close" : "Configure"}
-            </button>
-          )}
         </div>
       </div>
 
       <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-        {type === "stdio" && (
+        {server.config.command != null && (
           <p>
             <span className="font-medium text-foreground">command:</span>{" "}
             <code className="text-xs">
-              {String(server.config.command ?? "")}
+              {String(server.config.command)}
               {Array.isArray(server.config.args) &&
                 server.config.args.length > 0 &&
                 ` ${(server.config.args as string[]).join(" ")}`}
             </code>
           </p>
         )}
-        {(type === "sse" || type === "http") && (
+        {server.config.url != null && (
           <p>
             <span className="font-medium text-foreground">url:</span>{" "}
             <code className="text-xs">
-              {String(server.config.url ?? "")}
+              {String(server.config.url)}
             </code>
-          </p>
-        )}
-
-        {env && Object.keys(env).length > 0 && (
-          <p>
-            <span className="font-medium text-foreground">env:</span>{" "}
-            {Object.keys(env).map((k) => (
-              <code key={k} className="mr-1 text-xs">
-                {k}=***
-              </code>
-            ))}
-          </p>
-        )}
-
-        {headers && Object.keys(headers).length > 0 && (
-          <p>
-            <span className="font-medium text-foreground">headers:</span>{" "}
-            {Object.keys(headers).map((k) => (
-              <code key={k} className="mr-1 text-xs">
-                {k}: ***
-              </code>
-            ))}
           </p>
         )}
       </div>
 
-      {/* MCP Auth operation log — inline */}
+      {/* MCP Auth terminal — inline xterm.js readonly display */}
       {mcpAuth.operation && mcpAuth.events.length > 0 && (
         <div className="mt-3">
-          <OperationLog
-            operationId={mcpAuth.operation.id}
+          <McpAuthTerminal
             events={mcpAuth.events}
             isRunning={mcpAuth.isRunning}
-            phases={mcpAuth.operation.phases}
+            operationStatus={mcpAuth.operation.status}
           />
         </div>
-      )}
-
-      {showForm && (
-        <AuthConfigForm
-          server={server}
-          onSaved={() => {
-            setShowForm(false);
-            onSaved();
-          }}
-        />
       )}
     </div>
   );

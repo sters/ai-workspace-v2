@@ -14,6 +14,43 @@ const MAX_PROMPT_ARG_LENGTH = 200_000;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type StreamEvent = Record<string, any>;
 
+/** Patterns that indicate a fatal API error that should stop the process immediately. */
+const FATAL_ERROR_PATTERNS = [/API Error:\s*401/i, /authentication_failed/i];
+
+/**
+ * Check if a stream event contains a fatal API error (e.g. 401 Unauthorized).
+ * Returns the matched error message or null.
+ */
+export function detectFatalApiError(parsed: StreamEvent): string | null {
+  const candidates: string[] = [];
+
+  // result event with is_error / errors array
+  if (parsed.type === "result" && parsed.is_error && parsed.errors?.length) {
+    candidates.push(...parsed.errors);
+  }
+  // assistant message with error field
+  if (parsed.error) {
+    candidates.push(String(parsed.error));
+  }
+  // auth_status error
+  if (parsed.type === "auth_status" && parsed.error) {
+    candidates.push(String(parsed.error));
+  }
+  // result text itself
+  if (parsed.type === "result" && typeof parsed.result === "string") {
+    candidates.push(parsed.result);
+  }
+
+  for (const text of candidates) {
+    for (const pattern of FATAL_ERROR_PATTERNS) {
+      if (pattern.test(text)) {
+        return text;
+      }
+    }
+  }
+  return null;
+}
+
 function log(operationId: string, ...args: unknown[]) {
   console.log(`[claude-cli][${operationId}]`, ...args);
 }
@@ -140,6 +177,33 @@ export function runClaude(
               if (hasAskDenial) {
                 log(operationId, "AskUserQuestion permission denied, will wait for answer");
               }
+            }
+
+            // Detect fatal API errors (e.g. 401 Unauthorized) — kill immediately
+            const fatalError = detectFatalApiError(parsed);
+            if (fatalError) {
+              log(operationId, "fatal API error detected, killing process:", fatalError);
+              killed = true;
+              proc.kill();
+              emit({
+                type: "output",
+                operationId,
+                data: JSON.stringify(parsed),
+                timestamp: new Date().toISOString(),
+              });
+              emit({
+                type: "error",
+                operationId,
+                data: `Fatal API error: ${fatalError}`,
+                timestamp: new Date().toISOString(),
+              });
+              emit({
+                type: "complete",
+                operationId,
+                data: JSON.stringify({ exitCode: 1 }),
+                timestamp: new Date().toISOString(),
+              });
+              return; // Stop reading stdout
             }
 
             emit({

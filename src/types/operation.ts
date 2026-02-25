@@ -32,7 +32,7 @@ export interface Operation {
 }
 
 export interface OperationEvent {
-  type: "output" | "error" | "complete" | "status";
+  type: "output" | "error" | "complete" | "status" | "terminal";
   operationId: string;
   data: string;
   timestamp: string;
