@@ -62,7 +62,7 @@ describe("McpAuthTerminal", () => {
     });
   });
 
-  it("filters only terminal events and writes them to xterm", async () => {
+  it("writes terminal events as raw data and status events as dim lines", async () => {
     const events: OperationEvent[] = [
       makeEvent("status", "Starting..."),
       makeEvent("terminal", "hello pty"),
@@ -78,9 +78,35 @@ describe("McpAuthTerminal", () => {
 
     rerender(<McpAuthTerminal {...defaultProps} events={events} />);
 
-    expect(mockWrite).toHaveBeenCalledTimes(2);
+    // 1 status + 2 terminal = 3 writes
+    expect(mockWrite).toHaveBeenCalledTimes(3);
+    // Status event is written with dim ANSI prefix
+    expect(mockWrite).toHaveBeenCalledWith(
+      expect.stringContaining("[status] Starting..."),
+    );
     expect(mockWrite).toHaveBeenCalledWith("hello pty");
     expect(mockWrite).toHaveBeenCalledWith(" world");
+  });
+
+  it("skips internal __ status events", async () => {
+    const events: OperationEvent[] = [
+      makeEvent("status", "__setWorkspace:test"),
+      makeEvent("status", "__phaseUpdate:{}"),
+      makeEvent("status", "Visible message"),
+    ];
+
+    const { rerender } = render(<McpAuthTerminal {...defaultProps} />);
+
+    await vi.waitFor(() => {
+      expect(mockOpen).toHaveBeenCalled();
+    });
+
+    rerender(<McpAuthTerminal {...defaultProps} events={events} />);
+
+    expect(mockWrite).toHaveBeenCalledTimes(1);
+    expect(mockWrite).toHaveBeenCalledWith(
+      expect.stringContaining("Visible message"),
+    );
   });
 
   it("writes only new events on re-render (delta tracking)", async () => {
@@ -106,9 +132,8 @@ describe("McpAuthTerminal", () => {
     expect(mockWrite).toHaveBeenLastCalledWith("second");
   });
 
-  it("does not write non-terminal events", async () => {
+  it("does not write output/error/complete events", async () => {
     const events: OperationEvent[] = [
-      makeEvent("status", "status msg"),
       makeEvent("output", "output msg"),
       makeEvent("error", "error msg"),
       makeEvent("complete", '{"exitCode":0}'),
@@ -140,10 +165,13 @@ describe("McpAuthTerminal", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows failure message when failed", async () => {
+  it("shows failure message with last status when failed", async () => {
     render(
       <McpAuthTerminal
-        events={[makeEvent("terminal", "err")]}
+        events={[
+          makeEvent("status", "Spawn failed"),
+          makeEvent("status", "Error: connection refused"),
+        ]}
         isRunning={false}
         operationStatus="failed"
       />,
@@ -151,7 +179,9 @@ describe("McpAuthTerminal", () => {
     await vi.waitFor(() => {
       expect(mockOpen).toHaveBeenCalled();
     });
-    expect(screen.getByText(/failed/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Authentication failed.*connection refused/),
+    ).toBeInTheDocument();
   });
 
   it("disposes xterm on unmount", async () => {
