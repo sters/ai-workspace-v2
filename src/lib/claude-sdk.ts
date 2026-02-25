@@ -28,6 +28,8 @@ export interface ClaudeProcess {
   onEvent: (handler: (event: OperationEvent) => void) => void;
   kill: () => void;
   submitAnswer: (toolUseId: string, answers: Record<string, string>) => boolean;
+  /** Returns the model's final text response (captured from the result event). */
+  getResultText: () => string | undefined;
 }
 
 function log(operationId: string, ...args: unknown[]) {
@@ -37,6 +39,7 @@ function log(operationId: string, ...args: unknown[]) {
 export function runClaude(
   operationId: string,
   prompt: string,
+  _options?: { jsonSchema?: Record<string, unknown> },
 ): ClaudeProcess {
   const handlers: ((event: OperationEvent) => void)[] = [];
   const earlyEvents: OperationEvent[] = [];
@@ -172,5 +175,6 @@ export function runClaude(
       resolve(answers);
       return true;
     },
+    getResultText: () => undefined, // SDK path doesn't capture result text yet
   };
 }

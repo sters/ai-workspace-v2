@@ -10,9 +10,9 @@
     "dev:hot": "bun --bun bin/start.ts --hot",
     "build": "bun --bun next build",
     "start": "bun --bun bin/start.ts",
-    "lint": "tsc --noEmit && eslint src/",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "lint": "bun --bun tsc --noEmit && bun --bun eslint src/",
+    "test": "bun --bun vitest run",
+    "test:watch": "bun --bun vitest",
     "next-server": "bun run bin/next-server.ts",
     "chat-server": "bun run bin/chat-server.ts"
   },

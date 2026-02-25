@@ -5,7 +5,7 @@ import path from "node:path";
 import { startOperationPipeline } from "@/lib/process-manager";
 import { readWorkspaceReadme } from "@/lib/readme-parser";
 import {
-  parseAnalysisResult,
+  parseAnalysisResultText,
   setupWorkspace,
   setupRepository,
   commitWorkspaceSnapshot,
@@ -13,9 +13,11 @@ import {
   writeReportTemplates,
   README_TEMPLATE,
   type SetupRepositoryResult,
+  type TaskAnalysis,
 } from "@/lib/workspace-ops";
 import {
   buildInitAnalyzeAndReadmePrompt,
+  INIT_ANALYSIS_SCHEMA,
   buildPlannerPrompt,
   buildCoordinatorPrompt,
   buildReviewerPrompt,
@@ -32,14 +34,14 @@ export async function POST(request: Request) {
     );
   }
 
-  // Temp dir for analysis result and draft README
+  // Temp dir for draft README (analysis JSON is now returned via structured output)
   const tmpDir = path.join(os.tmpdir(), `ai-ws-init-${Date.now()}`);
-  const analysisPath = path.join(tmpDir, "analysis.json");
   const tempReadmePath = path.join(tmpDir, "README.md");
 
   // Shared mutable state across pipeline phases
   let wsName = "";
   let wsPath = "";
+  let analysis: TaskAnalysis | null = null;
   const repoResults: SetupRepositoryResult[] = [];
 
   const phases: PipelinePhase[] = [
@@ -60,11 +62,15 @@ export async function POST(request: Request) {
 
         const prompt = buildInitAnalyzeAndReadmePrompt({
           description,
-          analysisPath,
           readmePath: tempReadmePath,
         });
 
-        return ctx.runChild("Analyze & draft README", prompt);
+        return ctx.runChild("Analyze & draft README", prompt, {
+          jsonSchema: INIT_ANALYSIS_SCHEMA,
+          onResultText: (text) => {
+            analysis = parseAnalysisResultText(text, description);
+          },
+        });
       },
     },
     // Phase B: Read analysis result, create workspace, copy README, setup repos
@@ -72,7 +78,10 @@ export async function POST(request: Request) {
       kind: "function",
       label: "Setup workspace",
       fn: async (ctx) => {
-        const analysis = parseAnalysisResult(analysisPath, description);
+        // Use structured output analysis; fall back to defaults if unavailable
+        if (!analysis) {
+          analysis = parseAnalysisResultText(undefined, description);
+        }
 
         ctx.emitStatus(
           `Detected: type=${analysis.taskType}, slug=${analysis.slug}` +

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { cliPath } from "@/lib/claude-sdk";
-import { AI_WORKSPACE_ROOT } from "@/lib/config";
+import { spawnVersion } from "@/lib/spawn-version";
 
 export const dynamic = "force-dynamic";
 
@@ -24,11 +23,7 @@ async function readStream(stream: ReadableStream<Uint8Array>): Promise<string> {
 
 export async function GET() {
   try {
-    const proc = Bun.spawn([cliPath, "--version"], {
-      cwd: AI_WORKSPACE_ROOT,
-      stdout: "pipe",
-      stderr: "pipe",
-    });
+    const proc = spawnVersion();
 
     const [stdout, stderr, exitCode] = await Promise.all([
       readStream(proc.stdout as ReadableStream<Uint8Array>),

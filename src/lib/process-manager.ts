@@ -4,7 +4,7 @@ import type {
   OperationPhaseInfo,
   OperationType,
 } from "@/types/operation";
-import { runClaude, type ClaudeProcess } from "./claude";
+import { runClaude, type ClaudeProcess, type RunClaudeOptions } from "./claude";
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -83,6 +83,11 @@ function markComplete(managed: ManagedOperation, success: boolean) {
   });
 }
 
+interface WireChildResult {
+  success: boolean;
+  resultText?: string;
+}
+
 /**
  * Wire a child ClaudeProcess to the parent ManagedOperation.
  * Tags every event with childLabel (and optional phaseExtra) and updates child status on completion.
@@ -93,11 +98,11 @@ function wireChild(
   childLabel: string,
   process: ClaudeProcess,
   phaseExtra?: { phaseIndex?: number; phaseLabel?: string },
-): Promise<boolean> {
+): Promise<WireChildResult> {
   managed.childProcesses.set(childId, process);
   emitStatus(managed, "Initializing...", { childLabel, ...phaseExtra });
 
-  return new Promise<boolean>((resolve) => {
+  return new Promise<WireChildResult>((resolve) => {
     process.onEvent((event) => {
       const tagged: OperationEvent = {
         ...event,
@@ -113,7 +118,7 @@ function wireChild(
         const child = managed.operation.children?.find((c) => c.id === childId);
         if (child) child.status = success ? "completed" : "failed";
         managed.childProcesses.delete(childId);
-        resolve(success);
+        resolve({ success, resultText: process.getResultText() });
       }
     });
   });
@@ -173,6 +178,13 @@ export interface AskQuestionDef {
   multiSelect?: boolean;
 }
 
+export interface RunChildOptions {
+  /** JSON Schema for structured output via --json-schema. */
+  jsonSchema?: Record<string, unknown>;
+  /** Called with the model's final text response when the child process completes. */
+  onResultText?: (text: string) => void;
+}
+
 export interface PhaseFunctionContext {
   operationId: string;
   emitStatus: (message: string) => void;
@@ -183,7 +195,7 @@ export interface PhaseFunctionContext {
   /** Update the operation's workspace identifier. Notifies the FE via a special event. */
   setWorkspace: (workspace: string) => void;
   /** Run a single Claude child query and wait for completion. */
-  runChild: (label: string, prompt: string) => Promise<boolean>;
+  runChild: (label: string, prompt: string, options?: RunChildOptions) => Promise<boolean>;
   /** Run multiple Claude child queries in parallel and wait for all to complete. */
   runChildGroup: (children: GroupChild[]) => Promise<boolean[]>;
 }
@@ -329,18 +341,26 @@ export function startOperationPipeline(
                 });
               });
             },
-            runChild: (label, prompt) => {
+            runChild: async (label, prompt, childOptions) => {
               const cid = `${id}-phase-${i}-fn-${childCounter++}`;
               operation.children!.push({ id: cid, label, status: "running" });
-              const proc = runClaude(cid, prompt);
-              return wireChild(managed, cid, label, proc, phaseExtra);
+              const claudeOpts: RunClaudeOptions | undefined = childOptions?.jsonSchema
+                ? { jsonSchema: childOptions.jsonSchema }
+                : undefined;
+              const proc = runClaude(cid, prompt, claudeOpts);
+              const result = await wireChild(managed, cid, label, proc, phaseExtra);
+              if (result.resultText && childOptions?.onResultText) {
+                childOptions.onResultText(result.resultText);
+              }
+              return result.success;
             },
             runChildGroup: (children) => {
-              const promises = children.map((child) => {
+              const promises = children.map(async (child) => {
                 const cid = `${id}-phase-${i}-fn-${childCounter++}`;
                 operation.children!.push({ id: cid, label: child.label, status: "running" });
                 const proc = runClaude(cid, child.prompt);
-                return wireChild(managed, cid, child.label, proc, phaseExtra);
+                const result = await wireChild(managed, cid, child.label, proc, phaseExtra);
+                return result.success;
               });
               return Promise.all(promises);
             },
@@ -358,18 +378,20 @@ export function startOperationPipeline(
         const childId = `${id}-phase-${i}`;
         operation.children!.push({ id: childId, label: phase.label, status: "running" });
         const process = runClaude(childId, phase.prompt);
-        phaseSuccess = await wireChild(managed, childId, phase.label, process, phaseExtra);
+        const result = await wireChild(managed, childId, phase.label, process, phaseExtra);
+        phaseSuccess = result.success;
 
       } else {
         // group
         const groupLabel = phase.children.map((c) => c.label).join(", ");
         emitStatus(managed, `Phase ${phaseNum}/${phases.length}: parallel [${groupLabel}]`, phaseExtra);
 
-        const groupPromises = phase.children.map((child, j) => {
+        const groupPromises = phase.children.map(async (child, j) => {
           const childId = `${id}-phase-${i}-child-${j}`;
           operation.children!.push({ id: childId, label: child.label, status: "running" });
           const process = runClaude(childId, child.prompt);
-          return wireChild(managed, childId, child.label, process, phaseExtra);
+          const result = await wireChild(managed, childId, child.label, process, phaseExtra);
+          return result.success;
         });
 
         const results = await Promise.all(groupPromises);
