@@ -25,6 +25,11 @@ const tools = [
     description:
       "View and edit .claude/settings*.json files across project, local, and user scopes.",
   },
+  {
+    href: "/utilities/claude-auth",
+    name: "Claude Auth",
+    description: "Manage Claude Code authentication status and login.",
+  },
 ];
 
 export default function UtilitiesPage() {

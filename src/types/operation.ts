@@ -6,7 +6,8 @@ export type OperationType =
   | "update-todo"
   | "delete"
   | "workspace-prune"
-  | "mcp-auth";
+  | "mcp-auth"
+  | "claude-login";
 
 export interface OperationChild {
   id: string;
