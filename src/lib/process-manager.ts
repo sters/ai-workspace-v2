@@ -18,6 +18,8 @@ interface ManagedOperation {
   listeners: Set<(event: OperationEvent) => void>;
   /** Pending ask resolvers for function-phase emitAsk calls, keyed by toolUseId. */
   pendingAsks: Map<string, (answers: Record<string, string>) => void>;
+  /** Abort controller for cancelling function-phase work (e.g. PTY processes). */
+  abortController: AbortController;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,6 +202,8 @@ export interface PhaseFunctionContext {
   runChildGroup: (children: GroupChild[]) => Promise<boolean[]>;
   /** Emit raw terminal (PTY) output for xterm.js rendering on the client. */
   emitTerminal: (data: string) => void;
+  /** Abort signal that fires when the operation is killed. Use to clean up external processes. */
+  signal: AbortSignal;
 }
 
 export interface PipelinePhaseFunction {
@@ -253,6 +257,7 @@ export function startOperationPipeline(
     events: [],
     listeners: new Set(),
     pendingAsks: new Map(),
+    abortController: new AbortController(),
   };
 
   operations.set(id, managed);
@@ -365,6 +370,7 @@ export function startOperationPipeline(
                 ...phaseExtra,
               });
             },
+            signal: managed.abortController.signal,
             runChildGroup: (children) => {
               const promises = children.map(async (child) => {
                 const cid = `${id}-phase-${i}-fn-${childCounter++}`;
@@ -473,6 +479,7 @@ export function subscribeToOperation(
 export function killOperation(id: string): boolean {
   const managed = operations.get(id);
   if (!managed || managed.operation.status !== "running") return false;
+  managed.abortController.abort();
   if (managed.claudeProcess) managed.claudeProcess.kill();
   for (const [, process] of managed.childProcesses) process.kill();
   return true;

@@ -27,6 +27,7 @@ export async function POST(request: Request) {
           {
             emitStatus: ctx.emitStatus,
             emitTerminal: ctx.emitTerminal,
+            signal: ctx.signal,
           },
           { forceReauth: isReauth },
         );
