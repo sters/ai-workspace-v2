@@ -104,14 +104,14 @@ const sharedEnv = {
 
 // Start Next.js server
 const nextFlags = isHot ? ["--hot"] : isDev ? ["--dev"] : [];
-const nextServer = Bun.spawn(["bun", "run", "bin/next-server.ts", ...nextFlags], {
+const nextServer = Bun.spawn(["bun", "--bun", "run", "bin/next-server.ts", ...nextFlags], {
   cwd: packageDir,
   stdio: ["inherit", "inherit", "inherit"],
   env: sharedEnv,
 });
 
 // Start WebSocket chat server
-const chatServer = Bun.spawn(["bun", "run", "bin/chat-server.ts"], {
+const chatServer = Bun.spawn(["bun", "--bun", "run", "bin/chat-server.ts"], {
   cwd: packageDir,
   stdio: ["inherit", "inherit", "inherit"],
   env: sharedEnv,
