@@ -69,6 +69,12 @@ export default function RootLayout({
                     >
                       Claude Settings
                     </Link>
+                    <Link
+                      href="/utilities/claude-auth"
+                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                    >
+                      Claude Auth
+                    </Link>
                   </div>
                 </div>
               </nav>
