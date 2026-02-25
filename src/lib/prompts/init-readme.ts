@@ -1,13 +1,42 @@
 /**
  * Prompt template for the merged init operation: analyze task + draft README.
- * Claude analyzes the description, writes analysis JSON, and fills in the README template.
+ * Claude analyzes the description and fills in the README template.
+ * The analysis result is returned as structured JSON output via --json-schema.
  */
 
 export interface InitAnalyzeAndReadmeInput {
   description: string;
-  analysisPath: string;
   readmePath: string;
 }
+
+/**
+ * JSON Schema for the analysis result, used with --json-schema to constrain
+ * the model's final text response to valid, parseable JSON.
+ */
+export const INIT_ANALYSIS_SCHEMA: Record<string, unknown> = {
+  type: "object",
+  properties: {
+    taskType: {
+      type: "string",
+      enum: ["feature", "bugfix", "research", "investigation"],
+    },
+    slug: {
+      type: "string",
+      description: "Short English slug (2-5 lowercase words, hyphen-separated) for the workspace directory name",
+    },
+    ticketId: {
+      type: "string",
+      description: "Ticket ID if found (e.g. PROJ-123, #456), or empty string",
+    },
+    repositories: {
+      type: "array",
+      items: { type: "string" },
+      description: "Full repository paths (e.g. github.com/org/repo) found in description, or empty array",
+    },
+  },
+  required: ["taskType", "slug", "ticketId", "repositories"],
+  additionalProperties: false,
+};
 
 export function buildInitAnalyzeAndReadmePrompt(input: InitAnalyzeAndReadmeInput): string {
   return `# Task: Analyze description and draft workspace README
@@ -20,23 +49,14 @@ ${input.description}
 
 You have two jobs:
 
-### 1. Write analysis JSON
+### 1. Analyze the description
 
-Analyze the task description above and write a JSON object to \`${input.analysisPath}\` using the Write tool. No explanation, no markdown fences — just the JSON.
+Analyze the task description above. Your final text response will be constrained to a JSON schema automatically — just focus on determining the correct values:
 
-JSON schema:
-{
-  "taskType": "feature" | "bugfix" | "research" | "investigation",
-  "slug": "short-english-slug (2-5 lowercase words, hyphen-separated)",
-  "ticketId": "ticket ID if found (e.g. PROJ-123, #456), or empty string",
-  "repositories": ["github.com/org/repo", ...] (full paths found in description, or empty array)
-}
-
-Rules:
-- taskType: infer from context. Default to "feature" if unclear.
-- slug: concise English directory name for the workspace. Do NOT include the ticket ID in the slug.
-- ticketId: extract Jira IDs (XX-123), GitHub issue refs (#123 or org/repo#123), Linear IDs, etc. Empty string if none.
-- repositories: extract repository paths like "github.com/org/repo". Include the host. Empty array if none mentioned.
+- **taskType**: infer from context. Default to "feature" if unclear.
+- **slug**: concise English directory name for the workspace. Do NOT include the ticket ID in the slug.
+- **ticketId**: extract Jira IDs (XX-123), GitHub issue refs (#123 or org/repo#123), Linear IDs, etc. Empty string if none.
+- **repositories**: extract repository paths like "github.com/org/repo". Include the host. Empty array if none mentioned.
 
 ### 2. Edit the README template
 
@@ -58,6 +78,6 @@ A README template has been written at \`${input.readmePath}\`. Edit it to fill i
 - Use the file path \`${input.readmePath}\` for README edits
 - Keep the template structure, just fill in the placeholder sections
 - The README should give clear context for agents that will work on this task later
-- Write the analysis JSON file FIRST, then edit the README
+- Edit the README FIRST, then your final text response will be the analysis JSON
 `;
 }

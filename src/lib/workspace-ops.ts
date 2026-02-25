@@ -59,37 +59,11 @@ export interface TaskAnalysis {
 }
 
 /**
- * Build a prompt for a Claude child process to analyze a task description
- * and write the result as JSON to the given output path.
+ * Parse a TaskAnalysis from structured JSON text (from --json-schema output).
+ * Uses Bun.JSONL.parseChunk for non-throwing parse with error reporting.
+ * Returns a fallback if the text is empty or unparseable.
  */
-export function buildAnalysisPrompt(description: string, outputPath: string): string {
-  return `Analyze the following task description and extract structured metadata.
-
-Write ONLY a JSON object to the file ${outputPath} using the Write tool. No explanation, no markdown.
-
-JSON schema:
-{
-  "taskType": "feature" | "bugfix" | "research" | "investigation",
-  "slug": "short-english-slug (2-5 lowercase words, hyphen-separated)",
-  "ticketId": "ticket ID if found (e.g. PROJ-123, #456), or empty string",
-  "repositories": ["github.com/org/repo", ...] (full paths found in description, or empty array)
-}
-
-Rules:
-- taskType: infer from context. Default to "feature" if unclear.
-- slug: concise English directory name for the workspace. Do NOT include the ticket ID in the slug.
-- ticketId: extract Jira IDs (XX-123), GitHub issue refs (#123 or org/repo#123), Linear IDs, etc. Empty string if none.
-- repositories: extract repository paths like "github.com/org/repo". Include the host. Empty array if none mentioned.
-
-Task description:
-${description}`;
-}
-
-/**
- * Parse a TaskAnalysis from a JSON file written by the analysis child process.
- * Returns a fallback if the file is missing or unparseable.
- */
-export function parseAnalysisResult(filePath: string, fallbackDescription: string): TaskAnalysis {
+export function parseAnalysisResultText(jsonText: string | undefined, fallbackDescription: string): TaskAnalysis {
   const fallback: TaskAnalysis = {
     taskType: "feature",
     slug: sanitizeSlug(fallbackDescription),
@@ -97,20 +71,19 @@ export function parseAnalysisResult(filePath: string, fallbackDescription: strin
     repositories: [],
   };
 
-  try {
-    const raw = fs.readFileSync(filePath, "utf-8").trim();
-    // Strip markdown fences if present
-    const cleaned = raw.replace(/^```json?\s*/, "").replace(/\s*```$/, "").trim();
-    const parsed = JSON.parse(cleaned);
-    return {
-      taskType: parsed.taskType || fallback.taskType,
-      slug: sanitizeSlug(parsed.slug || "") || fallback.slug,
-      ticketId: parsed.ticketId || "",
-      repositories: Array.isArray(parsed.repositories) ? parsed.repositories : [],
-    };
-  } catch {
-    return fallback;
-  }
+  if (!jsonText) return fallback;
+
+  const { values, error } = Bun.JSONL.parseChunk(jsonText);
+  if (error || values.length === 0) return fallback;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const parsed = values[0] as Record<string, any>;
+  return {
+    taskType: parsed.taskType || fallback.taskType,
+    slug: sanitizeSlug(parsed.slug || "") || fallback.slug,
+    ticketId: parsed.ticketId || "",
+    repositories: Array.isArray(parsed.repositories) ? parsed.repositories : [],
+  };
 }
 
 // ---------------------------------------------------------------------------
