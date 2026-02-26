@@ -27,8 +27,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const isResearch =
-    meta.taskType === "research" || meta.taskType === "investigation";
+  const isResearch = meta.taskType === "research";
 
   try {
     if (isResearch) {

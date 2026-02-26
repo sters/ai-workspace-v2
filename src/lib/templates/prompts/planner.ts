@@ -14,7 +14,7 @@ export interface PlannerInput {
 }
 
 export function buildPlannerPrompt(input: PlannerInput): string {
-  const isResearch = input.taskType === "research" || input.taskType === "investigation";
+  const isResearch = input.taskType === "research";
   const instructions = isResearch ? RESEARCH_PLANNER_INSTRUCTIONS : PLANNER_INSTRUCTIONS;
 
   return `# Task: Plan TODO items for ${input.repoName}
