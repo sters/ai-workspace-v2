@@ -128,4 +128,21 @@ process.on("SIGTERM", killAll);
 // Wait for Next.js to exit, then clean up chat server
 const nextExitCode = await nextServer.exited;
 chatServer.kill();
+
+// Next.js dev server queries terminal capabilities (background color, cursor
+// position, device attributes). When the process is killed, the terminal's
+// responses arrive on stdin with no process to consume them, so the shell
+// displays them as garbage text. Drain any pending responses before exiting.
+if (process.stdin.isTTY) {
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.once("readable", () => {
+    // discard whatever is buffered
+    while (process.stdin.read() !== null) {}
+  });
+  await Bun.sleep(100);
+  process.stdin.pause();
+  process.stdin.setRawMode(false);
+}
+
 process.exit(nextExitCode ?? 0);
