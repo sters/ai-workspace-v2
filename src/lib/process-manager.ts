@@ -95,18 +95,19 @@ function markComplete(managed: ManagedOperation, success: boolean) {
   managed.operation.completedAt = new Date().toISOString();
   managed.completedAt = Date.now();
 
-  // Release references to help GC
-  managed.childProcesses.clear();
-  managed.pendingAsks.clear();
-  managed.listeners.clear();
-  managed.claudeProcess = null;
-
+  // Emit the complete event BEFORE clearing listeners so SSE clients receive it
   emitEvent(managed, {
     type: "complete",
     operationId: managed.operation.id,
     data: JSON.stringify({ exitCode: success ? 0 : 1 }),
     timestamp: new Date().toISOString(),
   });
+
+  // Release references to help GC
+  managed.childProcesses.clear();
+  managed.pendingAsks.clear();
+  managed.listeners.clear();
+  managed.claudeProcess = null;
 }
 
 // ---------------------------------------------------------------------------
