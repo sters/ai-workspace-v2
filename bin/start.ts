@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { existsSync, mkdirSync, cpSync, rmSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, rmSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +17,7 @@ if (packageDir.includes(`${sep}node_modules${sep}`)) {
   // Extract git hash from bunx temp bun.lock (e.g. "...#abc1234")
   try {
     const lockPath = resolve(packageDir, "..", "..", "bun.lock");
-    const lock = readFileSync(lockPath, "utf-8");
+    const lock = await Bun.file(lockPath).text();
     const match = lock.match(/ai-workspace-v2#([a-f0-9]+)/);
     if (match) resolvedGitHash = match[1];
   } catch {}

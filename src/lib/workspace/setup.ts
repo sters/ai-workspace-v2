@@ -2,7 +2,7 @@
  * Workspace setup — creating workspaces, setting up repositories, detecting branches.
  */
 
-import fs from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR } from "../config";
 import { exec, repoDir, sanitizeSlug } from "./helpers";
@@ -114,12 +114,12 @@ export interface SetupWorkspaceResult {
   workspacePath: string;
 }
 
-export function setupWorkspace(
+export async function setupWorkspace(
   taskType: string,
   description: string,
   ticketId?: string,
   preGeneratedSlug?: string,
-): SetupWorkspaceResult {
+): Promise<SetupWorkspaceResult> {
   // Use pre-generated slug if provided, otherwise sanitize the description
   let slug = preGeneratedSlug
     ? sanitizeSlug(preGeneratedSlug)
@@ -144,9 +144,9 @@ export function setupWorkspace(
 
   // If the directory already exists, append a numeric suffix
   let wsPath = path.join(WORKSPACE_DIR, dirName);
-  if (fs.existsSync(wsPath)) {
+  if (existsSync(wsPath)) {
     let suffix = 2;
-    while (fs.existsSync(path.join(WORKSPACE_DIR, `${dirName}-${suffix}`))) {
+    while (existsSync(path.join(WORKSPACE_DIR, `${dirName}-${suffix}`))) {
       suffix++;
     }
     dirName = `${dirName}-${suffix}`;
@@ -154,16 +154,16 @@ export function setupWorkspace(
   }
 
   // Create directories
-  fs.mkdirSync(wsPath, { recursive: true });
-  fs.mkdirSync(path.join(wsPath, "tmp"), { recursive: true });
-  fs.mkdirSync(path.join(wsPath, "artifacts"), { recursive: true });
-  fs.writeFileSync(path.join(wsPath, "artifacts", ".gitkeep"), "");
+  mkdirSync(wsPath, { recursive: true });
+  mkdirSync(path.join(wsPath, "tmp"), { recursive: true });
+  mkdirSync(path.join(wsPath, "artifacts"), { recursive: true });
+  await Bun.write(path.join(wsPath, "artifacts", ".gitkeep"), "");
 
   // Initialize git
   exec(`git init --quiet "${wsPath}"`);
 
   // Write .gitignore
-  fs.writeFileSync(path.join(wsPath, ".gitignore"), GITIGNORE_CONTENT);
+  await Bun.write(path.join(wsPath, ".gitignore"), GITIGNORE_CONTENT);
 
   // Write README from template
   const dateFormatted = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
@@ -172,7 +172,7 @@ export function setupWorkspace(
     .replace(/\{\{TASK_TYPE\}\}/g, taskType)
     .replace(/\{\{TICKET_ID\}\}/g, ticketId ?? "N/A")
     .replace(/\{\{DATE\}\}/g, dateFormatted);
-  fs.writeFileSync(path.join(wsPath, "README.md"), readme);
+  await Bun.write(path.join(wsPath, "README.md"), readme);
 
   // Initial commit
   exec(`git -C "${wsPath}" add .gitignore README.md artifacts/`);
@@ -258,15 +258,15 @@ export function setupRepository(
   const repoAbsPath = path.join(repoDir(), actualRepoPath);
   const wsPath = path.join(WORKSPACE_DIR, workspaceName);
 
-  if (!fs.existsSync(wsPath)) {
+  if (!existsSync(wsPath)) {
     throw new Error(`Workspace directory does not exist: ${wsPath}`);
   }
 
   // Clone or fetch
-  if (!fs.existsSync(repoAbsPath)) {
+  if (!existsSync(repoAbsPath)) {
     emit(`Repository not found locally, cloning ${actualRepoPath}...`);
     const parentDir = path.dirname(repoAbsPath);
-    fs.mkdirSync(parentDir, { recursive: true });
+    mkdirSync(parentDir, { recursive: true });
     const repoUrl = `https://${actualRepoPath}.git`;
     exec(`git clone "${repoUrl}" "${repoAbsPath}"`);
     emit("Clone complete.");
@@ -320,7 +320,7 @@ export function setupRepository(
   // Create worktree — use absolute path so git -C doesn't resolve it
   // relative to the repository directory
   const worktreePath = path.resolve(path.join(wsPath, repoPathInput));
-  fs.mkdirSync(path.dirname(worktreePath), { recursive: true });
+  mkdirSync(path.dirname(worktreePath), { recursive: true });
 
   // If the branch already exists, resolve the conflict
   try {
@@ -357,9 +357,9 @@ export function setupRepository(
 
   // If the target directory already exists (e.g. from a previous failed attempt),
   // remove it before creating the worktree
-  if (fs.existsSync(worktreePath)) {
+  if (existsSync(worktreePath)) {
     emit(`Target directory already exists, removing: ${repoPathInput}`);
-    fs.rmSync(worktreePath, { recursive: true, force: true });
+    rmSync(worktreePath, { recursive: true, force: true });
     try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
   }
 
@@ -372,7 +372,7 @@ export function setupRepository(
   }
 
   // Verify the worktree was actually created
-  if (!fs.existsSync(path.join(worktreePath, ".git"))) {
+  if (!existsSync(path.join(worktreePath, ".git"))) {
     // Log diagnostic info
     const list = exec(`git -C "${repoAbsPath}" worktree list`);
     emit(`Worktree list after add: ${list}`);

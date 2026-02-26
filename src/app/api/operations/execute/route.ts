@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import fs from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/process-manager";
@@ -16,7 +15,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return parsed.response;
 
   const workspace = resolveWorkspaceName(parsed.data.workspace);
-  const readmeContent = getReadme(workspace) ?? "";
+  const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
   const repos = listWorkspaceRepos(workspace);
   const wsPath = path.join(WORKSPACE_DIR, workspace);
@@ -34,7 +33,7 @@ export async function POST(request: Request) {
   try {
     if (isResearch) {
       // Write report templates (idempotent — ensures templates exist for older workspaces)
-      writeReportTemplates(wsPath);
+      await writeReportTemplates(wsPath);
 
       const reportPath = path.join(wsPath, "artifacts", "research-report.md");
       const prompt = buildResearcherPrompt({
@@ -56,11 +55,11 @@ export async function POST(request: Request) {
     }
 
     // Feature/bugfix: launch one executor per repository
-    const children = repos.map((repo) => {
+    const children = await Promise.all(repos.map(async (repo) => {
       const todoFileName = `TODO-${repo.repoName}.md`;
-      const todoPath = path.join(wsPath, todoFileName);
-      const todoContent = fs.existsSync(todoPath)
-        ? fs.readFileSync(todoPath, "utf-8")
+      const todoFile = Bun.file(path.join(wsPath, todoFileName));
+      const todoContent = (await todoFile.exists())
+        ? await todoFile.text()
         : "";
 
       const prompt = buildExecutorPrompt({
@@ -76,7 +75,7 @@ export async function POST(request: Request) {
         label: repo.repoName,
         prompt,
       };
-    });
+    }));
 
     const operation = startOperationPipeline("execute", workspace, [
       { kind: "group", children },

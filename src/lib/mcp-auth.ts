@@ -1,4 +1,3 @@
-import { execSync } from "node:child_process";
 import { AI_WORKSPACE_ROOT } from "./config";
 import {
   spawnTerminal,
@@ -22,11 +21,15 @@ const ARROW_DOWN = "\x1b[B";
  * Returns -1 if the server is not found.
  */
 function getServerIndex(serverName: string): number {
-  const output = execSync("claude mcp list", {
-    encoding: "utf-8",
+  const result = Bun.spawnSync(["claude", "mcp", "list"], {
     cwd: AI_WORKSPACE_ROOT,
-    timeout: 30_000,
+    stdout: "pipe",
+    stderr: "pipe",
   });
+  if (!result.success) {
+    throw new Error(`claude mcp list failed: ${result.stderr.toString()}`);
+  }
+  const output = result.stdout.toString();
   const servers: string[] = [];
   for (const line of output.split("\n")) {
     const match = line.match(/^(\S+):\s/);

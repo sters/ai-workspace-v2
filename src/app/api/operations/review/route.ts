@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import fs from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/process-manager";
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return parsed.response;
 
   const workspace = resolveWorkspaceName(parsed.data.workspace);
-  const readmeContent = getReadme(workspace) ?? "";
+  const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
   const repos = listWorkspaceRepos(workspace);
   const wsPath = path.join(WORKSPACE_DIR, workspace);
@@ -40,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   // Write report templates (idempotent — ensures templates exist for older workspaces)
-  writeReportTemplates(wsPath);
+  await writeReportTemplates(wsPath);
 
   const reviewTimestamp = prepareReviewDir(workspace);
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);
@@ -77,9 +76,9 @@ export async function POST(request: Request) {
 
     // TODO verifier
     const todoFileName = `TODO-${repo.repoName}.md`;
-    const todoPath = path.join(wsPath, todoFileName);
-    const todoContent = fs.existsSync(todoPath)
-      ? fs.readFileSync(todoPath, "utf-8")
+    const todoFile = Bun.file(path.join(wsPath, todoFileName));
+    const todoContent = (await todoFile.exists())
+      ? await todoFile.text()
       : "";
 
     reviewChildren.push({
@@ -109,10 +108,11 @@ export async function POST(request: Request) {
         kind: "function",
         label: "Collect review results",
         fn: async (ctx) => {
-          // List actual review/verify files that were created
-          const files = fs.existsSync(reviewDir) ? fs.readdirSync(reviewDir) : [];
-          const actualReviewFiles = files.filter((f) => f.startsWith("REVIEW-"));
-          const actualVerifyFiles = files.filter((f) => f.startsWith("VERIFY-"));
+          // List actual review/verify files using Bun.Glob
+          const reviewGlob = new Bun.Glob("REVIEW-*");
+          const verifyGlob = new Bun.Glob("VERIFY-*");
+          const actualReviewFiles = [...reviewGlob.scanSync({ cwd: reviewDir })];
+          const actualVerifyFiles = [...verifyGlob.scanSync({ cwd: reviewDir })];
 
           const prompt = buildCollectorPrompt({
             workspaceName: workspace,

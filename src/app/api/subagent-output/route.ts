@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { statSync, watch, type FSWatcher } from "node:fs";
 import path from "node:path";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   const targetPath: string = pathParam;
   const encoder = new TextEncoder();
   let offset = 0;
-  let watcher: fs.FSWatcher | null = null;
+  let watcher: FSWatcher | null = null;
   let fallbackTimer: ReturnType<typeof setInterval> | null = null;
   let closed = false;
 
@@ -48,26 +48,20 @@ export async function GET(request: Request) {
       // SSE comment to establish connection
       controller.enqueue(encoder.encode(":ok\n\n"));
 
-      function sendChunk() {
+      async function sendChunk() {
         if (closed) return;
         try {
-          const stat = fs.statSync(targetPath);
+          const stat = statSync(targetPath);
           if (stat.size <= offset) return;
 
           const readLen = Math.min(stat.size - offset, MAX_READ_BYTES);
-          const fd = fs.openSync(targetPath, "r");
-          try {
-            const buf = Buffer.alloc(readLen);
-            fs.readSync(fd, buf, 0, readLen, offset);
-            offset += readLen;
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({ content: buf.toString("utf-8"), size: offset })}\n\n`
-              )
-            );
-          } finally {
-            fs.closeSync(fd);
-          }
+          const content = await Bun.file(targetPath).slice(offset, offset + readLen).text();
+          offset += readLen;
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ content, size: offset })}\n\n`
+            )
+          );
 
           // Set up fs.watch once the file exists (it may not exist on first call)
           startWatching();
@@ -90,7 +84,7 @@ export async function GET(request: Request) {
       function startWatching() {
         if (watcher || closed) return;
         try {
-          watcher = fs.watch(targetPath, () => sendChunk());
+          watcher = watch(targetPath, () => sendChunk());
           watcher.on("error", () => {
             // File may have been removed/recreated; drop the watcher and let fallback handle it
             if (watcher) {

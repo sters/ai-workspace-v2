@@ -1,18 +1,27 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { NextRequest } from "next/server";
 
 const mockReadFile = vi.fn();
 const mockWriteFile = vi.fn();
 const mockMkdir = vi.fn();
 
+// Mock Bun.file() and Bun.write() for the test environment.
+// The global Bun object is non-configurable, so we override its properties directly.
+const mockBunFile = vi.fn((filePath: string) => ({
+  text: () => mockReadFile(filePath),
+}));
+const mockBunWrite = vi.fn((filePath: string, content: string) =>
+  mockWriteFile(filePath, content)
+);
+const originalBunFile = Bun.file;
+const originalBunWrite = Bun.write;
+Bun.file = mockBunFile as unknown as typeof Bun.file;
+Bun.write = mockBunWrite as unknown as typeof Bun.write;
+
 vi.mock("node:fs/promises", () => ({
   default: {
-    readFile: (...args: unknown[]) => mockReadFile(...args),
-    writeFile: (...args: unknown[]) => mockWriteFile(...args),
     mkdir: (...args: unknown[]) => mockMkdir(...args),
   },
-  readFile: (...args: unknown[]) => mockReadFile(...args),
-  writeFile: (...args: unknown[]) => mockWriteFile(...args),
   mkdir: (...args: unknown[]) => mockMkdir(...args),
 }));
 
@@ -52,6 +61,13 @@ beforeEach(() => {
   mockReadFile.mockReset();
   mockWriteFile.mockReset();
   mockMkdir.mockReset();
+  mockBunFile.mockClear();
+  mockBunWrite.mockClear();
+});
+
+afterAll(() => {
+  Bun.file = originalBunFile;
+  Bun.write = originalBunWrite;
 });
 
 describe("GET /api/claude-settings", () => {

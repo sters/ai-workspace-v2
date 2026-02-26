@@ -2,17 +2,21 @@
  * Workspace helpers — shared utilities used by workspace modules.
  */
 
-import { execSync } from "node:child_process";
-import fs from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { AI_WORKSPACE_ROOT, WORKSPACE_DIR } from "../config";
 
 export function exec(cmd: string, opts?: { cwd?: string; maxBuffer?: number }): string {
-  return execSync(cmd, {
-    encoding: "utf-8",
+  const result = Bun.spawnSync(["sh", "-c", cmd], {
     cwd: opts?.cwd ?? AI_WORKSPACE_ROOT,
-    maxBuffer: opts?.maxBuffer ?? 10 * 1024 * 1024,
-  }).trim();
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (!result.success) {
+    const stderr = result.stderr.toString().trim();
+    throw new Error(stderr || `Command failed: ${cmd}`);
+  }
+  return result.stdout.toString().trim();
 }
 
 export function repoDir(): string {
@@ -52,16 +56,16 @@ export interface StaleWorkspace {
 }
 
 export function listStaleWorkspaces(days: number): StaleWorkspace[] {
-  if (!fs.existsSync(WORKSPACE_DIR)) return [];
+  if (!existsSync(WORKSPACE_DIR)) return [];
 
   const threshold = Date.now() - days * 24 * 60 * 60 * 1000;
-  const entries = fs.readdirSync(WORKSPACE_DIR, { withFileTypes: true });
+  const entries = readdirSync(WORKSPACE_DIR, { withFileTypes: true });
   const stale: StaleWorkspace[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const wsPath = path.join(WORKSPACE_DIR, entry.name);
-    const stat = fs.statSync(wsPath);
+    const stat = statSync(wsPath);
     if (stat.mtime.getTime() < threshold) {
       stale.push({ name: entry.name, lastModified: stat.mtime });
     }
@@ -78,16 +82,16 @@ export interface WorkspaceAgeInfo {
 }
 
 export function listAllWorkspacesWithAge(staleDays: number): WorkspaceAgeInfo[] {
-  if (!fs.existsSync(WORKSPACE_DIR)) return [];
+  if (!existsSync(WORKSPACE_DIR)) return [];
 
   const now = Date.now();
-  const entries = fs.readdirSync(WORKSPACE_DIR, { withFileTypes: true });
+  const entries = readdirSync(WORKSPACE_DIR, { withFileTypes: true });
   const result: WorkspaceAgeInfo[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const wsPath = path.join(WORKSPACE_DIR, entry.name);
-    const stat = fs.statSync(wsPath);
+    const stat = statSync(wsPath);
     const ageDays = Math.floor((now - stat.mtime.getTime()) / (24 * 60 * 60 * 1000));
     result.push({
       name: entry.name,

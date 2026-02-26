@@ -1,79 +1,113 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
 
-const mockExecSync = vi.fn();
+const mockWhich = vi.fn();
+const mockSpawnSync = vi.fn();
 
-vi.mock("node:child_process", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:child_process")>();
-  return {
-    ...actual,
-    default: { ...actual, execSync: mockExecSync },
-    execSync: mockExecSync,
-  };
-});
+// Store original Bun methods
+const originalWhich = Bun.which;
+const originalSpawnSync = Bun.spawnSync;
 
-// Import after mock setup
+// Override Bun globals before importing the module
+Bun.which = mockWhich as typeof Bun.which;
+Bun.spawnSync = mockSpawnSync as typeof Bun.spawnSync;
+
 const { getCliPath, _resetCliPath } = await import("@/lib/claude/cli-path");
 
 describe("getCliPath", () => {
   beforeEach(() => {
     _resetCliPath();
-    mockExecSync.mockReset();
+    mockWhich.mockReset();
+    mockSpawnSync.mockReset();
   });
 
-  it("resolves via which + realpath", () => {
-    mockExecSync
-      .mockReturnValueOnce("/usr/local/bin/claude\n")
-      .mockReturnValueOnce("/usr/local/lib/claude/cli.js\n");
+  afterAll(() => {
+    // Restore original Bun methods
+    Bun.which = originalWhich;
+    Bun.spawnSync = originalSpawnSync;
+  });
+
+  it("resolves via Bun.which + realpath", () => {
+    mockWhich.mockReturnValue("/usr/local/bin/claude");
+    mockSpawnSync.mockReturnValueOnce({
+      success: true,
+      stdout: Buffer.from("/usr/local/lib/claude/cli.js\n"),
+      stderr: Buffer.from(""),
+    });
 
     expect(getCliPath()).toBe("/usr/local/lib/claude/cli.js");
-    expect(mockExecSync).toHaveBeenCalledTimes(2);
+    expect(mockWhich).toHaveBeenCalledWith("claude");
+    expect(mockSpawnSync).toHaveBeenCalledTimes(1);
   });
 
   it("falls back to readlink -f when realpath fails", () => {
-    mockExecSync
-      .mockReturnValueOnce("/usr/local/bin/claude\n")
-      .mockImplementationOnce(() => { throw new Error("realpath failed"); })
-      .mockReturnValueOnce("/usr/local/lib/claude/cli.js\n");
+    mockWhich.mockReturnValue("/usr/local/bin/claude");
+    mockSpawnSync
+      .mockReturnValueOnce({
+        success: false,
+        stdout: Buffer.from(""),
+        stderr: Buffer.from("realpath failed"),
+      })
+      .mockReturnValueOnce({
+        success: true,
+        stdout: Buffer.from("/usr/local/lib/claude/cli.js\n"),
+        stderr: Buffer.from(""),
+      });
 
     expect(getCliPath()).toBe("/usr/local/lib/claude/cli.js");
-    expect(mockExecSync).toHaveBeenCalledTimes(3);
+    expect(mockSpawnSync).toHaveBeenCalledTimes(2);
   });
 
   it("falls back to raw bin path when both realpath and readlink fail", () => {
-    mockExecSync
-      .mockReturnValueOnce("/usr/local/bin/claude\n")
-      .mockImplementationOnce(() => { throw new Error("realpath failed"); })
-      .mockImplementationOnce(() => { throw new Error("readlink failed"); });
+    mockWhich.mockReturnValue("/usr/local/bin/claude");
+    mockSpawnSync
+      .mockReturnValueOnce({
+        success: false,
+        stdout: Buffer.from(""),
+        stderr: Buffer.from("realpath failed"),
+      })
+      .mockReturnValueOnce({
+        success: false,
+        stdout: Buffer.from(""),
+        stderr: Buffer.from("readlink failed"),
+      });
 
     expect(getCliPath()).toBe("/usr/local/bin/claude");
   });
 
-  it("returns 'claude' when which fails", () => {
-    mockExecSync.mockImplementation(() => { throw new Error("not found"); });
+  it("returns 'claude' when Bun.which returns null", () => {
+    mockWhich.mockReturnValue(null);
 
     expect(getCliPath()).toBe("claude");
   });
 
   it("caches the result (lazy evaluation)", () => {
-    mockExecSync
-      .mockReturnValueOnce("/usr/local/bin/claude\n")
-      .mockReturnValueOnce("/usr/local/lib/claude/cli.js\n");
+    mockWhich.mockReturnValue("/usr/local/bin/claude");
+    mockSpawnSync.mockReturnValueOnce({
+      success: true,
+      stdout: Buffer.from("/usr/local/lib/claude/cli.js\n"),
+      stderr: Buffer.from(""),
+    });
 
     const first = getCliPath();
     const second = getCliPath();
     expect(first).toBe(second);
-    // execSync should only be called on first invocation
-    expect(mockExecSync).toHaveBeenCalledTimes(2);
+    // Bun.which should only be called on first invocation
+    expect(mockWhich).toHaveBeenCalledTimes(1);
   });
 
   it("re-resolves after _resetCliPath()", () => {
-    mockExecSync.mockReturnValue("/usr/local/bin/claude\n");
+    mockWhich.mockReturnValue("/usr/local/bin/claude");
+    mockSpawnSync.mockReturnValue({
+      success: true,
+      stdout: Buffer.from("/usr/local/bin/claude\n"),
+      stderr: Buffer.from(""),
+    });
 
     getCliPath();
     _resetCliPath();
     getCliPath();
 
     // Called for both resolutions
-    expect(mockExecSync.mock.calls.length).toBeGreaterThanOrEqual(3);
+    expect(mockWhich).toHaveBeenCalledTimes(2);
   });
 });

@@ -5,7 +5,6 @@ import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
 import { buildUpdaterPrompt } from "@/lib/prompts";
 import { updateTodoSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
-import fs from "node:fs";
 import path from "node:path";
 
 export async function POST(request: Request) {
@@ -17,17 +16,17 @@ export async function POST(request: Request) {
   const { instruction } = parsed.data;
   const workspacePath = path.join(WORKSPACE_DIR, workspace);
 
-  const readmePath = path.join(workspacePath, "README.md");
-  const readmeContent = fs.existsSync(readmePath)
-    ? fs.readFileSync(readmePath, "utf-8")
+  const readmeFile = Bun.file(path.join(workspacePath, "README.md"));
+  const readmeContent = (await readmeFile.exists())
+    ? await readmeFile.text()
     : "";
 
   const repos = listWorkspaceRepos(workspace);
 
-  const prompts = repos.map((repo) => {
-    const todoPath = path.join(workspacePath, `TODO-${repo.repoName}.md`);
-    const todoContent = fs.existsSync(todoPath)
-      ? fs.readFileSync(todoPath, "utf-8")
+  const prompts = await Promise.all(repos.map(async (repo) => {
+    const todoFile = Bun.file(path.join(workspacePath, `TODO-${repo.repoName}.md`));
+    const todoContent = (await todoFile.exists())
+      ? await todoFile.text()
       : "";
 
     return buildUpdaterPrompt({
@@ -39,7 +38,7 @@ export async function POST(request: Request) {
       workspacePath,
       instruction,
     });
-  });
+  }));
 
   const prompt =
     prompts.length === 1
