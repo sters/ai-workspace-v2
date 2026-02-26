@@ -8,6 +8,7 @@ import {
   detectBaseBranch,
   getRepoChanges,
   checkExistingPR,
+  readPRTemplate,
 } from "@/lib/workspace";
 import { buildPRCreatorPrompt } from "@/lib/templates";
 import { createPrSchema } from "@/lib/schemas";
@@ -40,6 +41,7 @@ export async function POST(request: Request) {
 
     const changes = getRepoChanges(workspace, repo.repoPath, baseBranch);
     const existingPR = checkExistingPR(repo.worktreePath);
+    const prTemplate = readPRTemplate(repo.worktreePath);
 
     const prompt = buildPRCreatorPrompt({
       workspaceName: workspace,
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
       readmeContent,
       repoChanges: `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`,
       draft: draft !== false,
+      prTemplate: prTemplate ?? undefined,
       existingPR: existingPR.exists
         ? { url: existingPR.url!, title: existingPR.title!, body: existingPR.body! }
         : undefined,
