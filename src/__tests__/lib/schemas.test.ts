@@ -39,8 +39,14 @@ describe("createPrSchema", () => {
     expect(createPrSchema.safeParse({ workspace: "test" }).success).toBe(true);
   });
 
-  it("accepts workspace with draft", () => {
+  it("accepts workspace with draft boolean", () => {
     const result = createPrSchema.safeParse({ workspace: "test", draft: true });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.draft).toBe(true);
+  });
+
+  it("coerces draft string to boolean", () => {
+    const result = createPrSchema.safeParse({ workspace: "test", draft: "true" });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.draft).toBe(true);
   });
@@ -65,14 +71,24 @@ describe("workspacePruneSchema", () => {
     expect(workspacePruneSchema.safeParse({}).success).toBe(true);
   });
 
-  it("accepts days parameter", () => {
+  it("accepts days as number", () => {
     const result = workspacePruneSchema.safeParse({ days: 14 });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.days).toBe(14);
+  });
+
+  it("coerces days from string to number", () => {
+    const result = workspacePruneSchema.safeParse({ days: "14" });
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.days).toBe(14);
   });
 
   it("rejects negative days", () => {
     expect(workspacePruneSchema.safeParse({ days: -1 }).success).toBe(false);
+  });
+
+  it("rejects negative days as string", () => {
+    expect(workspacePruneSchema.safeParse({ days: "-1" }).success).toBe(false);
   });
 });
 
