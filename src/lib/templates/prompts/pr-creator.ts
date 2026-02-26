@@ -32,8 +32,10 @@ ${input.existingPR.body}
 `
     : "";
 
-  const prTemplateSection = input.prTemplate
-    ? `## PR Template
+  // When an existing PR exists, its body serves as the template — no need for the repo template file.
+  const prTemplateSection =
+    !input.existingPR && input.prTemplate
+      ? `## PR Template
 
 The following is the repository's PR template. You MUST use this template as the PR body structure and fill in each section based on the changes above. Do NOT search for a PR template file — it is already provided here.
 
@@ -41,7 +43,7 @@ The following is the repository's PR template. You MUST use this template as the
 ${input.prTemplate}
 \`\`\`
 `
-    : "";
+      : "";
 
   return `# Task: ${input.existingPR ? "Update" : "Create"} PR for ${input.repoName}
 
@@ -86,11 +88,12 @@ const PR_CREATOR_INSTRUCTIONS = `You are a specialized agent for creating or upd
 
 ### If Updating an Existing PR
 
-1. **Use Existing PR Body** as the template
-2. **Overwrite** sections describing code changes with latest info
-3. **Keep everything else unchanged** (QA results, review notes, etc.)
-4. **Push** latest changes: \`git push\`
-5. **Update** PR using \`gh pr edit\`
+1. **Use the Existing PR Body as the base template** — preserve its structure and formatting
+2. **Update only sections that describe code changes** (summary, changed files, implementation details) with the latest "Repository Changes" info above
+3. **Keep everything else unchanged** — do NOT remove or rewrite QA results, review notes, manual annotations, or any human-added content
+4. **Update the title** if the scope of changes has significantly shifted
+5. **Push** latest changes: \`git push\`
+6. **Update** PR using \`gh pr edit\`
 
 ### Working Directory Rules
 
