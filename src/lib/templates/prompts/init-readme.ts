@@ -18,7 +18,7 @@ export const INIT_ANALYSIS_SCHEMA: Record<string, unknown> = {
   properties: {
     taskType: {
       type: "string",
-      enum: ["feature", "bugfix", "research", "investigation"],
+      enum: ["feature", "bugfix", "research"],
     },
     slug: {
       type: "string",
@@ -57,7 +57,10 @@ You have two jobs:
 
 Analyze the task description above. Your final text response will be constrained to a JSON schema automatically — just focus on determining the correct values:
 
-- **taskType**: infer from context. Default to "feature" if unclear.
+- **taskType**: classify based on the **end goal**, not the process:
+  - **"bugfix"**: the goal is to fix a bug, resolve an error, or correct wrong behavior. This includes tasks that require investigation/diagnosis as a step toward fixing. "Investigate and fix X" → bugfix.
+  - **"feature"**: the goal is to add new functionality, improve existing behavior, refactor, update configs, or make any code change that isn't a bug fix. Default to this if unclear.
+  - **"research"**: the goal is **only** to gather information or understand something, with no intent to change code. Pure investigation with no fix/implementation planned. Only use this when the task explicitly asks for research/analysis/documentation without code changes.
 - **slug**: concise English directory name for the workspace. Do NOT include the ticket ID in the slug.
 - **ticketId**: extract Jira IDs (XX-123), GitHub issue refs (#123 or org/repo#123), Linear IDs, etc. Empty string if none.
 - **repositories**: extract repository paths like "github.com/org/repo". Include the host. Empty array if none mentioned.
