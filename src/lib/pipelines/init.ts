@@ -114,24 +114,8 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
           }
         }
 
-        // Re-commit with the edited README
-        await commitWorkspaceSnapshot(wsName, "Init: workspace created with README");
-
-        const repoSummary = repoResults.length > 0
-          ? `\nRepositories: ${repoResults.map((r) => `${r.repoName} (${r.branchName})`).join(", ")}`
-          : "";
-        ctx.emitResult(`Workspace **${wsName}** created.${repoSummary}`);
-        return true;
-      },
-    },
-    // Phase C: Detect task type and setup any additional repos from README
-    {
-      kind: "function",
-      label: "Prepare for planning",
-      fn: async (ctx) => {
+        // Setup any additional repos that Claude added to the README but weren't in the analysis
         const { meta } = await readWorkspaceReadme(wsPath);
-
-        // If repos were added to README but not set up yet, set them up now
         for (const metaRepo of meta.repositories) {
           const already = repoResults.find(
             (r) => r.repoPath === metaRepo.path || r.repoName === metaRepo.alias,
@@ -147,33 +131,25 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
           }
         }
 
-        const isResearch = meta.taskType === "research" || meta.taskType === "investigation";
-        if (isResearch) {
-          await commitWorkspaceSnapshot(wsName, "Setup complete (research task)");
-          ctx.emitResult("Research/investigation task — skipping TODO planning.");
-          return true;
-        }
+        // Re-commit with the edited README
+        await commitWorkspaceSnapshot(wsName, "Init: workspace created with README");
 
-        if (repoResults.length === 0) {
-          await commitWorkspaceSnapshot(wsName, "Setup complete (no repos)");
-          ctx.emitResult("No repositories configured — skipping TODO planning.");
-          return true;
-        }
-
-        ctx.emitResult(`Ready to plan: ${repoResults.length} repo(s), task type: ${meta.taskType}`);
+        const repoSummary = repoResults.length > 0
+          ? `\nRepositories: ${repoResults.map((r) => `${r.repoName} (${r.branchName})`).join(", ")}`
+          : "";
+        ctx.emitResult(`Workspace **${wsName}** created.${repoSummary}`);
         return true;
       },
     },
-    // Phase D: Plan TODOs for each repo (parallel)
+    // Phase C: Plan TODOs for each repo (parallel)
     {
       kind: "function",
       label: "Plan TODO items",
       fn: async (ctx) => {
         const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
 
-        const isResearch = meta.taskType === "research" || meta.taskType === "investigation";
-        if (isResearch || repoResults.length === 0) {
-          ctx.emitResult("Skipped TODO planning.");
+        if (repoResults.length === 0) {
+          ctx.emitResult("No repositories configured — skipping TODO planning.");
           return true;
         }
 
@@ -199,15 +175,14 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
         return allSuccess;
       },
     },
-    // Phase E: Coordinate TODOs across repos (single, skip for single repo)
+    // Phase D: Coordinate TODOs across repos (single, skip for single repo)
     {
       kind: "function",
       label: "Coordinate TODOs",
       fn: async (ctx) => {
-        const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
-        const isResearch = meta.taskType === "research" || meta.taskType === "investigation";
-        if (isResearch || repoResults.length <= 1) {
-          ctx.emitResult("Skipped coordination (single repo or research task).");
+        const { content: readmeContent } = await readWorkspaceReadme(wsPath);
+        if (repoResults.length <= 1) {
+          ctx.emitResult("Skipped coordination (single repo).");
           return true;
         }
 
@@ -238,14 +213,13 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
         return ctx.runChild("Coordinate TODOs", prompt);
       },
     },
-    // Phase F: Review TODOs (parallel, per repo)
+    // Phase E: Review TODOs (parallel, per repo)
     {
       kind: "function",
       label: "Review TODOs",
       fn: async (ctx) => {
-        const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
-        const isResearch = meta.taskType === "research" || meta.taskType === "investigation";
-        if (isResearch || repoResults.length === 0) {
+        const { content: readmeContent } = await readWorkspaceReadme(wsPath);
+        if (repoResults.length === 0) {
           ctx.emitResult("Skipped TODO review.");
           return true;
         }
@@ -283,7 +257,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
         return allSuccess;
       },
     },
-    // Phase G: Commit workspace snapshot
+    // Phase F: Commit workspace snapshot
     {
       kind: "function",
       label: "Commit snapshot",
