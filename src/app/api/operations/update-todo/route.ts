@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/process-manager";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
-import { buildUpdaterPrompt } from "@/lib/prompts";
+import { buildUpdaterPrompt } from "@/lib/templates";
 import { updateTodoSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 import path from "node:path";

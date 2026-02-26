@@ -15,7 +15,7 @@ import {
   buildCodeReviewerPrompt,
   buildTodoVerifierPrompt,
   buildCollectorPrompt,
-} from "@/lib/prompts";
+} from "@/lib/templates";
 import type { PipelinePhase, GroupChild } from "@/lib/process-manager";
 import { reviewSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";

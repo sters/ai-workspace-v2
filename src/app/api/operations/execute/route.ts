@@ -5,7 +5,7 @@ import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/process-man
 import { getReadme } from "@/lib/workspace/reader";
 import { parseReadmeMeta } from "@/lib/parsers/readme";
 import { listWorkspaceRepos, writeReportTemplates } from "@/lib/workspace";
-import { buildExecutorPrompt, buildResearcherPrompt } from "@/lib/prompts";
+import { buildExecutorPrompt, buildResearcherPrompt } from "@/lib/templates";
 import { executeSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 

@@ -9,7 +9,7 @@ import {
   getRepoChanges,
   checkExistingPR,
 } from "@/lib/workspace";
-import { buildPRCreatorPrompt } from "@/lib/prompts";
+import { buildPRCreatorPrompt } from "@/lib/templates";
 import { createPrSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 
