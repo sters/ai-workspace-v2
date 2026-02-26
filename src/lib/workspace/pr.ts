@@ -2,9 +2,40 @@
  * PR and repo change analysis utilities.
  */
 
+import fs from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR } from "../config";
 import { exec } from "./helpers";
+
+// ---------------------------------------------------------------------------
+// readPRTemplate
+// ---------------------------------------------------------------------------
+
+const PR_TEMPLATE_PATHS = [
+  ".github/PULL_REQUEST_TEMPLATE.md",
+  ".github/pull_request_template.md",
+  ".github/PULL_REQUEST_TEMPLATE/default.md",
+  ".github/pull_request_template/default.md",
+  "docs/PULL_REQUEST_TEMPLATE.md",
+  "docs/pull_request_template.md",
+  "PULL_REQUEST_TEMPLATE.md",
+  "pull_request_template.md",
+];
+
+/**
+ * Read the PR template from a repository worktree.
+ * Searches standard GitHub PR template locations in priority order.
+ * Returns the template content or null if not found.
+ */
+export function readPRTemplate(worktreePath: string): string | null {
+  for (const templatePath of PR_TEMPLATE_PATHS) {
+    const fullPath = path.join(worktreePath, templatePath);
+    if (fs.existsSync(fullPath)) {
+      return fs.readFileSync(fullPath, "utf-8");
+    }
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // checkExistingPR

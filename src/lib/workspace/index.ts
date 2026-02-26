@@ -18,4 +18,4 @@ export { writeTodoTemplate, writeReportTemplates, prepareReviewDir } from "./tem
 
 // PR & repo analysis
 export type { ExistingPR, RepoChanges } from "./pr";
-export { checkExistingPR, getRepoChanges } from "./pr";
+export { checkExistingPR, getRepoChanges, readPRTemplate } from "./pr";

@@ -12,6 +12,7 @@ export interface PRCreatorInput {
   readmeContent: string;
   repoChanges: string;
   draft: boolean;
+  prTemplate?: string;
   existingPR?: {
     url: string;
     title: string;
@@ -28,6 +29,17 @@ export function buildPRCreatorPrompt(input: PRCreatorInput): string {
 
 **Body**:
 ${input.existingPR.body}
+`
+    : "";
+
+  const prTemplateSection = input.prTemplate
+    ? `## PR Template
+
+The following is the repository's PR template. You MUST use this template as the PR body structure and fill in each section based on the changes above. Do NOT search for a PR template file — it is already provided here.
+
+\`\`\`markdown
+${input.prTemplate}
+\`\`\`
 `
     : "";
 
@@ -48,7 +60,7 @@ ${input.readmeContent}
 ${input.repoChanges}
 
 ${existingPRSection}
-
+${prTemplateSection}
 ## Instructions
 
 ${PR_CREATOR_INSTRUCTIONS}
@@ -61,13 +73,10 @@ const PR_CREATOR_INSTRUCTIONS = `You are a specialized agent for creating or upd
 
 ### If Creating a New PR
 
-1. **Find PR Template**:
-   - Look for \`.github/pull_request_template.md\` or \`.github/PULL_REQUEST_TEMPLATE.md\`
-   - If no template found, use a standard format
-
-2. **Compose PR Content**:
+1. **Compose PR Content**:
    - Title: concise, under 70 characters
-   - Fill in PR template with change information
+   - If a PR Template is provided above, fill in each section of the template with the relevant change information. Do NOT search for a template file.
+   - If no PR Template is provided, use a standard format
    - Include ticket URLs in "Related issues" section
 
 3. **Push and Create**:
