@@ -1,27 +1,25 @@
 import { NextResponse } from "next/server";
 import { resolveWorkspaceName } from "@/lib/config";
-import { startOperationPipeline } from "@/lib/process-manager";
-import { getReadme } from "@/lib/workspace";
-import { parseReadmeMeta } from "@/lib/readme-parser";
+import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/process-manager";
+import { getReadme } from "@/lib/workspace/reader";
+import { parseReadmeMeta } from "@/lib/parsers/readme";
 import {
   listWorkspaceRepos,
   detectBaseBranch,
   getRepoChanges,
   checkExistingPR,
-} from "@/lib/workspace-ops";
+} from "@/lib/workspace";
 import { buildPRCreatorPrompt } from "@/lib/prompts";
+import { createPrSchema } from "@/lib/schemas";
+import { parseBody } from "@/lib/validate";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { workspace: rawWorkspace, draft } = body as { workspace: string; draft?: boolean };
-  if (!rawWorkspace) {
-    return NextResponse.json(
-      { error: "workspace is required" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(createPrSchema, body);
+  if (!parsed.success) return parsed.response;
 
-  const workspace = resolveWorkspaceName(rawWorkspace);
+  const workspace = resolveWorkspaceName(parsed.data.workspace);
+  const draft = parsed.data.draft;
   const readmeContent = getReadme(workspace) ?? "";
   const meta = parseReadmeMeta(readmeContent);
   const repos = listWorkspaceRepos(workspace);
@@ -63,8 +61,15 @@ export async function POST(request: Request) {
     };
   });
 
-  const operation = startOperationPipeline("create-pr", workspace, [
-    { kind: "group", children },
-  ]);
-  return NextResponse.json(operation);
+  try {
+    const operation = startOperationPipeline("create-pr", workspace, [
+      { kind: "group", children },
+    ]);
+    return NextResponse.json(operation);
+  } catch (err) {
+    if (err instanceof ConcurrencyLimitError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    throw err;
+  }
 }

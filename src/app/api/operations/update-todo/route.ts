@@ -1,25 +1,20 @@
 import { NextResponse } from "next/server";
-import { startOperationPipeline } from "@/lib/process-manager";
-import { listWorkspaceRepos } from "@/lib/workspace-ops";
+import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/process-manager";
+import { listWorkspaceRepos } from "@/lib/workspace";
 import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
 import { buildUpdaterPrompt } from "@/lib/prompts";
+import { updateTodoSchema } from "@/lib/schemas";
+import { parseBody } from "@/lib/validate";
 import fs from "node:fs";
 import path from "node:path";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { workspace: rawWorkspace, instruction } = body as {
-    workspace: string;
-    instruction: string;
-  };
-  if (!rawWorkspace || !instruction) {
-    return NextResponse.json(
-      { error: "workspace and instruction are required" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(updateTodoSchema, body);
+  if (!parsed.success) return parsed.response;
 
-  const workspace = resolveWorkspaceName(rawWorkspace);
+  const workspace = resolveWorkspaceName(parsed.data.workspace);
+  const { instruction } = parsed.data;
   const workspacePath = path.join(WORKSPACE_DIR, workspace);
 
   const readmePath = path.join(workspacePath, "README.md");
@@ -53,8 +48,15 @@ export async function POST(request: Request) {
           .map((p, i) => `# Repo ${i + 1} of ${prompts.length}\n\n${p}`)
           .join("\n\n---\n\n");
 
-  const operation = startOperationPipeline("update-todo", workspace, [
-    { kind: "single", label: "Update TODOs", prompt },
-  ]);
-  return NextResponse.json(operation);
+  try {
+    const operation = startOperationPipeline("update-todo", workspace, [
+      { kind: "single", label: "Update TODOs", prompt },
+    ]);
+    return NextResponse.json(operation);
+  } catch (err) {
+    if (err instanceof ConcurrencyLimitError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    throw err;
+  }
 }

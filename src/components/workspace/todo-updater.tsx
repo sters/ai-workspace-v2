@@ -5,7 +5,7 @@ import type { TodoFile } from "@/types/workspace";
 import { TodoItemRow } from "./todo-item";
 import { SectionBlock } from "./todo-viewer";
 import { ProgressBar } from "../shared/progress-bar";
-import { ClaudeOperation } from "../shared/claude-operation";
+import { ClaudeOperation } from "../operation/claude-operation";
 
 function UpdateForm({
   label,

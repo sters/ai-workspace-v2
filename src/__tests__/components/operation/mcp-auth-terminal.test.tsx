@@ -31,7 +31,7 @@ vi.mock("@xterm/addon-fit", () => {
 vi.mock("@xterm/xterm/css/xterm.css", () => ({}));
 
 // Import after mocks
-import { McpAuthTerminal } from "@/components/shared/mcp-auth-terminal";
+import { McpAuthTerminal } from "@/components/operation/mcp-auth-terminal";
 
 function makeEvent(
   type: OperationEvent["type"],

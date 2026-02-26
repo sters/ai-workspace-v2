@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseTodoFile, parseTodoItems, parseTodoSections } from "@/lib/todo-parser";
+import { parseTodoFile, parseTodoItems, parseTodoSections } from "@/lib/parsers/todo";
 
 describe("parseTodoItems", () => {
   it("parses completed items", () => {

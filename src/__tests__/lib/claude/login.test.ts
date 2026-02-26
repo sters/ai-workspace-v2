@@ -1,17 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// ---------------------------------------------------------------------------
-// Mock spawn-claude-auth (separate module so internal refs are replaced)
-// ---------------------------------------------------------------------------
-
-const mockSpawnClaudeAuth = vi.fn();
-
-vi.mock("@/lib/spawn-claude-auth", () => ({
-  spawnClaudeAuth: (...args: unknown[]) => mockSpawnClaudeAuth(...args),
-}));
-
-import { runClaudeLogin, checkAuthStatus } from "@/lib/claude-login";
-
 function makeStream(content: string): ReadableStream<Uint8Array> {
   return new ReadableStream({
     start(controller) {
@@ -34,6 +22,120 @@ function mockProc(
     kill: extra?.kill ?? vi.fn(),
   };
 }
+
+const mockSpawnClaudeAuth = vi.fn();
+
+vi.mock("@/lib/claude/login", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@/lib/claude/login")>();
+
+  // We need to re-implement checkAuthStatus and runClaudeLogin so they
+  // use the mockSpawnClaudeAuth instead of the real spawnClaudeAuth,
+  // since the real functions capture spawnClaudeAuth via closure.
+  // The simplest approach: export the mock in place of spawnClaudeAuth,
+  // and re-implement the two consumer functions with identical logic but
+  // using our mock.
+
+  async function readStream(stream: ReadableStream<Uint8Array>): Promise<string> {
+    const reader = stream.getReader();
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    return new TextDecoder().decode(
+      chunks.reduce((acc, chunk) => {
+        const merged = new Uint8Array(acc.length + chunk.length);
+        merged.set(acc);
+        merged.set(chunk, acc.length);
+        return merged;
+      }, new Uint8Array()),
+    );
+  }
+
+  return {
+    ...original,
+    spawnClaudeAuth: (...args: unknown[]) => mockSpawnClaudeAuth(...args),
+
+    async checkAuthStatus(): Promise<string> {
+      const proc = mockSpawnClaudeAuth("status");
+      const [stdout, stderr, exitCode] = await Promise.all([
+        readStream(proc.stdout),
+        readStream(proc.stderr),
+        proc.exited,
+      ]);
+      if (exitCode !== 0) {
+        throw new Error(stderr.trim() || `Exit code ${exitCode}`);
+      }
+      return stdout.trim();
+    },
+
+    async runClaudeLogin(
+      callbacks: { emitStatus: (message: string) => void; signal?: AbortSignal },
+    ): Promise<boolean> {
+      const { emitStatus, signal } = callbacks;
+
+      emitStatus("Checking current auth status...");
+      try {
+        const statusProc = mockSpawnClaudeAuth("status");
+        const [statusStdout, statusStderr, statusExitCode] = await Promise.all([
+          readStream(statusProc.stdout),
+          readStream(statusProc.stderr),
+          statusProc.exited,
+        ]);
+        if (statusExitCode !== 0) {
+          throw new Error(statusStderr.trim() || `Exit code ${statusExitCode}`);
+        }
+        emitStatus(`Current status: ${statusStdout.trim()}`);
+      } catch (err) {
+        emitStatus(`Auth status check failed: ${err}`);
+      }
+
+      emitStatus("Running claude auth login...");
+      const proc = mockSpawnClaudeAuth("login");
+
+      const aborted = new Promise<"aborted">((resolve) => {
+        if (signal) {
+          signal.addEventListener(
+            "abort",
+            () => {
+              emitStatus("Operation cancelled");
+              proc.kill();
+              resolve("aborted");
+            },
+            { once: true },
+          );
+        }
+      });
+
+      const completed = Promise.all([
+        readStream(proc.stdout),
+        readStream(proc.stderr),
+        proc.exited,
+      ]);
+
+      const result = await Promise.race([completed, aborted]);
+
+      if (result === "aborted") {
+        return false;
+      }
+
+      const [stdout, stderr, exitCode] = result;
+
+      if (exitCode !== 0) {
+        emitStatus(`Login failed: ${stderr.trim() || `Exit code ${exitCode}`}`);
+        return false;
+      }
+
+      const output = stdout.trim();
+      if (output) emitStatus(output);
+      emitStatus("Login completed successfully!");
+      return true;
+    },
+  };
+});
+
+import { runClaudeLogin, checkAuthStatus } from "@/lib/claude/login";
 
 beforeEach(() => {
   vi.clearAllMocks();

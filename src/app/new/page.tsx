@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ClaudeOperation } from "@/components/shared/claude-operation";
+import { ClaudeOperation } from "@/components/operation/claude-operation";
 
 export default function NewWorkspacePage() {
   const [description, setDescription] = useState("");

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockSpawnVersion = vi.fn();
-vi.mock("@/lib/spawn-version", () => ({
+vi.mock("@/lib/claude/version", () => ({
   spawnVersion: (...args: unknown[]) => mockSpawnVersion(...args),
 }));
 

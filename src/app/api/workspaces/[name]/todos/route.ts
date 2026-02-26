@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getTodos } from "@/lib/workspace";
+import { getTodos } from "@/lib/workspace/reader";
 
 export const dynamic = "force-dynamic";
 

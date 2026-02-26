@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { spawnVersion } from "@/lib/spawn-version";
+import { spawnVersion } from "@/lib/claude/version";
 
 export const dynamic = "force-dynamic";
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { startOperationPipeline } from "@/lib/process-manager";
-import { runClaudeLogin } from "@/lib/claude-login";
+import { runClaudeLogin } from "@/lib/claude/login";
 
 export async function POST() {
   const operation = startOperationPipeline("claude-login", "claude-login", [

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseReadmeMeta } from "@/lib/readme-parser";
+import { parseReadmeMeta } from "@/lib/parsers/readme";
 
 describe("parseReadmeMeta", () => {
   const sampleReadme = `# Task: Implement authentication flow

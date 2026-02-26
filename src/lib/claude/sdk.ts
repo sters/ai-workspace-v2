@@ -1,36 +1,8 @@
-import { execSync } from "node:child_process";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { AI_WORKSPACE_ROOT } from "./config";
+import { getCliPath } from "./cli-path";
+import { AI_WORKSPACE_ROOT } from "../config";
 import type { OperationEvent } from "@/types/operation";
-
-// Resolve the actual path to the claude CLI binary
-let cliPath: string;
-try {
-  const bin = execSync("which claude", { encoding: "utf-8" }).trim();
-  // Follow symlinks — try realpath first (works on macOS), fall back to readlink -f
-  try {
-    cliPath = execSync(`realpath "${bin}"`, { encoding: "utf-8" }).trim();
-  } catch {
-    try {
-      cliPath = execSync(`readlink -f "${bin}"`, { encoding: "utf-8" }).trim();
-    } catch {
-      cliPath = bin;
-    }
-  }
-} catch {
-  cliPath = "claude";
-}
-
-export { cliPath };
-
-export interface ClaudeProcess {
-  id: string;
-  onEvent: (handler: (event: OperationEvent) => void) => void;
-  kill: () => void;
-  submitAnswer: (toolUseId: string, answers: Record<string, string>) => boolean;
-  /** Returns the model's final text response (captured from the result event). */
-  getResultText: () => string | undefined;
-}
+import type { ClaudeProcess } from "@/types/claude";
 
 function log(operationId: string, ...args: unknown[]) {
   console.log(`[claude-sdk][${operationId}]`, ...args);
@@ -64,7 +36,7 @@ export function runClaude(
   log(operationId, "starting SDK query");
   log(operationId, "cwd:", cwd);
   log(operationId, "prompt:", prompt.slice(0, 200) + (prompt.length > 200 ? "..." : ""));
-  log(operationId, "cliPath:", cliPath);
+  log(operationId, "getCliPath():", getCliPath());
 
   // Run the SDK query in the background (non-blocking)
   (async () => {
@@ -74,7 +46,7 @@ export function runClaude(
         options: {
           abortController,
           cwd,
-          pathToClaudeCodeExecutable: cliPath,
+          pathToClaudeCodeExecutable: getCliPath(),
           // Load user settings and project settings (CLAUDE.md, .mcp.json, .claude/settings.json)
           settingSources: ["user", "project"],
           // Use canUseTool to auto-approve all tools and handle AskUserQuestion interactively

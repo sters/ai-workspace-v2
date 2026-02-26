@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCommitDiff } from "@/lib/workspace";
+import { getCommitDiff } from "@/lib/workspace/reader";
 
 export const dynamic = "force-dynamic";
 

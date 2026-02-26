@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseReviewSummary } from "@/lib/review-parser";
+import { parseReviewSummary } from "@/lib/parsers/review";
 
 describe("parseReviewSummary", () => {
   it("parses a complete review summary", () => {

@@ -5,6 +5,7 @@ import type {
   OperationType,
 } from "@/types/operation";
 import { runClaude, type ClaudeProcess, type RunClaudeOptions } from "./claude";
+import { Semaphore } from "./semaphore";
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -20,6 +21,21 @@ interface ManagedOperation {
   pendingAsks: Map<string, (answers: Record<string, string>) => void>;
   /** Abort controller for cancelling function-phase work (e.g. PTY processes). */
   abortController: AbortController;
+  /** Timestamp (ms) when the operation completed. Used for GC. */
+  completedAt?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Concurrency limits
+// ---------------------------------------------------------------------------
+
+export const MAX_CONCURRENT_OPERATIONS = 3;
+
+export class ConcurrencyLimitError extends Error {
+  constructor(running: number) {
+    super(`Too many concurrent operations (${running}/${MAX_CONCURRENT_OPERATIONS}). Try again later.`);
+    this.name = "ConcurrencyLimitError";
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -77,12 +93,57 @@ function emitStatus(
 function markComplete(managed: ManagedOperation, success: boolean) {
   managed.operation.status = success ? "completed" : "failed";
   managed.operation.completedAt = new Date().toISOString();
+  managed.completedAt = Date.now();
+
+  // Release references to help GC
+  managed.childProcesses.clear();
+  managed.pendingAsks.clear();
+  managed.listeners.clear();
+  managed.claudeProcess = null;
+
   emitEvent(managed, {
     type: "complete",
     operationId: managed.operation.id,
     data: JSON.stringify({ exitCode: success ? 0 : 1 }),
     timestamp: new Date().toISOString(),
   });
+}
+
+// ---------------------------------------------------------------------------
+// GC — clean up completed operations to prevent memory leaks
+// ---------------------------------------------------------------------------
+
+/** Max age in ms for completed operations before GC (30 minutes). */
+const GC_MAX_AGE_MS = 30 * 60 * 1000;
+/** Max number of completed operations to keep. */
+const GC_MAX_COMPLETED = 50;
+
+/** Exported for testing. */
+export const _gc = { GC_MAX_AGE_MS, GC_MAX_COMPLETED };
+
+function gcCompletedOperations() {
+  const now = Date.now();
+  const completed: [string, ManagedOperation][] = [];
+
+  for (const [id, managed] of operations) {
+    if (managed.completedAt != null) {
+      // Remove operations older than GC_MAX_AGE_MS
+      if (now - managed.completedAt > GC_MAX_AGE_MS) {
+        operations.delete(id);
+      } else {
+        completed.push([id, managed]);
+      }
+    }
+  }
+
+  // If still too many completed operations, remove oldest
+  if (completed.length > GC_MAX_COMPLETED) {
+    completed.sort((a, b) => (a[1].completedAt ?? 0) - (b[1].completedAt ?? 0));
+    const toRemove = completed.length - GC_MAX_COMPLETED;
+    for (let i = 0; i < toRemove; i++) {
+      operations.delete(completed[i][0]);
+    }
+  }
 }
 
 interface WireChildResult {
@@ -231,6 +292,17 @@ export function startOperationPipeline(
   phases: PipelinePhase[],
   pipelineOptions?: PipelineOptions,
 ): Operation {
+  gcCompletedOperations();
+
+  // Enforce concurrency limit
+  let running = 0;
+  for (const managed of operations.values()) {
+    if (managed.operation.status === "running") running++;
+  }
+  if (running >= MAX_CONCURRENT_OPERATIONS) {
+    throw new ConcurrencyLimitError(running);
+  }
+
   const id = nextId("pipe");
 
   // Build phase info array
@@ -372,12 +444,15 @@ export function startOperationPipeline(
             },
             signal: managed.abortController.signal,
             runChildGroup: (children) => {
+              const sem = new Semaphore(5);
               const promises = children.map(async (child) => {
-                const cid = `${id}-phase-${i}-fn-${childCounter++}`;
-                operation.children!.push({ id: cid, label: child.label, status: "running" });
-                const proc = runClaude(cid, child.prompt);
-                const result = await wireChild(managed, cid, child.label, proc, phaseExtra);
-                return result.success;
+                return sem.run(async () => {
+                  const cid = `${id}-phase-${i}-fn-${childCounter++}`;
+                  operation.children!.push({ id: cid, label: child.label, status: "running" });
+                  const proc = runClaude(cid, child.prompt);
+                  const result = await wireChild(managed, cid, child.label, proc, phaseExtra);
+                  return result.success;
+                });
               });
               return Promise.all(promises);
             },
@@ -403,12 +478,15 @@ export function startOperationPipeline(
         const groupLabel = phase.children.map((c) => c.label).join(", ");
         emitStatus(managed, `Phase ${phaseNum}/${phases.length}: parallel [${groupLabel}]`, phaseExtra);
 
+        const groupSem = new Semaphore(5);
         const groupPromises = phase.children.map(async (child, j) => {
-          const childId = `${id}-phase-${i}-child-${j}`;
-          operation.children!.push({ id: childId, label: child.label, status: "running" });
-          const process = runClaude(childId, child.prompt);
-          const result = await wireChild(managed, childId, child.label, process, phaseExtra);
-          return result.success;
+          return groupSem.run(async () => {
+            const childId = `${id}-phase-${i}-child-${j}`;
+            operation.children!.push({ id: childId, label: child.label, status: "running" });
+            const process = runClaude(childId, child.prompt);
+            const result = await wireChild(managed, childId, child.label, process, phaseExtra);
+            return result.success;
+          });
         });
 
         const results = await Promise.all(groupPromises);
@@ -455,6 +533,7 @@ export function startOperationPipeline(
 // ---------------------------------------------------------------------------
 
 export function getOperations(): Operation[] {
+  gcCompletedOperations();
   return Array.from(operations.values()).map((m) => m.operation);
 }
 

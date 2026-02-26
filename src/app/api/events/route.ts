@@ -57,7 +57,8 @@ export async function GET(request: Request) {
             unsubscribe();
             controller.close();
           }
-        } catch {
+        } catch (err) {
+          console.warn("[sse] enqueue failed:", err);
           unsubscribe();
         }
       });

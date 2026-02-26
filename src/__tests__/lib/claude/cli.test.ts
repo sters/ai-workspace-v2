@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectFatalApiError } from "@/lib/claude-cli";
+import { detectFatalApiError } from "@/lib/claude/cli";
 
 describe("detectFatalApiError", () => {
   it("detects API Error: 401 in result errors", () => {

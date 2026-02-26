@@ -1,20 +1,14 @@
 import { NextResponse } from "next/server";
 import { submitAnswer } from "@/lib/process-manager";
+import { operationAnswerSchema } from "@/lib/schemas";
+import { parseBody } from "@/lib/validate";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { operationId, toolUseId, answers } = body as {
-    operationId: string;
-    toolUseId: string;
-    answers: Record<string, string>;
-  };
+  const parsed = parseBody(operationAnswerSchema, body);
+  if (!parsed.success) return parsed.response;
 
-  if (!operationId || !toolUseId || !answers) {
-    return NextResponse.json(
-      { error: "operationId, toolUseId, and answers are required" },
-      { status: 400 }
-    );
-  }
+  const { operationId, toolUseId, answers } = parsed.data;
 
   const ok = submitAnswer(operationId, toolUseId, answers);
   if (!ok) {

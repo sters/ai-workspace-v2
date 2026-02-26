@@ -27,8 +27,8 @@ export function useOperation(storageKey?: string) {
       if (stored?.id) {
         setOperation(stored);
       }
-    } catch {
-      // corrupted data — ignore
+    } catch (err) {
+      console.warn("[use-operation] localStorage restore failed:", err);
     }
   }, [storageKey]);
 
@@ -89,8 +89,8 @@ export function useOperation(storageKey?: string) {
               }
             : null
         );
-      } catch {
-        // ignore
+      } catch (err) {
+        console.warn("[use-operation] complete event parse failed:", err);
       }
     }
   }, [events, operation?.status]);
@@ -122,8 +122,8 @@ export function useOperation(storageKey?: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ operationId: operation.id }),
       });
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[use-operation] kill failed:", err);
     }
   }, [operation]);
 

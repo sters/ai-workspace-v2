@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { useOperation } from "@/hooks/use-operation";
-import { McpAuthTerminal } from "@/components/shared/mcp-auth-terminal";
+import { McpAuthTerminal } from "@/components/operation/mcp-auth-terminal";
 
 type McpServerEntry = {
   name: string;
