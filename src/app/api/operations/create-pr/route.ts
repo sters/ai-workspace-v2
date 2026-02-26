@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
   const workspace = resolveWorkspaceName(parsed.data.workspace);
   const draft = parsed.data.draft;
-  const readmeContent = getReadme(workspace) ?? "";
+  const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
   const repos = listWorkspaceRepos(workspace);
 

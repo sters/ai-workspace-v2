@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { AI_WORKSPACE_ROOT } from "@/lib/config";
@@ -70,7 +69,7 @@ async function readMcpServersFromFile(
   scope: McpServerEntry["scope"]
 ): Promise<McpServerEntry[]> {
   try {
-    const content = await fs.readFile(filePath, "utf-8");
+    const content = await Bun.file(filePath).text();
     const data = JSON.parse(content);
     const mcpServers = data.mcpServers;
     if (!mcpServers || typeof mcpServers !== "object") return [];
@@ -93,10 +92,9 @@ async function readLocalMcpServers(): Promise<McpServerEntry[]> {
   // Claude Code stores per-project local MCP servers in
   // ~/.claude.json under projects[projectPath].mcpServers
   try {
-    const content = await fs.readFile(
-      path.join(os.homedir(), ".claude.json"),
-      "utf-8"
-    );
+    const content = await Bun.file(
+      path.join(os.homedir(), ".claude.json")
+    ).text();
     const data = JSON.parse(content);
     const projects = data.projects;
     if (!projects || typeof projects !== "object") return [];
@@ -155,7 +153,7 @@ export async function POST(request: NextRequest) {
 
     if (scope === "project") {
       const filePath = path.join(AI_WORKSPACE_ROOT, ".mcp.json");
-      const data = JSON.parse(await fs.readFile(filePath, "utf-8"));
+      const data = JSON.parse(await Bun.file(filePath).text());
       if (!data.mcpServers?.[serverName]) {
         return NextResponse.json(
           { error: `Server '${serverName}' not found in .mcp.json` },
@@ -163,11 +161,11 @@ export async function POST(request: NextRequest) {
         );
       }
       applyUpdates(data.mcpServers[serverName], updates);
-      await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+      await Bun.write(filePath, JSON.stringify(data, null, 2));
     } else {
       // local scope → ~/.claude.json
       const filePath = path.join(os.homedir(), ".claude.json");
-      const data = JSON.parse(await fs.readFile(filePath, "utf-8"));
+      const data = JSON.parse(await Bun.file(filePath).text());
       const absRoot = path.resolve(AI_WORKSPACE_ROOT);
       if (!data.projects?.[absRoot]?.mcpServers?.[serverName]) {
         return NextResponse.json(
@@ -176,7 +174,7 @@ export async function POST(request: NextRequest) {
         );
       }
       applyUpdates(data.projects[absRoot].mcpServers[serverName], updates);
-      await fs.writeFile(filePath, JSON.stringify(data, null, 2));
+      await Bun.write(filePath, JSON.stringify(data, null, 2));
     }
 
     return NextResponse.json({ ok: true });

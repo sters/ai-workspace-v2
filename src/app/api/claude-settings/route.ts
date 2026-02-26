@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { AI_WORKSPACE_ROOT } from "@/lib/config";
@@ -23,7 +23,7 @@ function getFilePath(scope: Scope): string {
 async function readSettingsFile(scope: Scope) {
   const filePath = getFilePath(scope);
   try {
-    const raw = await fs.readFile(filePath, "utf-8");
+    const raw = await Bun.file(filePath).text();
     try {
       JSON.parse(raw);
     } catch {
@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
     }
 
     const filePath = getFilePath(scope as Scope);
-    await fs.mkdir(path.dirname(filePath), { recursive: true });
-    await fs.writeFile(filePath, content);
+    await mkdir(path.dirname(filePath), { recursive: true });
+    await Bun.write(filePath, content);
 
     return NextResponse.json({ ok: true });
   } catch (err) {

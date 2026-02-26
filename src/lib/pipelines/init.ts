@@ -1,4 +1,4 @@
-import fs from "node:fs";
+import { mkdirSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { readWorkspaceReadme } from "@/lib/parsers/readme";
@@ -40,14 +40,14 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
       label: "Analyze & draft README",
       fn: async (ctx) => {
         // Create temp dir and write README template for Claude to edit
-        fs.mkdirSync(tmpDir, { recursive: true });
+        mkdirSync(tmpDir, { recursive: true });
         const today = new Date().toISOString().slice(0, 10);
         const readme = README_TEMPLATE
           .replace(/\{\{DESCRIPTION\}\}/g, description)
           .replace(/\{\{TASK_TYPE\}\}/g, "TBD")
           .replace(/\{\{TICKET_ID\}\}/g, "TBD")
           .replace(/\{\{DATE\}\}/g, today);
-        fs.writeFileSync(tempReadmePath, readme);
+        await Bun.write(tempReadmePath, readme);
 
         const prompt = buildInitAnalyzeAndReadmePrompt({
           description,
@@ -81,7 +81,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
         );
 
         ctx.emitStatus("Creating workspace directory...");
-        const result = setupWorkspace(
+        const result = await setupWorkspace(
           analysis.taskType,
           description,
           analysis.ticketId || undefined,
@@ -93,16 +93,18 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
         ctx.emitStatus(`Workspace created: ${wsName}`);
 
         // Copy the Claude-edited README over the template README
-        if (fs.existsSync(tempReadmePath)) {
-          fs.copyFileSync(tempReadmePath, path.join(wsPath, "README.md"));
+        const tempReadme = Bun.file(tempReadmePath);
+        if (await tempReadme.exists()) {
+          const content = await tempReadme.text();
+          await Bun.write(path.join(wsPath, "README.md"), content);
         }
 
         // Clean up temp dir
-        try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
         // Write template files for agents to reference
-        writeTodoTemplate(wsPath, analysis.taskType);
-        writeReportTemplates(wsPath);
+        await writeTodoTemplate(wsPath, analysis.taskType);
+        await writeReportTemplates(wsPath);
 
         if (analysis.repositories.length > 0) {
           for (const repoPath of analysis.repositories) {
@@ -118,7 +120,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
         }
 
         // Re-commit with the edited README
-        commitWorkspaceSnapshot(wsName, "Init: workspace created with README");
+        await commitWorkspaceSnapshot(wsName, "Init: workspace created with README");
 
         const repoSummary = repoResults.length > 0
           ? `\nRepositories: ${repoResults.map((r) => `${r.repoName} (${r.branchName})`).join(", ")}`
@@ -132,7 +134,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
       kind: "function",
       label: "Prepare for planning",
       fn: async (ctx) => {
-        const { meta } = readWorkspaceReadme(wsPath);
+        const { meta } = await readWorkspaceReadme(wsPath);
 
         // If repos were added to README but not set up yet, set them up now
         for (const metaRepo of meta.repositories) {
@@ -152,13 +154,13 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
 
         const isResearch = meta.taskType === "research" || meta.taskType === "investigation";
         if (isResearch) {
-          commitWorkspaceSnapshot(wsName, "Setup complete (research task)");
+          await commitWorkspaceSnapshot(wsName, "Setup complete (research task)");
           ctx.emitResult("Research/investigation task — skipping TODO planning.");
           return true;
         }
 
         if (repoResults.length === 0) {
-          commitWorkspaceSnapshot(wsName, "Setup complete (no repos)");
+          await commitWorkspaceSnapshot(wsName, "Setup complete (no repos)");
           ctx.emitResult("No repositories configured — skipping TODO planning.");
           return true;
         }
@@ -172,7 +174,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
       kind: "function",
       label: "Plan TODO items",
       fn: async (ctx) => {
-        const { content: readmeContent, meta } = readWorkspaceReadme(wsPath);
+        const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
 
         const isResearch = meta.taskType === "research" || meta.taskType === "investigation";
         if (isResearch || repoResults.length === 0) {
@@ -207,23 +209,23 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
       kind: "function",
       label: "Coordinate TODOs",
       fn: async (ctx) => {
-        const { content: readmeContent, meta } = readWorkspaceReadme(wsPath);
+        const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
         const isResearch = meta.taskType === "research" || meta.taskType === "investigation";
         if (isResearch || repoResults.length <= 1) {
           ctx.emitResult("Skipped coordination (single repo or research task).");
           return true;
         }
 
-        const todoFiles = repoResults
-          .map((repo) => {
-            const todoPath = path.join(wsPath, `TODO-${repo.repoName}.md`);
-            if (!fs.existsSync(todoPath)) return null;
-            return {
+        const todoFiles: { repoName: string; content: string }[] = [];
+        for (const repo of repoResults) {
+          const todoFile = Bun.file(path.join(wsPath, `TODO-${repo.repoName}.md`));
+          if (await todoFile.exists()) {
+            todoFiles.push({
               repoName: repo.repoName,
-              content: fs.readFileSync(todoPath, "utf-8"),
-            };
-          })
-          .filter((f): f is { repoName: string; content: string } => f !== null);
+              content: await todoFile.text(),
+            });
+          }
+        }
 
         if (todoFiles.length === 0) {
           ctx.emitResult("No TODO files found, skipping coordination.");
@@ -246,31 +248,30 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
       kind: "function",
       label: "Review TODOs",
       fn: async (ctx) => {
-        const { content: readmeContent, meta } = readWorkspaceReadme(wsPath);
+        const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
         const isResearch = meta.taskType === "research" || meta.taskType === "investigation";
         if (isResearch || repoResults.length === 0) {
           ctx.emitResult("Skipped TODO review.");
           return true;
         }
 
-        const children = repoResults
-          .map((repo) => {
-            const todoPath = path.join(wsPath, `TODO-${repo.repoName}.md`);
-            if (!fs.existsSync(todoPath)) return null;
-            const todoContent = fs.readFileSync(todoPath, "utf-8");
+        const children: { label: string; prompt: string }[] = [];
+        for (const repo of repoResults) {
+          const todoFile = Bun.file(path.join(wsPath, `TODO-${repo.repoName}.md`));
+          if (!(await todoFile.exists())) continue;
+          const todoContent = await todoFile.text();
 
-            return {
-              label: `review-${repo.repoName}`,
-              prompt: buildReviewerPrompt({
-                workspaceName: wsName,
-                repoName: repo.repoName,
-                readmeContent,
-                todoContent,
-                worktreePath: repo.worktreePath,
-              }),
-            };
-          })
-          .filter((c): c is NonNullable<typeof c> => c !== null);
+          children.push({
+            label: `review-${repo.repoName}`,
+            prompt: buildReviewerPrompt({
+              workspaceName: wsName,
+              repoName: repo.repoName,
+              readmeContent,
+              todoContent,
+              worktreePath: repo.worktreePath,
+            }),
+          });
+        }
 
         if (children.length === 0) {
           ctx.emitResult("No TODO files to review.");
@@ -293,7 +294,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
       label: "Commit snapshot",
       fn: async (ctx) => {
         ctx.emitStatus("Committing workspace snapshot...");
-        commitWorkspaceSnapshot(wsName, "Init complete: workspace setup and TODO planning");
+        await commitWorkspaceSnapshot(wsName, "Init complete: workspace setup and TODO planning");
         ctx.emitResult(`Workspace **${wsName}** initialization complete.`);
         return true;
       },

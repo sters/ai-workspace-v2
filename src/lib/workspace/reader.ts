@@ -1,5 +1,4 @@
-import { execSync } from "node:child_process";
-import fs from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR } from "../config";
 import { parseTodoFile } from "../parsers/todo";
@@ -13,20 +12,20 @@ import type {
   HistoryEntry,
 } from "@/types/workspace";
 
-export function listWorkspaces(): WorkspaceSummary[] {
-  if (!fs.existsSync(WORKSPACE_DIR)) return [];
+export async function listWorkspaces(): Promise<WorkspaceSummary[]> {
+  if (!existsSync(WORKSPACE_DIR)) return [];
 
-  const entries = fs.readdirSync(WORKSPACE_DIR, { withFileTypes: true });
+  const entries = readdirSync(WORKSPACE_DIR, { withFileTypes: true });
   const workspaces: WorkspaceSummary[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const wsPath = path.join(WORKSPACE_DIR, entry.name);
     const readmePath = path.join(wsPath, "README.md");
-    if (!fs.existsSync(readmePath)) continue;
+    if (!existsSync(readmePath)) continue;
 
     try {
-      const summary = buildWorkspaceSummary(entry.name, wsPath);
+      const summary = await buildWorkspaceSummary(entry.name, wsPath);
       workspaces.push(summary);
     } catch {
       // skip broken workspaces
@@ -42,39 +41,39 @@ export function listWorkspaces(): WorkspaceSummary[] {
   return workspaces;
 }
 
-export function getWorkspaceDetail(name: string): WorkspaceDetail | null {
+export async function getWorkspaceDetail(name: string): Promise<WorkspaceDetail | null> {
   const wsPath = path.join(WORKSPACE_DIR, name);
-  if (!fs.existsSync(wsPath)) return null;
+  if (!existsSync(wsPath)) return null;
 
-  const summary = buildWorkspaceSummary(name, wsPath);
-  const readmePath = path.join(wsPath, "README.md");
-  const readme = fs.existsSync(readmePath)
-    ? fs.readFileSync(readmePath, "utf-8")
+  const summary = await buildWorkspaceSummary(name, wsPath);
+  const readmeFile = Bun.file(path.join(wsPath, "README.md"));
+  const readme = (await readmeFile.exists())
+    ? await readmeFile.text()
     : "";
 
-  const reviews = listReviewSessions(wsPath);
+  const reviews = await listReviewSessions(wsPath);
 
   return { ...summary, readme, reviews };
 }
 
-function buildWorkspaceSummary(
+async function buildWorkspaceSummary(
   name: string,
   wsPath: string
-): WorkspaceSummary {
-  const readmePath = path.join(wsPath, "README.md");
-  const readmeContent = fs.existsSync(readmePath)
-    ? fs.readFileSync(readmePath, "utf-8")
+): Promise<WorkspaceSummary> {
+  const readmeFile = Bun.file(path.join(wsPath, "README.md"));
+  const readmeContent = (await readmeFile.exists())
+    ? await readmeFile.text()
     : "";
 
   const meta = parseReadmeMeta(readmeContent);
-  const todos = listTodoFiles(wsPath);
+  const todos = await listTodoFiles(wsPath);
 
   const totalCompleted = todos.reduce((s, t) => s + t.completed, 0);
   const totalItems = todos.reduce((s, t) => s + t.total, 0);
   const overallProgress =
     totalItems > 0 ? Math.round((totalCompleted * 100) / totalItems) : 0;
 
-  const stat = fs.statSync(wsPath);
+  const stat = statSync(wsPath);
 
   return {
     name,
@@ -88,28 +87,31 @@ function buildWorkspaceSummary(
   };
 }
 
-function listTodoFiles(wsPath: string): TodoFile[] {
-  const files = fs.readdirSync(wsPath).filter((f) => /^TODO-.*\.md$/.test(f));
-  return files.map((f) => {
-    const content = fs.readFileSync(path.join(wsPath, f), "utf-8");
-    return parseTodoFile(f, content);
-  });
+async function listTodoFiles(wsPath: string): Promise<TodoFile[]> {
+  const glob = new Bun.Glob("TODO-*.md");
+  const files = [...glob.scanSync({ cwd: wsPath })];
+  const results: TodoFile[] = [];
+  for (const f of files) {
+    const content = await Bun.file(path.join(wsPath, f)).text();
+    results.push(parseTodoFile(f, content));
+  }
+  return results;
 }
 
-function listReviewSessions(wsPath: string): ReviewSession[] {
+async function listReviewSessions(wsPath: string): Promise<ReviewSession[]> {
   const reviewsDir = path.join(wsPath, "artifacts", "reviews");
-  if (!fs.existsSync(reviewsDir)) return [];
+  if (!existsSync(reviewsDir)) return [];
 
-  const entries = fs.readdirSync(reviewsDir, { withFileTypes: true });
+  const entries = readdirSync(reviewsDir, { withFileTypes: true });
   const sessions: ReviewSession[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const summaryPath = path.join(reviewsDir, entry.name, "SUMMARY.md");
-    if (!fs.existsSync(summaryPath)) continue;
+    const summaryFile = Bun.file(path.join(reviewsDir, entry.name, "SUMMARY.md"));
+    if (!(await summaryFile.exists())) continue;
 
     try {
-      const content = fs.readFileSync(summaryPath, "utf-8");
+      const content = await summaryFile.text();
       sessions.push(parseReviewSummary(entry.name, content));
     } catch {
       // skip
@@ -120,27 +122,27 @@ function listReviewSessions(wsPath: string): ReviewSession[] {
   return sessions;
 }
 
-export function getReadme(name: string): string | null {
-  const p = path.join(WORKSPACE_DIR, name, "README.md");
-  return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : null;
+export async function getReadme(name: string): Promise<string | null> {
+  const file = Bun.file(path.join(WORKSPACE_DIR, name, "README.md"));
+  return (await file.exists()) ? file.text() : null;
 }
 
-export function getTodos(name: string): TodoFile[] {
+export async function getTodos(name: string): Promise<TodoFile[]> {
   const wsPath = path.join(WORKSPACE_DIR, name);
-  if (!fs.existsSync(wsPath)) return [];
+  if (!existsSync(wsPath)) return [];
   return listTodoFiles(wsPath);
 }
 
-export function getReviewSessions(name: string): ReviewSession[] {
+export async function getReviewSessions(name: string): Promise<ReviewSession[]> {
   const wsPath = path.join(WORKSPACE_DIR, name);
-  if (!fs.existsSync(wsPath)) return [];
+  if (!existsSync(wsPath)) return [];
   return listReviewSessions(wsPath);
 }
 
-export function getReviewDetail(
+export async function getReviewDetail(
   name: string,
   timestamp: string
-): { summary: string; files: { name: string; content: string }[] } | null {
+): Promise<{ summary: string; files: { name: string; content: string }[] } | null> {
   const reviewDir = path.join(
     WORKSPACE_DIR,
     name,
@@ -148,36 +150,38 @@ export function getReviewDetail(
     "reviews",
     timestamp
   );
-  if (!fs.existsSync(reviewDir)) return null;
+  if (!existsSync(reviewDir)) return null;
 
-  const summaryPath = path.join(reviewDir, "SUMMARY.md");
-  const summary = fs.existsSync(summaryPath)
-    ? fs.readFileSync(summaryPath, "utf-8")
+  const summaryFile = Bun.file(path.join(reviewDir, "SUMMARY.md"));
+  const summary = (await summaryFile.exists())
+    ? await summaryFile.text()
     : "";
 
-  const files = fs
-    .readdirSync(reviewDir)
-    .filter((f) => f.endsWith(".md") && f !== "SUMMARY.md")
-    .map((f) => ({
-      name: f,
-      content: fs.readFileSync(path.join(reviewDir, f), "utf-8"),
-    }));
+  const glob = new Bun.Glob("*.md");
+  const mdFiles = [...glob.scanSync({ cwd: reviewDir })].filter((f) => f !== "SUMMARY.md");
+  const files: { name: string; content: string }[] = [];
+  for (const f of mdFiles) {
+    const content = await Bun.file(path.join(reviewDir, f)).text();
+    files.push({ name: f, content });
+  }
 
   return { summary, files };
 }
 
 export function getCommitDiff(name: string, hash: string): string | null {
   const wsPath = path.join(WORKSPACE_DIR, name);
-  if (!fs.existsSync(path.join(wsPath, ".git"))) return null;
+  if (!existsSync(path.join(wsPath, ".git"))) return null;
 
   // Validate hash format to prevent injection
   if (!/^[0-9a-f]{4,40}$/i.test(hash)) return null;
 
   try {
-    return execSync(`git -C "${wsPath}" show ${hash} --format="" --patch`, {
-      encoding: "utf-8",
-      maxBuffer: 1024 * 1024,
-    });
+    const result = Bun.spawnSync(
+      ["git", "-C", wsPath, "show", hash, "--format=", "--patch"],
+      { stdout: "pipe", stderr: "pipe" }
+    );
+    if (!result.success) return null;
+    return result.stdout.toString();
   } catch {
     return null;
   }
@@ -185,14 +189,16 @@ export function getCommitDiff(name: string, hash: string): string | null {
 
 export function getHistory(name: string): HistoryEntry[] {
   const wsPath = path.join(WORKSPACE_DIR, name);
-  if (!fs.existsSync(path.join(wsPath, ".git"))) return [];
+  if (!existsSync(path.join(wsPath, ".git"))) return [];
 
   try {
-    const output = execSync(
-      `git -C "${wsPath}" log --format="%H|%aI|%s|%an" -30`,
-      { encoding: "utf-8" }
+    const result = Bun.spawnSync(
+      ["git", "-C", wsPath, "log", "--format=%H|%aI|%s|%an", "-30"],
+      { stdout: "pipe", stderr: "pipe" }
     );
-    return output
+    if (!result.success) return [];
+    return result.stdout
+      .toString()
       .trim()
       .split("\n")
       .filter(Boolean)

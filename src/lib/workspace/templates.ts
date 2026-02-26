@@ -2,7 +2,7 @@
  * Workspace templates — TODO, review, and report template management.
  */
 
-import fs from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR } from "../config";
 
@@ -181,9 +181,9 @@ function selectTodoTemplate(taskType: string): string {
  * Write the appropriate TODO template to {wsPath}/TODO-template.md
  * based on the task type.
  */
-export function writeTodoTemplate(wsPath: string, taskType: string): void {
+export async function writeTodoTemplate(wsPath: string, taskType: string): Promise<void> {
   const template = selectTodoTemplate(taskType);
-  fs.writeFileSync(path.join(wsPath, "TODO-template.md"), template);
+  await Bun.write(path.join(wsPath, "TODO-template.md"), template);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,11 +351,13 @@ const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
  * Write all report templates to the workspace directory.
  * These are used by review, verification, research, and summary agents.
  */
-export function writeReportTemplates(wsPath: string): void {
-  fs.writeFileSync(path.join(wsPath, "review-report-template.md"), REVIEW_REPORT_TEMPLATE);
-  fs.writeFileSync(path.join(wsPath, "verification-report-template.md"), VERIFICATION_REPORT_TEMPLATE);
-  fs.writeFileSync(path.join(wsPath, "research-report-template.md"), RESEARCH_REPORT_TEMPLATE);
-  fs.writeFileSync(path.join(wsPath, "summary-report-template.md"), SUMMARY_REPORT_TEMPLATE);
+export async function writeReportTemplates(wsPath: string): Promise<void> {
+  await Promise.all([
+    Bun.write(path.join(wsPath, "review-report-template.md"), REVIEW_REPORT_TEMPLATE),
+    Bun.write(path.join(wsPath, "verification-report-template.md"), VERIFICATION_REPORT_TEMPLATE),
+    Bun.write(path.join(wsPath, "research-report-template.md"), RESEARCH_REPORT_TEMPLATE),
+    Bun.write(path.join(wsPath, "summary-report-template.md"), SUMMARY_REPORT_TEMPLATE),
+  ]);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +366,7 @@ export function writeReportTemplates(wsPath: string): void {
 
 export function prepareReviewDir(workspaceName: string): string {
   const wsPath = path.join(WORKSPACE_DIR, workspaceName);
-  if (!fs.existsSync(wsPath)) {
+  if (!existsSync(wsPath)) {
     throw new Error(`Workspace directory not found: ${wsPath}`);
   }
 
@@ -381,6 +383,6 @@ export function prepareReviewDir(workspaceName: string): string {
   ].join("");
 
   const reviewDir = path.join(wsPath, "artifacts", "reviews", timestamp);
-  fs.mkdirSync(reviewDir, { recursive: true });
+  mkdirSync(reviewDir, { recursive: true });
   return timestamp;
 }

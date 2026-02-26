@@ -2,7 +2,7 @@
  * Workspace git operations — listing repos, committing snapshots, deleting workspaces.
  */
 
-import fs from "node:fs";
+import { existsSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR } from "../config";
 import { exec, repoDir } from "./helpers";
@@ -22,14 +22,14 @@ export interface WorkspaceRepo {
 
 export function listWorkspaceRepos(workspaceName: string): WorkspaceRepo[] {
   const wsPath = path.join(WORKSPACE_DIR, workspaceName);
-  if (!fs.existsSync(wsPath)) return [];
+  if (!existsSync(wsPath)) return [];
 
   const repos: WorkspaceRepo[] = [];
 
   // Find directories containing .git (regular repos or worktrees) up to 4 levels deep
   function walk(dir: string, depth: number) {
     if (depth > 4) return;
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    const entries = readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.name === "artifacts" || entry.name === "tmp" || entry.name === ".git") continue;
       const fullPath = path.join(dir, entry.name);
@@ -37,7 +37,7 @@ export function listWorkspaceRepos(workspaceName: string): WorkspaceRepo[] {
 
       // Check for .git (directory or file — worktrees use a file)
       const gitPath = path.join(fullPath, ".git");
-      if (fs.existsSync(gitPath)) {
+      if (existsSync(gitPath)) {
         const relPath = path.relative(wsPath, fullPath);
         repos.push({
           repoPath: relPath,
@@ -59,12 +59,12 @@ export function listWorkspaceRepos(workspaceName: string): WorkspaceRepo[] {
 // commitWorkspaceSnapshot
 // ---------------------------------------------------------------------------
 
-export function commitWorkspaceSnapshot(
+export async function commitWorkspaceSnapshot(
   workspaceName: string,
   message?: string,
-): boolean {
+): Promise<boolean> {
   const wsPath = path.join(WORKSPACE_DIR, workspaceName);
-  if (!fs.existsSync(path.join(wsPath, ".git"))) return false;
+  if (!existsSync(path.join(wsPath, ".git"))) return false;
 
   // Check for changes
   try {
@@ -77,13 +77,15 @@ export function commitWorkspaceSnapshot(
   // Stage changes
   try { exec(`git -C "${wsPath}" add README.md`); } catch { /* no README */ }
   try { exec(`git -C "${wsPath}" add "TODO-*.md" 2>/dev/null || true`); } catch { /* no TODOs */ }
-  // Use shell glob for TODO files
-  const todoFiles = fs.readdirSync(wsPath).filter(f => /^TODO-.*\.md$/.test(f));
+  // Use Bun.Glob for TODO files
+  const todoGlob = new Bun.Glob("TODO-*.md");
+  const todoFiles = [...todoGlob.scanSync({ cwd: wsPath })];
   for (const f of todoFiles) {
     try { exec(`git -C "${wsPath}" add "${f}"`); } catch { /* ignore */ }
   }
   // Stage template files
-  const templateFiles = fs.readdirSync(wsPath).filter(f => /^.*-template\.md$/.test(f));
+  const templateGlob = new Bun.Glob("*-template.md");
+  const templateFiles = [...templateGlob.scanSync({ cwd: wsPath })];
   for (const f of templateFiles) {
     try { exec(`git -C "${wsPath}" add "${f}"`); } catch { /* ignore */ }
   }
@@ -101,7 +103,7 @@ export function commitWorkspaceSnapshot(
     let completed = 0;
     let total = 0;
     for (const f of todoFiles) {
-      const content = fs.readFileSync(path.join(wsPath, f), "utf-8");
+      const content = await Bun.file(path.join(wsPath, f)).text();
       const lines = content.split("\n");
       for (const line of lines) {
         if (/^\s*- \[x\]/.test(line)) { completed++; total++; }
@@ -125,7 +127,7 @@ export function commitWorkspaceSnapshot(
 
 export function deleteWorkspace(workspaceName: string): void {
   const wsPath = path.join(WORKSPACE_DIR, workspaceName);
-  if (!fs.existsSync(wsPath)) {
+  if (!existsSync(wsPath)) {
     throw new Error(`Workspace directory not found: ${wsPath}`);
   }
 
@@ -134,13 +136,13 @@ export function deleteWorkspace(workspaceName: string): void {
   const repos = listWorkspaceRepos(workspaceName);
   for (const repo of repos) {
     const repoSource = path.join(repoDir(), repo.repoPath);
-    if (fs.existsSync(repoSource)) {
+    if (existsSync(repoSource)) {
       repoPaths.push(repoSource);
     }
   }
 
   // Remove workspace directory
-  fs.rmSync(wsPath, { recursive: true, force: true });
+  rmSync(wsPath, { recursive: true, force: true });
 
   // Prune worktree references
   for (const rp of repoPaths) {
