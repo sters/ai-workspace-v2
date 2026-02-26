@@ -1,10 +1,10 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { WORKSPACE_DIR } from "./config";
-import { parseTodoFile } from "./todo-parser";
-import { parseReadmeMeta } from "./readme-parser";
-import { parseReviewSummary } from "./review-parser";
+import { WORKSPACE_DIR } from "../config";
+import { parseTodoFile } from "../parsers/todo";
+import { parseReadmeMeta } from "../parsers/readme";
+import { parseReviewSummary } from "../parsers/review";
 import type {
   WorkspaceSummary,
   WorkspaceDetail,

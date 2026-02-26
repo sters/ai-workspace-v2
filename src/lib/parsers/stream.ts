@@ -80,7 +80,8 @@ export function parseStreamEvent(raw: string): LogEntry[] {
   let parsed;
   try {
     parsed = JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    console.warn("[stream-parser] JSON parse failed:", err);
     return [{ kind: "raw", content: raw }];
   }
 

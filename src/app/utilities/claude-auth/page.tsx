@@ -1,7 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import { ClaudeOperation } from "@/components/shared/claude-operation";
+import { ClaudeOperation } from "@/components/operation/claude-operation";
 
 type AuthStatus = {
   loggedIn: boolean;

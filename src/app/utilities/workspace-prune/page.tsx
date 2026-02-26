@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ClaudeOperation } from "@/components/shared/claude-operation";
+import { ClaudeOperation } from "@/components/operation/claude-operation";
 
 export default function WorkspacePrunePage() {
   const [days, setDays] = useState("7");

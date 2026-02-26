@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkAuthStatus } from "@/lib/claude-login";
+import { checkAuthStatus } from "@/lib/claude/login";
 
 export const dynamic = "force-dynamic";
 

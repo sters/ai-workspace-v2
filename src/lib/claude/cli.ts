@@ -3,8 +3,9 @@
 // in the same format as @anthropic-ai/claude-agent-sdk.
 
 import type { Subprocess } from "bun";
-import { cliPath, type ClaudeProcess } from "./claude-sdk";
-import { AI_WORKSPACE_ROOT } from "./config";
+import { getCliPath } from "./cli-path";
+import type { ClaudeProcess } from "@/types/claude";
+import { AI_WORKSPACE_ROOT } from "../config";
 import type { OperationEvent } from "@/types/operation";
 
 // Maximum argument length before falling back to stdin (ARG_MAX safety margin)
@@ -84,13 +85,13 @@ export function runClaude(
   log(operationId, "starting CLI query");
   log(operationId, "cwd:", AI_WORKSPACE_ROOT);
   log(operationId, "prompt:", prompt.slice(0, 200) + (prompt.length > 200 ? "..." : ""));
-  log(operationId, "cliPath:", cliPath);
+  log(operationId, "getCliPath():", getCliPath());
 
   // Accumulated result text from the stream's "result" event
   let resultText: string | undefined;
 
   function spawnAndStream(promptOrAnswer: string, resumeSessionId?: string) {
-    const args = [cliPath, "-p", promptOrAnswer, "--output-format", "stream-json", "--verbose"];
+    const args = [getCliPath(), "-p", promptOrAnswer, "--output-format", "stream-json", "--verbose"];
     if (options?.jsonSchema) {
       args.push("--json-schema", JSON.stringify(options.jsonSchema));
     }
@@ -100,7 +101,7 @@ export function runClaude(
 
     const useStdin = promptOrAnswer.length > MAX_PROMPT_ARG_LENGTH;
     const spawnArgs = useStdin
-      ? [cliPath, "-p", "-", "--output-format", "stream-json", "--verbose", ...(options?.jsonSchema ? ["--json-schema", JSON.stringify(options.jsonSchema)] : []), ...(resumeSessionId ? ["--resume", resumeSessionId] : [])]
+      ? [getCliPath(), "-p", "-", "--output-format", "stream-json", "--verbose", ...(options?.jsonSchema ? ["--json-schema", JSON.stringify(options.jsonSchema)] : []), ...(resumeSessionId ? ["--resume", resumeSessionId] : [])]
       : args;
 
     const env: Record<string, string | undefined> = { ...process.env, CLAUDECODE: undefined };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseAnalysisResultText, sanitizeSlug } from "@/lib/workspace-ops";
+import { parseAnalysisResultText } from "@/lib/workspace/setup";
+import { sanitizeSlug } from "@/lib/workspace/helpers";
 
 describe("parseAnalysisResultText", () => {
   it("parses valid JSON structured output", () => {

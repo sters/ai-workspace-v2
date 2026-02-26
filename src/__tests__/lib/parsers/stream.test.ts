@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseStreamEvent } from "@/lib/stream-parser";
+import { parseStreamEvent } from "@/lib/parsers/stream";
 
 describe("parseStreamEvent", () => {
   it("returns raw entry for unparseable JSON", () => {

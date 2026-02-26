@@ -1,14 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useReducer, useState, useCallback } from "react";
 import type { OperationEvent } from "@/types/operation";
 
+type EventAction = { type: "append"; events: OperationEvent[] } | { type: "clear" };
+
+function eventsReducer(state: OperationEvent[], action: EventAction): OperationEvent[] {
+  if (action.type === "clear") return [];
+  return state.concat(action.events);
+}
+
 export function useSSE(operationId: string | null) {
-  const [events, setEvents] = useState<OperationEvent[]>([]);
+  const [events, dispatch] = useReducer(eventsReducer, []);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState(false);
   const eventSourceRef = useRef<EventSource | null>(null);
   const retryCountRef = useRef(0);
+  const batchRef = useRef<OperationEvent[]>([]);
+  const rafRef = useRef<number>(0);
 
   useEffect(() => {
     if (!operationId) return;
@@ -31,15 +40,22 @@ export function useSSE(operationId: string | null) {
       es.onmessage = (e) => {
         try {
           const event: OperationEvent = JSON.parse(e.data);
-          setEvents((prev) => [...prev, event]);
+          batchRef.current.push(event);
+          if (!rafRef.current) {
+            rafRef.current = requestAnimationFrame(() => {
+              rafRef.current = 0;
+              dispatch({ type: "append", events: batchRef.current });
+              batchRef.current = [];
+            });
+          }
           // Only close on the pipeline-level complete (no childLabel).
           // Child process completes are tagged with childLabel and should not end the stream.
           if (event.type === "complete" && !event.childLabel) {
             es.close();
             setConnected(false);
           }
-        } catch {
-          // ignore parse errors
+        } catch (err) {
+          console.warn("[use-sse] parse error:", e.data, err);
         }
       };
 
@@ -61,11 +77,20 @@ export function useSSE(operationId: string | null) {
     return () => {
       eventSourceRef.current?.close();
       setConnected(false);
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
     };
   }, [operationId]);
 
   const clear = useCallback(() => {
-    setEvents([]);
+    dispatch({ type: "clear" });
+    batchRef.current = [];
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
     setError(false);
   }, []);
 

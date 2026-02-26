@@ -34,7 +34,7 @@ bun run test
 bun run test:watch
 
 # Run a single test file
-bunx vitest run src/__tests__/lib/todo-parser.test.ts
+bunx vitest run src/__tests__/lib/parsers/todo.test.ts
 ```
 
 The app runs on port 3741. Set `AI_WORKSPACE_ROOT` env var to point to the ai-workspace root directory (containing `workspace/` and `repositories/`). When running via `bunx`, it can also be passed as a CLI argument or defaults to the current working directory.
@@ -47,19 +47,32 @@ The app runs on port 3741. Set `AI_WORKSPACE_ROOT` env var to point to the ai-wo
 
 API routes under `src/app/api/` read workspace data directly from the filesystem (`workspace/` directory in ai-workspace root):
 
-- **`src/lib/workspace.ts`** — Core functions that scan `WORKSPACE_DIR` to list workspaces, read README.md, TODO files, review artifacts, and git history. All filesystem access happens here.
+- **`src/lib/workspace/reader.ts`** — Core functions that scan `WORKSPACE_DIR` to list workspaces, read README.md, TODO files, review artifacts, and git history. All filesystem access happens here.
 - **`src/lib/config.ts`** — Resolves `AI_WORKSPACE_ROOT` (from env or `..` fallback) and `WORKSPACE_DIR` paths.
-- **Parsers** (`src/lib/todo-parser.ts`, `readme-parser.ts`, `review-parser.ts`) — Extract structured data from markdown files using regex. TODO items use checkbox syntax: `[x]` completed, `[ ]` pending, `[!]` blocked, `[~]` in-progress.
+- **`src/lib/parsers/`** — Extract structured data from markdown files using regex:
+  - `todo.ts` — TODO items use checkbox syntax: `[x]` completed, `[ ]` pending, `[!]` blocked, `[~]` in-progress.
+  - `readme.ts` — Parse workspace metadata from README.md.
+  - `review.ts` — Parse review session summaries.
+  - `stream.ts` — Converts raw `stream-json` messages (from CLI or SDK) into typed `LogEntry` objects for rendering.
 
 ### Server-side: Running Claude Code operations
 
 Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes via `Bun.spawn`:
 
-- **`src/lib/claude-cli.ts`** — Spawns `claude -p` with `--output-format stream-json` via `Bun.spawn`. Streams events in the same format as the SDK. Handles `AskUserQuestion` by detecting permission denials and using `--resume {session_id}` to inject answers and continue.
-- **`src/lib/claude.ts`** — Facade that delegates to CLI (`claude-cli.ts`, default) or SDK (`claude-sdk.ts`, set `CLAUDE_USE_CLI=false`).
-- **`src/lib/claude-sdk.ts`** — Legacy SDK wrapper using `@anthropic-ai/claude-agent-sdk`'s `query()` function. Resolves the `claude` CLI path, auto-approves all tools via `canUseTool`, and handles `AskUserQuestion` interactively by blocking until the browser user answers.
+- **`src/lib/claude/`** — Claude CLI/SDK execution and authentication:
+  - `index.ts` — Facade that delegates to CLI (default) or SDK (set `CLAUDE_USE_CLI=false`).
+  - `cli.ts` — Spawns `claude -p` with `--output-format stream-json` via `Bun.spawn`. Handles `AskUserQuestion` by detecting permission denials and using `--resume {session_id}` to inject answers and continue.
+  - `sdk.ts` — Legacy SDK wrapper using `@anthropic-ai/claude-agent-sdk`'s `query()` function. Resolves the `claude` CLI path, auto-approves all tools via `canUseTool`.
+  - `login.ts` — Claude auth status checking and login via `Bun.spawn`.
+  - `version.ts` — Claude CLI version checking.
 - **`src/lib/process-manager.ts`** — Pipeline orchestration engine. Each operation is a sequence of `PipelinePhase`s (single child, parallel group, or TypeScript function). Function phases get a rich context (`ctx`) with helpers: `emitStatus`, `emitResult`, `emitAsk` (prompt user and await answer), `runChild`, `runChildGroup`, `setWorkspace`. Stores all state (`ManagedOperation` map, counter) on `globalThis` to survive HMR in dev.
-- **`src/lib/workspace-ops.ts`** — TypeScript equivalents of shell scripts: task analysis, workspace/repo setup (git clone, worktree creation), workspace snapshot commits. All paths relative to `AI_WORKSPACE_ROOT`.
+- **`src/lib/workspace/`** — TypeScript equivalents of shell scripts. All paths relative to `AI_WORKSPACE_ROOT`:
+  - `index.ts` — Barrel export for all workspace modules.
+  - `helpers.ts` — `exec()`, `repoDir()`, `sanitizeSlug()`, staleness utilities.
+  - `setup.ts` — `setupWorkspace()`, `setupRepository()`, `detectBaseBranch()`, `parseAnalysisResultText()`.
+  - `git.ts` — `listWorkspaceRepos()`, `commitWorkspaceSnapshot()`, `deleteWorkspace()`.
+  - `templates.ts` — TODO/README/Report templates, `writeTodoTemplate()`, `writeReportTemplates()`, `prepareReviewDir()`.
+  - `pr.ts` — `checkExistingPR()`, `getRepoChanges()`.
 - **`src/lib/prompts/`** — Prompt builder functions for each agent type (planner, executor, coordinator, reviewer, code-reviewer, todo-verifier, pr-creator, researcher, updater, collector, init-readme). Each exports a `build*Prompt(input)` function.
 - **`src/app/api/events/route.ts`** — SSE endpoint. Clients connect with `?operationId=` to stream `OperationEvent`s in real time. Replays existing events on connection, then streams new ones.
 
@@ -68,8 +81,11 @@ Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes 
 - **`src/hooks/use-workspaces.ts`** / **`use-workspace.ts`** — SWR hooks with auto-refresh (10s list, 5s detail) for workspace data.
 - **`src/hooks/use-operation.ts`** — Operation lifecycle hook. Persists active operation ID to localStorage (`aiw-op:{key}`) so navigating away and returning reconnects to the SSE stream. Detects `__setWorkspace:` and `__phaseUpdate:` control events from the server.
 - **`src/hooks/use-sse.ts`** — EventSource hook for streaming operation output from `/api/events`.
-- **`src/lib/stream-parser.ts`** — Converts raw `stream-json` messages (from CLI or SDK) into typed `LogEntry` objects for rendering (text, thinking, tool calls, tool results, ask prompts, system events, etc.).
-- **Components** — `workspace-list.tsx` (dashboard), `workspace-card.tsx` (summary card), `operation-panel.tsx` / `operation-log.tsx` / `claude-operation.tsx` (operation UI with log streaming and render-prop pattern), `init-dialog.tsx` (new workspace form).
+- **Components**:
+  - `dashboard/` — `workspace-list.tsx` (dashboard), `workspace-card.tsx` (summary card).
+  - `workspace/` — `operation-panel.tsx`, `readme-viewer.tsx`, `todo-viewer.tsx`, `review-viewer.tsx`, `history-timeline.tsx`, `chat-terminal.tsx`.
+  - `operation/` — Operation execution UI: `claude-operation.tsx` (render-prop wrapper), `log/` (split into `index.tsx`, `display-nodes.ts`, `sections.tsx`, `entries.tsx`, `ask-input.tsx`), `next-action-suggestions.tsx`, `mcp-auth-terminal.tsx`.
+  - `shared/` — Generic UI primitives: `status-badge.tsx`, `progress-bar.tsx`, `markdown-renderer.tsx`, `monaco-editor-lazy.tsx`.
 
 ### Pages
 
@@ -111,7 +127,7 @@ Uses Tailwind with a shadcn/ui-style CSS variable theme system (`hsl(var(--prima
 
 ## Testing
 
-Tests use **Vitest** with jsdom environment, `@testing-library/react`, and `@testing-library/jest-dom` matchers. Test files live in `src/__tests__/` mirroring the `src/` structure (e.g., `src/__tests__/lib/todo-parser.test.ts`). Vitest globals are enabled (no need to import `describe`/`it`/`expect`).
+Tests use **Vitest** with jsdom environment, `@testing-library/react`, and `@testing-library/jest-dom` matchers. Test files live in `src/__tests__/` mirroring the `src/` structure (e.g., `src/__tests__/lib/parsers/todo.test.ts`). Vitest globals are enabled (no need to import `describe`/`it`/`expect`).
 
 ## Key Dependencies
 

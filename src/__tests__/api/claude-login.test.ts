@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockRunClaudeLogin = vi.fn();
 const mockStartOperationPipeline = vi.fn();
 
-vi.mock("@/lib/claude-login", () => ({
+vi.mock("@/lib/claude/login", () => ({
   runClaudeLogin: (...args: unknown[]) => mockRunClaudeLogin(...args),
 }));
 

@@ -2,11 +2,11 @@
 
 import { useEffect, useRef, useMemo, useState, type ReactNode } from "react";
 import { useOperation } from "@/hooks/use-operation";
-import { OperationLog } from "./operation-log";
+import { OperationLog } from "./log";
 import { NextActionSuggestions } from "./next-action-suggestions";
-import { StatusBadge } from "./status-badge";
-import { MarkdownRenderer } from "./markdown-renderer";
-import { parseStreamEvent, type LogEntry } from "@/lib/stream-parser";
+import { StatusBadge } from "../shared/status-badge";
+import { MarkdownRenderer } from "../shared/markdown-renderer";
+import { parseStreamEvent, type LogEntry } from "@/lib/parsers/stream";
 import type { Operation, OperationType, OperationEvent } from "@/types/operation";
 
 export interface OperationContext {

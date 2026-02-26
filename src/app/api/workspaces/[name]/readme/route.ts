@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getReadme } from "@/lib/workspace";
+import { getReadme } from "@/lib/workspace/reader";
 
 export const dynamic = "force-dynamic";
 
