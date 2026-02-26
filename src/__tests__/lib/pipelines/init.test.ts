@@ -11,9 +11,9 @@ vi.mock("@/lib/workspace", () => ({
   commitWorkspaceSnapshot: vi.fn(),
   writeTodoTemplate: vi.fn(),
   writeReportTemplates: vi.fn(),
-  buildReadmeContent: vi.fn((desc: string, type: string, ticket: string, date: string) => `# Task: TBD\n\n## Initial Request\n\n${desc}\n\n${type} ${ticket} ${date}`),
 }));
-vi.mock("@/lib/prompts", () => ({
+vi.mock("@/lib/templates", () => ({
+  buildReadmeContent: vi.fn((desc: string, type: string, ticket: string, date: string) => `# Task: TBD\n\n## Initial Request\n\n${desc}\n\n${type} ${ticket} ${date}`),
   buildInitAnalyzeAndReadmePrompt: vi.fn(() => "prompt"),
   INIT_ANALYSIS_SCHEMA: {},
   buildPlannerPrompt: vi.fn(() => "planner-prompt"),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildInitPrompt } from "@/lib/chat-prompt";
+import { buildInitPrompt } from "@/lib/templates";
 
 describe("buildInitPrompt", () => {
   it("includes the workspace ID", () => {

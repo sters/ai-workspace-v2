@@ -13,7 +13,7 @@ import {
   type DataListener,
   type TerminalSubprocess,
 } from "./pty";
-import { buildInitPrompt } from "./chat-prompt";
+import { buildInitPrompt } from "@/lib/templates";
 
 // ---------------------------------------------------------------------------
 // Session management (globalThis for HMR survival)

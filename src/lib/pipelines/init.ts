@@ -7,17 +7,17 @@ import {
   commitWorkspaceSnapshot,
   writeTodoTemplate,
   writeReportTemplates,
-  buildReadmeContent,
   type SetupRepositoryResult,
   type TaskAnalysis,
 } from "@/lib/workspace";
 import {
+  buildReadmeContent,
   buildInitAnalyzeAndReadmePrompt,
   INIT_ANALYSIS_SCHEMA,
   buildPlannerPrompt,
   buildCoordinatorPrompt,
   buildReviewerPrompt,
-} from "@/lib/prompts";
+} from "@/lib/templates";
 import type { PipelinePhase } from "@/lib/process-manager";
 
 export function buildInitPipeline(description: string): PipelinePhase[] {

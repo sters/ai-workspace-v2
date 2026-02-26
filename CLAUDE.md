@@ -71,9 +71,14 @@ Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes 
   - `helpers.ts` — `exec()`, `repoDir()`, `sanitizeSlug()`, staleness utilities.
   - `setup.ts` — `setupWorkspace()`, `setupRepository()`, `detectBaseBranch()`, `parseAnalysisResultText()`.
   - `git.ts` — `listWorkspaceRepos()`, `commitWorkspaceSnapshot()`, `deleteWorkspace()`.
-  - `templates.ts` — TODO/README/Report templates, `writeTodoTemplate()`, `writeReportTemplates()`, `prepareReviewDir()`.
+  - `templates.ts` — I/O wrappers: `writeTodoTemplate()`, `writeReportTemplates()`, `prepareReviewDir()`. Template content lives in `src/lib/templates/`.
   - `pr.ts` — `checkExistingPR()`, `getRepoChanges()`.
-- **`src/lib/prompts/`** — Prompt builder functions for each agent type (planner, executor, coordinator, reviewer, code-reviewer, todo-verifier, pr-creator, researcher, updater, collector, init-readme). Each exports a `build*Prompt(input)` function.
+- **`src/lib/templates/`** — All template strings and prompt builders, organized by concern:
+  - `todo.ts` — TODO template strings for each task type + `selectTodoTemplate()`.
+  - `reports.ts` — Report template strings (review, verification, research, summary) + `REPORT_TEMPLATES` map.
+  - `readme.ts` — `buildReadmeContent()` for new workspace READMEs.
+  - `prompts/` — Prompt builder functions for each agent type (planner, executor, coordinator, reviewer, code-reviewer, todo-verifier, pr-creator, researcher, updater, collector, init-readme, chat). Each exports a `build*Prompt(input)` function.
+  - `index.ts` — Barrel re-export of all templates and prompts.
 - **`src/app/api/events/route.ts`** — SSE endpoint. Clients connect with `?operationId=` to stream `OperationEvent`s in real time. Replays existing events on connection, then streams new ones.
 
 ### Client-side
