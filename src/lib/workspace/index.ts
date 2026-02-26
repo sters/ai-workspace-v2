@@ -7,7 +7,7 @@ export { listStaleWorkspaces, listAllWorkspacesWithAge } from "./helpers";
 
 // Setup
 export type { TaskAnalysis, SetupWorkspaceResult, SetupRepositoryResult } from "./setup";
-export { parseAnalysisResultText, setupWorkspace, detectBaseBranch, setupRepository, README_TEMPLATE } from "./setup";
+export { parseAnalysisResultText, setupWorkspace, detectBaseBranch, setupRepository, buildReadmeContent } from "./setup";
 
 // Git operations
 export type { WorkspaceRepo } from "./git";

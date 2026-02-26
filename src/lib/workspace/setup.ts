@@ -50,17 +50,18 @@ export function parseAnalysisResultText(jsonText: string | undefined, fallbackDe
 // README Template
 // ---------------------------------------------------------------------------
 
-export const README_TEMPLATE = `# Task: TBD
+export function buildReadmeContent(description: string, taskType: string, ticketId: string, date: string): string {
+  return `# Task: TBD
 
 ## Initial Request
 
-{{DESCRIPTION}}
+${description}
 
 ## Overview
 
-**Task Type**: {{TASK_TYPE}}
-**Ticket ID**: {{TICKET_ID}}
-**Date**: {{DATE}}
+**Task Type**: ${taskType}
+**Ticket ID**: ${ticketId}
+**Date**: ${date}
 
 ## Workspace Structure
 
@@ -97,6 +98,7 @@ This workspace is a git repository. Changes to \`README.md\`, \`TODO-*.md\`, and
 
 <!-- Links to issues, documentation, etc. -->
 `;
+}
 
 const GITIGNORE_CONTENT = `# Exclude repository worktrees (they are separate git repos)
 github.com/
@@ -169,13 +171,9 @@ export async function setupWorkspace(
   // Write .gitignore
   await Bun.write(path.join(wsPath, ".gitignore"), GITIGNORE_CONTENT);
 
-  // Write README from template
+  // Write README
   const dateFormatted = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
-  const readme = README_TEMPLATE
-    .replace(/\{\{DESCRIPTION\}\}/g, description)
-    .replace(/\{\{TASK_TYPE\}\}/g, taskType)
-    .replace(/\{\{TICKET_ID\}\}/g, ticketId ?? "N/A")
-    .replace(/\{\{DATE\}\}/g, dateFormatted);
+  const readme = buildReadmeContent(description, taskType, ticketId ?? "N/A", dateFormatted);
   await Bun.write(path.join(wsPath, "README.md"), readme);
 
   // Initial commit
