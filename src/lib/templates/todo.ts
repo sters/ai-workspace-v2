@@ -163,6 +163,7 @@ export function selectTodoTemplate(taskType: string): string {
     case "bug":
       return TODO_BUGFIX_TEMPLATE;
     case "research":
+    case "investigation":
       return TODO_RESEARCH_TEMPLATE;
     default:
       return TODO_DEFAULT_TEMPLATE;

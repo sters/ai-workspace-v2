@@ -14,6 +14,9 @@ export interface PlannerInput {
 }
 
 export function buildPlannerPrompt(input: PlannerInput): string {
+  const isResearch = input.taskType === "research" || input.taskType === "investigation";
+  const instructions = isResearch ? RESEARCH_PLANNER_INSTRUCTIONS : PLANNER_INSTRUCTIONS;
+
   return `# Task: Plan TODO items for ${input.repoName}
 
 ## Workspace: ${input.workspaceName}
@@ -33,7 +36,7 @@ Use it as the base structure for the TODO file. Replace \`{{REPOSITORY_NAME}}\` 
 
 ## Instructions
 
-${PLANNER_INSTRUCTIONS}
+${instructions}
 `;
 }
 
@@ -101,4 +104,56 @@ Each TODO item MUST follow this structured format:
 If Mode is "interactive", pause at two checkpoints:
 1. After analysis, present findings and proposed approach (ask user before creating TODOs)
 2. After creating draft TODOs, present for review (ask user before finalizing)
+`;
+
+const RESEARCH_PLANNER_INSTRUCTIONS = `You are a specialized agent for creating TODO items for a **research/investigation task**. Your role is to outline what needs to be investigated — NOT to perform the investigation itself.
+
+**CRITICAL: Do NOT analyze source code, read implementation files, or investigate the codebase. The executor will do that. Your job is only to create a TODO list of what to look into.**
+
+### Execution Steps
+
+1. **Read Workspace Context** (provided above):
+   - Understand what needs to be researched or investigated
+   - Identify the key questions to answer
+
+2. **Use the TODO Template**:
+   - Read the TODO template file specified above
+   - Write the template to the workspace as the TODO file
+   - Replace \`{{REPOSITORY_NAME}}\` with the actual repository name
+
+3. **Read Repository Documentation Only**:
+   - Read CLAUDE.md, README.md from the repository
+   - Use this only to understand the project structure at a high level
+   - Do NOT explore source code, do NOT read implementation files
+
+4. **Create TODO Items**:
+   - Break down the research questions into specific, focused investigation tasks
+   - Each TODO should describe *what* to find out, not *how* (the executor decides how)
+   - Keep items simple: "Investigate X", "Find out how Y works", "Identify where Z is implemented"
+   - Do NOT include findings or conclusions — you haven't investigated yet
+
+### Output
+
+Write the TODO file to: workspace/{workspace-name}/TODO-{repository-name}.md
+
+### Working Directory Rules
+
+**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+
+### TODO Item Format
+
+Each TODO item MUST follow this structured format:
+
+\`\`\`markdown
+- [ ] **[Target]** Action description
+  - Target: area or topic to investigate
+  - Action: What question to answer or what to find out
+\`\`\`
+
+### Guidelines
+
+1. Focus on this repository only
+2. Keep TODOs at the "what to investigate" level — do NOT perform the investigation
+3. Order by priority: most important research questions first
+4. Include a final TODO to document findings in the workspace README
 `;
