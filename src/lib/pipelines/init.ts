@@ -7,7 +7,7 @@ import {
   commitWorkspaceSnapshot,
   writeTodoTemplate,
   writeReportTemplates,
-  README_TEMPLATE,
+  buildReadmeContent,
   type SetupRepositoryResult,
   type TaskAnalysis,
 } from "@/lib/workspace";
@@ -35,11 +35,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
       fn: async (ctx) => {
         // Build README template content to include in the prompt
         const today = new Date().toISOString().slice(0, 10);
-        const readmeTemplate = README_TEMPLATE
-          .replace(/\{\{DESCRIPTION\}\}/g, description)
-          .replace(/\{\{TASK_TYPE\}\}/g, "TBD")
-          .replace(/\{\{TICKET_ID\}\}/g, "TBD")
-          .replace(/\{\{DATE\}\}/g, today);
+        const readmeTemplate = buildReadmeContent(description, "TBD", "TBD", today);
 
         const prompt = buildInitAnalyzeAndReadmePrompt({
           description,
