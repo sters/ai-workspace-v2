@@ -87,8 +87,10 @@ export function runClaude(
   log(operationId, "prompt:", prompt.slice(0, 200) + (prompt.length > 200 ? "..." : ""));
   log(operationId, "getCliPath():", getCliPath());
 
-  // Accumulated result text from the stream's "result" event
+  // Accumulated result text from StructuredOutput tool_use or the "result" event
   let resultText: string | undefined;
+  // Whether resultText was set from a StructuredOutput tool_use (takes precedence over result event)
+  let hasStructuredOutput = false;
 
   function spawnAndStream(promptOrAnswer: string, resumeSessionId?: string) {
     const args = [getCliPath(), "-p", promptOrAnswer, "--output-format", "stream-json", "--verbose"];
@@ -154,17 +156,23 @@ export function runClaude(
               log(operationId, "session_id:", sessionId);
             }
 
-            // Capture result text from the result event
-            if (parsed.type === "result" && parsed.subtype === "success" && typeof parsed.result === "string") {
+            // Capture result text from the result event (unless StructuredOutput already set it)
+            if (parsed.type === "result" && parsed.subtype === "success" && typeof parsed.result === "string" && !hasStructuredOutput) {
               resultText = parsed.result;
             }
 
-            // Detect AskUserQuestion tool_use in assistant messages
+            // Detect AskUserQuestion / StructuredOutput tool_use in assistant messages
             if (parsed.type === "assistant" && parsed.message?.content) {
               for (const block of parsed.message.content) {
                 if (block.type === "tool_use" && block.name === "AskUserQuestion") {
                   pendingAskToolUseId = block.id;
                   log(operationId, "AskUserQuestion detected, toolUseId:", block.id);
+                }
+                // Capture structured output from --json-schema responses
+                if (block.type === "tool_use" && block.name === "StructuredOutput" && block.input) {
+                  resultText = JSON.stringify(block.input);
+                  hasStructuredOutput = true;
+                  log(operationId, "StructuredOutput captured:", resultText.slice(0, 200));
                 }
               }
             }

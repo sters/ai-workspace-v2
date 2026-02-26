@@ -71,6 +71,10 @@ function summarizeToolInput(name: string, input: any): string {
       return input?.url ?? "";
     case "WebSearch":
       return input?.query ?? "";
+    case "StructuredOutput": {
+      const json = JSON.stringify(input);
+      return json.length > 120 ? json.slice(0, 120) + "…" : json;
+    }
     default:
       return "";
   }
