@@ -14,7 +14,7 @@ export const reviewSchema = workspaceSchema;
 
 export const createPrSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
-  draft: z.boolean().optional(),
+  draft: z.coerce.boolean().optional(),
 });
 
 export const updateTodoSchema = z.object({
@@ -25,7 +25,7 @@ export const updateTodoSchema = z.object({
 export const deleteSchema = workspaceSchema;
 
 export const workspacePruneSchema = z.object({
-  days: z.number().positive().optional(),
+  days: z.coerce.number().positive().optional(),
 });
 
 export const operationKillSchema = z.object({
