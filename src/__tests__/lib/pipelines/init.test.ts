@@ -11,7 +11,7 @@ vi.mock("@/lib/workspace", () => ({
   commitWorkspaceSnapshot: vi.fn(),
   writeTodoTemplate: vi.fn(),
   writeReportTemplates: vi.fn(),
-  README_TEMPLATE: "# Task: {{DESCRIPTION}}\n{{TASK_TYPE}} {{TICKET_ID}} {{DATE}}",
+  README_TEMPLATE: "# Task: TBD\n\n## Initial Request\n\n{{DESCRIPTION}}\n\n{{TASK_TYPE}} {{TICKET_ID}} {{DATE}}",
 }));
 vi.mock("@/lib/prompts", () => ({
   buildInitAnalyzeAndReadmePrompt: vi.fn(() => "prompt"),

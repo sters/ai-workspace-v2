@@ -6,7 +6,7 @@
 
 export interface InitAnalyzeAndReadmeInput {
   description: string;
-  readmePath: string;
+  readmeTemplate: string;
 }
 
 /**
@@ -33,8 +33,12 @@ export const INIT_ANALYSIS_SCHEMA: Record<string, unknown> = {
       items: { type: "string" },
       description: "Full repository paths (e.g. github.com/org/repo) found in description, or empty array",
     },
+    readmeContent: {
+      type: "string",
+      description: "The fully edited README.md content with all sections filled in",
+    },
   },
-  required: ["taskType", "slug", "ticketId", "repositories"],
+  required: ["taskType", "slug", "ticketId", "repositories", "readmeContent"],
   additionalProperties: false,
 };
 
@@ -60,7 +64,13 @@ Analyze the task description above. Your final text response will be constrained
 
 ### 2. Edit the README template
 
-A README template has been written at \`${input.readmePath}\`. Edit it to fill in the workspace details:
+Here is the README template to fill in:
+
+\`\`\`markdown
+${input.readmeTemplate}
+\`\`\`
+
+Edit this template and return the full edited content in the \`readmeContent\` field of your JSON response:
 
 1. **Rewrite the \`# Task:\` heading** to a concise, descriptive title (not the raw URL or description). Under 80 characters, natural language. For example: \`# Task: Add pagination to user search API\`
 2. **Update \`**Task Type**\` and \`**Ticket ID**\`** fields based on your analysis
@@ -75,9 +85,9 @@ A README template has been written at \`${input.readmePath}\`. Edit it to fill i
 ### Important Notes
 
 - **Do NOT browse, read, or analyze source code in repositories.** Your sole input is the user's description (and ticket URL if provided). Repository code analysis happens in a later planning phase — not here.
-- Use the file path \`${input.readmePath}\` for README edits
+- **Do NOT use file editing tools.** Return the edited README content in the \`readmeContent\` field of your JSON response.
 - Keep the template structure, just fill in the placeholder sections
 - The README should give clear context for agents that will work on this task later
-- Edit the README FIRST, then your final text response will be the analysis JSON
+- Your final text response must be the JSON with all fields including readmeContent
 `;
 }
