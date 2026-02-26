@@ -1,5 +1,3 @@
-import { mkdirSync, rmSync } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import {
@@ -23,14 +21,10 @@ import {
 import type { PipelinePhase } from "@/lib/process-manager";
 
 export function buildInitPipeline(description: string): PipelinePhase[] {
-  // Temp dir for draft README (analysis JSON is now returned via structured output)
-  const tmpDir = path.join(os.tmpdir(), `ai-ws-init-${Date.now()}`);
-  const tempReadmePath = path.join(tmpDir, "README.md");
-
   // Shared mutable state across pipeline phases
   let wsName = "";
   let wsPath = "";
-  let analysis: TaskAnalysis | null = null;
+  let analysis: (TaskAnalysis & { readmeContent?: string }) | null = null;
   const repoResults: SetupRepositoryResult[] = [];
 
   return [
@@ -39,25 +33,35 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
       kind: "function",
       label: "Analyze & draft README",
       fn: async (ctx) => {
-        // Create temp dir and write README template for Claude to edit
-        mkdirSync(tmpDir, { recursive: true });
+        // Build README template content to include in the prompt
         const today = new Date().toISOString().slice(0, 10);
-        const readme = README_TEMPLATE
+        const readmeTemplate = README_TEMPLATE
           .replace(/\{\{DESCRIPTION\}\}/g, description)
           .replace(/\{\{TASK_TYPE\}\}/g, "TBD")
           .replace(/\{\{TICKET_ID\}\}/g, "TBD")
           .replace(/\{\{DATE\}\}/g, today);
-        await Bun.write(tempReadmePath, readme);
 
         const prompt = buildInitAnalyzeAndReadmePrompt({
           description,
-          readmePath: tempReadmePath,
+          readmeTemplate,
         });
 
         return ctx.runChild("Analyze & draft README", prompt, {
           jsonSchema: INIT_ANALYSIS_SCHEMA,
           onResultText: (text) => {
             analysis = parseAnalysisResultText(text, description);
+            // Extract readmeContent from the structured output
+            if (text) {
+              try {
+                const { values } = Bun.JSONL.parseChunk(text);
+                if (values.length > 0) {
+                  const parsed = values[0] as Record<string, unknown>;
+                  if (typeof parsed.readmeContent === "string") {
+                    analysis = { ...analysis!, readmeContent: parsed.readmeContent };
+                  }
+                }
+              } catch { /* use template as fallback */ }
+            }
           },
         });
       },
@@ -92,15 +96,10 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
         ctx.setWorkspace(wsName);
         ctx.emitStatus(`Workspace created: ${wsName}`);
 
-        // Copy the Claude-edited README over the template README
-        const tempReadme = Bun.file(tempReadmePath);
-        if (await tempReadme.exists()) {
-          const content = await tempReadme.text();
-          await Bun.write(path.join(wsPath, "README.md"), content);
+        // Overwrite template README with Claude-edited content from structured output
+        if (analysis?.readmeContent) {
+          await Bun.write(path.join(wsPath, "README.md"), analysis.readmeContent);
         }
-
-        // Clean up temp dir
-        try { rmSync(tmpDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
         // Write template files for agents to reference
         await writeTodoTemplate(wsPath, analysis.taskType);

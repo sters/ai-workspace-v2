@@ -50,7 +50,11 @@ export function parseAnalysisResultText(jsonText: string | undefined, fallbackDe
 // README Template
 // ---------------------------------------------------------------------------
 
-export const README_TEMPLATE = `# Task: {{DESCRIPTION}}
+export const README_TEMPLATE = `# Task: TBD
+
+## Initial Request
+
+{{DESCRIPTION}}
 
 ## Overview
 
