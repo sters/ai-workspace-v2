@@ -8,11 +8,8 @@
  */
 
 import path from "node:path";
-import {
-  spawnTerminal,
-  type DataListener,
-  type TerminalSubprocess,
-} from "./pty";
+import { spawnTerminal } from "./pty";
+import type { DataListener, TerminalSubprocess } from "@/types/pty";
 import { buildInitPrompt } from "@/lib/templates";
 
 // ---------------------------------------------------------------------------

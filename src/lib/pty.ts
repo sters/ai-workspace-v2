@@ -3,24 +3,7 @@
  * Shared between mcp-auth.ts and chat-server.ts.
  */
 
-export type DataListener = (data: string) => void;
-
-/**
- * Bun.spawn with terminal option returns a subprocess with PTY control.
- * Type definitions may lag behind runtime support, so we define our own interface.
- */
-export interface TerminalSubprocess {
-  terminal: { write(data: string): void };
-  kill(): void;
-  exited: Promise<number>;
-}
-
-export interface SpawnTerminalOptions {
-  cwd: string;
-  env: Record<string, string | undefined>;
-  cols?: number;
-  rows?: number;
-}
+import type { DataListener, TerminalSubprocess, SpawnTerminalOptions } from "@/types/pty";
 
 export function spawnTerminal(
   cmd: string[],

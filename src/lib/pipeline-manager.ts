@@ -5,21 +5,9 @@ import type {
   OperationType,
 } from "@/types/operation";
 import type { PipelinePhase, PipelineOptions } from "@/types/pipeline";
-import { runClaude, type ClaudeProcess, type RunClaudeOptions } from "./claude";
+import { runClaude } from "./claude";
+import type { ClaudeProcess, RunClaudeOptions } from "@/types/claude";
 import { Semaphore } from "./semaphore";
-
-export type {
-  GroupChild,
-  PipelinePhaseSingle,
-  PipelinePhaseGroup,
-  AskQuestionOption,
-  AskQuestionDef,
-  RunChildOptions,
-  PhaseFunctionContext,
-  PipelinePhaseFunction,
-  PipelinePhase,
-  PipelineOptions,
-} from "@/types/pipeline";
 
 // ---------------------------------------------------------------------------
 // Internal types

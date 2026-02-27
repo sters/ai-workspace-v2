@@ -6,12 +6,10 @@ import {
   commitWorkspaceSnapshot,
   writeTodoTemplate,
   writeReportTemplates,
-  type TaskAnalysis,
 } from "@/lib/workspace";
-import {
-  setupRepository,
-  type SetupRepositoryResult,
-} from "./actions/setup-repository";
+import type { TaskAnalysis } from "@/types/workspace";
+import { setupRepository } from "./actions/setup-repository";
+import type { SetupRepositoryResult } from "@/types/pipeline";
 import {
   buildReadmeContent,
   buildInitAnalyzeAndReadmePrompt,

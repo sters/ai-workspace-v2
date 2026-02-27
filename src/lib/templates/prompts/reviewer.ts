@@ -3,13 +3,7 @@
  * Reviews and validates TODO items for a specific repository.
  */
 
-export interface ReviewerInput {
-  workspaceName: string;
-  repoName: string;
-  readmeContent: string;
-  todoContent: string;
-  worktreePath: string;
-}
+import type { ReviewerInput } from "@/types/prompts";
 
 export function buildReviewerPrompt(input: ReviewerInput): string {
   return `# Task: Review TODO items for ${input.repoName}

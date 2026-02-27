@@ -1,9 +1,4 @@
-export interface SpawnResult {
-  stdout: ReadableStream<Uint8Array>;
-  stderr: ReadableStream<Uint8Array>;
-  exited: Promise<number>;
-  kill(): void;
-}
+import type { SpawnResult } from "@/types/pty";
 
 /** Spawn `claude auth <subcommand>` via Bun.spawn with piped stdio. */
 export function spawnClaudeAuth(subcommand: string): SpawnResult {

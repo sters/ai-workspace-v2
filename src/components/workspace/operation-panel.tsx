@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ClaudeOperation, type OperationContext } from "../operation/claude-operation";
+import { ClaudeOperation } from "../operation/claude-operation";
+import type { OperationContext } from "@/types/operation";
 import type { OperationType } from "@/types/operation";
 
 export function OperationPanel({

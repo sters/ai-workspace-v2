@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { LogEntry } from "@/lib/parsers/stream";
+import type { LogEntry } from "@/types/claude";
 import { MarkdownRenderer } from "../../shared/markdown-renderer";
 
 // ---------------------------------------------------------------------------

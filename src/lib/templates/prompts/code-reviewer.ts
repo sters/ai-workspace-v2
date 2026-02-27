@@ -3,17 +3,7 @@
  * Reviews code changes in a repository.
  */
 
-export interface CodeReviewerInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
-  baseBranch: string;
-  reviewTimestamp: string;
-  readmeContent: string;
-  worktreePath: string;
-  repoChanges: string;
-  reviewFilePath: string;
-}
+import type { CodeReviewerInput } from "@/types/prompts";
 
 export function buildCodeReviewerPrompt(input: CodeReviewerInput): string {
   return `# Task: Review code changes for ${input.repoName}

@@ -3,14 +3,7 @@
  * Executes TODO items for a specific repository within a workspace.
  */
 
-export interface ExecutorInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
-  readmeContent: string;
-  todoContent: string;
-  worktreePath: string;
-}
+import type { ExecutorInput } from "@/types/prompts";
 
 export function buildExecutorPrompt(input: ExecutorInput): string {
   return `# Task: Execute TODO items for ${input.repoName}

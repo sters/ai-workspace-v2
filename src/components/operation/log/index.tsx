@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import type { OperationEvent, OperationPhaseInfo } from "@/types/operation";
-import { parseStreamEvent, type LogEntry } from "@/lib/parsers/stream";
+import { parseStreamEvent } from "@/lib/parsers/stream";
+import type { LogEntry } from "@/types/claude";
 import { buildDisplayNodes, groupByChildLabel, findPendingAsk } from "./display-nodes";
 import { ChildGroupSection, SubAgentSection } from "./sections";
 import { EntryRow } from "./entries";

@@ -3,15 +3,7 @@
  * Reads review artifacts and generates actionable TODO items.
  */
 
-export interface CreateTodoPlannerInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
-  readmeContent: string;
-  worktreePath: string;
-  reviewDir: string;
-  taskType: string;
-}
+import type { CreateTodoPlannerInput } from "@/types/prompts";
 
 export function buildCreateTodoFromReviewPrompt(input: CreateTodoPlannerInput): string {
   return `# Task: Create TODO items from review findings for ${input.repoName}

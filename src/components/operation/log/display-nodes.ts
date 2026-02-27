@@ -1,33 +1,5 @@
-import type { LogEntry } from "@/lib/parsers/stream";
-
-/**
- * A display node in the log tree.
- * Top-level entries render directly; sub-agent groups render as collapsible sections.
- */
-export type DisplayNode =
-  | { type: "entry"; entry: LogEntry }
-  | {
-      type: "subagent";
-      toolUseId: string;
-      description: string;
-      status: "running" | "completed" | "failed" | "stopped";
-      /** Summary text from task_notification. */
-      summary?: string;
-      /** Formatted usage (e.g., "12.3s, 5 tools"). */
-      usage?: string;
-      /** Task ID from the SDK. */
-      taskId?: string;
-      /** Output file path for background tasks. */
-      outputFile?: string;
-      /** Sub-agent messages (if any come through the SDK stream). */
-      entries: LogEntry[];
-    }
-  | {
-      type: "child-group";
-      label: string;
-      status: "running" | "completed" | "failed";
-      children: DisplayNode[];
-    };
+import type { LogEntry, AskQuestion } from "@/types/claude";
+import type { DisplayNode } from "@/types/claude";
 
 /** Extract output_file path from a background Task tool_result text. */
 function extractOutputFilePath(text: string): string | undefined {
@@ -253,8 +225,6 @@ export function groupByChildLabel(nodes: DisplayNode[]): DisplayNode[] {
 // ---------------------------------------------------------------------------
 // Find pending ask
 // ---------------------------------------------------------------------------
-
-import type { AskQuestion } from "@/lib/parsers/stream";
 
 /** Find the latest "ask" entry that doesn't have a subsequent tool_result for the same toolId. */
 export function findPendingAsk(
