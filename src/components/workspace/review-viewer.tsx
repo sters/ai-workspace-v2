@@ -4,12 +4,15 @@ import { useState } from "react";
 import type { ReviewSession } from "@/types/workspace";
 import { useReviewDetail } from "@/hooks/use-workspace";
 import { MarkdownRenderer } from "../shared/markdown-renderer";
+import { ClaudeOperation } from "../operation/claude-operation";
 
 export function ReviewViewer({
   workspaceName,
+  workspacePath,
   reviews,
 }: {
   workspaceName: string;
+  workspacePath: string;
   reviews: ReviewSession[];
 }) {
   const [selected, setSelected] = useState<string | null>(
@@ -28,7 +31,7 @@ export function ReviewViewer({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {reviews.map((r) => (
           <button
             key={r.timestamp}
@@ -54,6 +57,27 @@ export function ReviewViewer({
 
       {selected && (
         <div className="space-y-4">
+          <ClaudeOperation
+            storageKey={`review-todo:${workspacePath}:${selected}`}
+            workspace={workspacePath}
+            vertical
+          >
+            {({ start, isRunning }) => (
+              <button
+                onClick={() =>
+                  start("create-todo", {
+                    workspace: workspacePath,
+                    reviewTimestamp: selected,
+                  })
+                }
+                disabled={isRunning}
+                className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                Create TODO
+              </button>
+            )}
+          </ClaudeOperation>
+
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading...</p>
           ) : (

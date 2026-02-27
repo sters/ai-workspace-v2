@@ -22,6 +22,11 @@ export const updateTodoSchema = z.object({
   instruction: z.string().min(1, "instruction is required"),
 });
 
+export const createTodoSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  reviewTimestamp: z.string().min(1, "reviewTimestamp is required"),
+});
+
 export const deleteSchema = workspaceSchema;
 
 export const workspacePruneSchema = z.object({

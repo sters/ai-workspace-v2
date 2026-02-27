@@ -6,7 +6,7 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { OperationPanel } from "@/components/workspace/operation-panel";
 import type { OperationType } from "@/types/operation";
 
-const VALID_AUTO_ACTIONS = new Set<string>(["execute", "review", "create-pr"]);
+const VALID_AUTO_ACTIONS = new Set<string>(["execute", "review", "create-pr", "create-todo"]);
 
 export default function WorkspaceOperationsPage({
   params,

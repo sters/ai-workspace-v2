@@ -4,6 +4,7 @@ export type OperationType =
   | "review"
   | "create-pr"
   | "update-todo"
+  | "create-todo"
   | "delete"
   | "workspace-prune"
   | "mcp-auth"
