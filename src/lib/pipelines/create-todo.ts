@@ -1,16 +1,12 @@
 import path from "node:path";
 import { readWorkspaceReadme } from "@/lib/parsers/readme";
-import {
-  listWorkspaceRepos,
-  commitWorkspaceSnapshot,
-} from "@/lib/workspace";
-import {
-  buildCreateTodoFromReviewPrompt,
-  buildCoordinatorPrompt,
-  buildReviewerPrompt,
-} from "@/lib/templates";
+import { listWorkspaceRepos } from "@/lib/workspace";
+import { buildCreateTodoFromReviewPrompt } from "@/lib/templates";
 import { WORKSPACE_DIR } from "@/lib/config";
-import type { PipelinePhase } from "@/lib/process-manager";
+import type { PipelinePhase } from "@/types/pipeline";
+import { buildCommitSnapshotPhase } from "./actions/commit-snapshot";
+import { buildCoordinateTodosPhase } from "./actions/coordinate-todos";
+import { buildReviewTodosPhase } from "./actions/review-todos";
 
 export function buildCreateTodoPipeline(
   workspace: string,
@@ -60,101 +56,36 @@ export function buildCreateTodoPipeline(
     {
       kind: "function",
       label: "Coordinate TODOs",
-      fn: async (ctx) => {
-        const { content: readmeContent } = await readWorkspaceReadme(wsPath);
+      fn: (ctx) => {
         const repos = listWorkspaceRepos(workspace);
-
-        if (repos.length <= 1) {
-          ctx.emitResult("Skipped coordination (single repo).");
-          return true;
-        }
-
-        const todoFiles: { repoName: string; content: string }[] = [];
-        for (const repo of repos) {
-          const todoFile = Bun.file(path.join(wsPath, `TODO-${repo.repoName}.md`));
-          if (await todoFile.exists()) {
-            todoFiles.push({
-              repoName: repo.repoName,
-              content: await todoFile.text(),
-            });
-          }
-        }
-
-        if (todoFiles.length === 0) {
-          ctx.emitResult("No TODO files found, skipping coordination.");
-          return true;
-        }
-
-        const prompt = buildCoordinatorPrompt({
-          workspaceName: workspace,
-          readmeContent,
-          todoFiles,
-          workspacePath: wsPath,
-        });
-
-        ctx.emitStatus("Coordinating TODOs across repositories");
-        return ctx.runChild("Coordinate TODOs", prompt);
+        return buildCoordinateTodosPhase({
+          workspace,
+          wsPath,
+          repoNames: repos.map((r) => r.repoName),
+        }).fn(ctx);
       },
     },
     // Phase C: Review TODOs (parallel per repo)
     {
       kind: "function",
       label: "Review TODOs",
-      fn: async (ctx) => {
-        const { content: readmeContent } = await readWorkspaceReadme(wsPath);
+      fn: (ctx) => {
         const repos = listWorkspaceRepos(workspace);
-
-        if (repos.length === 0) {
-          ctx.emitResult("Skipped TODO review.");
-          return true;
-        }
-
-        const children: { label: string; prompt: string }[] = [];
-        for (const repo of repos) {
-          const todoFile = Bun.file(path.join(wsPath, `TODO-${repo.repoName}.md`));
-          if (!(await todoFile.exists())) continue;
-          const todoContent = await todoFile.text();
-
-          children.push({
-            label: `review-${repo.repoName}`,
-            prompt: buildReviewerPrompt({
-              workspaceName: workspace,
-              repoName: repo.repoName,
-              readmeContent,
-              todoContent,
-              worktreePath: repo.worktreePath,
-            }),
-          });
-        }
-
-        if (children.length === 0) {
-          ctx.emitResult("No TODO files to review.");
-          return true;
-        }
-
-        ctx.emitStatus(`Reviewing TODOs for ${children.length} repositories`);
-        const results = await ctx.runChildGroup(children);
-        const allSuccess = results.every(Boolean);
-        ctx.emitStatus(
-          `Review complete: ${results.filter(Boolean).length}/${results.length} succeeded`,
-        );
-
-        return allSuccess;
+        return buildReviewTodosPhase({
+          workspace,
+          wsPath,
+          repos: repos.map((r) => ({
+            repoName: r.repoName,
+            worktreePath: r.worktreePath,
+          })),
+        }).fn(ctx);
       },
     },
     // Phase D: Commit snapshot
-    {
-      kind: "function",
-      label: "Commit snapshot",
-      fn: async (ctx) => {
-        ctx.emitStatus("Committing workspace snapshot...");
-        await commitWorkspaceSnapshot(
-          workspace,
-          `Create TODO from review: ${reviewTimestamp}`,
-        );
-        ctx.emitResult(`TODO items created from review **${reviewTimestamp}**.`);
-        return true;
-      },
-    },
+    buildCommitSnapshotPhase(
+      workspace,
+      `Create TODO from review: ${reviewTimestamp}`,
+      `TODO items created from review **${reviewTimestamp}**.`,
+    ),
   ];
 }

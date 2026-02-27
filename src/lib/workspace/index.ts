@@ -1,13 +1,13 @@
 // Barrel export for workspace modules
 
 // Helpers
-export { sanitizeSlug } from "./helpers";
+export { sanitizeSlug, detectBaseBranch } from "./helpers";
 export type { StaleWorkspace, WorkspaceAgeInfo } from "./helpers";
 export { listStaleWorkspaces, listAllWorkspacesWithAge } from "./helpers";
 
 // Setup
-export type { TaskAnalysis, SetupWorkspaceResult, SetupRepositoryResult } from "./setup";
-export { parseAnalysisResultText, setupWorkspace, detectBaseBranch, setupRepository } from "./setup";
+export type { TaskAnalysis, SetupWorkspaceResult } from "./setup";
+export { parseAnalysisResultText, setupWorkspace } from "./setup";
 
 // Git operations
 export type { WorkspaceRepo } from "./git";

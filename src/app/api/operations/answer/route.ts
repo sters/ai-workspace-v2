@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { submitAnswer } from "@/lib/process-manager";
+import { submitAnswer } from "@/lib/pipeline-manager";
 import { operationAnswerSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 

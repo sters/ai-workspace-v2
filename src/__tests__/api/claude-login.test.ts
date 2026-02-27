@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockRunClaudeLogin = vi.fn();
+const mockCheckAuthStatus = vi.fn();
+const mockSpawnClaudeAuth = vi.fn();
 const mockStartOperationPipeline = vi.fn();
 
 vi.mock("@/lib/claude/login", () => ({
-  runClaudeLogin: (...args: unknown[]) => mockRunClaudeLogin(...args),
+  checkAuthStatus: (...args: unknown[]) => mockCheckAuthStatus(...args),
+  spawnClaudeAuth: (...args: unknown[]) => mockSpawnClaudeAuth(...args),
 }));
 
-vi.mock("@/lib/process-manager", () => ({
+vi.mock("@/lib/pipeline-manager", () => ({
   startOperationPipeline: (...args: unknown[]) =>
     mockStartOperationPipeline(...args),
 }));
@@ -44,24 +46,41 @@ describe("POST /api/operations/claude-login", () => {
     );
   });
 
-  it("passes a function phase that calls runClaudeLogin", async () => {
+  it("passes a function phase that calls checkAuthStatus and spawnClaudeAuth", async () => {
     await POST();
 
     const phases = mockStartOperationPipeline.mock.calls[0][2];
     const fnPhase = phases[0];
 
+    // Mock checkAuthStatus to return a status string
+    mockCheckAuthStatus.mockResolvedValueOnce("Authenticated");
+
+    // Mock spawnClaudeAuth to return a completed login process
+    const encoder = new TextEncoder();
+    mockSpawnClaudeAuth.mockReturnValueOnce({
+      stdout: new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode("Login successful"));
+          controller.close();
+        },
+      }),
+      stderr: new ReadableStream({
+        start(controller) { controller.close(); },
+      }),
+      exited: Promise.resolve(0),
+      kill: vi.fn(),
+    });
+
     const mockCtx = {
       emitStatus: vi.fn(),
       signal: new AbortController().signal,
     };
-    mockRunClaudeLogin.mockResolvedValueOnce(true);
 
     const result = await fnPhase.fn(mockCtx);
 
     expect(result).toBe(true);
-    expect(mockRunClaudeLogin).toHaveBeenCalledWith({
-      emitStatus: mockCtx.emitStatus,
-      signal: mockCtx.signal,
-    });
+    expect(mockCheckAuthStatus).toHaveBeenCalled();
+    expect(mockSpawnClaudeAuth).toHaveBeenCalledWith("login");
+    expect(mockCtx.emitStatus).toHaveBeenCalledWith("Login completed successfully!");
   });
 });

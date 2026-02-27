@@ -7,10 +7,12 @@ vi.mock("@/lib/parsers/readme", () => ({
 vi.mock("@/lib/workspace", () => ({
   parseAnalysisResultText: vi.fn(),
   setupWorkspace: vi.fn(),
-  setupRepository: vi.fn(),
   commitWorkspaceSnapshot: vi.fn(),
   writeTodoTemplate: vi.fn(),
   writeReportTemplates: vi.fn(),
+}));
+vi.mock("@/lib/pipelines/actions/setup-repository", () => ({
+  setupRepository: vi.fn(),
 }));
 vi.mock("@/lib/templates", () => ({
   buildReadmeContent: vi.fn((desc: string, type: string, ticket: string, date: string) => `# Task: TBD\n\n## Initial Request\n\n${desc}\n\n${type} ${ticket} ${date}`),

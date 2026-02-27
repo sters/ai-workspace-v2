@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/process-manager";
-import { runMcpAuthSession } from "@/lib/mcp-auth";
+import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
+import { buildMcpAuthPipeline } from "@/lib/pipelines/mcp-auth";
 import { mcpAuthSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 
@@ -13,24 +13,8 @@ export async function POST(request: Request) {
   const isReauth = forceReauth === true || forceReauth === "true";
 
   try {
-    const operation = startOperationPipeline("mcp-auth", `mcp:${serverName}`, [
-      {
-        kind: "function",
-        label: `Authenticate ${serverName}`,
-        fn: async (ctx) => {
-          return runMcpAuthSession(
-            serverName,
-            {
-              emitStatus: ctx.emitStatus,
-              emitTerminal: ctx.emitTerminal,
-              signal: ctx.signal,
-            },
-            { forceReauth: isReauth },
-          );
-        },
-      },
-    ]);
-
+    const phases = buildMcpAuthPipeline(serverName, isReauth);
+    const operation = startOperationPipeline("mcp-auth", `mcp:${serverName}`, phases);
     return NextResponse.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {
