@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
-import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/process-manager";
+import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { createTodoSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";

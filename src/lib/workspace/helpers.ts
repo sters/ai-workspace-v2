@@ -81,6 +81,49 @@ export interface WorkspaceAgeInfo {
   isStale: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// Git branch detection
+// ---------------------------------------------------------------------------
+
+export function detectBaseBranch(repoAbsPath: string): string {
+  // 1. symbolic-ref
+  try {
+    const ref = exec(
+      `git -C "${repoAbsPath}" symbolic-ref refs/remotes/origin/HEAD`,
+    );
+    const branch = ref.replace(/^refs\/remotes\/origin\//, "");
+    if (branch) return branch;
+  } catch { /* continue */ }
+
+  // 2. set-head --auto
+  try {
+    exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
+    const ref = exec(
+      `git -C "${repoAbsPath}" symbolic-ref refs/remotes/origin/HEAD`,
+    );
+    const branch = ref.replace(/^refs\/remotes\/origin\//, "");
+    if (branch) return branch;
+  } catch { /* continue */ }
+
+  // 3. common branch names
+  for (const b of ["main", "master", "develop", "development"]) {
+    try {
+      exec(
+        `git -C "${repoAbsPath}" show-ref --verify --quiet refs/remotes/origin/${b}`,
+      );
+      return b;
+    } catch { /* continue */ }
+  }
+
+  // 4. current branch
+  try {
+    const current = exec(`git -C "${repoAbsPath}" rev-parse --abbrev-ref HEAD`);
+    if (current && current !== "HEAD") return current;
+  } catch { /* continue */ }
+
+  throw new Error(`Could not determine base branch for ${repoAbsPath}`);
+}
+
 export function listAllWorkspacesWithAge(staleDays: number): WorkspaceAgeInfo[] {
   if (!existsSync(WORKSPACE_DIR)) return [];
 

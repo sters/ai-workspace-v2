@@ -24,16 +24,10 @@ function mockProc(
 }
 
 const mockSpawnClaudeAuth = vi.fn();
+const mockCheckAuthStatus = vi.fn();
 
 vi.mock("@/lib/claude/login", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/claude/login")>();
-
-  // We need to re-implement checkAuthStatus and runClaudeLogin so they
-  // use the mockSpawnClaudeAuth instead of the real spawnClaudeAuth,
-  // since the real functions capture spawnClaudeAuth via closure.
-  // The simplest approach: export the mock in place of spawnClaudeAuth,
-  // and re-implement the two consumer functions with identical logic but
-  // using our mock.
 
   async function readStream(stream: ReadableStream<Uint8Array>): Promise<string> {
     const reader = stream.getReader();
@@ -58,6 +52,11 @@ vi.mock("@/lib/claude/login", async (importOriginal) => {
     spawnClaudeAuth: (...args: unknown[]) => mockSpawnClaudeAuth(...args),
 
     async checkAuthStatus(): Promise<string> {
+      // Delegate to mockCheckAuthStatus if it has an implementation,
+      // otherwise fall through to the spawn-based implementation
+      if (mockCheckAuthStatus.getMockImplementation()) {
+        return mockCheckAuthStatus();
+      }
       const proc = mockSpawnClaudeAuth("status");
       const [stdout, stderr, exitCode] = await Promise.all([
         readStream(proc.stdout),
@@ -69,76 +68,15 @@ vi.mock("@/lib/claude/login", async (importOriginal) => {
       }
       return stdout.trim();
     },
-
-    async runClaudeLogin(
-      callbacks: { emitStatus: (message: string) => void; signal?: AbortSignal },
-    ): Promise<boolean> {
-      const { emitStatus, signal } = callbacks;
-
-      emitStatus("Checking current auth status...");
-      try {
-        const statusProc = mockSpawnClaudeAuth("status");
-        const [statusStdout, statusStderr, statusExitCode] = await Promise.all([
-          readStream(statusProc.stdout),
-          readStream(statusProc.stderr),
-          statusProc.exited,
-        ]);
-        if (statusExitCode !== 0) {
-          throw new Error(statusStderr.trim() || `Exit code ${statusExitCode}`);
-        }
-        emitStatus(`Current status: ${statusStdout.trim()}`);
-      } catch (err) {
-        emitStatus(`Auth status check failed: ${err}`);
-      }
-
-      emitStatus("Running claude auth login...");
-      const proc = mockSpawnClaudeAuth("login");
-
-      const aborted = new Promise<"aborted">((resolve) => {
-        if (signal) {
-          signal.addEventListener(
-            "abort",
-            () => {
-              emitStatus("Operation cancelled");
-              proc.kill();
-              resolve("aborted");
-            },
-            { once: true },
-          );
-        }
-      });
-
-      const completed = Promise.all([
-        readStream(proc.stdout),
-        readStream(proc.stderr),
-        proc.exited,
-      ]);
-
-      const result = await Promise.race([completed, aborted]);
-
-      if (result === "aborted") {
-        return false;
-      }
-
-      const [stdout, stderr, exitCode] = result;
-
-      if (exitCode !== 0) {
-        emitStatus(`Login failed: ${stderr.trim() || `Exit code ${exitCode}`}`);
-        return false;
-      }
-
-      const output = stdout.trim();
-      if (output) emitStatus(output);
-      emitStatus("Login completed successfully!");
-      return true;
-    },
   };
 });
 
-import { runClaudeLogin, checkAuthStatus } from "@/lib/claude/login";
+import { checkAuthStatus } from "@/lib/claude/login";
+import { buildClaudeLoginPhase } from "@/lib/pipelines/actions/claude-login";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockCheckAuthStatus.mockReset();
 });
 
 describe("checkAuthStatus", () => {
@@ -167,22 +105,37 @@ describe("checkAuthStatus", () => {
   });
 });
 
-describe("runClaudeLogin", () => {
+describe("buildClaudeLoginPhase", () => {
+  function makeMockCtx(signalOverride?: AbortSignal) {
+    return {
+      operationId: "test-op",
+      emitStatus: vi.fn(),
+      emitResult: vi.fn(),
+      emitAsk: vi.fn(),
+      setWorkspace: vi.fn(),
+      runChild: vi.fn(),
+      runChildGroup: vi.fn(),
+      emitTerminal: vi.fn(),
+      signal: signalOverride ?? new AbortController().signal,
+    };
+  }
+
   it("returns true on successful login", async () => {
-    // First call: auth status
+    // checkAuthStatus
     mockSpawnClaudeAuth.mockReturnValueOnce(
       mockProc('{"loggedIn":false}', "", 0),
     );
-    // Second call: auth login
+    // auth login
     mockSpawnClaudeAuth.mockReturnValueOnce(
       mockProc("Login successful!", "", 0),
     );
 
-    const emitStatus = vi.fn();
-    const result = await runClaudeLogin({ emitStatus });
+    const phase = buildClaudeLoginPhase();
+    const ctx = makeMockCtx();
+    const result = await phase.fn(ctx);
 
     expect(result).toBe(true);
-    expect(emitStatus).toHaveBeenCalledWith("Login completed successfully!");
+    expect(ctx.emitStatus).toHaveBeenCalledWith("Login completed successfully!");
     expect(mockSpawnClaudeAuth).toHaveBeenCalledWith("login");
   });
 
@@ -194,11 +147,12 @@ describe("runClaudeLogin", () => {
       mockProc("", "Authentication error", 1),
     );
 
-    const emitStatus = vi.fn();
-    const result = await runClaudeLogin({ emitStatus });
+    const phase = buildClaudeLoginPhase();
+    const ctx = makeMockCtx();
+    const result = await phase.fn(ctx);
 
     expect(result).toBe(false);
-    expect(emitStatus).toHaveBeenCalledWith(
+    expect(ctx.emitStatus).toHaveBeenCalledWith(
       expect.stringContaining("Authentication error"),
     );
   });
@@ -211,11 +165,12 @@ describe("runClaudeLogin", () => {
       mockProc("Logged in", "", 0),
     );
 
-    const emitStatus = vi.fn();
-    const result = await runClaudeLogin({ emitStatus });
+    const phase = buildClaudeLoginPhase();
+    const ctx = makeMockCtx();
+    const result = await phase.fn(ctx);
 
     expect(result).toBe(true);
-    expect(emitStatus).toHaveBeenCalledWith(
+    expect(ctx.emitStatus).toHaveBeenCalledWith(
       expect.stringContaining("Auth status check failed"),
     );
   });
@@ -236,11 +191,9 @@ describe("runClaudeLogin", () => {
 
     setTimeout(() => controller.abort(), 50);
 
-    const emitStatus = vi.fn();
-    const result = await runClaudeLogin({
-      emitStatus,
-      signal: controller.signal,
-    });
+    const phase = buildClaudeLoginPhase();
+    const ctx = makeMockCtx(controller.signal);
+    const result = await phase.fn(ctx);
 
     expect(result).toBe(false);
     expect(killFn).toHaveBeenCalled();

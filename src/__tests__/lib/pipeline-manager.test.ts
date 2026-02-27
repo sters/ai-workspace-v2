@@ -1,5 +1,5 @@
 /**
- * Tests for process-manager GC and concurrency logic.
+ * Tests for pipeline-manager GC and concurrency logic.
  * We test the exported functions directly by manipulating the global store.
  */
 
@@ -9,7 +9,7 @@ import {
   getOperations,
   ConcurrencyLimitError,
   MAX_CONCURRENT_OPERATIONS,
-} from "@/lib/process-manager";
+} from "@/lib/pipeline-manager";
 
 // Mock the Claude runner so we don't spawn real processes
 vi.mock("@/lib/claude", () => ({
@@ -28,7 +28,7 @@ function getGlobalOps(): Map<string, unknown> {
   return g.__aiWorkspaceOps!;
 }
 
-describe("process-manager GC", () => {
+describe("pipeline-manager GC", () => {
   beforeEach(() => {
     // Clear all operations before each test
     getGlobalOps().clear();
@@ -105,7 +105,7 @@ describe("process-manager GC", () => {
   });
 });
 
-describe("process-manager concurrency", () => {
+describe("pipeline-manager concurrency", () => {
   beforeEach(() => {
     getGlobalOps().clear();
   });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { killOperation } from "@/lib/process-manager";
+import { killOperation } from "@/lib/pipeline-manager";
 import { operationKillSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 

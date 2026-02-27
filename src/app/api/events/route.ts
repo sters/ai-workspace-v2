@@ -2,7 +2,7 @@ import {
   getOperation,
   getOperationEvents,
   subscribeToOperation,
-} from "@/lib/process-manager";
+} from "@/lib/pipeline-manager";
 
 export const dynamic = "force-dynamic";
 
