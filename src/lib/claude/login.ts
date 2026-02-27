@@ -1,11 +1,9 @@
 import type { SpawnResult } from "@/types/pty";
+import { spawnClaude } from "./cli";
 
-/** Spawn `claude auth <subcommand>` via Bun.spawn with piped stdio. */
+/** Spawn `claude auth <subcommand>` via spawnClaude with piped stdio. */
 export function spawnClaudeAuth(subcommand: string): SpawnResult {
-  return Bun.spawn(["claude", "auth", subcommand], {
-    stdout: "pipe",
-    stderr: "pipe",
-  }) as SpawnResult;
+  return spawnClaude({ args: ["auth", subcommand] }) as SpawnResult;
 }
 
 async function readStream(stream: ReadableStream<Uint8Array>): Promise<string> {

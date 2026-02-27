@@ -8,7 +8,7 @@
  */
 
 import path from "node:path";
-import { spawnTerminal } from "./pty";
+import { spawnClaudeTerminal } from "./claude/cli";
 import type { DataListener, TerminalSubprocess } from "@/types/pty";
 import { buildInitPrompt } from "@/lib/templates";
 
@@ -163,31 +163,18 @@ export function startChatServer(port: number) {
             const listeners = new Set<DataListener>();
             const root = getWorkspaceRoot();
             const workspacePath = path.join(root, "workspace", msg.workspaceId);
-            const env: Record<string, string | undefined> = {
-              ...process.env,
-              CLAUDECODE: undefined,
-            };
 
             const initPrompt = buildInitPrompt(msg.workspaceId, workspacePath);
 
             let proc: TerminalSubprocess;
             try {
-              proc = spawnTerminal(["claude", initPrompt], { cwd: root, env }, listeners);
-            } catch {
-              // Fallback: try with full path
-              try {
-                proc = spawnTerminal(
-                  [process.env.CLAUDE_PATH || "claude", initPrompt],
-                  { cwd: root, env },
-                  listeners,
-                );
-              } catch (err) {
-                send(ws, {
-                  type: "error",
-                  message: `Failed to spawn claude: ${err}`,
-                });
-                return;
-              }
+              proc = spawnClaudeTerminal({ args: [initPrompt], cwd: root, listeners });
+            } catch (err) {
+              send(ws, {
+                type: "error",
+                message: `Failed to spawn claude: ${err}`,
+              });
+              return;
             }
 
             const session: ChatSession = {

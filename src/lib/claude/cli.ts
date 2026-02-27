@@ -3,10 +3,100 @@
 // in the same format as @anthropic-ai/claude-agent-sdk.
 
 import type { Subprocess } from "bun";
-import { getCliPath } from "./cli-path";
-import type { ClaudeProcess, RunClaudeOptions, StreamEvent } from "@/types/claude";
+import type { ClaudeProcess, RunClaudeOptions, SpawnClaudeOptions, SpawnClaudeTerminalOptions, StreamEvent } from "@/types/claude";
+import type { TerminalSubprocess } from "@/types/pty";
 import { AI_WORKSPACE_ROOT } from "../config";
 import type { OperationEvent } from "@/types/operation";
+import { spawnTerminal } from "../pty";
+
+// ---------------------------------------------------------------------------
+// CLI path resolution (moved from cli-path.ts)
+// ---------------------------------------------------------------------------
+
+let _cliPath: string | null = null;
+
+function resolveCliPath(): string {
+  // Allow explicit override via CLAUDE_PATH env var
+  if (process.env.CLAUDE_PATH) {
+    return process.env.CLAUDE_PATH;
+  }
+
+  const bin = Bun.which("claude");
+  if (!bin) {
+    console.warn("[cli-path] claude CLI not found in PATH");
+    return "claude";
+  }
+
+  // Try realpath
+  const realpathResult = Bun.spawnSync(["realpath", bin], { stdout: "pipe", stderr: "pipe" });
+  if (realpathResult.success) {
+    const resolved = realpathResult.stdout.toString().trim();
+    if (resolved) return resolved;
+  }
+
+  // Try readlink -f
+  const readlinkResult = Bun.spawnSync(["readlink", "-f", bin], { stdout: "pipe", stderr: "pipe" });
+  if (readlinkResult.success) {
+    const resolved = readlinkResult.stdout.toString().trim();
+    if (resolved) return resolved;
+  }
+
+  return bin;
+}
+
+export function getCliPath(): string {
+  if (_cliPath === null) _cliPath = resolveCliPath();
+  return _cliPath;
+}
+
+/** Reset cached path (for testing). */
+export function _resetCliPath(): void {
+  _cliPath = null;
+}
+
+// ---------------------------------------------------------------------------
+// Shared spawn utilities
+// ---------------------------------------------------------------------------
+
+/** Build a clean env object with CLAUDECODE cleared and optional extras merged. */
+export function getClaudeEnv(
+  extra?: Record<string, string | undefined>,
+): Record<string, string | undefined> {
+  return { ...process.env, CLAUDECODE: undefined, ...extra };
+}
+
+/** Spawn Claude CLI asynchronously via Bun.spawn. */
+export function spawnClaude(options: SpawnClaudeOptions) {
+  const { args, cwd = AI_WORKSPACE_ROOT, stdin, env } = options;
+  return Bun.spawn([getCliPath(), ...args], {
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+    stdin,
+    env: env ?? getClaudeEnv(),
+  });
+}
+
+/** Spawn Claude CLI synchronously via Bun.spawnSync. */
+export function spawnClaudeSync(options: Omit<SpawnClaudeOptions, "stdin">) {
+  const { args, cwd = AI_WORKSPACE_ROOT, env } = options;
+  return Bun.spawnSync([getCliPath(), ...args], {
+    cwd,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: env ?? getClaudeEnv(),
+  });
+}
+
+/** Spawn Claude CLI in interactive PTY mode via spawnTerminal. */
+export function spawnClaudeTerminal(options: SpawnClaudeTerminalOptions): TerminalSubprocess {
+  const { args, cwd = AI_WORKSPACE_ROOT, env, listeners, cols, rows } = options;
+  return spawnTerminal(
+    [getCliPath(), ...args],
+    { cwd, env: env ?? getClaudeEnv(), cols, rows },
+    listeners,
+  );
+}
 
 // Maximum argument length before falling back to stdin (ARG_MAX safety margin)
 const MAX_PROMPT_ARG_LENGTH = 200_000;
@@ -84,32 +174,24 @@ export function runClaude(
   let hasStructuredOutput = false;
 
   function spawnAndStream(promptOrAnswer: string, resumeSessionId?: string) {
-    const args = [getCliPath(), "-p", promptOrAnswer, "--output-format", "stream-json", "--verbose"];
-    if (options?.jsonSchema) {
-      args.push("--json-schema", JSON.stringify(options.jsonSchema));
-    }
-    if (resumeSessionId) {
-      args.push("--resume", resumeSessionId);
-    }
-
     const useStdin = promptOrAnswer.length > MAX_PROMPT_ARG_LENGTH;
-    const spawnArgs = useStdin
-      ? [getCliPath(), "-p", "-", "--output-format", "stream-json", "--verbose", ...(options?.jsonSchema ? ["--json-schema", JSON.stringify(options.jsonSchema)] : []), ...(resumeSessionId ? ["--resume", resumeSessionId] : [])]
-      : args;
 
-    const env: Record<string, string | undefined> = { ...process.env, CLAUDECODE: undefined };
+    const cliArgs = [
+      "-p", useStdin ? "-" : promptOrAnswer,
+      "--output-format", "stream-json",
+      "--verbose",
+      ...(options?.jsonSchema ? ["--json-schema", JSON.stringify(options.jsonSchema)] : []),
+      ...(resumeSessionId ? ["--resume", resumeSessionId] : []),
+    ];
 
-    log(operationId, "spawning:", spawnArgs.join(" ").slice(0, 300));
+    log(operationId, "spawning:", [getCliPath(), ...cliArgs].join(" ").slice(0, 300));
     if (useStdin) {
       log(operationId, "using stdin for prompt (length:", promptOrAnswer.length, ")");
     }
 
-    const proc = Bun.spawn(spawnArgs, {
-      cwd: AI_WORKSPACE_ROOT,
-      stdout: "pipe",
-      stderr: "pipe",
+    const proc = spawnClaude({
+      args: cliArgs,
       stdin: useStdin ? "pipe" : undefined,
-      env,
     });
     currentProc = proc;
 

@@ -1,5 +1,5 @@
-import { AI_WORKSPACE_ROOT } from "@/lib/config";
-import { spawnTerminal, collectOutput } from "@/lib/pty";
+import { collectOutput } from "@/lib/pty";
+import { spawnClaudeSync, spawnClaudeTerminal } from "@/lib/claude/cli";
 import type { DataListener, TerminalSubprocess } from "@/types/pty";
 import type { PipelinePhaseFunction } from "@/types/pipeline";
 
@@ -18,11 +18,7 @@ const ARROW_DOWN = "\x1b[B";
  * Returns -1 if the server is not found.
  */
 function getServerIndex(serverName: string): number {
-  const result = Bun.spawnSync(["claude", "mcp", "list"], {
-    cwd: AI_WORKSPACE_ROOT,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+  const result = spawnClaudeSync({ args: ["mcp", "list"] });
   if (!result.success) {
     throw new Error(`claude mcp list failed: ${result.stderr.toString()}`);
   }
@@ -61,20 +57,16 @@ export function buildMcpAuthPhase(
       emitStatus(`Server "${serverName}" is at index ${serverIndex}`);
 
       // Step 2: Spawn PTY
-      const claudeCmd = "claude";
-      const env = { ...process.env };
-      delete env.CLAUDECODE;
-
       emitStatus(`Starting Claude CLI session...`);
 
       const listeners = new Set<DataListener>();
 
       let proc: TerminalSubprocess;
       try {
-        proc = spawnTerminal([claudeCmd], { cwd: AI_WORKSPACE_ROOT, env }, listeners);
+        proc = spawnClaudeTerminal({ args: [], listeners });
       } catch (spawnErr) {
         const err = spawnErr as Error;
-        emitStatus(`Failed to spawn "${claudeCmd}": ${err.message}`);
+        emitStatus(`Failed to spawn claude: ${err.message}`);
         return false;
       }
       emitStatus("PTY spawned successfully");
