@@ -79,6 +79,7 @@ Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes 
   - `readme.ts` — `buildReadmeContent()` for new workspace READMEs.
   - `prompts/` — Prompt builder functions for each agent type (planner, executor, coordinator, reviewer, code-reviewer, todo-verifier, pr-creator, researcher, updater, collector, init-readme, chat). Each exports a `build*Prompt(input)` function.
   - `index.ts` — Barrel re-export of all templates and prompts.
+- **`src/lib/pipelines/`** — Pipeline definitions for each operation type (init, execute, review, create-pr, etc.). Each file exports a `build*Pipeline()` function that returns a sequence of `PipelinePhase`s. Shared reusable actions (commit-snapshot, coordinate-todos, setup-repository, etc.) live in `actions/`.
 - **`src/app/api/events/route.ts`** — SSE endpoint. Clients connect with `?operationId=` to stream `OperationEvent`s in real time. Replays existing events on connection, then streams new ones.
 
 ### Client-side
@@ -125,7 +126,7 @@ Uses Tailwind with a shadcn/ui-style CSS variable theme system (`hsl(var(--prima
 ## Conventions
 
 - Path alias: `@/*` maps to `./src/*` (configured in `tsconfig.json`).
-- Types live in `src/types/` — `operation.ts` (Operation, OperationEvent, OperationType, OperationPhaseInfo) and `workspace.ts` (TodoItem, TodoFile, WorkspaceMeta, WorkspaceSummary, WorkspaceDetail, ReviewSession, HistoryEntry).
+- Types live in `src/types/` — `operation.ts` (Operation, OperationEvent, OperationType, OperationPhaseInfo), `workspace.ts` (TodoItem, TodoFile, WorkspaceMeta, WorkspaceSummary, WorkspaceDetail, ReviewSession, HistoryEntry), `claude.ts` (ClaudeProcess, RunClaudeOptions, LogEntry types), `pipeline.ts` (PipelinePhase, PhaseFunctionContext), `prompts.ts` (prompt input interfaces), `pty.ts` (DataListener).
 - `bin/start.mjs` is the CLI entry point. Resolves `AI_WORKSPACE_ROOT` from args/env/cwd, validates workspace directory exists, then spawns `bun run dev` or `bun run start`.
 - `NEXT_PUBLIC_GIT_HASH` is injected at build time by `next.config.mjs` for display in the sidebar.
 - ESLint uses flat config (`eslint.config.mjs`) with typescript-eslint. Unused vars must be prefixed with `_` (both args and vars).
