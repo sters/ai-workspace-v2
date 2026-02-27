@@ -1,4 +1,4 @@
-import type { OperationEvent } from "./operation";
+import type { OperationEvent, OperationStatus } from "./operation";
 import type { DataListener } from "./pty";
 
 export interface ClaudeProcess {
@@ -64,10 +64,15 @@ export type LogEntry = LogEntryBase &
       }
   );
 
+export interface AskQuestionOption {
+  label: string;
+  description: string;
+}
+
 export interface AskQuestion {
   question: string;
-  options: { label: string; description: string }[];
-  multiSelect: boolean;
+  options: AskQuestionOption[];
+  multiSelect?: boolean;
 }
 
 /**
@@ -80,7 +85,7 @@ export type DisplayNode =
       type: "subagent";
       toolUseId: string;
       description: string;
-      status: "running" | "completed" | "failed" | "stopped";
+      status: OperationStatus | "stopped";
       /** Summary text from task_notification. */
       summary?: string;
       /** Formatted usage (e.g., "12.3s, 5 tools"). */
@@ -95,7 +100,7 @@ export type DisplayNode =
   | {
       type: "child-group";
       label: string;
-      status: "running" | "completed" | "failed";
+      status: OperationStatus;
       children: DisplayNode[];
     };
 
