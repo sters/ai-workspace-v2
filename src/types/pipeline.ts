@@ -1,3 +1,6 @@
+import type { AskQuestion } from "./claude";
+import type { WorkspaceRepo } from "./workspace";
+
 export interface GroupChild {
   label: string;
   prompt: string;
@@ -14,17 +17,6 @@ export interface PipelinePhaseGroup {
   children: GroupChild[];
 }
 
-export interface AskQuestionOption {
-  label: string;
-  description: string;
-}
-
-export interface AskQuestionDef {
-  question: string;
-  options: AskQuestionOption[];
-  multiSelect?: boolean;
-}
-
 export interface RunChildOptions {
   /** JSON Schema for structured output via --json-schema. */
   jsonSchema?: Record<string, unknown>;
@@ -38,7 +30,7 @@ export interface PhaseFunctionContext {
   /** Emit a result message that will be displayed outside the collapsible log. */
   emitResult: (message: string) => void;
   /** Ask the user a question and wait for their answer. Returns the answers keyed by question text. */
-  emitAsk: (questions: AskQuestionDef[]) => Promise<Record<string, string>>;
+  emitAsk: (questions: AskQuestion[]) => Promise<Record<string, string>>;
   /** Update the operation's workspace identifier. Notifies the FE via a special event. */
   setWorkspace: (workspace: string) => void;
   /** Run a single Claude child query and wait for completion. */
@@ -70,10 +62,7 @@ export interface PipelineOptions {
   ) => "continue" | "skip" | "abort";
 }
 
-export interface SetupRepositoryResult {
-  repoPath: string; // e.g. github.com/org/repo
-  repoName: string; // e.g. repo
-  worktreePath: string; // absolute path
+export interface SetupRepositoryResult extends WorkspaceRepo {
   baseBranch: string;
   branchName: string;
 }

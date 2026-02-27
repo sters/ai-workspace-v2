@@ -10,23 +10,25 @@ export type OperationType =
   | "mcp-auth"
   | "claude-login";
 
+export type OperationStatus = "running" | "completed" | "failed";
+
 export interface OperationChild {
   id: string;
   label: string;
-  status: "running" | "completed" | "failed";
+  status: OperationStatus;
 }
 
 export interface OperationPhaseInfo {
   index: number;
   label: string;
-  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  status: OperationStatus | "pending" | "skipped";
 }
 
 export interface Operation {
   id: string;
   type: OperationType;
   workspace: string;
-  status: "running" | "completed" | "failed";
+  status: OperationStatus;
   startedAt: string;
   completedAt?: string;
   children?: OperationChild[];

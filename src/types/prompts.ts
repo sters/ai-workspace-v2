@@ -1,18 +1,20 @@
-export interface ExecutorInput {
+import type { WorkspaceRepo } from "./workspace";
+
+/**
+ * Base for prompt inputs that target a specific repo within a workspace.
+ * Combines workspace identity with the repo location fields from WorkspaceRepo.
+ */
+export interface RepoPromptInput extends WorkspaceRepo {
   workspaceName: string;
-  repoPath: string;
-  repoName: string;
-  readmeContent: string;
-  todoContent: string;
-  worktreePath: string;
 }
 
-export interface PlannerInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
+export interface ExecutorInput extends RepoPromptInput {
   readmeContent: string;
-  worktreePath: string;
+  todoContent: string;
+}
+
+export interface PlannerInput extends RepoPromptInput {
+  readmeContent: string;
   taskType: string;
   interactive?: boolean;
 }
@@ -32,35 +34,23 @@ export interface ReviewerInput {
   worktreePath: string;
 }
 
-export interface CodeReviewerInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
+export interface CodeReviewerInput extends RepoPromptInput {
   baseBranch: string;
   reviewTimestamp: string;
   readmeContent: string;
-  worktreePath: string;
   repoChanges: string;
   reviewFilePath: string;
 }
 
-export interface TodoVerifierInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
+export interface TodoVerifierInput extends RepoPromptInput {
   baseBranch: string;
   reviewTimestamp: string;
   todoContent: string;
-  worktreePath: string;
   verifyFilePath: string;
 }
 
-export interface PRCreatorInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
+export interface PRCreatorInput extends RepoPromptInput {
   baseBranch: string;
-  worktreePath: string;
   readmeContent: string;
   repoChanges: string;
   draft: boolean;
@@ -75,7 +65,7 @@ export interface PRCreatorInput {
 export interface ResearcherInput {
   workspaceName: string;
   readmeContent: string;
-  repos: { repoPath: string; repoName: string; worktreePath: string }[];
+  repos: WorkspaceRepo[];
   workspacePath: string;
   reportPath: string;
 }
@@ -104,12 +94,8 @@ export interface InitAnalyzeAndReadmeInput {
   readmeTemplate: string;
 }
 
-export interface CreateTodoPlannerInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
+export interface CreateTodoPlannerInput extends RepoPromptInput {
   readmeContent: string;
-  worktreePath: string;
   reviewDir: string;
   taskType: string;
 }
