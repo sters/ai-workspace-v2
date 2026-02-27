@@ -203,18 +203,19 @@ function ServerCard({
       </div>
 
       <div className="mt-2 space-y-1 text-sm text-muted-foreground">
-        {server.config.command != null && (
+        {"command" in server.config && server.config.command != null && (
           <p>
             <span className="font-medium text-foreground">command:</span>{" "}
             <code className="text-xs">
               {String(server.config.command)}
-              {Array.isArray(server.config.args) &&
+              {"args" in server.config &&
+                Array.isArray(server.config.args) &&
                 server.config.args.length > 0 &&
-                ` ${(server.config.args as string[]).join(" ")}`}
+                ` ${server.config.args.join(" ")}`}
             </code>
           </p>
         )}
-        {server.config.url != null && (
+        {"url" in server.config && server.config.url != null && (
           <p>
             <span className="font-medium text-foreground">url:</span>{" "}
             <code className="text-xs">

@@ -1,5 +1,5 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { getCliPath } from "./cli-path";
+import { getCliPath } from "./cli";
 import { AI_WORKSPACE_ROOT } from "../config";
 import type { OperationEvent } from "@/types/operation";
 import type { ClaudeProcess } from "@/types/claude";

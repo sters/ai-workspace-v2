@@ -1,4 +1,5 @@
 import type { OperationEvent } from "./operation";
+import type { DataListener } from "./pty";
 
 export interface ClaudeProcess {
   id: string;
@@ -98,14 +99,84 @@ export type DisplayNode =
       children: DisplayNode[];
     };
 
+// ---------------------------------------------------------------------------
+// CLI spawn types
+// ---------------------------------------------------------------------------
+
+export interface SpawnClaudeOptions {
+  args: string[];
+  cwd?: string;
+  stdin?: "pipe" | undefined;
+  env?: Record<string, string | undefined>;
+}
+
+export interface SpawnClaudeTerminalOptions {
+  args: string[];
+  cwd?: string;
+  env?: Record<string, string | undefined>;
+  listeners: Set<DataListener>;
+  cols?: number;
+  rows?: number;
+}
+
 export type McpConnectionStatus = {
   name: string;
   status: "ok" | "needs_auth" | "error" | "unknown";
   statusText: string;
 };
 
+// ---------------------------------------------------------------------------
+// MCP server config types
+// ---------------------------------------------------------------------------
+
+export type McpStdioServerConfig = {
+  type?: "stdio";
+  command: string;
+  args?: string[];
+  env?: Record<string, string>;
+};
+
+export type McpSSEServerConfig = {
+  type: "sse";
+  url: string;
+  headers?: Record<string, string>;
+};
+
+export type McpHttpServerConfig = {
+  type: "http";
+  url: string;
+  headers?: Record<string, string>;
+};
+
+export type McpServerConfig =
+  | McpStdioServerConfig
+  | McpSSEServerConfig
+  | McpHttpServerConfig;
+
+export type McpAuthStatus = {
+  hasAuth: boolean;
+  authType: "env" | "headers" | "none";
+  keyCount: number;
+};
+
 export type McpServerEntry = {
   name: string;
   scope: "user" | "project" | "local";
-  config: Record<string, unknown>;
+  config: McpServerConfig;
+  authStatus: McpAuthStatus;
+};
+
+// ---------------------------------------------------------------------------
+// Settings types
+// ---------------------------------------------------------------------------
+
+export const SETTINGS_SCOPES = ["project", "local", "user"] as const;
+export type SettingsScope = (typeof SETTINGS_SCOPES)[number];
+
+export type SettingsFileInfo = {
+  scope: SettingsScope;
+  filePath: string;
+  exists: boolean;
+  content: string | null;
+  error: string | null;
 };

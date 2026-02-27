@@ -1,10 +1,10 @@
-import { getCliPath } from "./cli-path";
-import { AI_WORKSPACE_ROOT } from "../config";
+import { spawnClaudeSync } from "./cli";
 
-export function spawnVersion() {
-  return Bun.spawn([getCliPath(), "--version"], {
-    cwd: AI_WORKSPACE_ROOT,
-    stdout: "pipe",
-    stderr: "pipe",
-  });
+/** Run `claude --version` and return the version string. */
+export function getClaudeVersion(): string {
+  const result = spawnClaudeSync({ args: ["--version"] });
+  if (!result.success) {
+    throw new Error(result.stderr.toString().trim() || "claude --version failed");
+  }
+  return result.stdout.toString().trim();
 }
