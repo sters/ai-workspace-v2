@@ -7,17 +7,12 @@ import path from "node:path";
 import { WORKSPACE_DIR } from "../config";
 import { buildReadmeContent } from "../templates";
 import { exec, sanitizeSlug } from "./helpers";
+import type { TaskAnalysis } from "@/types/workspace";
+import type { SetupWorkspaceResult } from "@/types/operation";
 
 // ---------------------------------------------------------------------------
 // Task analysis — structured metadata extraction via Claude child process
 // ---------------------------------------------------------------------------
-
-export interface TaskAnalysis {
-  taskType: string;
-  slug: string;
-  ticketId: string;
-  repositories: string[];
-}
 
 /**
  * Parse a TaskAnalysis from structured JSON text (from --json-schema output).
@@ -61,11 +56,6 @@ tmp/
 // ---------------------------------------------------------------------------
 // setupWorkspace
 // ---------------------------------------------------------------------------
-
-export interface SetupWorkspaceResult {
-  workspaceName: string;
-  workspacePath: string;
-}
 
 export async function setupWorkspace(
   taskType: string,

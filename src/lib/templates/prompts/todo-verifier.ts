@@ -3,16 +3,7 @@
  * Verifies TODO items have been properly completed.
  */
 
-export interface TodoVerifierInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
-  baseBranch: string;
-  reviewTimestamp: string;
-  todoContent: string;
-  worktreePath: string;
-  verifyFilePath: string;
-}
+import type { TodoVerifierInput } from "@/types/prompts";
 
 export function buildTodoVerifierPrompt(input: TodoVerifierInput): string {
   return `# Task: Verify TODO completion for ${input.repoName}

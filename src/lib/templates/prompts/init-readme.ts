@@ -4,10 +4,7 @@
  * The analysis result is returned as structured JSON output via --json-schema.
  */
 
-export interface InitAnalyzeAndReadmeInput {
-  description: string;
-  readmeTemplate: string;
-}
+import type { InitAnalyzeAndReadmeInput } from "@/types/prompts";
 
 /**
  * JSON Schema for the analysis result, used with --json-schema to constrain

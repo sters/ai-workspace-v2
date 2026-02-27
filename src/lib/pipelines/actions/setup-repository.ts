@@ -7,14 +7,7 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR } from "@/lib/config";
 import { exec, repoDir, detectBaseBranch } from "@/lib/workspace/helpers";
-
-export interface SetupRepositoryResult {
-  repoPath: string; // e.g. github.com/org/repo
-  repoName: string; // e.g. repo
-  worktreePath: string; // absolute path
-  baseBranch: string;
-  branchName: string;
-}
+import type { SetupRepositoryResult } from "@/types/pipeline";
 
 export function setupRepository(
   workspaceName: string,

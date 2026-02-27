@@ -1,10 +1,6 @@
 import { AI_WORKSPACE_ROOT } from "@/lib/config";
-import {
-  spawnTerminal,
-  collectOutput,
-  type DataListener,
-  type TerminalSubprocess,
-} from "@/lib/pty";
+import { spawnTerminal, collectOutput } from "@/lib/pty";
+import type { DataListener, TerminalSubprocess } from "@/types/pty";
 import type { PipelinePhaseFunction } from "@/types/pipeline";
 
 function stripAnsi(text: string): string {

@@ -3,16 +3,7 @@
  * Updates TODO items in a workspace repository.
  */
 
-export interface UpdaterInput {
-  workspaceName: string;
-  repoName: string;
-  readmeContent: string;
-  todoContent: string;
-  worktreePath: string;
-  workspacePath: string;
-  instruction: string;
-  interactive?: boolean;
-}
+import type { UpdaterInput } from "@/types/prompts";
 
 export function buildUpdaterPrompt(input: UpdaterInput): string {
   return `# Task: Update TODO items for ${input.repoName}

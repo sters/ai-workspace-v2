@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { AskQuestion } from "@/lib/parsers/stream";
+import type { AskQuestion } from "@/types/claude";
 
 export function AskInput({
   operationId,

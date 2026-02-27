@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { parseStreamEvent, type LogEntry } from "@/lib/parsers/stream";
+import { parseStreamEvent } from "@/lib/parsers/stream";
+import type { LogEntry } from "@/types/claude";
 import { useSubagentOutput } from "@/hooks/use-subagent-output";
-import type { DisplayNode } from "./display-nodes";
+import type { DisplayNode } from "@/types/claude";
 import { EntryRow } from "./entries";
 
 // ---------------------------------------------------------------------------

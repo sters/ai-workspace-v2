@@ -3,13 +3,7 @@
  * Performs cross-repository research and investigation.
  */
 
-export interface ResearcherInput {
-  workspaceName: string;
-  readmeContent: string;
-  repos: { repoPath: string; repoName: string; worktreePath: string }[];
-  workspacePath: string;
-  reportPath: string;
-}
+import type { ResearcherInput } from "@/types/prompts";
 
 export function buildResearcherPrompt(input: ResearcherInput): string {
   const repoList = input.repos

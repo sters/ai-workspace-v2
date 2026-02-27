@@ -6,6 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR } from "../config";
 import { exec } from "./helpers";
+import type { ExistingPR, RepoChanges } from "@/types/workspace";
 
 // ---------------------------------------------------------------------------
 // readPRTemplate
@@ -41,13 +42,6 @@ export function readPRTemplate(worktreePath: string): string | null {
 // checkExistingPR
 // ---------------------------------------------------------------------------
 
-export interface ExistingPR {
-  exists: boolean;
-  url?: string;
-  title?: string;
-  body?: string;
-}
-
 export function checkExistingPR(worktreePath: string): ExistingPR {
   try {
     const url = exec(`gh pr view --json url -q ".url"`, { cwd: worktreePath });
@@ -63,13 +57,6 @@ export function checkExistingPR(worktreePath: string): ExistingPR {
 // ---------------------------------------------------------------------------
 // getRepoChanges
 // ---------------------------------------------------------------------------
-
-export interface RepoChanges {
-  currentBranch: string;
-  changedFiles: string;
-  diffStat: string;
-  commitLog: string;
-}
 
 export function getRepoChanges(
   workspaceName: string,

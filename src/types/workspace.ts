@@ -62,3 +62,45 @@ export interface HistoryEntry {
   message: string;
   author: string;
 }
+
+export interface WorkspaceRepo {
+  /** e.g. github.com/org/repo */
+  repoPath: string;
+  /** e.g. repo */
+  repoName: string;
+  /** absolute path to worktree */
+  worktreePath: string;
+}
+
+export interface TaskAnalysis {
+  taskType: string;
+  slug: string;
+  ticketId: string;
+  repositories: string[];
+}
+
+export interface StaleWorkspace {
+  name: string;
+  lastModified: Date;
+}
+
+export interface WorkspaceAgeInfo {
+  name: string;
+  lastModified: Date;
+  ageDays: number;
+  isStale: boolean;
+}
+
+export interface ExistingPR {
+  exists: boolean;
+  url?: string;
+  title?: string;
+  body?: string;
+}
+
+export interface RepoChanges {
+  currentBranch: string;
+  changedFiles: string;
+  diffStat: string;
+  commitLog: string;
+}

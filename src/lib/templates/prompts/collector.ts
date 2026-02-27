@@ -3,13 +3,7 @@
  * Collects review results and generates a summary report.
  */
 
-export interface CollectorInput {
-  workspaceName: string;
-  reviewTimestamp: string;
-  reviewDir: string;
-  reviewFiles: string[];
-  verifyFiles: string[];
-}
+import type { CollectorInput } from "@/types/prompts";
 
 export function buildCollectorPrompt(input: CollectorInput): string {
   return `# Task: Collect review results and create summary

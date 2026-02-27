@@ -4,18 +4,7 @@ import { useCallback, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { useOperation } from "@/hooks/use-operation";
 import { McpAuthTerminal } from "@/components/operation/mcp-auth-terminal";
-
-type McpServerEntry = {
-  name: string;
-  scope: "user" | "project" | "local";
-  config: Record<string, unknown>;
-};
-
-type McpConnectionStatus = {
-  name: string;
-  status: "ok" | "needs_auth" | "error" | "unknown";
-  statusText: string;
-};
+import type { McpServerEntry, McpConnectionStatus } from "@/types/claude";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 

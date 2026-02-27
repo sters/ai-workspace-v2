@@ -3,12 +3,7 @@
  * Coordinates TODO items across multiple repositories.
  */
 
-export interface CoordinatorInput {
-  workspaceName: string;
-  readmeContent: string;
-  todoFiles: { repoName: string; content: string }[];
-  workspacePath: string;
-}
+import type { CoordinatorInput } from "@/types/prompts";
 
 export function buildCoordinatorPrompt(input: CoordinatorInput): string {
   const todoSections = input.todoFiles

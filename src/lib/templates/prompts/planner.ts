@@ -3,15 +3,7 @@
  * Plans and creates TODO items for a specific repository.
  */
 
-export interface PlannerInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
-  readmeContent: string;
-  worktreePath: string;
-  taskType: string;
-  interactive?: boolean;
-}
+import type { PlannerInput } from "@/types/prompts";
 
 export function buildPlannerPrompt(input: PlannerInput): string {
   const isResearch = input.taskType === "research";

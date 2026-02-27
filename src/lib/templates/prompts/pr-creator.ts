@@ -3,22 +3,7 @@
  * Creates or updates a pull request for a repository.
  */
 
-export interface PRCreatorInput {
-  workspaceName: string;
-  repoPath: string;
-  repoName: string;
-  baseBranch: string;
-  worktreePath: string;
-  readmeContent: string;
-  repoChanges: string;
-  draft: boolean;
-  prTemplate?: string;
-  existingPR?: {
-    url: string;
-    title: string;
-    body: string;
-  };
-}
+import type { PRCreatorInput } from "@/types/prompts";
 
 export function buildPRCreatorPrompt(input: PRCreatorInput): string {
   const existingPRSection = input.existingPR

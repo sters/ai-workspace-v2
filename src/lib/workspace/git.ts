@@ -6,19 +6,11 @@ import { existsSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { WORKSPACE_DIR } from "../config";
 import { exec, repoDir } from "./helpers";
+import type { WorkspaceRepo } from "@/types/workspace";
 
 // ---------------------------------------------------------------------------
 // listWorkspaceRepos
 // ---------------------------------------------------------------------------
-
-export interface WorkspaceRepo {
-  /** e.g. github.com/org/repo */
-  repoPath: string;
-  /** e.g. repo */
-  repoName: string;
-  /** absolute path to worktree */
-  worktreePath: string;
-}
 
 export function listWorkspaceRepos(workspaceName: string): WorkspaceRepo[] {
   const wsPath = path.join(WORKSPACE_DIR, workspaceName);

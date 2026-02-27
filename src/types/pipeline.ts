@@ -69,3 +69,11 @@ export interface PipelineOptions {
     success: boolean,
   ) => "continue" | "skip" | "abort";
 }
+
+export interface SetupRepositoryResult {
+  repoPath: string; // e.g. github.com/org/repo
+  repoName: string; // e.g. repo
+  worktreePath: string; // absolute path
+  baseBranch: string;
+  branchName: string;
+}

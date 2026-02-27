@@ -1,14 +1,9 @@
 import { NextResponse } from "next/server";
 import { execSync } from "node:child_process";
 import { AI_WORKSPACE_ROOT } from "@/lib/config";
+import type { McpConnectionStatus } from "@/types/claude";
 
 export const dynamic = "force-dynamic";
-
-export type McpConnectionStatus = {
-  name: string;
-  status: "ok" | "needs_auth" | "error" | "unknown";
-  statusText: string;
-};
 
 /**
  * Parse `claude mcp list` output to get real connection status.

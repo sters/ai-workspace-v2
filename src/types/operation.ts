@@ -45,3 +45,25 @@ export interface OperationEvent {
   /** Pipeline phase label this event belongs to. */
   phaseLabel?: string;
 }
+
+export interface SetupWorkspaceResult {
+  workspaceName: string;
+  workspacePath: string;
+}
+
+export interface OperationContext {
+  /** Start a new operation. Handles loading state internally. */
+  start: (
+    type: OperationType,
+    body: Record<string, string>
+  ) => Promise<void>;
+  /** True while an operation is running (or starting). */
+  isRunning: boolean;
+  /** True when there is an active or completed operation. */
+  hasOperation: boolean;
+  /** The workspace name (may be updated dynamically during the operation). */
+  workspace?: string;
+  /** The operation status. */
+  status?: string;
+}
+

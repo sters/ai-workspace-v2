@@ -4,16 +4,12 @@
 
 import type { Subprocess } from "bun";
 import { getCliPath } from "./cli-path";
-import type { ClaudeProcess } from "@/types/claude";
+import type { ClaudeProcess, RunClaudeOptions, StreamEvent } from "@/types/claude";
 import { AI_WORKSPACE_ROOT } from "../config";
 import type { OperationEvent } from "@/types/operation";
 
 // Maximum argument length before falling back to stdin (ARG_MAX safety margin)
 const MAX_PROMPT_ARG_LENGTH = 200_000;
-
-// Minimal shape of a stream-json event for internal inspection
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type StreamEvent = Record<string, any>;
 
 /** Patterns that indicate a fatal API error that should stop the process immediately. */
 const FATAL_ERROR_PATTERNS = [/API Error:\s*401/i, /authentication_failed/i];
@@ -54,11 +50,6 @@ export function detectFatalApiError(parsed: StreamEvent): string | null {
 
 function log(operationId: string, ...args: unknown[]) {
   console.log(`[claude-cli][${operationId}]`, ...args);
-}
-
-export interface RunClaudeOptions {
-  /** JSON Schema to constrain the model's final text response via --json-schema. */
-  jsonSchema?: Record<string, unknown>;
 }
 
 export function runClaude(

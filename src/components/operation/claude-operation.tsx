@@ -6,24 +6,9 @@ import { OperationLog } from "./log";
 import { NextActionSuggestions } from "./next-action-suggestions";
 import { StatusBadge } from "../shared/status-badge";
 import { MarkdownRenderer } from "../shared/markdown-renderer";
-import { parseStreamEvent, type LogEntry } from "@/lib/parsers/stream";
-import type { Operation, OperationType, OperationEvent } from "@/types/operation";
-
-export interface OperationContext {
-  /** Start a new operation. Handles loading state internally. */
-  start: (
-    type: OperationType,
-    body: Record<string, string>
-  ) => Promise<void>;
-  /** True while an operation is running (or starting). */
-  isRunning: boolean;
-  /** True when there is an active or completed operation. */
-  hasOperation: boolean;
-  /** The workspace name (may be updated dynamically during the operation). */
-  workspace?: string;
-  /** The operation status. */
-  status?: string;
-}
+import { parseStreamEvent } from "@/lib/parsers/stream";
+import type { LogEntry } from "@/types/claude";
+import type { Operation, OperationType, OperationEvent, OperationContext } from "@/types/operation";
 
 /**
  * Shared component for running Claude operations.

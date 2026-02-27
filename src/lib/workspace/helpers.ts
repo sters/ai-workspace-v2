@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { AI_WORKSPACE_ROOT, WORKSPACE_DIR } from "../config";
+import type { StaleWorkspace, WorkspaceAgeInfo } from "@/types/workspace";
 
 export function exec(cmd: string, opts?: { cwd?: string; maxBuffer?: number }): string {
   const result = Bun.spawnSync(["sh", "-c", cmd], {
@@ -50,11 +51,6 @@ export function sanitizeSlug(input: string, maxLength = 50): string {
 // Staleness utilities
 // ---------------------------------------------------------------------------
 
-export interface StaleWorkspace {
-  name: string;
-  lastModified: Date;
-}
-
 export function listStaleWorkspaces(days: number): StaleWorkspace[] {
   if (!existsSync(WORKSPACE_DIR)) return [];
 
@@ -72,13 +68,6 @@ export function listStaleWorkspaces(days: number): StaleWorkspace[] {
   }
 
   return stale.sort((a, b) => a.lastModified.getTime() - b.lastModified.getTime());
-}
-
-export interface WorkspaceAgeInfo {
-  name: string;
-  lastModified: Date;
-  ageDays: number;
-  isStale: boolean;
 }
 
 // ---------------------------------------------------------------------------
