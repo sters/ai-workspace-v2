@@ -16,6 +16,10 @@ export default function WorkspaceReviewPage({
   if (!workspace) return null;
 
   return (
-    <ReviewViewer workspaceName={decodedName} reviews={workspace.reviews} />
+    <ReviewViewer
+      workspaceName={decodedName}
+      workspacePath={workspace.path}
+      reviews={workspace.reviews}
+    />
   );
 }

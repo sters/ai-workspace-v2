@@ -48,6 +48,7 @@ function getNextActions(
         },
       ];
     case "update-todo":
+    case "create-todo":
       return [
         {
           label: "Execute",
