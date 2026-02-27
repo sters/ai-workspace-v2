@@ -14,8 +14,8 @@ export function useSSE(operationId: string | null) {
   const [events, dispatch] = useReducer(eventsReducer, []);
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const retryCountRef = useRef(0);
+  const [notFound, setNotFound] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
   const batchRef = useRef<OperationEvent[]>([]);
   const rafRef = useRef<number>(0);
 
@@ -23,59 +23,88 @@ export function useSSE(operationId: string | null) {
     if (!operationId) return;
 
     setError(false);
-    retryCountRef.current = 0;
+    setNotFound(false);
+    let retryCount = 0;
 
-    const connect = () => {
-      const es = new EventSource(
-        `/api/events?operationId=${encodeURIComponent(operationId)}`
-      );
-      eventSourceRef.current = es;
+    const connect = async () => {
+      const controller = new AbortController();
+      abortRef.current = controller;
 
-      es.onopen = () => {
+      try {
+        const res = await fetch(
+          `/api/events?operationId=${encodeURIComponent(operationId)}`,
+          { signal: controller.signal }
+        );
+
+        if (res.status === 404) {
+          setNotFound(true);
+          return;
+        }
+
+        if (!res.ok || !res.body) {
+          throw new Error(`SSE failed: ${res.status}`);
+        }
+
         setConnected(true);
         setError(false);
-        retryCountRef.current = 0;
-      };
+        retryCount = 0;
 
-      es.onmessage = (e) => {
-        try {
-          const event: OperationEvent = JSON.parse(e.data);
-          batchRef.current.push(event);
-          if (!rafRef.current) {
-            rafRef.current = requestAnimationFrame(() => {
-              rafRef.current = 0;
-              dispatch({ type: "append", events: batchRef.current });
-              batchRef.current = [];
-            });
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // Process complete lines
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const event: OperationEvent = JSON.parse(line.slice(6));
+              batchRef.current.push(event);
+              if (!rafRef.current) {
+                rafRef.current = requestAnimationFrame(() => {
+                  rafRef.current = 0;
+                  dispatch({ type: "append", events: batchRef.current });
+                  batchRef.current = [];
+                });
+              }
+              // Only close on the pipeline-level complete (no childLabel).
+              // Child process completes are tagged with childLabel and should not end the stream.
+              if (event.type === "complete" && !event.childLabel) {
+                setConnected(false);
+                return;
+              }
+            } catch (err) {
+              console.warn("[use-sse] parse error:", line, err);
+            }
           }
-          // Only close on the pipeline-level complete (no childLabel).
-          // Child process completes are tagged with childLabel and should not end the stream.
-          if (event.type === "complete" && !event.childLabel) {
-            es.close();
-            setConnected(false);
-          }
-        } catch (err) {
-          console.warn("[use-sse] parse error:", e.data, err);
         }
-      };
 
-      es.onerror = () => {
-        es.close();
+        setConnected(false);
+      } catch {
+        if (controller.signal.aborted) return;
         setConnected(false);
 
-        if (retryCountRef.current < 2) {
-          retryCountRef.current++;
+        if (retryCount < 2) {
+          retryCount++;
           setTimeout(connect, 1000);
         } else {
           setError(true);
         }
-      };
+      }
     };
 
     connect();
 
     return () => {
-      eventSourceRef.current?.close();
+      abortRef.current?.abort();
       setConnected(false);
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
@@ -92,7 +121,8 @@ export function useSSE(operationId: string | null) {
       rafRef.current = 0;
     }
     setError(false);
+    setNotFound(false);
   }, []);
 
-  return { events, connected, error, clear };
+  return { events, connected, error, notFound, clear };
 }

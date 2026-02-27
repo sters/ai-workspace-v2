@@ -33,7 +33,7 @@ export function useOperation(storageKey?: string) {
   }, [storageKey]);
 
   // ---------- SSE ----------
-  const { events, connected, error: sseError, clear } = useSSE(
+  const { events, connected, error: sseError, notFound: sseNotFound, clear } = useSSE(
     operation?.id ?? null
   );
 
@@ -49,6 +49,14 @@ export function useOperation(storageKey?: string) {
       localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
     }
   }, [storageKey, operation]);
+
+  // ---------- SSE not found → clear stale stored operation immediately ----------
+  useEffect(() => {
+    if (sseNotFound && storageKey && operation) {
+      localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
+      setOperation(null);
+    }
+  }, [sseNotFound, storageKey, operation]);
 
   // ---------- SSE error → clear stale stored operation ----------
   useEffect(() => {
