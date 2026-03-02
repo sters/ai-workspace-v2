@@ -2,12 +2,40 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import type { OperationType } from "@/types/operation";
+import { SplitButton } from "../shared/split-button";
 
 interface NextAction {
   label: string;
   type: OperationType;
   body: Record<string, string>;
   primary?: boolean;
+  /** Batch dropdown items for this action. */
+  batchItems?: { label: string; type: OperationType; body: Record<string, string> }[];
+}
+
+function executeBatchItems(workspace: string): NextAction["batchItems"] {
+  return [
+    {
+      label: "Execute \u2192 Review",
+      type: "batch",
+      body: { startWith: "execute", mode: "execute-review", workspace },
+    },
+    {
+      label: "Execute \u2192 PR",
+      type: "batch",
+      body: { startWith: "execute", mode: "execute-pr", workspace },
+    },
+    {
+      label: "Execute \u2192 Review \u2192 PR (gated)",
+      type: "batch",
+      body: { startWith: "execute", mode: "execute-review-pr-gated", workspace },
+    },
+    {
+      label: "Execute \u2192 Review \u2192 PR",
+      type: "batch",
+      body: { startWith: "execute", mode: "execute-review-pr", workspace },
+    },
+  ];
 }
 
 function getNextActions(
@@ -22,6 +50,7 @@ function getNextActions(
           type: "execute",
           body: { workspace },
           primary: true,
+          batchItems: executeBatchItems(workspace),
         },
       ];
     case "execute":
@@ -45,6 +74,7 @@ function getNextActions(
           label: "Execute",
           type: "execute",
           body: { workspace },
+          batchItems: executeBatchItems(workspace),
         },
       ];
     case "update-todo":
@@ -55,10 +85,12 @@ function getNextActions(
           type: "execute",
           body: { workspace },
           primary: true,
+          batchItems: executeBatchItems(workspace),
         },
       ];
     case "create-pr":
-      // Terminal operation
+    case "batch":
+      // Terminal operations
       return [];
     default:
       return [];
@@ -70,6 +102,7 @@ const OPERATIONS_TAB_ACTIONS = new Set<OperationType>([
   "execute",
   "review",
   "create-pr",
+  "batch",
 ]);
 
 export function NextActionSuggestions({
@@ -92,12 +125,19 @@ export function NextActionSuggestions({
 
   if (actions.length === 0) return null;
 
-  const handleClick = (action: NextAction) => {
+  const handleClick = (action: NextAction | { type: OperationType; body: Record<string, string>; primary?: boolean }) => {
     if (useNavigation && OPERATIONS_TAB_ACTIONS.has(action.type)) {
       // Navigate to the operations sub-route with ?action= to auto-trigger
       // pathname may be /workspace/[name] or /workspace/[name]/todo etc.
       const basePath = pathname.split("/").slice(0, 3).join("/");
-      router.push(`${basePath}/operations?action=${action.type}`);
+      const params = new URLSearchParams({ action: action.type });
+      // For batch actions, include extra params in the URL
+      if (action.type === "batch") {
+        for (const [key, val] of Object.entries(action.body)) {
+          if (key !== "workspace") params.set(key, val);
+        }
+      }
+      router.push(`${basePath}/operations?${params.toString()}`);
     } else {
       onStart(action.type, action.body);
     }
@@ -107,20 +147,38 @@ export function NextActionSuggestions({
     <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/30">
       <p className="mb-2 text-sm font-medium text-foreground">Next steps</p>
       <div className="flex flex-wrap gap-2">
-        {actions.map((action) => (
-          <button
-            key={action.type}
-            onClick={() => handleClick(action)}
-            disabled={isRunning}
-            className={
-              action.primary
-                ? "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                : "rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
-            }
-          >
-            {action.label}
-          </button>
-        ))}
+        {actions.map((action) =>
+          action.batchItems ? (
+            <SplitButton
+              key={action.type}
+              label={action.label}
+              onClick={() => handleClick(action)}
+              disabled={isRunning}
+              className={
+                action.primary
+                  ? "rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  : "rounded-l-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
+              }
+              items={action.batchItems.map((bi) => ({
+                label: bi.label,
+                onClick: () => handleClick({ ...bi, primary: false }),
+              }))}
+            />
+          ) : (
+            <button
+              key={action.type}
+              onClick={() => handleClick(action)}
+              disabled={isRunning}
+              className={
+                action.primary
+                  ? "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  : "rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
+              }
+            >
+              {action.label}
+            </button>
+          )
+        )}
       </div>
     </div>
   );

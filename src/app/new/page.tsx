@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ClaudeOperation } from "@/components/operation/claude-operation";
+import { SplitButton } from "@/components/shared/split-button";
 
 export default function NewWorkspacePage() {
   const [description, setDescription] = useState("");
@@ -33,16 +35,60 @@ export default function NewWorkspacePage() {
         {({ start, isRunning, workspace, status }) => (
           <>
             {!isRunning && status !== "completed" && (
-              <button
+              <SplitButton
+                label="Initialize"
                 onClick={() => {
                   if (!description.trim()) return;
                   start("init", { description: description.trim() });
                 }}
                 disabled={!description.trim()}
-                className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              >
-                Initialize
-              </button>
+                items={[
+                  {
+                    label: "Init \u2192 Execute \u2192 Review",
+                    onClick: () => {
+                      if (!description.trim()) return;
+                      start("batch", {
+                        startWith: "init",
+                        mode: "execute-review",
+                        description: description.trim(),
+                      });
+                    },
+                  },
+                  {
+                    label: "Init \u2192 Execute \u2192 PR",
+                    onClick: () => {
+                      if (!description.trim()) return;
+                      start("batch", {
+                        startWith: "init",
+                        mode: "execute-pr",
+                        description: description.trim(),
+                      });
+                    },
+                  },
+                  {
+                    label: "Init \u2192 Execute \u2192 Review \u2192 PR (gated)",
+                    onClick: () => {
+                      if (!description.trim()) return;
+                      start("batch", {
+                        startWith: "init",
+                        mode: "execute-review-pr-gated",
+                        description: description.trim(),
+                      });
+                    },
+                  },
+                  {
+                    label: "Init \u2192 Execute \u2192 Review \u2192 PR",
+                    onClick: () => {
+                      if (!description.trim()) return;
+                      start("batch", {
+                        startWith: "init",
+                        mode: "execute-review-pr",
+                        description: description.trim(),
+                      });
+                    },
+                  },
+                ]}
+              />
             )}
             {status === "completed" && workspace && (
               <InitNextActions workspace={workspace} />
@@ -55,18 +101,52 @@ export default function NewWorkspacePage() {
 }
 
 function InitNextActions({ workspace }: { workspace: string }) {
+  const router = useRouter();
+  const wsEncoded = encodeURIComponent(workspace);
+
   return (
     <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/30">
       <p className="mb-2 text-sm font-medium text-foreground">Next steps</p>
       <div className="flex flex-wrap gap-2">
+        <SplitButton
+          label="Execute"
+          onClick={() =>
+            router.push(`/workspace/${wsEncoded}/operations?action=execute`)
+          }
+          className="rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          items={[
+            {
+              label: "Execute \u2192 Review",
+              onClick: () =>
+                router.push(
+                  `/workspace/${wsEncoded}/operations?action=batch&startWith=execute&mode=execute-review`,
+                ),
+            },
+            {
+              label: "Execute \u2192 PR",
+              onClick: () =>
+                router.push(
+                  `/workspace/${wsEncoded}/operations?action=batch&startWith=execute&mode=execute-pr`,
+                ),
+            },
+            {
+              label: "Execute \u2192 Review \u2192 PR (gated)",
+              onClick: () =>
+                router.push(
+                  `/workspace/${wsEncoded}/operations?action=batch&startWith=execute&mode=execute-review-pr-gated`,
+                ),
+            },
+            {
+              label: "Execute \u2192 Review \u2192 PR",
+              onClick: () =>
+                router.push(
+                  `/workspace/${wsEncoded}/operations?action=batch&startWith=execute&mode=execute-review-pr`,
+                ),
+            },
+          ]}
+        />
         <Link
-          href={`/workspace/${encodeURIComponent(workspace)}/operations?action=execute`}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Execute
-        </Link>
-        <Link
-          href={`/workspace/${encodeURIComponent(workspace)}`}
+          href={`/workspace/${wsEncoded}`}
           className="rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
         >
           View Workspace

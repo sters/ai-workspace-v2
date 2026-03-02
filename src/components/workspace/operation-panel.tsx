@@ -2,17 +2,21 @@
 
 import { useEffect, useRef } from "react";
 import { ClaudeOperation } from "../operation/claude-operation";
+import { SplitButton } from "../shared/split-button";
 import type { OperationContext } from "@/types/operation";
 import type { OperationType } from "@/types/operation";
 
 export function OperationPanel({
   workspacePath,
   autoAction,
+  autoActionExtra,
   onAutoActionConsumed,
 }: {
   workspacePath: string;
   /** When set, auto-trigger this operation on mount (once). */
   autoAction?: OperationType;
+  /** Extra params for auto-action (e.g. batch mode/startWith from URL). */
+  autoActionExtra?: Record<string, string>;
   /** Called after auto-action has been triggered, so the parent can clear the param. */
   onAutoActionConsumed?: () => void;
 }) {
@@ -23,6 +27,7 @@ export function OperationPanel({
       {({ start, isRunning, hasOperation }) => (
         <AutoActionWrapper
           autoAction={autoAction}
+          autoActionExtra={autoActionExtra}
           firedRef={autoActionFiredRef}
           start={start}
           isRunning={isRunning}
@@ -30,13 +35,50 @@ export function OperationPanel({
           workspacePath={workspacePath}
           onConsumed={onAutoActionConsumed}
         >
-          <button
+          <SplitButton
+            label="Execute"
             onClick={() => start("execute", { workspace: workspacePath })}
             disabled={isRunning}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-          >
-            Execute
-          </button>
+            className="rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            items={[
+              {
+                label: "Execute \u2192 Review",
+                onClick: () =>
+                  start("batch", {
+                    startWith: "execute",
+                    mode: "execute-review",
+                    workspace: workspacePath,
+                  }),
+              },
+              {
+                label: "Execute \u2192 PR",
+                onClick: () =>
+                  start("batch", {
+                    startWith: "execute",
+                    mode: "execute-pr",
+                    workspace: workspacePath,
+                  }),
+              },
+              {
+                label: "Execute \u2192 Review \u2192 PR (gated)",
+                onClick: () =>
+                  start("batch", {
+                    startWith: "execute",
+                    mode: "execute-review-pr-gated",
+                    workspace: workspacePath,
+                  }),
+              },
+              {
+                label: "Execute \u2192 Review \u2192 PR",
+                onClick: () =>
+                  start("batch", {
+                    startWith: "execute",
+                    mode: "execute-review-pr",
+                    workspace: workspacePath,
+                  }),
+              },
+            ]}
+          />
           <button
             onClick={() => start("review", { workspace: workspacePath })}
             disabled={isRunning}
@@ -71,6 +113,7 @@ export function OperationPanel({
  */
 function AutoActionWrapper({
   autoAction,
+  autoActionExtra,
   firedRef,
   start,
   isRunning,
@@ -80,6 +123,7 @@ function AutoActionWrapper({
   children,
 }: {
   autoAction?: OperationType;
+  autoActionExtra?: Record<string, string>;
   firedRef: React.MutableRefObject<boolean>;
   start: OperationContext["start"];
   isRunning: boolean;
@@ -91,9 +135,9 @@ function AutoActionWrapper({
   useEffect(() => {
     if (!autoAction || firedRef.current || isRunning || hasOperation) return;
     firedRef.current = true;
-    start(autoAction, { workspace: workspacePath });
+    start(autoAction, { workspace: workspacePath, ...autoActionExtra });
     onConsumed?.();
-  }, [autoAction, firedRef, start, isRunning, hasOperation, workspacePath, onConsumed]);
+  }, [autoAction, autoActionExtra, firedRef, start, isRunning, hasOperation, workspacePath, onConsumed]);
 
   return <>{children}</>;
 }
