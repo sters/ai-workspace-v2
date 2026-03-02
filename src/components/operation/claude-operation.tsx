@@ -27,6 +27,7 @@ export function ClaudeOperation({
   workspace,
   onRunningChange,
   navigateNextActions,
+  initialOperationId,
 }: {
   storageKey: string;
   children: (ctx: OperationContext) => ReactNode;
@@ -37,9 +38,11 @@ export function ClaudeOperation({
   onRunningChange?: (running: boolean) => void;
   /** When true, next action buttons navigate via URL (?action=) instead of triggering inline. */
   navigateNextActions?: boolean;
+  /** When provided, reconnect to an existing operation by ID (e.g. from Running Operations page). */
+  initialOperationId?: string;
 }) {
   const { operation, events, isRunning, start, cancel, reset } =
-    useOperation(storageKey);
+    useOperation(storageKey, initialOperationId);
   const [loading, setLoading] = useState(false);
 
   const handleStart = async (

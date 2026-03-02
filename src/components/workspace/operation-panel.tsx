@@ -11,6 +11,7 @@ export function OperationPanel({
   autoAction,
   autoActionExtra,
   onAutoActionConsumed,
+  initialOperationId,
 }: {
   workspacePath: string;
   /** When set, auto-trigger this operation on mount (once). */
@@ -19,11 +20,13 @@ export function OperationPanel({
   autoActionExtra?: Record<string, string>;
   /** Called after auto-action has been triggered, so the parent can clear the param. */
   onAutoActionConsumed?: () => void;
+  /** When provided, reconnect to an existing operation by ID. */
+  initialOperationId?: string;
 }) {
   const autoActionFiredRef = useRef(false);
 
   return (
-    <ClaudeOperation storageKey={`workspace:${workspacePath}`} workspace={workspacePath}>
+    <ClaudeOperation storageKey={`workspace:${workspacePath}`} workspace={workspacePath} initialOperationId={initialOperationId}>
       {({ start, isRunning, hasOperation }) => (
         <AutoActionWrapper
           autoAction={autoAction}

@@ -21,11 +21,17 @@ export default function WorkspaceOperationsPage({
   const pathname = usePathname();
   const [autoAction, setAutoAction] = useState<OperationType | undefined>();
   const [autoActionExtra, setAutoActionExtra] = useState<Record<string, string> | undefined>();
+  const [initialOperationId, setInitialOperationId] = useState<string | undefined>();
 
-  // Parse ?action= param and auto-trigger
+  // Parse ?action= and ?operationId= params
   useEffect(() => {
     const action = searchParams.get("action");
-    if (action && VALID_AUTO_ACTIONS.has(action)) {
+    const opId = searchParams.get("operationId");
+
+    if (opId) {
+      setInitialOperationId(opId);
+      router.replace(pathname, { scroll: false });
+    } else if (action && VALID_AUTO_ACTIONS.has(action)) {
       setAutoAction(action as OperationType);
       // For batch actions, parse extra query params
       if (action === "batch") {
@@ -54,6 +60,7 @@ export default function WorkspaceOperationsPage({
       autoAction={autoAction}
       autoActionExtra={autoActionExtra}
       onAutoActionConsumed={handleAutoActionConsumed}
+      initialOperationId={initialOperationId}
     />
   );
 }
