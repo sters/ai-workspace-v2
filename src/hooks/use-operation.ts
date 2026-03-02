@@ -103,6 +103,26 @@ export function useOperation(storageKey?: string) {
     }
   }, [events, operation?.status]);
 
+  // ---------- Cleanup on unmount when operation is finished ----------
+  const operationRef = useRef(operation);
+  operationRef.current = operation;
+
+  useEffect(() => {
+    return () => {
+      const op = operationRef.current;
+      if (!op || op.status === "running") return;
+      // Operation is completed/failed — clean up both localStorage and server
+      if (storageKey) {
+        localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
+      }
+      fetch("/api/operations/clear", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operationId: op.id }),
+      }).catch(() => {});
+    };
+  }, [storageKey]);
+
   // ---------- Actions ----------
   const start = useCallback(
     async (type: OperationType, body: Record<string, string>) => {
