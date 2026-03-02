@@ -79,7 +79,7 @@ export default function RootLayout({
                       href="/utilities/running"
                       className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                     >
-                      Running
+                      Running Operations
                     </Link>
                   </div>
                 </div>
