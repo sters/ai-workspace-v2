@@ -10,11 +10,13 @@ export interface PipelinePhaseSingle {
   kind: "single";
   label: string;
   prompt: string;
+  timeoutMs?: number;
 }
 
 export interface PipelinePhaseGroup {
   kind: "group";
   children: GroupChild[];
+  timeoutMs?: number;
 }
 
 export interface RunChildOptions {
@@ -47,6 +49,7 @@ export interface PipelinePhaseFunction {
   kind: "function";
   label: string;
   fn: (ctx: PhaseFunctionContext) => Promise<boolean>;
+  timeoutMs?: number;
 }
 
 export type PipelinePhase =

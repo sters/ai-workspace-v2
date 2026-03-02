@@ -7,8 +7,11 @@ import { vi, describe, it, expect, beforeEach } from "vitest";
 import {
   startOperationPipeline,
   getOperations,
+  killOperation,
   ConcurrencyLimitError,
   MAX_CONCURRENT_OPERATIONS,
+  DEFAULT_CLAUDE_TIMEOUT_MS,
+  DEFAULT_FUNCTION_TIMEOUT_MS,
 } from "@/lib/pipeline-manager";
 
 // Mock the Claude runner so we don't spawn real processes
@@ -156,5 +159,108 @@ describe("pipeline-manager concurrency", () => {
         { kind: "function", label: "test", fn: async () => true },
       ]);
     }).not.toThrow();
+  });
+});
+
+describe("pipeline-manager killOperation", () => {
+  beforeEach(() => {
+    getGlobalOps().clear();
+  });
+
+  it("killOperation unblocks pending emitAsk and marks operation as failed", async () => {
+    let askCalled = false;
+
+    const op = startOperationPipeline("workspace-prune", "test", [
+      {
+        kind: "function",
+        label: "test-ask",
+        fn: async (ctx) => {
+          askCalled = true;
+          // This emitAsk will block until answered or cancelled
+          await ctx.emitAsk([
+            {
+              question: "Proceed?",
+              options: [
+                { label: "Yes", description: "Continue" },
+                { label: "No", description: "Cancel" },
+              ],
+            },
+          ]);
+          return true;
+        },
+      },
+    ]);
+
+    // Wait for the pipeline to reach the emitAsk
+    await new Promise((r) => setTimeout(r, 50));
+    expect(askCalled).toBe(true);
+    expect(op.status).toBe("running");
+
+    // Kill the operation
+    const killed = killOperation(op.id);
+    expect(killed).toBe(true);
+
+    // Wait for the pipeline to unwind after the abort
+    await new Promise((r) => setTimeout(r, 50));
+
+    expect(op.status).toBe("failed");
+  });
+
+  it("killOperation on already completed operation returns false", async () => {
+    const op = startOperationPipeline("init", "test", [
+      { kind: "function", label: "quick", fn: async () => true },
+    ]);
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(op.status).toBe("completed");
+
+    const killed = killOperation(op.id);
+    expect(killed).toBe(false);
+  });
+});
+
+describe("pipeline-manager phase timeout", () => {
+  beforeEach(() => {
+    getGlobalOps().clear();
+  });
+
+  it("function phase times out and fails the pipeline", async () => {
+    const op = startOperationPipeline("workspace-prune", "test", [
+      {
+        kind: "function",
+        label: "slow-fn",
+        timeoutMs: 50, // very short timeout
+        fn: async (ctx) => {
+          // Block on emitAsk which respects the abort signal
+          await ctx.emitAsk([
+            {
+              question: "Wait forever?",
+              options: [
+                { label: "Yes", description: "yes" },
+                { label: "No", description: "no" },
+              ],
+            },
+          ]);
+          return true;
+        },
+      },
+    ]);
+
+    // Wait for the timeout to fire and the pipeline to complete
+    await new Promise((r) => setTimeout(r, 200));
+
+    expect(op.status).toBe("failed");
+
+    // Verify the timeout message was emitted
+    const managed = getGlobalOps().get(op.id) as { events: Array<{ data: string }> };
+    const timedOutEvent = managed.events.find((e) =>
+      e.data.includes("timed out after 50ms"),
+    );
+    expect(timedOutEvent).toBeDefined();
+  });
+
+  it("uses correct default timeouts for each phase kind", () => {
+    expect(DEFAULT_CLAUDE_TIMEOUT_MS).toBe(20 * 60 * 1000);
+    expect(DEFAULT_FUNCTION_TIMEOUT_MS).toBe(3 * 60 * 1000);
   });
 });
