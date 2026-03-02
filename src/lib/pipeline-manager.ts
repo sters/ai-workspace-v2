@@ -41,6 +41,15 @@ export class ConcurrencyLimitError extends Error {
 }
 
 // ---------------------------------------------------------------------------
+// Phase timeout defaults
+// ---------------------------------------------------------------------------
+
+/** Default timeout for Claude execution phases (single/group): 20 minutes. */
+export const DEFAULT_CLAUDE_TIMEOUT_MS = 20 * 60 * 1000;
+/** Default timeout for function phases: 3 minutes. */
+export const DEFAULT_FUNCTION_TIMEOUT_MS = 3 * 60 * 1000;
+
+// ---------------------------------------------------------------------------
 // Global store (survives HMR in dev mode)
 // ---------------------------------------------------------------------------
 
@@ -93,6 +102,7 @@ function emitStatus(
 }
 
 function markComplete(managed: ManagedOperation, success: boolean) {
+  if (managed.operation.status !== "running") return;
   managed.operation.status = success ? "completed" : "failed";
   managed.operation.completedAt = new Date().toISOString();
   managed.completedAt = Date.now();
@@ -278,6 +288,27 @@ export function startOperationPipeline(
 
       emitPhaseUpdate(managed, i, phaseLabel, "running");
 
+      // Determine timeout for this phase
+      const defaultTimeout = phase.kind === "function"
+        ? DEFAULT_FUNCTION_TIMEOUT_MS
+        : DEFAULT_CLAUDE_TIMEOUT_MS;
+      const timeoutMs = phase.timeoutMs ?? defaultTimeout;
+
+      // Set up timeout timer
+      let timedOut = false;
+      const timeoutTimer = setTimeout(() => {
+        timedOut = true;
+        emitStatus(managed, `Phase ${phaseNum} timed out after ${timeoutMs}ms`, phaseExtra);
+        // Abort function phases via the abort controller
+        if (phase.kind === "function") {
+          managed.abortController.abort();
+        }
+        // Kill all child processes for single/group phases
+        for (const [, proc] of managed.childProcesses) {
+          proc.kill();
+        }
+      }, timeoutMs);
+
       if (phase.kind === "function") {
         emitStatus(managed, `Phase ${phaseNum}/${phases.length}: ${phase.label}`, phaseExtra);
         const childId = `${id}-phase-${i}`;
@@ -328,8 +359,21 @@ export function startOperationPipeline(
                 ...phaseExtra,
               });
               // Return a promise that resolves when the user answers
-              return new Promise<Record<string, string>>((resolve) => {
+              // or rejects when the operation is cancelled
+              return new Promise<Record<string, string>>((resolve, reject) => {
+                const signal = managed.abortController.signal;
+                if (signal.aborted) {
+                  managed.pendingAsks.delete(toolUseId);
+                  reject(new DOMException("Operation cancelled", "AbortError"));
+                  return;
+                }
+                const onAbort = () => {
+                  managed.pendingAsks.delete(toolUseId);
+                  reject(new DOMException("Operation cancelled", "AbortError"));
+                };
+                signal.addEventListener("abort", onAbort, { once: true });
                 managed.pendingAsks.set(toolUseId, (answers) => {
+                  signal.removeEventListener("abort", onAbort);
                   // Emit a tool_result event so findPendingAsk marks it answered
                   emitEvent(managed, {
                     type: "output",
@@ -389,8 +433,12 @@ export function startOperationPipeline(
             },
           });
         } catch (err) {
-          emitStatus(managed, `Phase ${phaseNum} error: ${err}`, phaseExtra);
-          phaseSuccess = false;
+          if (timedOut) {
+            phaseSuccess = false;
+          } else {
+            emitStatus(managed, `Phase ${phaseNum} error: ${err}`, phaseExtra);
+            phaseSuccess = false;
+          }
         }
 
         const child = operation.children!.find((c) => c.id === childId);
@@ -428,6 +476,9 @@ export function startOperationPipeline(
           phaseExtra,
         );
       }
+
+      clearTimeout(timeoutTimer);
+      if (timedOut) phaseSuccess = false;
 
       emitPhaseUpdate(managed, i, phaseLabel, phaseSuccess ? "completed" : "failed");
 
