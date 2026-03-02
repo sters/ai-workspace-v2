@@ -10,6 +10,10 @@ export function spawnTerminal(
   options: SpawnTerminalOptions,
   listeners: Set<DataListener>,
 ): TerminalSubprocess {
+  // Single streaming decoder so multi-byte UTF-8 characters split across
+  // PTY chunks are buffered instead of replaced with U+FFFD.
+  const decoder = new TextDecoder();
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (Bun.spawn as any)(cmd, {
     cwd: options.cwd,
@@ -18,8 +22,8 @@ export function spawnTerminal(
       cols: options.cols ?? 120,
       rows: options.rows ?? 40,
       data(_terminal: unknown, rawData: Uint8Array) {
-        const text = new TextDecoder().decode(rawData);
-        for (const fn of listeners) fn(text);
+        const text = decoder.decode(rawData, { stream: true });
+        for (const fn of listeners) fn(text, rawData);
       },
     },
   }) as TerminalSubprocess;

@@ -8,15 +8,129 @@ const CHAT_WS_URL =
     ? `ws://${window.location.hostname}:${process.env.NEXT_PUBLIC_CHAT_WS_PORT || "3742"}/ws`
     : "";
 
-type SessionState = "idle" | "connecting" | "running" | "exited";
+type SessionState = "idle" | "connecting" | "resuming" | "running" | "exited";
 
 interface ServerMessage {
-  type: "output" | "started" | "exited" | "error";
+  type: "output" | "started" | "exited" | "error" | "resumed" | "replay_done";
   data?: string;
   sessionId?: string;
   code?: number;
   message?: string;
+  exited?: boolean;
+  exitCode?: number;
+  bufferedChunks?: number;
 }
+
+// ---------------------------------------------------------------------------
+// Terminal theme (shared between start and resume)
+// ---------------------------------------------------------------------------
+
+const TERMINAL_THEME = {
+  background: "#1a1b26",
+  foreground: "#a9b1d6",
+  cursor: "#c0caf5",
+  selectionBackground: "#33467c",
+  black: "#15161e",
+  red: "#f7768e",
+  green: "#9ece6a",
+  yellow: "#e0af68",
+  blue: "#7aa2f7",
+  magenta: "#bb9af7",
+  cyan: "#7dcfff",
+  white: "#a9b1d6",
+  brightBlack: "#414868",
+  brightRed: "#f7768e",
+  brightGreen: "#9ece6a",
+  brightYellow: "#e0af68",
+  brightBlue: "#7aa2f7",
+  brightMagenta: "#bb9af7",
+  brightCyan: "#7dcfff",
+  brightWhite: "#c0caf5",
+} as const;
+
+// ---------------------------------------------------------------------------
+// localStorage helpers
+// ---------------------------------------------------------------------------
+
+function chatStorageKey(workspaceId: string): string {
+  return `aiw-chat:${workspaceId}`;
+}
+
+function saveChatSession(workspaceId: string, sessionId: string): void {
+  try {
+    localStorage.setItem(chatStorageKey(workspaceId), JSON.stringify({ sessionId }));
+  } catch {
+    // ignore quota errors
+  }
+}
+
+function loadChatSession(workspaceId: string): string | null {
+  try {
+    const raw = localStorage.getItem(chatStorageKey(workspaceId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.sessionId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function clearChatSession(workspaceId: string): void {
+  try {
+    localStorage.removeItem(chatStorageKey(workspaceId));
+  } catch {
+    // ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Terminal initialization helper
+// ---------------------------------------------------------------------------
+
+interface TerminalBundle {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  term: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fitAddon: any;
+}
+
+async function initTerminal(container: HTMLElement): Promise<TerminalBundle> {
+  const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
+    import("@xterm/xterm"),
+    import("@xterm/addon-fit"),
+    import("@xterm/addon-web-links"),
+  ]);
+
+  // Clear any residual DOM from a previous xterm instance to prevent
+  // duplicate terminals when re-mounting after tab navigation.
+  container.innerHTML = "";
+
+  const fitAddon = new FitAddon();
+  const term = new Terminal({
+    cursorBlink: true,
+    fontSize: 14,
+    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
+    theme: TERMINAL_THEME,
+  });
+
+  term.loadAddon(fitAddon);
+  term.loadAddon(new WebLinksAddon());
+  term.open(container);
+
+  requestAnimationFrame(() => {
+    try {
+      fitAddon.fit();
+    } catch {
+      // ignore fit errors during transitions
+    }
+  });
+
+  return { term, fitAddon };
+}
+
+// ---------------------------------------------------------------------------
+// ChatTerminal component
+// ---------------------------------------------------------------------------
 
 export function ChatTerminal({ workspaceId }: { workspaceId: string }) {
   const termRef = useRef<HTMLDivElement>(null);
@@ -32,6 +146,9 @@ export function ChatTerminal({ workspaceId }: { workspaceId: string }) {
   const fitAddonRef = useRef<any>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Generation counter: incremented before each async session init.
+  // After the await, if the counter has moved on, this call is stale.
+  const generationRef = useRef(0);
 
   const cleanup = useCallback(() => {
     if (wsRef.current) {
@@ -45,7 +162,7 @@ export function ChatTerminal({ workspaceId }: { workspaceId: string }) {
     fitAddonRef.current = null;
   }, []);
 
-  // Cleanup on unmount
+  // Cleanup on unmount — close WS + dispose xterm, but keep localStorage
   useEffect(() => {
     return () => cleanup();
   }, [cleanup]);
@@ -65,65 +182,128 @@ export function ChatTerminal({ workspaceId }: { workspaceId: string }) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Auto-resume on mount if localStorage has a saved session
+  useEffect(() => {
+    const savedSessionId = loadChatSession(workspaceId);
+    if (savedSessionId && stateRef.current === "idle") {
+      resumeSession(savedSessionId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspaceId]);
+
+  const resumeSession = useCallback(
+    async (sessionId: string) => {
+      cleanup();
+      const gen = ++generationRef.current;
+      setState("resuming");
+      setExitCode(null);
+      setError(null);
+
+      if (!termRef.current) return;
+
+      const { term, fitAddon } = await initTerminal(termRef.current);
+
+      // If another session init started while we awaited, abandon this one.
+      if (generationRef.current !== gen) {
+        term.dispose();
+        return;
+      }
+
+      xtermRef.current = term;
+      fitAddonRef.current = fitAddon;
+
+      const ws = new WebSocket(CHAT_WS_URL);
+      wsRef.current = ws;
+
+      // Track whether the resumed session had already exited
+      let resumedExited = false;
+      let resumedExitCode: number | undefined;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: "resume", sessionId }));
+      };
+
+      ws.onmessage = (event) => {
+        let msg: ServerMessage;
+        try {
+          msg = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+
+        switch (msg.type) {
+          case "resumed":
+            resumedExited = msg.exited ?? false;
+            resumedExitCode = msg.exitCode;
+            break;
+          case "output":
+            if (msg.data) {
+              term.write(msg.data);
+            }
+            break;
+          case "replay_done":
+            if (resumedExited) {
+              setState("exited");
+              setExitCode(resumedExitCode ?? -1);
+            } else {
+              setState("running");
+            }
+            break;
+          case "exited":
+            setState("exited");
+            setExitCode(msg.code ?? -1);
+            break;
+          case "error":
+            // Session not found — clear localStorage, go idle
+            clearChatSession(workspaceId);
+            setError(null);
+            setState("idle");
+            cleanup();
+            break;
+        }
+      };
+
+      ws.onerror = () => {
+        clearChatSession(workspaceId);
+        setError("WebSocket connection failed. Is the chat server running?");
+        setState("exited");
+      };
+
+      ws.onclose = () => {
+        if (stateRef.current === "running" || stateRef.current === "resuming") {
+          setState("exited");
+        }
+      };
+
+      // Forward terminal input to WebSocket
+      term.onData((data: string) => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "input", data }));
+        }
+      });
+    },
+    [workspaceId, cleanup],
+  );
+
   const startSession = useCallback(async () => {
     cleanup();
+    const gen = ++generationRef.current;
     setState("connecting");
     setExitCode(null);
     setError(null);
 
-    // Dynamic import to avoid SSR issues
-    const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
-      import("@xterm/xterm"),
-      import("@xterm/addon-fit"),
-      import("@xterm/addon-web-links"),
-    ]);
-
     if (!termRef.current) return;
 
-    const fitAddon = new FitAddon();
-    fitAddonRef.current = fitAddon;
+    const { term, fitAddon } = await initTerminal(termRef.current);
 
-    const term = new Terminal({
-      cursorBlink: true,
-      fontSize: 14,
-      fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
-      theme: {
-        background: "#1a1b26",
-        foreground: "#a9b1d6",
-        cursor: "#c0caf5",
-        selectionBackground: "#33467c",
-        black: "#15161e",
-        red: "#f7768e",
-        green: "#9ece6a",
-        yellow: "#e0af68",
-        blue: "#7aa2f7",
-        magenta: "#bb9af7",
-        cyan: "#7dcfff",
-        white: "#a9b1d6",
-        brightBlack: "#414868",
-        brightRed: "#f7768e",
-        brightGreen: "#9ece6a",
-        brightYellow: "#e0af68",
-        brightBlue: "#7aa2f7",
-        brightMagenta: "#bb9af7",
-        brightCyan: "#7dcfff",
-        brightWhite: "#c0caf5",
-      },
-    });
+    // If another session init started while we awaited, abandon this one.
+    if (generationRef.current !== gen) {
+      term.dispose();
+      return;
+    }
+
     xtermRef.current = term;
-
-    term.loadAddon(fitAddon);
-    term.loadAddon(new WebLinksAddon());
-    term.open(termRef.current);
-
-    // Wait a tick for the terminal to be in the DOM
-    requestAnimationFrame(() => {
-      try {
-        fitAddon.fit();
-      } catch {
-        // ignore
-      }
-    });
+    fitAddonRef.current = fitAddon;
 
     // Connect WebSocket
     const ws = new WebSocket(CHAT_WS_URL);
@@ -144,6 +324,10 @@ export function ChatTerminal({ workspaceId }: { workspaceId: string }) {
       switch (msg.type) {
         case "started":
           setState("running");
+          // Save session to localStorage for resume
+          if (msg.sessionId) {
+            saveChatSession(workspaceId, msg.sessionId);
+          }
           break;
         case "output":
           if (msg.data) {
@@ -184,7 +368,9 @@ export function ChatTerminal({ workspaceId }: { workspaceId: string }) {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "kill" }));
     }
-  }, []);
+    // Clear localStorage on explicit kill
+    clearChatSession(workspaceId);
+  }, [workspaceId]);
 
   return (
     <div className="flex h-full flex-col">
@@ -200,6 +386,9 @@ export function ChatTerminal({ workspaceId }: { workspaceId: string }) {
         )}
         {state === "connecting" && (
           <span className="text-sm text-muted-foreground">Connecting...</span>
+        )}
+        {state === "resuming" && (
+          <span className="text-sm text-muted-foreground">Reconnecting...</span>
         )}
         {state === "running" && (
           <button

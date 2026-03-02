@@ -1,4 +1,4 @@
-export type DataListener = (data: string) => void;
+export type DataListener = (data: string, rawData: Uint8Array) => void;
 
 /**
  * Bun.spawn with terminal option returns a subprocess with PTY control.
