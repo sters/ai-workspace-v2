@@ -104,6 +104,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
 
         if (analysis.repositories.length > 0) {
           for (const repoPath of analysis.repositories) {
+            if (ctx.signal.aborted) return false;
             ctx.emitStatus(`Setting up repository: ${repoPath}`);
             try {
               const repoResult = setupRepository(wsName, repoPath, undefined, ctx.emitStatus);
@@ -115,9 +116,12 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
           }
         }
 
+        if (ctx.signal.aborted) return false;
+
         // Setup any additional repos that Claude added to the README but weren't in the analysis
         const { meta } = await readWorkspaceReadme(wsPath);
         for (const metaRepo of meta.repositories) {
+          if (ctx.signal.aborted) return false;
           const already = repoResults.find(
             (r) => r.repoPath === metaRepo.path || r.repoName === metaRepo.alias,
           );

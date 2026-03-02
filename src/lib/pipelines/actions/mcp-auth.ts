@@ -155,7 +155,7 @@ export function buildMcpAuthPhase(
         const pollTimeout = 60_000;
 
         while (Date.now() - pollStart < pollTimeout) {
-          if (exited) break;
+          if (exited || signal.aborted) break;
 
           output = await collectOutput(listeners, 2000, 5000);
           const cleanedOutput = stripAnsi(output).toLowerCase();
@@ -174,7 +174,11 @@ export function buildMcpAuthPhase(
           }
         }
 
-        emitStatus("OAuth polling timed out after 60 seconds");
+        if (signal.aborted) {
+          emitStatus("OAuth polling cancelled");
+        } else {
+          emitStatus("OAuth polling timed out after 60 seconds");
+        }
         proc.kill();
         return false;
       } catch (err) {
