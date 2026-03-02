@@ -208,7 +208,7 @@ export function TodoUpdater({
         <p className="mb-2 text-sm font-medium">Update workspace TODOs</p>
         <InlineOperationForm
           storageKey={`workspace-todo-all:${workspaceName}`}
-          label="Update All"
+          label="Update"
           placeholder="Describe TODO changes to apply across all repositories..."
           disabled={anyRepoRunning}
           onRunningChange={handleWorkspaceRunningChange}
