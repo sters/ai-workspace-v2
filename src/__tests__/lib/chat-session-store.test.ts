@@ -23,6 +23,7 @@ function makeSession(
     outputBuffer: [],
     activeWs: null,
     exitedAt: overrides.exitedAt ?? null,
+    startedAt: Date.now(),
   };
 }
 

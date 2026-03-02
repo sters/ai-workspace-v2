@@ -41,6 +41,7 @@ interface ChatSession {
   outputBuffer: Uint8Array[];
   activeWs: { send(data: string): void } | null;
   exitedAt: number | null;
+  startedAt: number;
 }
 
 const store = globalThis as unknown as {
@@ -227,6 +228,22 @@ export function startChatServer(port: number) {
       if (url.pathname === "/health") {
         return new Response("ok");
       }
+      // Active chat sessions
+      if (url.pathname === "/sessions") {
+        const sessions: Array<{ id: string; workspaceId: string; startedAt: number }> = [];
+        for (const session of store.__chatSessions!.values()) {
+          if (!session.exited) {
+            sessions.push({
+              id: session.id,
+              workspaceId: session.workspaceId,
+              startedAt: session.startedAt,
+            });
+          }
+        }
+        return new Response(JSON.stringify(sessions), {
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       return new Response("Not found", { status: 404 });
     },
     websocket: {
@@ -288,6 +305,7 @@ export function startChatServer(port: number) {
               outputBuffer: [],
               activeWs: ws,
               exitedAt: null,
+              startedAt: Date.now(),
             };
             store.__chatSessions!.set(sessionId, session);
 
