@@ -179,6 +179,8 @@ function wireChild(
   emitStatus(managed, "Initializing...", { childLabel, ...phaseExtra });
 
   return new Promise<WireChildResult>((resolve) => {
+    let resolved = false;
+
     process.onEvent((event) => {
       const tagged: OperationEvent = {
         ...event,
@@ -189,6 +191,8 @@ function wireChild(
       emitEvent(managed, tagged);
 
       if (event.type === "complete") {
+        if (resolved) return;
+        resolved = true;
         const data = JSON.parse(event.data);
         const success = data.exitCode === 0;
         const child = managed.operation.children?.find((c) => c.id === childId);
@@ -197,6 +201,22 @@ function wireChild(
         resolve({ success, resultText: process.getResultText() });
       }
     });
+
+    // If the operation is cancelled, resolve immediately as failed
+    const signal = managed.abortController.signal;
+    const onAbort = () => {
+      if (resolved) return;
+      resolved = true;
+      const child = managed.operation.children?.find((c) => c.id === childId);
+      if (child) child.status = "failed";
+      managed.childProcesses.delete(childId);
+      resolve({ success: false, resultText: undefined });
+    };
+    if (signal.aborted) {
+      onAbort();
+    } else {
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
   });
 }
 
@@ -280,6 +300,17 @@ export function startOperationPipeline(
     let pipelineSuccess = true;
 
     for (let i = 0; i < phases.length; i++) {
+      // Check if the operation was cancelled between phases
+      if (managed.abortController.signal.aborted) {
+        emitStatus(managed, "Operation cancelled");
+        pipelineSuccess = false;
+        // Mark remaining phases as skipped
+        for (let j = i; j < phases.length; j++) {
+          emitPhaseUpdate(managed, j, phaseInfos[j].label, "skipped");
+        }
+        break;
+      }
+
       const phase = phases[i];
       const phaseNum = i + 1;
       const phaseLabel = phaseInfos[i].label;
@@ -440,6 +471,8 @@ export function startOperationPipeline(
           });
         } catch (err) {
           if (timedOut) {
+            phaseSuccess = false;
+          } else if (managed.abortController.signal.aborted) {
             phaseSuccess = false;
           } else {
             emitStatus(managed, `Phase ${phaseNum} error: ${err}`, phaseExtra);
