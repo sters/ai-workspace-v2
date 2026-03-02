@@ -107,8 +107,6 @@ function RepoTodoCard({
   disabled: boolean;
   onRunningChange: (key: string, running: boolean) => void;
 }) {
-  const [showForm, setShowForm] = useState(false);
-
   const handleRunningChange = useCallback(
     (running: boolean) => onRunningChange(todo.repoName, running),
     [onRunningChange, todo.repoName]
@@ -130,34 +128,25 @@ function RepoTodoCard({
               {todo.inProgress} in progress
             </span>
           )}
-          <button
-            onClick={() => setShowForm((v) => !v)}
-            disabled={disabled}
-            className="rounded-md border px-2 py-0.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
-          >
-            {showForm ? "Close" : "Update"}
-          </button>
         </div>
       </div>
       <ProgressBar value={todo.progress} className="mb-3" />
 
-      {showForm && (
-        <div className="mb-3">
-          <InlineOperationForm
-            storageKey={`workspace-todo-repo:${workspaceName}:${todo.repoName}`}
-            label="Update"
-            placeholder={`Update TODOs for ${todo.repoName}...`}
-            disabled={disabled}
-            onRunningChange={handleRunningChange}
-            workspace={workspacePath}
-            onSubmitBody={(instruction) => ({
-              workspace: workspacePath,
-              instruction,
-              repo: todo.repoName,
-            })}
-          />
-        </div>
-      )}
+      <div className="mb-3">
+        <InlineOperationForm
+          storageKey={`workspace-todo-repo:${workspaceName}:${todo.repoName}`}
+          label="Update"
+          placeholder={`Update TODOs for ${todo.repoName}...`}
+          disabled={disabled}
+          onRunningChange={handleRunningChange}
+          workspace={workspacePath}
+          onSubmitBody={(instruction) => ({
+            workspace: workspacePath,
+            instruction,
+            repo: todo.repoName,
+          })}
+        />
+      </div>
 
       <div className="space-y-3">
         {todo.sections.length > 0
@@ -216,7 +205,7 @@ export function TodoUpdater({
     <div className="space-y-6">
       {/* Workspace-wide update form */}
       <div className="rounded-lg border border-dashed p-4">
-        <p className="mb-2 text-sm font-medium">Update all repositories</p>
+        <p className="mb-2 text-sm font-medium">Update workspace TODOs</p>
         <InlineOperationForm
           storageKey={`workspace-todo-all:${workspaceName}`}
           label="Update All"
