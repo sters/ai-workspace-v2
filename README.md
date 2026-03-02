@@ -50,7 +50,7 @@ bunx tsc --noEmit
 
 ## Tech Stack
 
-- **Next.js 15** (App Router) with React 19
+- **Next.js 16** (App Router) with React 19
 - **TypeScript** (strict mode)
 - **Tailwind CSS 3** with shadcn/ui-style theme
 - **SWR** for data fetching
