@@ -543,6 +543,15 @@ export function subscribeToOperation(
   return () => managed.listeners.delete(listener);
 }
 
+export function deleteOperation(id: string): boolean {
+  const managed = operations.get(id);
+  if (!managed) return false;
+  // Only allow deleting completed/failed operations
+  if (managed.operation.status === "running") return false;
+  operations.delete(id);
+  return true;
+}
+
 export function killOperation(id: string): boolean {
   const managed = operations.get(id);
   if (!managed || managed.operation.status !== "running") return false;

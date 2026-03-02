@@ -37,6 +37,10 @@ export const operationKillSchema = z.object({
   operationId: z.string().min(1, "operationId is required"),
 });
 
+export const operationClearSchema = z.object({
+  operationId: z.string().min(1, "operationId is required"),
+});
+
 export const operationAnswerSchema = z.object({
   operationId: z.string().min(1, "operationId is required"),
   toolUseId: z.string().min(1, "toolUseId is required"),
