@@ -30,6 +30,12 @@ const tools = [
     name: "Claude Auth",
     description: "Manage Claude Code authentication status and login.",
   },
+  {
+    href: "/utilities/running",
+    name: "Running",
+    description:
+      "View and manage all currently running operations.",
+  },
 ];
 
 export default function UtilitiesPage() {
