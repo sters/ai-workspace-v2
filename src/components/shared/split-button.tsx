@@ -13,12 +13,14 @@ export function SplitButton({
   items,
   disabled,
   className,
+  dropdownClassName,
 }: {
   label: string;
   onClick: () => void;
   items: SplitButtonItem[];
   disabled?: boolean;
   className?: string;
+  dropdownClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -49,7 +51,10 @@ export function SplitButton({
       <button
         onClick={() => setOpen(!open)}
         disabled={disabled}
-        className="rounded-r-md border-l border-primary-foreground/20 bg-primary px-1.5 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        className={
+          dropdownClassName ??
+          "rounded-r-md border-l border-primary-foreground/20 bg-primary px-1.5 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        }
         aria-label="More options"
       >
         <svg

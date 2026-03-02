@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { ClaudeOperation } from "../operation/claude-operation";
 import { SplitButton } from "../shared/split-button";
 import type { OperationContext } from "@/types/operation";
@@ -8,12 +8,15 @@ import type { OperationType } from "@/types/operation";
 
 export function OperationPanel({
   workspacePath,
+  repositories,
   autoAction,
   autoActionExtra,
   onAutoActionConsumed,
   initialOperationId,
 }: {
   workspacePath: string;
+  /** Repository metadata from workspace README for "Open in VS Code" dropdown. */
+  repositories?: { alias: string; path: string }[];
   /** When set, auto-trigger this operation on mount (once). */
   autoAction?: OperationType;
   /** Extra params for auto-action (e.g. batch mode/startWith from URL). */
@@ -96,6 +99,7 @@ export function OperationPanel({
           >
             Create PR
           </button>
+          <OpenVSCodeButton workspacePath={workspacePath} repositories={repositories} />
           <button
             onClick={() => start("delete", { workspace: workspacePath })}
             disabled={isRunning}
@@ -143,4 +147,55 @@ function AutoActionWrapper({
   }, [autoAction, autoActionExtra, firedRef, start, isRunning, hasOperation, workspacePath, onConsumed]);
 
   return <>{children}</>;
+}
+
+function openInVSCode(targetPath: string) {
+  fetch("/api/operations/open-vscode", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace: targetPath }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const data = await res.json();
+      console.error("Failed to open VS Code:", data.error);
+    }
+  }).catch((e) => {
+    console.error("Failed to open VS Code:", e);
+  });
+}
+
+function OpenVSCodeButton({
+  workspacePath,
+  repositories,
+}: {
+  workspacePath: string;
+  repositories?: { alias: string; path: string }[];
+}) {
+  const handleClick = useCallback(() => openInVSCode(workspacePath), [workspacePath]);
+
+  const repoItems = (repositories ?? []).map((repo) => ({
+    label: repo.alias || repo.path.split("/").pop() || repo.path,
+    onClick: () => openInVSCode(`${workspacePath}/${repo.path}`),
+  }));
+
+  if (repoItems.length === 0) {
+    return (
+      <button
+        onClick={handleClick}
+        className="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
+      >
+        Open in VS Code
+      </button>
+    );
+  }
+
+  return (
+    <SplitButton
+      label="Open in VS Code"
+      onClick={handleClick}
+      className="rounded-l-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
+      dropdownClassName="rounded-r-md border-l border-secondary-foreground/20 bg-secondary px-1.5 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
+      items={repoItems}
+    />
+  );
 }

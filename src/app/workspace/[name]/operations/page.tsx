@@ -57,6 +57,7 @@ export default function WorkspaceOperationsPage({
   return (
     <OperationPanel
       workspacePath={workspace.path}
+      repositories={workspace.meta.repositories}
       autoAction={autoAction}
       autoActionExtra={autoActionExtra}
       onAutoActionConsumed={handleAutoActionConsumed}
