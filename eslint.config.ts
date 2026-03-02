@@ -2,6 +2,7 @@ import js from "@eslint/js";
 import nextPlugin from "@next/eslint-plugin-next";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
+import type { ConfigArray } from "typescript-eslint";
 
 export default tseslint.config(
   {
@@ -24,8 +25,8 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooksPlugin.configs.recommended.rules,
-      ...nextPlugin.configs.recommended.rules,
-      ...nextPlugin.configs["core-web-vitals"].rules,
+      ...(nextPlugin.configs.recommended.rules as ConfigArray[number]["rules"]),
+      ...(nextPlugin.configs["core-web-vitals"].rules as ConfigArray[number]["rules"]),
       "@typescript-eslint/no-unused-vars": [
         "error",
         {
@@ -35,4 +36,4 @@ export default tseslint.config(
       ],
     },
   }
-);
+) satisfies ConfigArray;
