@@ -32,7 +32,7 @@ const tools = [
   },
   {
     href: "/utilities/running",
-    name: "Running",
+    name: "Running Operations",
     description:
       "View and manage all currently running operations.",
   },
