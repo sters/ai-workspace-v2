@@ -41,6 +41,15 @@ export const operationClearSchema = z.object({
   operationId: z.string().min(1, "operationId is required"),
 });
 
+export const batchSchema = z.object({
+  mode: z.enum(["execute-review", "execute-pr", "execute-review-pr-gated", "execute-review-pr"]),
+  startWith: z.enum(["init", "update-todo", "execute"]),
+  description: z.string().optional(),
+  workspace: z.string().optional(),
+  instruction: z.string().optional(),
+  draft: z.coerce.boolean().optional(),
+});
+
 export const operationAnswerSchema = z.object({
   operationId: z.string().min(1, "operationId is required"),
   toolUseId: z.string().min(1, "toolUseId is required"),

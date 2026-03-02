@@ -6,17 +6,22 @@ import { TodoItemRow } from "./todo-item";
 import { SectionBlock } from "./todo-viewer";
 import { ProgressBar } from "../shared/progress-bar";
 import { ClaudeOperation } from "../operation/claude-operation";
+import { SplitButton, type SplitButtonItem } from "../shared/split-button";
+import type { OperationType } from "@/types/operation";
 
 function UpdateForm({
   label,
   placeholder,
   onSubmit,
   disabled,
+  batchItems,
 }: {
   label: string;
   placeholder: string;
   onSubmit: (instruction: string) => void;
   disabled: boolean;
+  /** When provided, renders a SplitButton with batch dropdown items. */
+  batchItems?: (instruction: string) => SplitButtonItem[];
 }) {
   const [instruction, setInstruction] = useState("");
 
@@ -26,6 +31,8 @@ function UpdateForm({
     onSubmit(trimmed);
     setInstruction("");
   };
+
+  const items = batchItems ? batchItems(instruction) : undefined;
 
   return (
     <div className="flex gap-2">
@@ -40,13 +47,22 @@ function UpdateForm({
         disabled={disabled}
         className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground disabled:opacity-50"
       />
-      <button
-        onClick={handleSubmit}
-        disabled={disabled || !instruction.trim()}
-        className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-      >
-        {label}
-      </button>
+      {items ? (
+        <SplitButton
+          label={label}
+          onClick={handleSubmit}
+          disabled={disabled || !instruction.trim()}
+          items={items}
+        />
+      ) : (
+        <button
+          onClick={handleSubmit}
+          disabled={disabled || !instruction.trim()}
+          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {label}
+        </button>
+      )}
     </div>
   );
 }
@@ -63,6 +79,7 @@ function InlineOperationForm({
   onRunningChange,
   onSubmitBody,
   workspace,
+  batchItems,
 }: {
   storageKey: string;
   label: string;
@@ -71,6 +88,11 @@ function InlineOperationForm({
   onRunningChange: (running: boolean) => void;
   onSubmitBody: (instruction: string) => Record<string, string>;
   workspace?: string;
+  /** When provided, renders a SplitButton with batch dropdown items. */
+  batchItems?: (
+    start: (type: OperationType, body: Record<string, string>) => void,
+    instruction: string,
+  ) => SplitButtonItem[];
 }) {
   return (
     <ClaudeOperation
@@ -88,6 +110,14 @@ function InlineOperationForm({
           onSubmit={(instruction) => {
             ctx.start("update-todo", onSubmitBody(instruction));
           }}
+          batchItems={
+            batchItems
+              ? (instruction) => batchItems(
+                  (type, body) => ctx.start(type, body),
+                  instruction,
+                )
+              : undefined
+          }
         />
       )}
     </ClaudeOperation>
@@ -145,6 +175,48 @@ function RepoTodoCard({
             instruction,
             repo: todo.repoName,
           })}
+          batchItems={(start, instruction) => [
+            {
+              label: "Update \u2192 Execute \u2192 Review",
+              onClick: () =>
+                start("batch", {
+                  startWith: "update-todo",
+                  mode: "execute-review",
+                  workspace: workspacePath,
+                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+                }),
+            },
+            {
+              label: "Update \u2192 Execute \u2192 PR",
+              onClick: () =>
+                start("batch", {
+                  startWith: "update-todo",
+                  mode: "execute-pr",
+                  workspace: workspacePath,
+                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+                }),
+            },
+            {
+              label: "Update \u2192 Execute \u2192 Review \u2192 PR (gated)",
+              onClick: () =>
+                start("batch", {
+                  startWith: "update-todo",
+                  mode: "execute-review-pr-gated",
+                  workspace: workspacePath,
+                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+                }),
+            },
+            {
+              label: "Update \u2192 Execute \u2192 Review \u2192 PR",
+              onClick: () =>
+                start("batch", {
+                  startWith: "update-todo",
+                  mode: "execute-review-pr",
+                  workspace: workspacePath,
+                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+                }),
+            },
+          ]}
         />
       </div>
 
@@ -217,6 +289,48 @@ export function TodoUpdater({
             workspace: workspacePath,
             instruction,
           })}
+          batchItems={(start, instruction) => [
+            {
+              label: "Update \u2192 Execute \u2192 Review",
+              onClick: () =>
+                start("batch", {
+                  startWith: "update-todo",
+                  mode: "execute-review",
+                  workspace: workspacePath,
+                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+                }),
+            },
+            {
+              label: "Update \u2192 Execute \u2192 PR",
+              onClick: () =>
+                start("batch", {
+                  startWith: "update-todo",
+                  mode: "execute-pr",
+                  workspace: workspacePath,
+                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+                }),
+            },
+            {
+              label: "Update \u2192 Execute \u2192 Review \u2192 PR (gated)",
+              onClick: () =>
+                start("batch", {
+                  startWith: "update-todo",
+                  mode: "execute-review-pr-gated",
+                  workspace: workspacePath,
+                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+                }),
+            },
+            {
+              label: "Update \u2192 Execute \u2192 Review \u2192 PR",
+              onClick: () =>
+                start("batch", {
+                  startWith: "update-todo",
+                  mode: "execute-review-pr",
+                  workspace: workspacePath,
+                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+                }),
+            },
+          ]}
         />
       </div>
 

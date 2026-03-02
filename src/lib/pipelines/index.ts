@@ -8,3 +8,4 @@ export { buildDeletePipeline } from "./delete";
 export { buildWorkspacePrunePipeline } from "./workspace-prune";
 export { buildMcpAuthPipeline } from "./mcp-auth";
 export { buildClaudeLoginPipeline } from "./claude-login";
+export { buildBatchPipeline } from "./batch";
