@@ -286,13 +286,19 @@ export function startOperationPipeline(
       const phaseExtra = { phaseIndex: i, phaseLabel };
       let phaseSuccess: boolean;
 
-      emitPhaseUpdate(managed, i, phaseLabel, "running");
-
       // Determine timeout for this phase
       const defaultTimeout = phase.kind === "function"
         ? DEFAULT_FUNCTION_TIMEOUT_MS
         : DEFAULT_CLAUDE_TIMEOUT_MS;
       const timeoutMs = phase.timeoutMs ?? defaultTimeout;
+
+      // Store timeout and start time on the phase info before emitting the update
+      if (phaseInfos[i]) {
+        phaseInfos[i].timeoutMs = timeoutMs;
+        phaseInfos[i].startedAt = new Date().toISOString();
+      }
+
+      emitPhaseUpdate(managed, i, phaseLabel, "running");
 
       // Set up timeout timer
       let timedOut = false;

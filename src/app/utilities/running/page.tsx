@@ -1,11 +1,78 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import useSWR from "swr";
-import type { Operation } from "@/types/operation";
+import type { Operation, OperationPhaseInfo, OperationType } from "@/types/operation";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+const UTILITY_TYPE_PATHS: Partial<Record<OperationType, string>> = {
+  "workspace-prune": "/utilities/workspace-prune",
+  "mcp-auth": "/utilities/mcp-servers",
+  "claude-login": "/utilities/claude-auth",
+};
+
+function getViewHref(op: Operation): string {
+  return UTILITY_TYPE_PATHS[op.type] ?? `/workspace/${encodeURIComponent(op.workspace)}/operations`;
+}
+
+function formatRemaining(ms: number): string {
+  if (ms <= 0) return "expired";
+  const totalSec = Math.floor(ms / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  if (min > 0) return `${min}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function useNow(intervalMs: number) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(id);
+  }, [intervalMs]);
+  return now;
+}
+
+function PhaseExpiration({ phase, now }: { phase: OperationPhaseInfo; now: number }) {
+  if (!phase.timeoutMs || !phase.startedAt) return null;
+
+  const elapsed = now - new Date(phase.startedAt).getTime();
+  const remaining = phase.timeoutMs - elapsed;
+  const pct = Math.max(0, Math.min(100, (elapsed / phase.timeoutMs) * 100));
+  const isExpired = remaining <= 0;
+  const isWarning = !isExpired && remaining < 60_000;
+
+  return (
+    <div className="mt-1.5 flex items-center gap-2 text-xs">
+      <span className="text-muted-foreground">Timeout:</span>
+      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+        <div
+          className={`h-full rounded-full transition-all ${
+            isExpired
+              ? "bg-destructive"
+              : isWarning
+                ? "bg-yellow-500"
+                : "bg-primary"
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span
+        className={
+          isExpired
+            ? "font-medium text-destructive"
+            : isWarning
+              ? "text-yellow-600"
+              : "text-muted-foreground"
+        }
+      >
+        {formatRemaining(remaining)} remaining
+      </span>
+    </div>
+  );
+}
 
 export default function RunningPage() {
   const { data, error, isLoading, mutate } = useSWR<Operation[]>(
@@ -15,6 +82,7 @@ export default function RunningPage() {
   );
 
   const running = data?.filter((op) => op.status === "running") ?? [];
+  const now = useNow(running.length > 0 ? 1000 : 0);
 
   const kill = useCallback(
     async (operationId: string) => {
@@ -84,10 +152,11 @@ export default function RunningPage() {
                       </span>
                     )}
                   </div>
+                  {currentPhase && <PhaseExpiration phase={currentPhase} now={now} />}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   <Link
-                    href={`/workspace/${encodeURIComponent(op.workspace)}/operations`}
+                    href={getViewHref(op)}
                     className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
                   >
                     View

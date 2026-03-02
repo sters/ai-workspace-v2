@@ -22,6 +22,10 @@ export interface OperationPhaseInfo {
   index: number;
   label: string;
   status: OperationStatus | "pending" | "skipped";
+  /** Timeout in milliseconds for this phase. */
+  timeoutMs?: number;
+  /** ISO timestamp when this phase started running. */
+  startedAt?: string;
 }
 
 export interface Operation {
