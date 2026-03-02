@@ -13,6 +13,21 @@ import type { DataListener, TerminalSubprocess } from "@/types/pty";
 import { buildInitPrompt } from "@/lib/templates";
 
 // ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Maximum output buffer chunks before trimming */
+export const BUFFER_HIGH = 5000;
+/** Number of chunks to keep after trim */
+export const BUFFER_LOW = 3000;
+/** GC: max age (ms) for exited sessions before cleanup */
+export const GC_MAX_AGE_MS = 10 * 60 * 1000;
+/** GC: max number of exited sessions to keep */
+export const GC_MAX_EXITED = 10;
+/** GC interval (ms) */
+const GC_INTERVAL_MS = 60 * 1000;
+
+// ---------------------------------------------------------------------------
 // Session management (globalThis for HMR survival)
 // ---------------------------------------------------------------------------
 
@@ -22,11 +37,16 @@ interface ChatSession {
   proc: TerminalSubprocess;
   listeners: Set<DataListener>;
   exited: boolean;
+  exitCode: number | null;
+  outputBuffer: Uint8Array[];
+  activeWs: { send(data: string): void } | null;
+  exitedAt: number | null;
 }
 
 const store = globalThis as unknown as {
   __chatSessions?: Map<string, ChatSession>;
   __chatCounter?: number;
+  __chatGcTimer?: ReturnType<typeof setInterval>;
 };
 
 if (!store.__chatSessions) {
@@ -38,6 +58,59 @@ if (store.__chatCounter == null) {
 
 function nextSessionId(): string {
   return `chat-${++store.__chatCounter!}-${Date.now()}`;
+}
+
+// ---------------------------------------------------------------------------
+// Buffer management (exported for testing)
+// ---------------------------------------------------------------------------
+
+export function trimBuffer<T>(buffer: T[]): T[] {
+  if (buffer.length > BUFFER_HIGH) {
+    return buffer.slice(buffer.length - BUFFER_LOW);
+  }
+  return buffer;
+}
+
+// ---------------------------------------------------------------------------
+// GC (exported for testing)
+// ---------------------------------------------------------------------------
+
+export function gcSessions(sessions: Map<string, ChatSession>, now: number): number {
+  let removed = 0;
+
+  // Remove sessions that exited more than GC_MAX_AGE_MS ago
+  for (const [id, session] of sessions) {
+    if (session.exited && session.exitedAt != null && now - session.exitedAt > GC_MAX_AGE_MS) {
+      sessions.delete(id);
+      removed++;
+    }
+  }
+
+  // If still too many exited sessions, remove oldest first
+  const exitedSessions: Array<{ id: string; exitedAt: number }> = [];
+  for (const [id, session] of sessions) {
+    if (session.exited && session.exitedAt != null) {
+      exitedSessions.push({ id, exitedAt: session.exitedAt });
+    }
+  }
+
+  if (exitedSessions.length > GC_MAX_EXITED) {
+    exitedSessions.sort((a, b) => a.exitedAt - b.exitedAt);
+    const toRemove = exitedSessions.length - GC_MAX_EXITED;
+    for (let i = 0; i < toRemove; i++) {
+      sessions.delete(exitedSessions[i].id);
+      removed++;
+    }
+  }
+
+  return removed;
+}
+
+function runGc() {
+  const removed = gcSessions(store.__chatSessions!, Date.now());
+  if (removed > 0) {
+    console.log(`[chat-server] GC removed ${removed} expired session(s)`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -72,7 +145,12 @@ interface KillMessage {
   type: "kill";
 }
 
-type ClientMessage = StartMessage | InputMessage | ResizeMessage | KillMessage;
+interface ResumeMessage {
+  type: "resume";
+  sessionId: string;
+}
+
+type ClientMessage = StartMessage | InputMessage | ResizeMessage | KillMessage | ResumeMessage;
 
 interface ServerOutputMessage {
   type: "output";
@@ -94,11 +172,25 @@ interface ServerErrorMessage {
   message: string;
 }
 
+interface ServerResumedMessage {
+  type: "resumed";
+  sessionId: string;
+  exited: boolean;
+  exitCode?: number;
+  bufferedChunks: number;
+}
+
+interface ServerReplayDoneMessage {
+  type: "replay_done";
+}
+
 type ServerMessage =
   | ServerOutputMessage
   | ServerStartedMessage
   | ServerExitedMessage
-  | ServerErrorMessage;
+  | ServerErrorMessage
+  | ServerResumedMessage
+  | ServerReplayDoneMessage;
 
 // ---------------------------------------------------------------------------
 // WebSocket server factory
@@ -113,6 +205,12 @@ function send(ws: { send(data: string): void }, msg: ServerMessage) {
 }
 
 export function startChatServer(port: number) {
+  // Start GC timer (clear any previous from HMR)
+  if (store.__chatGcTimer) {
+    clearInterval(store.__chatGcTimer);
+  }
+  store.__chatGcTimer = setInterval(runGc, GC_INTERVAL_MS);
+
   const server = Bun.serve<WsData>({
     port,
     fetch(req, server) {
@@ -157,6 +255,9 @@ export function startChatServer(port: number) {
               store.__chatSessions!.delete(wsData.sessionId);
             }
 
+            // Run GC opportunistically
+            runGc();
+
             const sessionId = nextSessionId();
             wsData.sessionId = sessionId;
 
@@ -183,26 +284,81 @@ export function startChatServer(port: number) {
               proc,
               listeners,
               exited: false,
+              exitCode: null,
+              outputBuffer: [],
+              activeWs: ws,
+              exitedAt: null,
             };
             store.__chatSessions!.set(sessionId, session);
 
-            // Forward PTY output to WebSocket
-            const outputListener: DataListener = (data) => {
-              send(ws, { type: "output", data });
+            // Forward PTY output to buffer (raw bytes) + active WebSocket (decoded text)
+            const outputListener: DataListener = (data, rawData) => {
+              session.outputBuffer.push(rawData);
+              session.outputBuffer = trimBuffer(session.outputBuffer);
+              if (session.activeWs) {
+                send(session.activeWs, { type: "output", data });
+              }
             };
             listeners.add(outputListener);
 
             // Track process exit
             proc.exited.then((code) => {
               session.exited = true;
-              send(ws, { type: "exited", code });
-              store.__chatSessions!.delete(sessionId);
+              session.exitCode = code;
+              session.exitedAt = Date.now();
+              if (session.activeWs) {
+                send(session.activeWs, { type: "exited", code });
+              }
             });
 
             send(ws, { type: "started", sessionId });
 
             console.log(
               `[chat-server] Session ${sessionId} started for workspace "${msg.workspaceId}"`,
+            );
+            break;
+          }
+
+          case "resume": {
+            const session = store.__chatSessions!.get(msg.sessionId);
+            if (!session) {
+              send(ws, { type: "error", message: "Session not found" });
+              return;
+            }
+
+            // Update session's active WebSocket
+            session.activeWs = ws;
+            wsData.sessionId = msg.sessionId;
+
+            // Send resumed notification with buffer size
+            send(ws, {
+              type: "resumed",
+              sessionId: session.id,
+              exited: session.exited,
+              exitCode: session.exitCode ?? undefined,
+              bufferedChunks: session.outputBuffer.length,
+            });
+
+            // Replay buffered output — re-decode from raw bytes so multi-byte
+            // UTF-8 characters that were split across chunks are decoded correctly.
+            const replayDecoder = new TextDecoder();
+            for (const chunk of session.outputBuffer) {
+              const text = replayDecoder.decode(chunk, { stream: true });
+              if (text) {
+                send(ws, { type: "output", data: text });
+              }
+            }
+            // Flush any trailing bytes held by the streaming decoder
+            const trailing = replayDecoder.decode();
+            if (trailing) {
+              send(ws, { type: "output", data: trailing });
+            }
+
+            // Signal replay complete
+            send(ws, { type: "replay_done" });
+
+            console.log(
+              `[chat-server] Session ${session.id} resumed (${session.outputBuffer.length} buffered chunks, exited=${session.exited})`,
             );
             break;
           }
@@ -235,6 +391,10 @@ export function startChatServer(port: number) {
             if (session && !session.exited) {
               session.proc.kill();
             }
+            // Explicit kill: remove session entirely
+            if (session) {
+              store.__chatSessions!.delete(session.id);
+            }
             break;
           }
         }
@@ -243,11 +403,13 @@ export function startChatServer(port: number) {
         const wsData = ws.data;
         if (wsData.sessionId) {
           const session = store.__chatSessions!.get(wsData.sessionId);
-          if (session && !session.exited) {
-            session.proc.kill();
+          if (session) {
+            // Detach WebSocket but keep session alive for resume
+            session.activeWs = null;
+            console.log(
+              `[chat-server] WebSocket detached from session ${wsData.sessionId} (process continues)`,
+            );
           }
-          store.__chatSessions!.delete(wsData.sessionId);
-          console.log(`[chat-server] Session ${wsData.sessionId} closed`);
         }
       },
     },
