@@ -14,8 +14,10 @@ const UTILITY_TYPE_PATHS: Partial<Record<OperationType, string>> = {
   "claude-login": "/utilities/claude-auth",
 };
 
-function getViewHref(op: Operation): string {
-  return UTILITY_TYPE_PATHS[op.type] ?? `/workspace/${encodeURIComponent(op.workspace)}/operations`;
+function getViewHref(op: Operation): string | null {
+  if (UTILITY_TYPE_PATHS[op.type]) return UTILITY_TYPE_PATHS[op.type]!;
+  if (!op.workspace) return null;
+  return `/workspace/${encodeURIComponent(op.workspace)}/operations?operationId=${encodeURIComponent(op.id)}`;
 }
 
 function formatRemaining(ms: number): string {
@@ -165,12 +167,18 @@ export default function RunningPage() {
                   {currentPhase && <PhaseExpiration phase={currentPhase} now={now} />}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <Link
-                    href={getViewHref(op)}
-                    className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
-                  >
-                    View
-                  </Link>
+                  {getViewHref(op) ? (
+                    <Link
+                      href={getViewHref(op)!}
+                      className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
+                    >
+                      View
+                    </Link>
+                  ) : (
+                    <span className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground">
+                      View
+                    </span>
+                  )}
                   <button
                     onClick={() => kill(op.id)}
                     className="rounded-md border border-destructive/50 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"

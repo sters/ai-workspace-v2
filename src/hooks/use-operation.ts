@@ -11,14 +11,28 @@ const STORAGE_PREFIX = "aiw-op:";
  *                    When provided, the operation ID is saved so that navigating
  *                    away and returning automatically reconnects to the SSE stream.
  */
-export function useOperation(storageKey?: string) {
+export function useOperation(storageKey?: string, initialOperationId?: string) {
   const [operation, setOperation] = useState<Operation | null>(null);
   const restoredRef = useRef(false);
 
-  // ---------- Restore from localStorage on mount ----------
+  // ---------- Restore from initialOperationId or localStorage on mount ----------
   useEffect(() => {
-    if (!storageKey || restoredRef.current) return;
+    if (restoredRef.current) return;
     restoredRef.current = true;
+
+    // If an explicit operation ID was provided, fetch it from the server
+    if (initialOperationId) {
+      fetch(`/api/operations`)
+        .then((r) => r.json())
+        .then((ops: Operation[]) => {
+          const op = ops.find((o) => o.id === initialOperationId);
+          if (op) setOperation(op);
+        })
+        .catch(() => {});
+      return;
+    }
+
+    if (!storageKey) return;
     try {
       const raw = localStorage.getItem(`${STORAGE_PREFIX}${storageKey}`);
       if (!raw) return;
@@ -30,7 +44,7 @@ export function useOperation(storageKey?: string) {
     } catch (err) {
       console.warn("[use-operation] localStorage restore failed:", err);
     }
-  }, [storageKey]);
+  }, [storageKey, initialOperationId]);
 
   // ---------- SSE ----------
   const { events, connected, error: sseError, notFound: sseNotFound, clear } = useSSE(
