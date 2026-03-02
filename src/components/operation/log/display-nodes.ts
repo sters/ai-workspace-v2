@@ -229,7 +229,7 @@ export function groupByChildLabel(nodes: DisplayNode[]): DisplayNode[] {
 /** Find the latest "ask" entry that doesn't have a subsequent tool_result for the same toolId. */
 export function findPendingAsk(
   entries: LogEntry[]
-): { toolId: string; questions: AskQuestion[] } | null {
+): { toolId: string; questions: AskQuestion[]; allowFreeText: boolean } | null {
   const answeredIds = new Set<string>();
   for (const e of entries) {
     if (e.kind === "tool_result") {
@@ -241,7 +241,7 @@ export function findPendingAsk(
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i];
     if (e.kind === "ask" && !answeredIds.has(e.toolId)) {
-      return { toolId: e.toolId, questions: e.questions };
+      return { toolId: e.toolId, questions: e.questions, allowFreeText: e.allowFreeText ?? true };
     }
   }
 

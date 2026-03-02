@@ -177,6 +177,7 @@ export function OperationLog({
           operationId={operationId}
           toolUseId={pendingAsk.toolId}
           questions={pendingAsk.questions}
+          allowFreeText={pendingAsk.allowFreeText}
         />
       )}
     </div>

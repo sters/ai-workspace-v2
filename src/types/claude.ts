@@ -35,7 +35,7 @@ export type LogEntry = LogEntryBase &
     | { kind: "thinking"; content: string }
     | { kind: "tool_call"; toolName: string; toolId: string; summary: string }
     | { kind: "tool_result"; toolId: string; content: string; isError: boolean }
-    | { kind: "ask"; toolId: string; questions: AskQuestion[] }
+    | { kind: "ask"; toolId: string; questions: AskQuestion[]; allowFreeText?: boolean }
     | { kind: "result"; content: string; cost?: string; duration?: string }
     | {
         kind: "system";
