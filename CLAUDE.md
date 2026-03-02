@@ -41,7 +41,7 @@ The app runs on port 3741. Set `AI_WORKSPACE_ROOT` env var to point to the ai-wo
 
 ## Architecture
 
-**Next.js 15 App Router** with React 19, TypeScript strict mode, Tailwind CSS 3, and SWR for data fetching.
+**Next.js 16 App Router** with React 19, TypeScript strict mode, Tailwind CSS 3, and SWR for data fetching.
 
 ### Server-side: Reading workspace state from disk
 
@@ -128,8 +128,8 @@ Uses Tailwind with a shadcn/ui-style CSS variable theme system (`hsl(var(--prima
 - Path alias: `@/*` maps to `./src/*` (configured in `tsconfig.json`).
 - Types live in `src/types/` — `operation.ts` (Operation, OperationEvent, OperationType, OperationPhaseInfo), `workspace.ts` (TodoItem, TodoFile, WorkspaceMeta, WorkspaceSummary, WorkspaceDetail, ReviewSession, HistoryEntry), `claude.ts` (ClaudeProcess, RunClaudeOptions, LogEntry types), `pipeline.ts` (PipelinePhase, PhaseFunctionContext), `prompts.ts` (prompt input interfaces), `pty.ts` (DataListener).
 - `bin/start.mjs` is the CLI entry point. Resolves `AI_WORKSPACE_ROOT` from args/env/cwd, validates workspace directory exists, then spawns `bun run dev` or `bun run start`.
-- `NEXT_PUBLIC_GIT_HASH` is injected at build time by `next.config.mjs` for display in the sidebar.
-- ESLint uses flat config (`eslint.config.mjs`) with typescript-eslint. Unused vars must be prefixed with `_` (both args and vars).
+- `NEXT_PUBLIC_GIT_HASH` is injected at build time by `next.config.ts` for display in the sidebar.
+- ESLint uses flat config (`eslint.config.ts`) with typescript-eslint. Unused vars must be prefixed with `_` (both args and vars).
 
 ## Testing
 
