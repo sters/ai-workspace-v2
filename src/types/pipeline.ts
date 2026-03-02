@@ -32,7 +32,7 @@ export interface PhaseFunctionContext {
   /** Emit a result message that will be displayed outside the collapsible log. */
   emitResult: (message: string) => void;
   /** Ask the user a question and wait for their answer. Returns the answers keyed by question text. */
-  emitAsk: (questions: AskQuestion[]) => Promise<Record<string, string>>;
+  emitAsk: (questions: AskQuestion[], options?: { allowFreeText?: boolean }) => Promise<Record<string, string>>;
   /** Update the operation's workspace identifier. Notifies the FE via a special event. */
   setWorkspace: (workspace: string) => void;
   /** Run a single Claude child query and wait for completion. */

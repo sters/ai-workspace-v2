@@ -369,7 +369,7 @@ export function startOperationPipeline(
               managed.operation.workspace = ws;
               emitStatus(managed, `__setWorkspace:${ws}`, phaseExtra);
             },
-            emitAsk: (questions) => {
+            emitAsk: (questions, askOptions) => {
               const toolUseId = `fn-ask-${id}-${i}-${childCounter++}`;
               // Emit an ask event that the UI will render
               emitEvent(managed, {
@@ -388,6 +388,7 @@ export function startOperationPipeline(
                           options: q.options,
                           multiSelect: q.multiSelect ?? false,
                         })),
+                        allowFreeText: askOptions?.allowFreeText ?? false,
                       },
                     }],
                   },

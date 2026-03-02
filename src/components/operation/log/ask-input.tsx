@@ -7,10 +7,12 @@ export function AskInput({
   operationId,
   toolUseId,
   questions,
+  allowFreeText = true,
 }: {
   operationId: string;
   toolUseId: string;
   questions: AskQuestion[];
+  allowFreeText?: boolean;
 }) {
   const [value, setValue] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -144,24 +146,26 @@ export function AskInput({
         </div>
       ))}
 
-      <form onSubmit={handleFreeText} className="flex gap-2">
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Type a response..."
-          disabled={submitting}
-          className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm disabled:opacity-50"
-          autoFocus
-        />
-        <button
-          type="submit"
-          disabled={!value.trim() || submitting}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          Send
-        </button>
-      </form>
+      {allowFreeText && (
+        <form onSubmit={handleFreeText} className="flex gap-2">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Type a response..."
+            disabled={submitting}
+            className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm disabled:opacity-50"
+            autoFocus
+          />
+          <button
+            type="submit"
+            disabled={!value.trim() || submitting}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            Send
+          </button>
+        </form>
+      )}
     </div>
   );
 }

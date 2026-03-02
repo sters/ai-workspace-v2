@@ -85,6 +85,7 @@ export function parseStreamEvent(raw: string): LogEntry[] {
                 multiSelect: q.multiSelect ?? false,
               })
             ),
+            allowFreeText: block.input.allowFreeText ?? true,
             parentToolUseId: parentId,
           });
         } else {
