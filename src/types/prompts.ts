@@ -98,4 +98,5 @@ export interface CreateTodoPlannerInput extends RepoPromptInput {
   readmeContent: string;
   reviewDir: string;
   taskType: string;
+  instruction?: string;
 }

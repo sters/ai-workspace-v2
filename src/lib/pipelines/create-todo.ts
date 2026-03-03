@@ -12,6 +12,7 @@ import { buildReviewTodosPhase } from "./actions/review-todos";
 export function buildCreateTodoPipeline(
   workspace: string,
   reviewTimestamp: string,
+  instruction?: string,
 ): PipelinePhase[] {
   const wsPath = path.join(WORKSPACE_DIR, workspace);
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);
@@ -41,6 +42,7 @@ export function buildCreateTodoPipeline(
             worktreePath: repo.worktreePath,
             reviewDir,
             taskType: meta.taskType,
+            instruction,
           }),
         }));
 
