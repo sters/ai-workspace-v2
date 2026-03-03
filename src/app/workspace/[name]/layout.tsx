@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, use, useEffect, useState, useCallback } from "react";
+import { Suspense, use, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -8,13 +8,13 @@ import { ProgressBar } from "@/components/shared/progress-bar";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { OperationPanel } from "@/components/workspace/operation-panel";
 import { cn } from "@/lib/utils";
-import type { OperationType } from "@/types/operation";
 
 const TABS = [
   { label: "Overview", segment: "" },
   { label: "TODOs", segment: "todo" },
   { label: "Reviews", segment: "review" },
   { label: "History", segment: "history" },
+  { label: "Operations", segment: "operations" },
   { label: "Chat", segment: "chat" },
 ] as const;
 
@@ -56,36 +56,25 @@ function WorkspaceLayoutContent({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [autoAction, setAutoAction] = useState<OperationType | undefined>();
-  const [autoActionExtra, setAutoActionExtra] = useState<Record<string, string> | undefined>();
-  const [initialOperationId, setInitialOperationId] = useState<string | undefined>();
 
-  // Parse ?action= and ?operationId= search params
+  // Redirect ?action= and ?operationId= to the Operations tab
   useEffect(() => {
     const action = searchParams.get("action");
     const opId = searchParams.get("operationId");
 
     if (opId) {
-      setInitialOperationId(opId);
-      router.replace(pathname, { scroll: false });
+      router.replace(`/workspace/${name}/operations?operationId=${encodeURIComponent(opId)}`, { scroll: false });
     } else if (action && VALID_AUTO_ACTIONS.has(action)) {
-      setAutoAction(action as OperationType);
+      const params = new URLSearchParams({ action });
       if (action === "batch") {
-        const extra: Record<string, string> = {};
         for (const key of ["startWith", "mode", "instruction", "draft"]) {
           const val = searchParams.get(key);
-          if (val) extra[key] = val;
+          if (val) params.set(key, val);
         }
-        setAutoActionExtra(extra);
       }
-      router.replace(pathname, { scroll: false });
+      router.replace(`/workspace/${name}/operations?${params.toString()}`, { scroll: false });
     }
-  }, [searchParams, router, pathname]);
-
-  const handleAutoActionConsumed = useCallback(() => {
-    setAutoAction(undefined);
-    setAutoActionExtra(undefined);
-  }, []);
+  }, [searchParams, router, name]);
 
   // Redirect to dashboard when workspace disappears (e.g. after deletion)
   useEffect(() => {
@@ -161,12 +150,9 @@ function WorkspaceLayoutContent({
       {/* Operations */}
       <div className="mb-6">
         <OperationPanel
+          workspaceName={decodedName}
           workspacePath={workspace.path}
           repositories={workspace.meta.repositories}
-          autoAction={autoAction}
-          autoActionExtra={autoActionExtra}
-          onAutoActionConsumed={handleAutoActionConsumed}
-          initialOperationId={initialOperationId}
         />
       </div>
 

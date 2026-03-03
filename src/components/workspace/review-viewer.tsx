@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import type { ReviewSession } from "@/types/workspace";
 import { useReviewDetail } from "@/hooks/use-workspace";
 import { MarkdownRenderer } from "../shared/markdown-renderer";
-import { ClaudeOperation } from "../operation/claude-operation";
+import { useRunningOperations } from "@/hooks/use-running-operations";
 
 export function ReviewViewer({
   workspaceName,
@@ -24,6 +25,28 @@ export function ReviewViewer({
   const { summary, files, isLoading } = useReviewDetail(
     workspaceName,
     selected
+  );
+  const router = useRouter();
+  const { isWorkspaceRunning } = useRunningOperations();
+  const isRunning = isWorkspaceRunning(workspaceName);
+
+  const startAndNavigate = useCallback(
+    async (body: Record<string, string>) => {
+      const res = await fetch("/api/operations/create-todo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        console.error("Failed to start operation:", await res.text());
+        return;
+      }
+      const op = await res.json();
+      router.push(
+        `/workspace/${encodeURIComponent(workspaceName)}/operations?operationId=${encodeURIComponent(op.id)}`
+      );
+    },
+    [router, workspaceName]
   );
 
   if (reviews.length === 0) {
@@ -60,42 +83,34 @@ export function ReviewViewer({
 
       {selected && (
         <div className="space-y-4">
-          <ClaudeOperation
-            storageKey={`review-todo:${workspacePath}:${selected}`}
-            workspace={workspacePath}
-            vertical
-          >
-            {({ start, isRunning }) => (
-              <div className="rounded-lg border border-dashed p-4">
-                <h3 className="mb-2 text-sm font-medium">Create TODO</h3>
-                <div className="space-y-2">
-                  <textarea
-                    value={instruction}
-                    onChange={(e) => setInstruction(e.target.value)}
-                    placeholder="e.g. Focus on security issues only (leave empty for all)"
-                    disabled={isRunning}
-                    rows={2}
-                    className="w-full min-h-[2lh] resize-y rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground disabled:opacity-50"
-                  />
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() =>
-                        start("create-todo", {
-                          workspace: workspacePath,
-                          reviewTimestamp: selected,
-                          ...(instruction.trim() && { instruction: instruction.trim() }),
-                        })
-                      }
-                      disabled={isRunning}
-                      className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                    >
-                      Create TODO
-                    </button>
-                  </div>
-                </div>
+          <div className="rounded-lg border border-dashed p-4">
+            <h3 className="mb-2 text-sm font-medium">Create TODO</h3>
+            <div className="space-y-2">
+              <textarea
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                placeholder="e.g. Focus on security issues only (leave empty for all)"
+                disabled={isRunning}
+                rows={2}
+                className="w-full min-h-[2lh] resize-y rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground disabled:opacity-50"
+              />
+              <div className="flex justify-end">
+                <button
+                  onClick={() =>
+                    startAndNavigate({
+                      workspace: workspacePath,
+                      reviewTimestamp: selected,
+                      ...(instruction.trim() && { instruction: instruction.trim() }),
+                    })
+                  }
+                  disabled={isRunning}
+                  className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                >
+                  Create TODO
+                </button>
               </div>
-            )}
-          </ClaudeOperation>
+            </div>
+          </div>
 
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading...</p>

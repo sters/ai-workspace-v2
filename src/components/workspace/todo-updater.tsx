@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { TodoFile } from "@/types/workspace";
 import { TodoItemRow } from "./todo-item";
 import { SectionBlock } from "./todo-viewer";
 import { ProgressBar } from "../shared/progress-bar";
-import { ClaudeOperation } from "../operation/claude-operation";
 import { SplitButton, type SplitButtonItem } from "../shared/split-button";
+import { useRunningOperations } from "@/hooks/use-running-operations";
 import type { OperationType } from "@/types/operation";
 
 function UpdateForm({
@@ -72,81 +73,17 @@ function UpdateForm({
   );
 }
 
-/**
- * Inline operation form: renders both the input form and the operation log
- * directly below it, using its own independent ClaudeOperation state.
- */
-function InlineOperationForm({
-  storageKey,
-  label,
-  placeholder,
-  disabled,
-  onRunningChange,
-  onSubmitBody,
-  workspace,
-  batchItems,
-}: {
-  storageKey: string;
-  label: string;
-  placeholder: string;
-  disabled: boolean;
-  onRunningChange: (running: boolean) => void;
-  onSubmitBody: (instruction: string) => Record<string, string>;
-  workspace?: string;
-  /** When provided, renders a SplitButton with batch dropdown items. */
-  batchItems?: (
-    start: (type: OperationType, body: Record<string, string>) => void,
-    instruction: string,
-  ) => SplitButtonItem[];
-}) {
-  return (
-    <ClaudeOperation
-      storageKey={storageKey}
-      vertical
-      onRunningChange={onRunningChange}
-      workspace={workspace}
-      navigateNextActions
-    >
-      {(ctx) => (
-        <UpdateForm
-          label={label}
-          placeholder={placeholder}
-          disabled={disabled || ctx.isRunning}
-          onSubmit={(instruction) => {
-            ctx.start("update-todo", onSubmitBody(instruction));
-          }}
-          batchItems={
-            batchItems
-              ? (instruction) => batchItems(
-                  (type, body) => ctx.start(type, body),
-                  instruction,
-                )
-              : undefined
-          }
-        />
-      )}
-    </ClaudeOperation>
-  );
-}
-
 function RepoTodoCard({
   todo,
   workspacePath,
-  workspaceName,
   disabled,
-  onRunningChange,
+  onStartAndNavigate,
 }: {
   todo: TodoFile;
   workspacePath: string;
-  workspaceName: string;
   disabled: boolean;
-  onRunningChange: (key: string, running: boolean) => void;
+  onStartAndNavigate: (type: OperationType, body: Record<string, string>) => void;
 }) {
-  const handleRunningChange = useCallback(
-    (running: boolean) => onRunningChange(todo.repoName, running),
-    [onRunningChange, todo.repoName]
-  );
-
   return (
     <div className="rounded-lg border p-4">
       <div className="mb-3 flex items-center justify-between">
@@ -168,23 +105,22 @@ function RepoTodoCard({
       <ProgressBar value={todo.progress} className="mb-3" />
 
       <div className="mb-3">
-        <InlineOperationForm
-          storageKey={`workspace-todo-repo:${workspaceName}:${todo.repoName}`}
+        <UpdateForm
           label="Update"
           placeholder={`Update TODOs for ${todo.repoName}...`}
           disabled={disabled}
-          onRunningChange={handleRunningChange}
-          workspace={workspacePath}
-          onSubmitBody={(instruction) => ({
-            workspace: workspacePath,
-            instruction,
-            repo: todo.repoName,
-          })}
-          batchItems={(start, instruction) => [
+          onSubmit={(instruction) => {
+            onStartAndNavigate("update-todo", {
+              workspace: workspacePath,
+              instruction,
+              repo: todo.repoName,
+            });
+          }}
+          batchItems={(instruction) => [
             {
               label: "Update \u2192 Execute \u2192 Review",
               onClick: () =>
-                start("batch", {
+                onStartAndNavigate("batch", {
                   startWith: "update-todo",
                   mode: "execute-review",
                   workspace: workspacePath,
@@ -194,7 +130,7 @@ function RepoTodoCard({
             {
               label: "Update \u2192 Execute \u2192 PR",
               onClick: () =>
-                start("batch", {
+                onStartAndNavigate("batch", {
                   startWith: "update-todo",
                   mode: "execute-pr",
                   workspace: workspacePath,
@@ -204,7 +140,7 @@ function RepoTodoCard({
             {
               label: "Update \u2192 Execute \u2192 Review \u2192 PR (gated)",
               onClick: () =>
-                start("batch", {
+                onStartAndNavigate("batch", {
                   startWith: "update-todo",
                   mode: "execute-review-pr-gated",
                   workspace: workspacePath,
@@ -214,7 +150,7 @@ function RepoTodoCard({
             {
               label: "Update \u2192 Execute \u2192 Review \u2192 PR",
               onClick: () =>
-                start("batch", {
+                onStartAndNavigate("batch", {
                   startWith: "update-todo",
                   mode: "execute-review-pr",
                   workspace: workspacePath,
@@ -245,31 +181,27 @@ export function TodoUpdater({
   workspacePath: string;
   workspaceName: string;
 }) {
-  // Track which operations are currently running.
-  // "workspace" key = workspace-wide operation; repo names = per-repo operations.
-  const [runningOps, setRunningOps] = useState<Set<string>>(new Set());
+  const router = useRouter();
+  const { isWorkspaceRunning } = useRunningOperations();
+  const isRunning = isWorkspaceRunning(workspaceName);
 
-  const updateRunning = useCallback((key: string, running: boolean) => {
-    setRunningOps((prev) => {
-      const next = new Set(prev);
-      if (running) {
-        next.add(key);
-      } else {
-        next.delete(key);
+  const startAndNavigate = useCallback(
+    async (type: OperationType, body: Record<string, string>) => {
+      const res = await fetch(`/api/operations/${type}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        console.error("Failed to start operation:", await res.text());
+        return;
       }
-      return next;
-    });
-  }, []);
-
-  const handleWorkspaceRunningChange = useCallback(
-    (running: boolean) => updateRunning("workspace", running),
-    [updateRunning]
-  );
-
-  const workspaceWideRunning = runningOps.has("workspace");
-  const anyRepoRunning = useMemo(
-    () => Array.from(runningOps).some((k) => k !== "workspace"),
-    [runningOps]
+      const op = await res.json();
+      router.push(
+        `/workspace/${encodeURIComponent(workspaceName)}/operations?operationId=${encodeURIComponent(op.id)}`
+      );
+    },
+    [router, workspaceName]
   );
 
   if (todos.length === 0) {
@@ -283,22 +215,21 @@ export function TodoUpdater({
       {/* Workspace-wide update form */}
       <div className="rounded-lg border border-dashed p-4">
         <p className="mb-2 text-sm font-medium">Update workspace TODOs</p>
-        <InlineOperationForm
-          storageKey={`workspace-todo-all:${workspaceName}`}
+        <UpdateForm
           label="Update"
           placeholder="Describe TODO changes to apply across all repositories..."
-          disabled={anyRepoRunning}
-          onRunningChange={handleWorkspaceRunningChange}
-          workspace={workspacePath}
-          onSubmitBody={(instruction) => ({
-            workspace: workspacePath,
-            instruction,
-          })}
-          batchItems={(start, instruction) => [
+          disabled={isRunning}
+          onSubmit={(instruction) => {
+            startAndNavigate("update-todo", {
+              workspace: workspacePath,
+              instruction,
+            });
+          }}
+          batchItems={(instruction) => [
             {
               label: "Update \u2192 Execute \u2192 Review",
               onClick: () =>
-                start("batch", {
+                startAndNavigate("batch", {
                   startWith: "update-todo",
                   mode: "execute-review",
                   workspace: workspacePath,
@@ -308,7 +239,7 @@ export function TodoUpdater({
             {
               label: "Update \u2192 Execute \u2192 PR",
               onClick: () =>
-                start("batch", {
+                startAndNavigate("batch", {
                   startWith: "update-todo",
                   mode: "execute-pr",
                   workspace: workspacePath,
@@ -318,7 +249,7 @@ export function TodoUpdater({
             {
               label: "Update \u2192 Execute \u2192 Review \u2192 PR (gated)",
               onClick: () =>
-                start("batch", {
+                startAndNavigate("batch", {
                   startWith: "update-todo",
                   mode: "execute-review-pr-gated",
                   workspace: workspacePath,
@@ -328,7 +259,7 @@ export function TodoUpdater({
             {
               label: "Update \u2192 Execute \u2192 Review \u2192 PR",
               onClick: () =>
-                start("batch", {
+                startAndNavigate("batch", {
                   startWith: "update-todo",
                   mode: "execute-review-pr",
                   workspace: workspacePath,
@@ -345,9 +276,8 @@ export function TodoUpdater({
           key={todo.filename}
           todo={todo}
           workspacePath={workspacePath}
-          workspaceName={workspaceName}
-          disabled={workspaceWideRunning}
-          onRunningChange={updateRunning}
+          disabled={isRunning}
+          onStartAndNavigate={startAndNavigate}
         />
       ))}
     </div>

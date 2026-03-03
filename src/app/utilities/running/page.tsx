@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 import useSWR from "swr";
-import type { Operation, OperationPhaseInfo, OperationType } from "@/types/operation";
+import type { Operation, OperationType } from "@/types/operation";
 import type { ChatSessionInfo } from "@/types/chat";
+import { OperationSummary, useNow } from "@/components/operation/operation-summary";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -17,64 +18,7 @@ const UTILITY_TYPE_PATHS: Partial<Record<OperationType, string>> = {
 function getViewHref(op: Operation): string | null {
   if (UTILITY_TYPE_PATHS[op.type]) return UTILITY_TYPE_PATHS[op.type]!;
   if (!op.workspace) return null;
-  return `/workspace/${encodeURIComponent(op.workspace)}?operationId=${encodeURIComponent(op.id)}`;
-}
-
-function formatRemaining(ms: number): string {
-  if (ms <= 0) return "expired";
-  const totalSec = Math.floor(ms / 1000);
-  const min = Math.floor(totalSec / 60);
-  const sec = totalSec % 60;
-  if (min > 0) return `${min}m ${sec}s`;
-  return `${sec}s`;
-}
-
-function useNow(intervalMs: number) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-  return now;
-}
-
-function PhaseExpiration({ phase, now }: { phase: OperationPhaseInfo; now: number }) {
-  if (!phase.timeoutMs || !phase.startedAt) return null;
-
-  const elapsed = now - new Date(phase.startedAt).getTime();
-  const remaining = phase.timeoutMs - elapsed;
-  const pct = Math.max(0, Math.min(100, (elapsed / phase.timeoutMs) * 100));
-  const isExpired = remaining <= 0;
-  const isWarning = !isExpired && remaining < 60_000;
-
-  return (
-    <div className="mt-1.5 flex items-center gap-2 text-xs">
-      <span className="text-muted-foreground">Timeout:</span>
-      <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-        <div
-          className={`h-full rounded-full transition-all ${
-            isExpired
-              ? "bg-destructive"
-              : isWarning
-                ? "bg-yellow-500"
-                : "bg-primary"
-          }`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span
-        className={
-          isExpired
-            ? "font-medium text-destructive"
-            : isWarning
-              ? "text-yellow-600"
-              : "text-muted-foreground"
-        }
-      >
-        {formatRemaining(remaining)} remaining
-      </span>
-    </div>
-  );
+  return `/workspace/${encodeURIComponent(op.workspace)}/operations?operationId=${encodeURIComponent(op.id)}`;
 }
 
 export default function RunningPage() {
@@ -140,55 +84,34 @@ export default function RunningPage() {
 
       {running.length > 0 && (
         <div className="grid gap-3">
-          {running.map((op) => {
-            const currentPhase = op.phases?.find(
-              (p) => p.status === "running"
-            );
-            return (
-              <div
-                key={op.id}
-                className="flex items-center justify-between rounded-lg border p-4"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{op.type}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {op.workspace}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Started {new Date(op.startedAt).toLocaleString()}
-                    {currentPhase && (
-                      <span className="ml-2">
-                        — Phase: {currentPhase.label}
-                      </span>
-                    )}
-                  </div>
-                  {currentPhase && <PhaseExpiration phase={currentPhase} now={now} />}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {getViewHref(op) ? (
-                    <Link
-                      href={getViewHref(op)!}
-                      className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
-                    >
-                      View
-                    </Link>
-                  ) : (
-                    <span className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground">
-                      View
-                    </span>
-                  )}
-                  <button
-                    onClick={() => kill(op.id)}
-                    className="rounded-md border border-destructive/50 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
+          {running.map((op) => (
+            <div
+              key={op.id}
+              className="flex items-center justify-between rounded-lg border p-4"
+            >
+              <OperationSummary operation={op} now={now} />
+              <div className="flex shrink-0 items-center gap-2">
+                {getViewHref(op) ? (
+                  <Link
+                    href={getViewHref(op)!}
+                    className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
                   >
-                    Cancel
-                  </button>
-                </div>
+                    View
+                  </Link>
+                ) : (
+                  <span className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground">
+                    View
+                  </span>
+                )}
+                <button
+                  onClick={() => kill(op.id)}
+                  className="rounded-md border border-destructive/50 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
+                >
+                  Cancel
+                </button>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       )}
 

@@ -74,6 +74,8 @@ export function ClaudeOperation({
     operation.status === "completed" &&
     !effectiveRunning;
 
+  const isDone = !effectiveRunning && operation && (operation.status === "completed" || operation.status === "failed");
+
   const statusBlock = operation && (
     <div className="flex items-center gap-2">
       <StatusBadge label={operation.status} variant={operation.status} />
@@ -85,12 +87,26 @@ export function ClaudeOperation({
           Cancel
         </button>
       ) : (
-        <button
-          onClick={reset}
-          className="text-xs text-muted-foreground underline hover:text-foreground"
-        >
-          Clear
-        </button>
+        <>
+          {isDone && operation.type !== "delete" && (
+            <button
+              onClick={() =>
+                handleStart(operation.type, {
+                  workspace: operation.workspace,
+                })
+              }
+              className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent"
+            >
+              Retry
+            </button>
+          )}
+          <button
+            onClick={reset}
+            className="text-xs text-muted-foreground underline hover:text-foreground"
+          >
+            Clear
+          </button>
+        </>
       )}
     </div>
   );
