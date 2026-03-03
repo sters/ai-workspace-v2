@@ -15,6 +15,7 @@ import {
   buildCollectorPrompt,
 } from "@/lib/templates";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
+import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
 
 export async function buildReviewPipeline(input: {
   workspace: string;
@@ -93,6 +94,7 @@ export async function buildReviewPipeline(input: {
     {
       kind: "function",
       label: "Collect review results",
+      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
       fn: async (ctx) => {
         // List actual review/verify files using Bun.Glob
         const reviewGlob = new Bun.Glob("REVIEW-*");

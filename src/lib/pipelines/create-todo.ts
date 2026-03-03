@@ -4,6 +4,7 @@ import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildCreateTodoFromReviewPrompt } from "@/lib/templates";
 import { WORKSPACE_DIR } from "@/lib/config";
 import type { PipelinePhase } from "@/types/pipeline";
+import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
 import { buildCommitSnapshotPhase } from "./actions/commit-snapshot";
 import { buildCoordinateTodosPhase } from "./actions/coordinate-todos";
 import { buildReviewTodosPhase } from "./actions/review-todos";
@@ -20,6 +21,7 @@ export function buildCreateTodoPipeline(
     {
       kind: "function",
       label: "Plan TODO from review",
+      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
       fn: async (ctx) => {
         const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
         const repos = listWorkspaceRepos(workspace);
@@ -56,6 +58,7 @@ export function buildCreateTodoPipeline(
     {
       kind: "function",
       label: "Coordinate TODOs",
+      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
       fn: (ctx) => {
         const repos = listWorkspaceRepos(workspace);
         return buildCoordinateTodosPhase({
@@ -69,6 +72,7 @@ export function buildCreateTodoPipeline(
     {
       kind: "function",
       label: "Review TODOs",
+      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
       fn: (ctx) => {
         const repos = listWorkspaceRepos(workspace);
         return buildReviewTodosPhase({

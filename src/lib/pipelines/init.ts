@@ -17,6 +17,7 @@ import {
   buildPlannerPrompt,
 } from "@/lib/templates";
 import type { PipelinePhase } from "@/types/pipeline";
+import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
 import { buildCommitSnapshotPhase } from "./actions/commit-snapshot";
 import { buildCoordinateTodosPhase } from "./actions/coordinate-todos";
 import { buildReviewTodosPhase } from "./actions/review-todos";
@@ -33,6 +34,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
     {
       kind: "function",
       label: "Analyze & draft README",
+      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
       fn: async (ctx) => {
         // Build README template content to include in the prompt
         const today = new Date().toISOString().slice(0, 10);
@@ -150,6 +152,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
     {
       kind: "function",
       label: "Plan TODO items",
+      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
       fn: async (ctx) => {
         const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
 
@@ -185,6 +188,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
     {
       kind: "function",
       label: "Coordinate TODOs",
+      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
       fn: (ctx) => buildCoordinateTodosPhase({
         workspace: wsName,
         wsPath,
@@ -195,6 +199,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
     {
       kind: "function",
       label: "Review TODOs",
+      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
       fn: (ctx) => buildReviewTodosPhase({
         workspace: wsName,
         wsPath,
