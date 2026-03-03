@@ -1,3 +1,4 @@
+import { unlinkSync, existsSync } from "node:fs";
 import path from "node:path";
 import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import {
@@ -179,6 +180,12 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
         ctx.emitStatus(
           `Planning complete: ${results.filter(Boolean).length}/${results.length} succeeded`,
         );
+
+        // Remove the template file now that planning is done
+        const templatePath = path.join(wsPath, "TODO-template.md");
+        if (existsSync(templatePath)) {
+          unlinkSync(templatePath);
+        }
 
         return allSuccess;
       },
