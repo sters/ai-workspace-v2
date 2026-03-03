@@ -146,7 +146,7 @@ export function NextActionSuggestions({
           if (key !== "workspace") params.set(key, val);
         }
       }
-      router.push(`${basePath}/operations?${params.toString()}`);
+      router.push(`${basePath}?${params.toString()}`);
     } else {
       onStart(action.type, action.body);
     }

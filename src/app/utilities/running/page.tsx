@@ -17,7 +17,7 @@ const UTILITY_TYPE_PATHS: Partial<Record<OperationType, string>> = {
 function getViewHref(op: Operation): string | null {
   if (UTILITY_TYPE_PATHS[op.type]) return UTILITY_TYPE_PATHS[op.type]!;
   if (!op.workspace) return null;
-  return `/workspace/${encodeURIComponent(op.workspace)}/operations?operationId=${encodeURIComponent(op.id)}`;
+  return `/workspace/${encodeURIComponent(op.workspace)}?operationId=${encodeURIComponent(op.id)}`;
 }
 
 function formatRemaining(ms: number): string {
