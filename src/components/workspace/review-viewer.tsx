@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { MessageSquare } from "lucide-react";
 import type { ReviewSession } from "@/types/workspace";
 import { useReviewDetail } from "@/hooks/use-workspace";
 import { MarkdownRenderer } from "../shared/markdown-renderer";
@@ -99,7 +101,20 @@ export function ReviewViewer({
             <p className="text-sm text-muted-foreground">Loading...</p>
           ) : (
             <>
-              {summary && <MarkdownRenderer content={summary} />}
+              {summary && (
+                <div>
+                  <div className="mb-2 flex items-center justify-end">
+                    <Link
+                      href={`/workspace/${encodeURIComponent(workspaceName)}/chat?reviewTimestamp=${selected}`}
+                      className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      Chat about this
+                    </Link>
+                  </div>
+                  <MarkdownRenderer content={summary} />
+                </div>
+              )}
               {files && files.length > 0 && (
                 <div className="space-y-4">
                   {files.map((f) => (

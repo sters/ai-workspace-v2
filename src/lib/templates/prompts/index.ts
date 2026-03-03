@@ -9,5 +9,5 @@ export { buildResearcherPrompt } from "./researcher";
 export { buildUpdaterPrompt } from "./updater";
 export { buildCollectorPrompt } from "./collector";
 export { buildInitAnalyzeAndReadmePrompt, INIT_ANALYSIS_SCHEMA } from "./init-readme";
-export { buildInitPrompt } from "./chat";
+export { buildInitPrompt, buildReviewChatPrompt } from "./chat";
 export { buildCreateTodoFromReviewPrompt } from "./create-todo-planner";

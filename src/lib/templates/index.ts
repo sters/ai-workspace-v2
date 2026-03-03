@@ -18,5 +18,6 @@ export {
   buildInitAnalyzeAndReadmePrompt,
   INIT_ANALYSIS_SCHEMA,
   buildInitPrompt,
+  buildReviewChatPrompt,
   buildCreateTodoFromReviewPrompt,
 } from "./prompts";

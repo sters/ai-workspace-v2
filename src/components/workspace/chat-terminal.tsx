@@ -132,11 +132,17 @@ async function initTerminal(container: HTMLElement): Promise<TerminalBundle> {
 // ChatTerminal component
 // ---------------------------------------------------------------------------
 
-export function ChatTerminal({ workspaceId }: { workspaceId: string }) {
+export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { workspaceId: string; initialPrompt?: string; reviewTimestamp?: string }) {
   const termRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<SessionState>("idle");
   const [exitCode, setExitCode] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Keep latest props in refs so async callbacks always read current values
+  const initialPromptRef = useRef(initialPrompt);
+  initialPromptRef.current = initialPrompt;
+  const reviewTimestampRef = useRef(reviewTimestamp);
+  reviewTimestampRef.current = reviewTimestamp;
 
   // Refs for xterm and websocket (survive re-renders)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -182,11 +188,20 @@ export function ChatTerminal({ workspaceId }: { workspaceId: string }) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Auto-resume on mount if localStorage has a saved session
+  // Auto-resume on mount if localStorage has a saved session,
+  // or auto-start if initialPrompt/reviewTimestamp is provided.
+  // When reviewTimestamp is set, always start a fresh session (skip resume).
   useEffect(() => {
-    const savedSessionId = loadChatSession(workspaceId);
-    if (savedSessionId && stateRef.current === "idle") {
-      resumeSession(savedSessionId);
+    if (stateRef.current !== "idle") return;
+    if (initialPromptRef.current || reviewTimestampRef.current) {
+      // Custom prompt requested — start a fresh session regardless of saved state
+      clearChatSession(workspaceId);
+      startSession();
+    } else {
+      const savedSessionId = loadChatSession(workspaceId);
+      if (savedSessionId) {
+        resumeSession(savedSessionId);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
@@ -310,7 +325,9 @@ export function ChatTerminal({ workspaceId }: { workspaceId: string }) {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "start", workspaceId }));
+      const prompt = initialPromptRef.current;
+      const review = reviewTimestampRef.current;
+      ws.send(JSON.stringify({ type: "start", workspaceId, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }) }));
     };
 
     ws.onmessage = (event) => {
