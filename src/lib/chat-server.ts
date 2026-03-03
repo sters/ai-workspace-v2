@@ -10,7 +10,7 @@
 import path from "node:path";
 import { spawnClaudeTerminal } from "./claude/cli";
 import type { DataListener, TerminalSubprocess } from "@/types/pty";
-import { buildInitPrompt } from "@/lib/templates";
+import { buildInitPrompt, buildReviewChatPrompt } from "@/lib/templates";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -129,6 +129,8 @@ function getWorkspaceRoot(): string {
 interface StartMessage {
   type: "start";
   workspaceId: string;
+  initialPrompt?: string;
+  reviewTimestamp?: string;
 }
 
 interface InputMessage {
@@ -282,7 +284,10 @@ export function startChatServer(port: number) {
             const root = getWorkspaceRoot();
             const workspacePath = path.join(root, "workspace", msg.workspaceId);
 
-            const initPrompt = buildInitPrompt(msg.workspaceId, workspacePath);
+            const initPrompt = msg.initialPrompt
+              || (msg.reviewTimestamp
+                ? buildReviewChatPrompt(msg.workspaceId, workspacePath, msg.reviewTimestamp)
+                : buildInitPrompt(msg.workspaceId, workspacePath));
 
             let proc: TerminalSubprocess;
             try {
