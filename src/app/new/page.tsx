@@ -111,7 +111,7 @@ function InitNextActions({ workspace }: { workspace: string }) {
         <SplitButton
           label="Execute"
           onClick={() =>
-            router.push(`/workspace/${wsEncoded}/operations?action=execute`)
+            router.push(`/workspace/${wsEncoded}?action=execute`)
           }
           className="rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           items={[
@@ -119,28 +119,28 @@ function InitNextActions({ workspace }: { workspace: string }) {
               label: "Execute \u2192 Review",
               onClick: () =>
                 router.push(
-                  `/workspace/${wsEncoded}/operations?action=batch&startWith=execute&mode=execute-review`,
+                  `/workspace/${wsEncoded}?action=batch&startWith=execute&mode=execute-review`,
                 ),
             },
             {
               label: "Execute \u2192 PR",
               onClick: () =>
                 router.push(
-                  `/workspace/${wsEncoded}/operations?action=batch&startWith=execute&mode=execute-pr`,
+                  `/workspace/${wsEncoded}?action=batch&startWith=execute&mode=execute-pr`,
                 ),
             },
             {
               label: "Execute \u2192 Review \u2192 PR (gated)",
               onClick: () =>
                 router.push(
-                  `/workspace/${wsEncoded}/operations?action=batch&startWith=execute&mode=execute-review-pr-gated`,
+                  `/workspace/${wsEncoded}?action=batch&startWith=execute&mode=execute-review-pr-gated`,
                 ),
             },
             {
               label: "Execute \u2192 Review \u2192 PR",
               onClick: () =>
                 router.push(
-                  `/workspace/${wsEncoded}/operations?action=batch&startWith=execute&mode=execute-review-pr`,
+                  `/workspace/${wsEncoded}?action=batch&startWith=execute&mode=execute-review-pr`,
                 ),
             },
           ]}
