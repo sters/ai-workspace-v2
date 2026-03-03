@@ -33,6 +33,7 @@ const {
   spawnClaude,
   spawnClaudeSync,
   spawnClaudeTerminal,
+  runClaude,
 } = await import("@/lib/claude/cli");
 
 afterAll(() => {
@@ -398,5 +399,156 @@ describe("spawnClaudeTerminal", () => {
     const [, opts] = mockSpawnTerminal.mock.calls[0];
     expect(opts.cols).toBe(80);
     expect(opts.rows).toBe(24);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runClaude — AskUserQuestion suppression
+// ---------------------------------------------------------------------------
+
+describe("runClaude", () => {
+  function createMockStdout(lines: object[]): ReadableStream<Uint8Array> {
+    const encoder = new TextEncoder();
+    return new ReadableStream({
+      start(controller) {
+        for (const line of lines) {
+          controller.enqueue(encoder.encode(JSON.stringify(line) + "\n"));
+        }
+        controller.close();
+      },
+    });
+  }
+
+  function createEmptyStream(): ReadableStream<Uint8Array> {
+    return new ReadableStream({ start(c) { c.close(); } });
+  }
+
+  beforeEach(() => {
+    _resetCliPath();
+    process.env.CLAUDE_PATH = "/mock/claude";
+    mockSpawn.mockReset();
+  });
+
+  it("suppresses CLI auto-error for AskUserQuestion and kills process", async () => {
+    const mockKill = vi.fn();
+
+    mockSpawn.mockReturnValue({
+      stdout: createMockStdout([
+        { type: "system", subtype: "init", session_id: "test-session", model: "claude-3" },
+        {
+          type: "assistant",
+          message: {
+            content: [{
+              type: "tool_use",
+              name: "AskUserQuestion",
+              id: "ask-1",
+              input: {
+                questions: [{ question: "Which repo?", options: [{ label: "A", description: "Opt A" }], multiSelect: false }],
+              },
+            }],
+          },
+        },
+        {
+          type: "user",
+          message: {
+            content: [{
+              type: "tool_result",
+              tool_use_id: "ask-1",
+              content: "Answer questions?",
+              is_error: true,
+            }],
+          },
+        },
+        // This should NOT be emitted — process is killed before reaching it
+        { type: "assistant", message: { content: [{ type: "text", text: "Continuing without answer" }] } },
+      ]),
+      stderr: createEmptyStream(),
+      exited: Promise.resolve(0),
+      kill: mockKill,
+    });
+
+    const claudeProcess = runClaude("test-op-ask", "test prompt");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const events: any[] = [];
+    claudeProcess.onEvent((event) => events.push(event));
+
+    // Wait for async stream processing to complete
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // proc.kill should have been called
+    expect(mockKill).toHaveBeenCalled();
+
+    // Check emitted output events
+    const outputEvents = events.filter((e) => e.type === "output");
+    const parsedOutputs = outputEvents.map((e) => JSON.parse(e.data));
+
+    // system init should be emitted
+    expect(parsedOutputs.some((p) => p.type === "system")).toBe(true);
+
+    // AskUserQuestion assistant message should be emitted
+    expect(parsedOutputs.some((p) =>
+      p.type === "assistant" &&
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      p.message?.content?.some((b: any) => b.name === "AskUserQuestion"),
+    )).toBe(true);
+
+    // The auto-error tool_result should NOT be emitted
+    expect(parsedOutputs.some((p) => p.type === "user")).toBe(false);
+
+    // The subsequent assistant message should NOT be emitted
+    expect(parsedOutputs.filter((p) => p.type === "assistant")).toHaveLength(1);
+
+    // No complete event — waiting for AskUserQuestion answer
+    expect(events.some((e) => e.type === "complete")).toBe(false);
+  });
+
+  it("emits normal tool_result when not an AskUserQuestion auto-error", async () => {
+    mockSpawn.mockReturnValue({
+      stdout: createMockStdout([
+        { type: "system", subtype: "init", session_id: "test-session-2", model: "claude-3" },
+        {
+          type: "assistant",
+          message: {
+            content: [{
+              type: "tool_use",
+              name: "Bash",
+              id: "bash-1",
+              input: { command: "ls" },
+            }],
+          },
+        },
+        {
+          type: "user",
+          message: {
+            content: [{
+              type: "tool_result",
+              tool_use_id: "bash-1",
+              content: "file1.txt\nfile2.txt",
+              is_error: false,
+            }],
+          },
+        },
+        { type: "result", subtype: "success", result: "Done", total_cost_usd: 0.01, duration_ms: 1000 },
+      ]),
+      stderr: createEmptyStream(),
+      exited: Promise.resolve(0),
+      kill: vi.fn(),
+    });
+
+    const claudeProcess = runClaude("test-op-normal", "test prompt");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const events: any[] = [];
+    claudeProcess.onEvent((event) => events.push(event));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const outputEvents = events.filter((e) => e.type === "output");
+    const parsedOutputs = outputEvents.map((e) => JSON.parse(e.data));
+
+    // Normal tool_result should be emitted
+    expect(parsedOutputs.some((p) => p.type === "user")).toBe(true);
+
+    // Complete event should be emitted (no pending ask)
+    expect(events.some((e) => e.type === "complete")).toBe(true);
   });
 });

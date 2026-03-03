@@ -209,8 +209,10 @@ export function runClaude(
         const reader = proc.stdout.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let askKilled = false;
 
         for (;;) {
+          if (askKilled) break;
           const { done, value } = await reader.read();
           if (done) break;
 
@@ -258,6 +260,31 @@ export function runClaude(
               );
               if (hasAskDenial) {
                 log(operationId, "AskUserQuestion permission denied, will wait for answer");
+              }
+            }
+
+            // Detect CLI's auto-error response to AskUserQuestion in -p mode.
+            // The CLI can't show interactive UI, so it auto-responds with
+            // tool_result { is_error: true, content: "Answer questions?" }.
+            // We suppress this event (so findPendingAsk() keeps the ask pending
+            // for the UI) and kill the process so the model doesn't continue
+            // without the user's answer. submitAnswer() will resume via --resume.
+            if (pendingAskToolUseId && parsed.type === "user" && parsed.message?.content) {
+              const blocks = Array.isArray(parsed.message.content)
+                ? parsed.message.content
+                : [];
+              const isAskAutoError = blocks.some(
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (b: any) =>
+                  b.type === "tool_result" &&
+                  b.tool_use_id === pendingAskToolUseId &&
+                  b.is_error,
+              );
+              if (isAskAutoError) {
+                log(operationId, "suppressing CLI auto-error for AskUserQuestion, killing process");
+                askKilled = true;
+                proc.kill();
+                break; // Stop processing this chunk; outer loop checks askKilled
               }
             }
 
