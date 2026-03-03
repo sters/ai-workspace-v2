@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import type { OperationType } from "@/types/operation";
 import { SplitButton } from "../shared/split-button";
@@ -11,6 +12,8 @@ interface NextAction {
   primary?: boolean;
   /** Batch dropdown items for this action. */
   batchItems?: { label: string; type: OperationType; body: Record<string, string> }[];
+  /** When set, renders as a link navigating to this sub-path (e.g. "/review") instead of triggering an operation. */
+  linkSubPath?: string;
 }
 
 function executeBatchItems(workspace: string): NextAction["batchItems"] {
@@ -64,6 +67,12 @@ function getNextActions(
       ];
     case "review":
       return [
+        {
+          label: "View Review",
+          type: "review",
+          body: { workspace },
+          linkSubPath: "/review",
+        },
         {
           label: "Create PR",
           type: "create-pr",
@@ -147,24 +156,39 @@ export function NextActionSuggestions({
     <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/30">
       <p className="mb-2 text-sm font-medium text-foreground">Next steps</p>
       <div className="flex flex-wrap gap-2">
-        {actions.map((action) =>
-          action.batchItems ? (
-            <SplitButton
-              key={action.type}
-              label={action.label}
-              onClick={() => handleClick(action)}
-              disabled={isRunning}
-              className={
-                action.primary
-                  ? "rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                  : "rounded-l-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              }
-              items={action.batchItems.map((bi) => ({
-                label: bi.label,
-                onClick: () => handleClick({ ...bi, primary: false }),
-              }))}
-            />
-          ) : (
+        {actions.map((action) => {
+          if (action.linkSubPath) {
+            const basePath = pathname.split("/").slice(0, 3).join("/");
+            return (
+              <Link
+                key={action.label}
+                href={`${basePath}${action.linkSubPath}`}
+                className="rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
+              >
+                {action.label}
+              </Link>
+            );
+          }
+          if (action.batchItems) {
+            return (
+              <SplitButton
+                key={action.type}
+                label={action.label}
+                onClick={() => handleClick(action)}
+                disabled={isRunning}
+                className={
+                  action.primary
+                    ? "rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                    : "rounded-l-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
+                }
+                items={action.batchItems.map((bi) => ({
+                  label: bi.label,
+                  onClick: () => handleClick({ ...bi, primary: false }),
+                }))}
+              />
+            );
+          }
+          return (
             <button
               key={action.type}
               onClick={() => handleClick(action)}
@@ -177,8 +201,8 @@ export function NextActionSuggestions({
             >
               {action.label}
             </button>
-          )
-        )}
+          );
+        })}
       </div>
     </div>
   );
