@@ -6,6 +6,17 @@
 import type { CreateTodoPlannerInput } from "@/types/prompts";
 
 export function buildCreateTodoFromReviewPrompt(input: CreateTodoPlannerInput): string {
+  const userInstruction = input.instruction
+    ? `
+
+## User Instruction
+
+The user has provided the following instruction for TODO creation. Focus on creating TODO items that match this instruction rather than covering all review findings:
+
+> ${input.instruction}
+`
+    : "";
+
   return `# Task: Create TODO items from review findings for ${input.repoName}
 
 ## Workspace: ${input.workspaceName}
@@ -13,14 +24,14 @@ export function buildCreateTodoFromReviewPrompt(input: CreateTodoPlannerInput): 
 ## Worktree: ${input.worktreePath}
 ## Review Directory: ${input.reviewDir}
 ## Task Type: ${input.taskType}
-
+${userInstruction}
 ## Workspace README
 
 ${input.readmeContent}
 
 ## Instructions
 
-You are a specialized agent for creating TODO items based on review findings. Your role is to read review artifacts and generate actionable TODO items that address the issues found during code review.
+You are a specialized agent for creating TODO items based on review findings. Your role is to read review artifacts and generate actionable TODO items that address the issues found during code review.${input.instruction ? " Pay special attention to the user instruction above and prioritize items that match it." : ""}
 
 ### Execution Steps
 
