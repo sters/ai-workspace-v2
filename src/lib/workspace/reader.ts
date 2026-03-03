@@ -89,7 +89,9 @@ async function buildWorkspaceSummary(
 
 async function listTodoFiles(wsPath: string): Promise<TodoFile[]> {
   const glob = new Bun.Glob("TODO-*.md");
-  const files = [...glob.scanSync({ cwd: wsPath })];
+  const files = [...glob.scanSync({ cwd: wsPath })].filter(
+    (f) => f !== "TODO-template.md",
+  );
   const results: TodoFile[] = [];
   for (const f of files) {
     const content = await Bun.file(path.join(wsPath, f)).text();
