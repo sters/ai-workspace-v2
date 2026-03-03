@@ -64,30 +64,32 @@ export function ReviewViewer({
             vertical
           >
             {({ start, isRunning }) => (
-              <div className="rounded-lg border p-4">
+              <div className="rounded-lg border border-dashed p-4">
                 <h3 className="mb-2 text-sm font-medium">Create TODO</h3>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
+                <div className="space-y-2">
+                  <textarea
                     value={instruction}
                     onChange={(e) => setInstruction(e.target.value)}
                     placeholder="e.g. Focus on security issues only (leave empty for all)"
                     disabled={isRunning}
-                    className="min-w-0 flex-1 rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground disabled:opacity-50"
+                    rows={2}
+                    className="w-full min-h-[2lh] resize-y rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground disabled:opacity-50"
                   />
-                  <button
-                    onClick={() =>
-                      start("create-todo", {
-                        workspace: workspacePath,
-                        reviewTimestamp: selected,
-                        ...(instruction.trim() && { instruction: instruction.trim() }),
-                      })
-                    }
-                    disabled={isRunning}
-                    className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    Create TODO
-                  </button>
+                  <div className="flex justify-end">
+                    <button
+                      onClick={() =>
+                        start("create-todo", {
+                          workspace: workspacePath,
+                          reviewTimestamp: selected,
+                          ...(instruction.trim() && { instruction: instruction.trim() }),
+                        })
+                      }
+                      disabled={isRunning}
+                      className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                    >
+                      Create TODO
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
