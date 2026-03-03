@@ -35,34 +35,39 @@ function UpdateForm({
   const items = batchItems ? batchItems(instruction) : undefined;
 
   return (
-    <div className="flex gap-2">
-      <input
-        type="text"
+    <div className="space-y-2">
+      <textarea
         value={instruction}
         onChange={(e) => setInstruction(e.target.value)}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.nativeEvent.isComposing) handleSubmit();
+          if (e.key === "Enter" && e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            handleSubmit();
+          }
         }}
         placeholder={placeholder}
         disabled={disabled}
-        className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground disabled:opacity-50"
+        rows={2}
+        className="w-full min-h-[2lh] resize-y rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground disabled:opacity-50"
       />
-      {items ? (
-        <SplitButton
-          label={label}
-          onClick={handleSubmit}
-          disabled={disabled || !instruction.trim()}
-          items={items}
-        />
-      ) : (
-        <button
-          onClick={handleSubmit}
-          disabled={disabled || !instruction.trim()}
-          className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {label}
-        </button>
-      )}
+      <div className="flex justify-end">
+        {items ? (
+          <SplitButton
+            label={label}
+            onClick={handleSubmit}
+            disabled={disabled || !instruction.trim()}
+            items={items}
+          />
+        ) : (
+          <button
+            onClick={handleSubmit}
+            disabled={disabled || !instruction.trim()}
+            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {label}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
