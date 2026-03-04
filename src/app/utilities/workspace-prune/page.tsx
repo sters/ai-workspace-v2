@@ -3,16 +3,17 @@
 import { useState } from "react";
 import { ClaudeOperation } from "@/components/operation/claude-operation";
 import { Button } from "@/components/shared/buttons/button";
+import { PageHeader } from "@/components/shared/feedback/page-header";
 
 export default function WorkspacePrunePage() {
   const [days, setDays] = useState("7");
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Workspace Prune</h1>
-      <p className="mb-4 text-sm text-muted-foreground">
-        Delete workspaces not modified within the specified number of days.
-      </p>
+      <PageHeader
+        title="Workspace Prune"
+        description="Delete workspaces not modified within the specified number of days."
+      />
 
       <ClaudeOperation storageKey="utility:workspace-prune" vertical>
         {({ start, isRunning }) => (
