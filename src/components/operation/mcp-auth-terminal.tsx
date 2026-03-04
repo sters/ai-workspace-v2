@@ -2,7 +2,8 @@
 
 import { useRef, useEffect, useState, useMemo } from "react";
 import type { OperationEvent } from "@/types/operation";
-import "@xterm/xterm/css/xterm.css";
+import { useTerminal } from "@/hooks/use-terminal";
+import { Button } from "../shared/buttons/button";
 
 interface McpAuthTerminalProps {
   events: OperationEvent[];
@@ -10,110 +11,27 @@ interface McpAuthTerminalProps {
   operationStatus?: "running" | "completed" | "failed";
 }
 
-const THEME = {
-  background: "#1a1b26",
-  foreground: "#a9b1d6",
-  cursor: "#c0caf5",
-  selectionBackground: "#33467c",
-  black: "#15161e",
-  red: "#f7768e",
-  green: "#9ece6a",
-  yellow: "#e0af68",
-  blue: "#7aa2f7",
-  magenta: "#bb9af7",
-  cyan: "#7dcfff",
-  white: "#a9b1d6",
-  brightBlack: "#414868",
-  brightRed: "#f7768e",
-  brightGreen: "#9ece6a",
-  brightYellow: "#e0af68",
-  brightBlue: "#7aa2f7",
-  brightMagenta: "#bb9af7",
-  brightCyan: "#7dcfff",
-  brightWhite: "#c0caf5",
-};
-
 export function McpAuthTerminal({
   events,
   isRunning,
   operationStatus,
 }: McpAuthTerminalProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const xtermRef = useRef<any>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fitAddonRef = useRef<any>(null);
+  const { containerRef, termRef, init } = useTerminal({ readonly: true });
   const writtenCountRef = useRef(0);
   const [logsOpen, setLogsOpen] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
 
   // Initialize xterm on mount
   useEffect(() => {
-    let disposed = false;
-
-    (async () => {
-      const [{ Terminal }, { FitAddon }] = await Promise.all([
-        import("@xterm/xterm"),
-        import("@xterm/addon-fit"),
-      ]);
-
-      if (disposed || !containerRef.current) return;
-
-      const fitAddon = new FitAddon();
-      fitAddonRef.current = fitAddon;
-
-      const term = new Terminal({
-        cursorBlink: false,
-        cursorInactiveStyle: "none",
-        disableStdin: true,
-        fontSize: 14,
-        fontFamily:
-          "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
-        theme: { ...THEME, cursor: THEME.background },
-      });
-
-      term.loadAddon(fitAddon);
-      term.open(containerRef.current);
-      xtermRef.current = term;
-
-      requestAnimationFrame(() => {
-        try {
-          fitAddon.fit();
-        } catch {
-          // ignore
-        }
-      });
-    })();
-
+    init();
     return () => {
-      disposed = true;
-      if (xtermRef.current) {
-        xtermRef.current.dispose();
-        xtermRef.current = null;
-      }
-      fitAddonRef.current = null;
       writtenCountRef.current = 0;
     };
-  }, []);
-
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (fitAddonRef.current) {
-        try {
-          fitAddonRef.current.fit();
-        } catch {
-          // ignore
-        }
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [init]);
 
   // Write only terminal (PTY) events to xterm
   useEffect(() => {
-    const term = xtermRef.current;
+    const term = termRef.current;
     if (!term) return;
 
     const terminalEvents = events.filter((e) => e.type === "terminal");
@@ -187,15 +105,16 @@ export function McpAuthTerminal({
       {/* Debug logs */}
       {statusLogs.length > 0 && (
         <div className="mt-1 rounded-b border border-t-0">
-          <button
+          <Button
+            variant="ghost-toggle"
             onClick={() => setLogsOpen((v) => !v)}
-            className="flex w-full items-center gap-1 px-3 py-1 text-left text-xs text-muted-foreground hover:bg-muted/40"
+            className="flex w-full items-center gap-1 px-3 py-1 text-left text-xs hover:bg-muted/40"
           >
             <span className={`transition-transform ${logsOpen ? "rotate-90" : ""}`}>
               &#9654;
             </span>
             Debug logs ({statusLogs.length})
-          </button>
+          </Button>
           {logsOpen && (
             <div className="max-h-48 overflow-y-auto border-t px-3 py-1.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
               {statusLogs.map((msg, i) => (

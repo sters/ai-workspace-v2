@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef, useEffect, useState, useCallback } from "react";
-import "@xterm/xterm/css/xterm.css";
+import { useTerminal } from "@/hooks/use-terminal";
+import { Button } from "../shared/buttons/button";
+import { StatusText } from "../shared/feedback/status-text";
 
 const CHAT_WS_URL =
   typeof window !== "undefined"
@@ -20,33 +22,6 @@ interface ServerMessage {
   exitCode?: number;
   bufferedChunks?: number;
 }
-
-// ---------------------------------------------------------------------------
-// Terminal theme (shared between start and resume)
-// ---------------------------------------------------------------------------
-
-const TERMINAL_THEME = {
-  background: "#1a1b26",
-  foreground: "#a9b1d6",
-  cursor: "#c0caf5",
-  selectionBackground: "#33467c",
-  black: "#15161e",
-  red: "#f7768e",
-  green: "#9ece6a",
-  yellow: "#e0af68",
-  blue: "#7aa2f7",
-  magenta: "#bb9af7",
-  cyan: "#7dcfff",
-  white: "#a9b1d6",
-  brightBlack: "#414868",
-  brightRed: "#f7768e",
-  brightGreen: "#9ece6a",
-  brightYellow: "#e0af68",
-  brightBlue: "#7aa2f7",
-  brightMagenta: "#bb9af7",
-  brightCyan: "#7dcfff",
-  brightWhite: "#c0caf5",
-} as const;
 
 // ---------------------------------------------------------------------------
 // localStorage helpers
@@ -84,56 +59,11 @@ function clearChatSession(workspaceId: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Terminal initialization helper
-// ---------------------------------------------------------------------------
-
-interface TerminalBundle {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  term: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  fitAddon: any;
-}
-
-async function initTerminal(container: HTMLElement): Promise<TerminalBundle> {
-  const [{ Terminal }, { FitAddon }, { WebLinksAddon }] = await Promise.all([
-    import("@xterm/xterm"),
-    import("@xterm/addon-fit"),
-    import("@xterm/addon-web-links"),
-  ]);
-
-  // Clear any residual DOM from a previous xterm instance to prevent
-  // duplicate terminals when re-mounting after tab navigation.
-  container.innerHTML = "";
-
-  const fitAddon = new FitAddon();
-  const term = new Terminal({
-    cursorBlink: true,
-    fontSize: 14,
-    fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', Menlo, monospace",
-    theme: TERMINAL_THEME,
-  });
-
-  term.loadAddon(fitAddon);
-  term.loadAddon(new WebLinksAddon());
-  term.open(container);
-
-  requestAnimationFrame(() => {
-    try {
-      fitAddon.fit();
-    } catch {
-      // ignore fit errors during transitions
-    }
-  });
-
-  return { term, fitAddon };
-}
-
-// ---------------------------------------------------------------------------
 // ChatTerminal component
 // ---------------------------------------------------------------------------
 
 export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { workspaceId: string; initialPrompt?: string; reviewTimestamp?: string }) {
-  const termRef = useRef<HTMLDivElement>(null);
+  const { containerRef, termRef, init, dispose } = useTerminal({ webLinks: true });
   const [state, setState] = useState<SessionState>("idle");
   const [exitCode, setExitCode] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -144,12 +74,8 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
   const reviewTimestampRef = useRef(reviewTimestamp);
   reviewTimestampRef.current = reviewTimestamp;
 
-  // Refs for xterm and websocket (survive re-renders)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const xtermRef = useRef<any>(null);
+  // Refs for websocket (survive re-renders)
   const wsRef = useRef<WebSocket | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const fitAddonRef = useRef<any>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
   // Generation counter: incremented before each async session init.
@@ -161,32 +87,13 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
       wsRef.current.close();
       wsRef.current = null;
     }
-    if (xtermRef.current) {
-      xtermRef.current.dispose();
-      xtermRef.current = null;
-    }
-    fitAddonRef.current = null;
-  }, []);
+    dispose();
+  }, [dispose]);
 
   // Cleanup on unmount — close WS + dispose xterm, but keep localStorage
   useEffect(() => {
     return () => cleanup();
   }, [cleanup]);
-
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      if (fitAddonRef.current) {
-        try {
-          fitAddonRef.current.fit();
-        } catch {
-          // ignore fit errors during transitions
-        }
-      }
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
   // Auto-resume on mount if localStorage has a saved session,
   // or auto-start if initialPrompt/reviewTimestamp is provided.
@@ -214,18 +121,16 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
       setExitCode(null);
       setError(null);
 
-      if (!termRef.current) return;
-
-      const { term, fitAddon } = await initTerminal(termRef.current);
+      await init();
 
       // If another session init started while we awaited, abandon this one.
       if (generationRef.current !== gen) {
-        term.dispose();
+        dispose();
         return;
       }
 
-      xtermRef.current = term;
-      fitAddonRef.current = fitAddon;
+      const term = termRef.current;
+      if (!term) return;
 
       const ws = new WebSocket(CHAT_WS_URL);
       wsRef.current = ws;
@@ -297,7 +202,7 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
         }
       });
     },
-    [workspaceId, cleanup],
+    [workspaceId, cleanup, init, dispose, termRef],
   );
 
   const startSession = useCallback(async () => {
@@ -307,18 +212,16 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
     setExitCode(null);
     setError(null);
 
-    if (!termRef.current) return;
-
-    const { term, fitAddon } = await initTerminal(termRef.current);
+    await init();
 
     // If another session init started while we awaited, abandon this one.
     if (generationRef.current !== gen) {
-      term.dispose();
+      dispose();
       return;
     }
 
-    xtermRef.current = term;
-    fitAddonRef.current = fitAddon;
+    const term = termRef.current;
+    if (!term) return;
 
     // Connect WebSocket
     const ws = new WebSocket(CHAT_WS_URL);
@@ -379,7 +282,7 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
         ws.send(JSON.stringify({ type: "input", data }));
       }
     });
-  }, [workspaceId, cleanup]);
+  }, [workspaceId, cleanup, init, dispose, termRef]);
 
   const stopSession = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
@@ -394,48 +297,33 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
       {/* Toolbar */}
       <div className="flex items-center gap-2 border-b px-4 py-2">
         {state === "idle" && (
-          <button
-            onClick={startSession}
-            className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Start Chat
-          </button>
+          <Button onClick={startSession}>Start Chat</Button>
         )}
         {state === "connecting" && (
-          <span className="text-sm text-muted-foreground">Connecting...</span>
+          <StatusText>Connecting...</StatusText>
         )}
         {state === "resuming" && (
-          <span className="text-sm text-muted-foreground">Reconnecting...</span>
+          <StatusText>Reconnecting...</StatusText>
         )}
         {state === "running" && (
-          <button
-            onClick={stopSession}
-            className="rounded bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90"
-          >
-            Stop
-          </button>
+          <Button variant="destructive" onClick={stopSession}>Stop</Button>
         )}
         {state === "exited" && (
           <>
-            <span className="text-sm text-muted-foreground">
+            <StatusText>
               Session ended{exitCode !== null ? ` (code ${exitCode})` : ""}
-            </span>
-            <button
-              onClick={startSession}
-              className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              New Session
-            </button>
+            </StatusText>
+            <Button onClick={startSession}>New Session</Button>
           </>
         )}
         {error && (
-          <span className="text-sm text-destructive">{error}</span>
+          <StatusText variant="error">{error}</StatusText>
         )}
       </div>
 
       {/* Terminal container */}
       <div
-        ref={termRef}
+        ref={containerRef}
         className="min-h-0 flex-1 bg-[#1a1b26] p-1"
         style={{
           display: state === "idle" ? "none" : "block",
@@ -452,12 +340,7 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
             <p className="mb-4 text-sm text-muted-foreground">
               Start an interactive Claude session to discuss this workspace
             </p>
-            <button
-              onClick={startSession}
-              className="rounded bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Start Chat
-            </button>
+            <Button onClick={startSession}>Start Chat</Button>
           </div>
         </div>
       )}
