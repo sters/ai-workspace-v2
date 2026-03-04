@@ -308,6 +308,7 @@ export function startOperationPipeline(
   (async () => {
     let pipelineSuccess = true;
 
+    try {
     for (let i = 0; i < phases.length; i++) {
       // Check if the operation was cancelled between phases
       if (managed.abortController.signal.aborted) {
@@ -552,8 +553,12 @@ export function startOperationPipeline(
         break;
       }
     }
-
-    markComplete(managed, pipelineSuccess);
+    } catch (err) {
+      emitStatus(managed, `Pipeline error: ${err}`);
+      pipelineSuccess = false;
+    } finally {
+      markComplete(managed, pipelineSuccess);
+    }
   })();
 
   return operation;
