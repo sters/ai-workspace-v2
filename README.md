@@ -50,24 +50,24 @@ The root directory must contain `workspace/` and `repositories/` subdirectories.
 
 ## Claude Settings and MCP Servers
 
-Claude の設定ファイルと MCP サーバー構成は `AI_WORKSPACE_ROOT` に依存します。
+Claude configuration files and MCP server definitions are resolved relative to `AI_WORKSPACE_ROOT`. If the root changes, the referenced paths change accordingly.
 
 ### Settings
 
 | Scope | Path | Description |
 |-------|------|-------------|
-| **project** | `${AI_WORKSPACE_ROOT}/.claude/settings.json` | プロジェクト設定（git 管理対象） |
-| **local** | `${AI_WORKSPACE_ROOT}/.claude/settings.local.json` | ローカル上書き（git 管理対象外） |
-| **user** | `~/.claude/settings.json` | グローバルユーザー設定 |
+| **project** | `${AI_WORKSPACE_ROOT}/.claude/settings.json` | Project settings (tracked in git) |
+| **local** | `${AI_WORKSPACE_ROOT}/.claude/settings.local.json` | Local overrides (not tracked in git) |
+| **user** | `~/.claude/settings.json` | Global user settings |
 
 ### MCP Servers
 
-MCP サーバーは 2 つのソースから読み込まれます:
+MCP servers are loaded from two sources:
 
 - **Project scope**: `${AI_WORKSPACE_ROOT}/.mcp.json`
-- **Local scope**: `~/.claude.json` の `projects[absolutePath].mcpServers`（キーは `AI_WORKSPACE_ROOT` の絶対パス）
+- **Local scope**: `~/.claude.json` under `projects[absolutePath].mcpServers` (keyed by the absolute path of `AI_WORKSPACE_ROOT`)
 
-これらの設定は Web UI の Settings / MCP Servers ページから閲覧・編集できます。`AI_WORKSPACE_ROOT` が変わると参照先も変わるため、環境ごとに適切に設定してください。
+These configurations can be viewed and edited from the Settings / MCP Servers page in the Web UI.
 
 ## Development
 
