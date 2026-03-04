@@ -1,7 +1,30 @@
 import useSWR from "swr";
-import type { OperationListItem } from "@/types/operation";
+import type { OperationListItem, OperationType } from "@/types/operation";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+/**
+ * Expand a batch operation into the individual operation types it encompasses,
+ * based on its `inputs.mode` and `inputs.startWith`.
+ */
+function expandBatchTypes(inputs?: Record<string, string>): OperationType[] {
+  const types: OperationType[] = ["batch"];
+  if (!inputs) return types;
+
+  const mode = inputs.mode;
+  const startWith = inputs.startWith;
+
+  if (startWith === "update-todo") types.push("update-todo");
+  if (startWith === "init") types.push("init");
+
+  // All batch modes include execute
+  types.push("execute");
+
+  if (mode !== "execute-pr") types.push("review");
+  if (mode !== "execute-review") types.push("create-pr");
+
+  return types;
+}
 
 export function useRunningOperations() {
   const { data, mutate } = useSWR<OperationListItem[]>("/api/operations", fetcher, {
@@ -11,14 +34,36 @@ export function useRunningOperations() {
   const operations = data ?? [];
 
   const runningWorkspaces = new Set<string>();
+  const runningWorkspaceTypes = new Map<string, Set<OperationType>>();
   for (const op of operations) {
     if (op.status === "running") {
       runningWorkspaces.add(op.workspace);
+      let types = runningWorkspaceTypes.get(op.workspace);
+      if (!types) {
+        types = new Set();
+        runningWorkspaceTypes.set(op.workspace, types);
+      }
+      if (op.type === "batch") {
+        for (const t of expandBatchTypes(op.inputs)) types.add(t);
+      } else {
+        types.add(op.type);
+      }
     }
   }
 
   const isWorkspaceRunning = (workspace: string) =>
     runningWorkspaces.has(workspace);
 
-  return { operations, runningWorkspaces, isWorkspaceRunning, mutate };
+  /** Check if a specific operation type (or any of the given types) is running for a workspace. */
+  const isWorkspaceTypeRunning = (
+    workspace: string,
+    type: OperationType | OperationType[],
+  ): boolean => {
+    const types = runningWorkspaceTypes.get(workspace);
+    if (!types) return false;
+    if (Array.isArray(type)) return type.some((t) => types.has(t));
+    return types.has(type);
+  };
+
+  return { operations, runningWorkspaces, isWorkspaceRunning, isWorkspaceTypeRunning, mutate };
 }
