@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import {
   getOperation,
   getOperationEvents,
@@ -6,6 +7,21 @@ import {
 import { readOperationLog } from "@/lib/operation-store";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Resolve events for a completed operation from memory or disk.
+ */
+function resolveCompletedEvents(operationId: string): OperationEventList | null {
+  // Try memory first
+  const memEvents = getOperationEvents(operationId);
+  if (memEvents.length > 0) return memEvents;
+
+  // Fall back to disk
+  const stored = readOperationLog(operationId);
+  return stored ? stored.events : null;
+}
+
+type OperationEventList = ReturnType<typeof getOperationEvents>;
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -17,62 +33,41 @@ export async function GET(request: Request) {
 
   const operation = getOperation(operationId);
 
-  // Fall back to disk if not in memory
+  // ---------- Not in memory → check disk ----------
   if (!operation) {
     const stored = readOperationLog(operationId);
     if (!stored) {
-      console.log(`[sse][${operationId}] operation not found`);
+      console.log(`[events][${operationId}] operation not found`);
       return new Response("operation not found", { status: 404 });
     }
 
-    // Replay stored events and close immediately
-    console.log(`[sse][${operationId}] serving from disk, ${stored.events.length} events`);
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(":ok\n\n"));
-        for (const event of stored.events) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
-        }
-        controller.close();
-      },
-    });
-
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache, no-transform",
-        "X-Accel-Buffering": "no",
-      },
-    });
+    // Completed on disk → return JSON
+    console.log(`[events][${operationId}] serving from disk (JSON), ${stored.events.length} events`);
+    return NextResponse.json(stored.events);
   }
 
-  console.log(`[sse][${operationId}] connected, status=${operation.status}`);
+  // ---------- Completed in memory → return JSON ----------
+  if (operation.status !== "running") {
+    const events = resolveCompletedEvents(operationId) ?? [];
+    console.log(`[events][${operationId}] completed (JSON), ${events.length} events`);
+    return NextResponse.json(events);
+  }
+
+  // ---------- Running → SSE stream ----------
+  console.log(`[sse][${operationId}] connected, status=running`);
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(controller) {
-      // SSE comment to establish connection
       controller.enqueue(encoder.encode(":ok\n\n"));
 
-      // Send existing events (memory first, fall back to disk for completed ops)
-      let existing = getOperationEvents(operationId);
-      if (existing.length === 0 && operation.status !== "running") {
-        const stored = readOperationLog(operationId);
-        if (stored) existing = stored.events;
-      }
+      // Send existing events
+      const existing = getOperationEvents(operationId);
       console.log(`[sse][${operationId}] sending ${existing.length} existing events`);
       for (const event of existing) {
         controller.enqueue(
           encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
         );
-      }
-
-      // If already finished, close immediately
-      if (operation.status !== "running") {
-        console.log(`[sse][${operationId}] already done, closing`);
-        controller.close();
-        return;
       }
 
       // Subscribe to new events
@@ -81,8 +76,6 @@ export async function GET(request: Request) {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify(event)}\n\n`)
           );
-          // Only close on the pipeline-level complete (no childLabel).
-          // Child process completes should not end the SSE stream.
           if (event.type === "complete" && !event.childLabel) {
             console.log(`[sse][${operationId}] complete`);
             unsubscribe();

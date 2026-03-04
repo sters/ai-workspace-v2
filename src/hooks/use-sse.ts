@@ -49,6 +49,17 @@ export function useSSE(operationId: string | null) {
           throw new Error(`SSE failed: ${res.status}`);
         }
 
+        const contentType = res.headers.get("Content-Type") ?? "";
+
+        // ---------- JSON response (completed operations) ----------
+        if (contentType.includes("application/json")) {
+          const data: OperationEvent[] = await res.json();
+          dispatch({ type: "append", events: data });
+          setConnected(false);
+          return;
+        }
+
+        // ---------- SSE stream (running operations) ----------
         setConnected(true);
         setError(false);
         retryCount = 0;
