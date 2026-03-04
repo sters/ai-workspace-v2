@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import type { Operation, OperationType } from "@/types/operation";
+import type { OperationListItem, OperationType } from "@/types/operation";
 import { useSSE } from "./use-sse";
 
 const STORAGE_PREFIX = "aiw-op:";
@@ -12,7 +12,7 @@ const STORAGE_PREFIX = "aiw-op:";
  *                    away and returning automatically reconnects to the SSE stream.
  */
 export function useOperation(storageKey?: string, initialOperationId?: string) {
-  const [operation, setOperation] = useState<Operation | null>(null);
+  const [operation, setOperation] = useState<OperationListItem | null>(null);
   const restoredRef = useRef(false);
 
   // ---------- Restore from initialOperationId or localStorage on mount ----------
@@ -24,7 +24,7 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
     if (initialOperationId) {
       fetch(`/api/operations`)
         .then((r) => r.json())
-        .then((ops: Operation[]) => {
+        .then((ops: OperationListItem[]) => {
           const op = ops.find((o) => o.id === initialOperationId);
           if (op) setOperation(op);
         })
@@ -36,7 +36,7 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
     try {
       const raw = localStorage.getItem(`${STORAGE_PREFIX}${storageKey}`);
       if (!raw) return;
-      const stored: Operation = JSON.parse(raw);
+      const stored: OperationListItem = JSON.parse(raw);
       // Only restore running operations (completed ones can be shown too)
       if (stored?.id) {
         setOperation(stored);
@@ -129,7 +129,7 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
       if (!res.ok) {
         throw new Error(await res.text());
       }
-      const op: Operation = await res.json();
+      const op: OperationListItem = await res.json();
       setOperation(op);
       return op;
     },

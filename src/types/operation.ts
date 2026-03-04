@@ -42,6 +42,20 @@ export interface Operation {
   inputs?: Record<string, string>;
 }
 
+/** Lightweight summary for listing operations (no children/full phases). */
+export interface OperationListItem {
+  id: string;
+  type: OperationType;
+  workspace: string;
+  status: OperationStatus;
+  startedAt: string;
+  completedAt?: string;
+  /** Only the currently-running phase (if any), for display in lists. */
+  currentPhase?: Pick<OperationPhaseInfo, "index" | "label" | "status" | "timeoutMs" | "startedAt">;
+  /** User-provided inputs (present when created locally via POST, absent from list API). */
+  inputs?: Record<string, string>;
+}
+
 export interface OperationEvent {
   type: "output" | "error" | "complete" | "status" | "terminal";
   operationId: string;

@@ -7,7 +7,7 @@ import { NextActionSuggestions } from "@/components/operation/next-action-sugges
 import { MarkdownRenderer } from "@/components/shared/markdown-renderer";
 import { useSSE } from "@/hooks/use-sse";
 import { parseStreamEvent } from "@/lib/parsers/stream";
-import type { Operation, OperationType, OperationPhaseInfo } from "@/types/operation";
+import type { OperationListItem, OperationType, OperationPhaseInfo } from "@/types/operation";
 import type { LogEntry } from "@/types/claude";
 
 /** Track which operations have had their next-steps dismissed (persists across page reloads via sessionStorage). */
@@ -34,7 +34,7 @@ function addHiddenNextStepsId(id: string) {
 }
 
 interface OperationCardProps {
-  operation: Operation;
+  operation: OperationListItem;
   /** Called when user starts a new operation from next-action suggestions. */
   onStartOperation: (type: OperationType, body: Record<string, string>) => Promise<void>;
   /** Called when user clicks Cancel on a running operation. */
@@ -78,26 +78,30 @@ export function OperationCard({
 
   // Derive live phases from SSE events
   const livePhases = useMemo(() => {
-    if (!operation.phases || operation.phases.length === 0) return operation.phases;
     const phaseMap = new Map<number, OperationPhaseInfo>();
-    for (const p of operation.phases) {
-      phaseMap.set(p.index, { ...p });
-    }
     for (const event of events) {
       if (event.type === "status" && event.data.startsWith("__phaseUpdate:")) {
         try {
           const data = JSON.parse(event.data.slice("__phaseUpdate:".length));
-          const existing = phaseMap.get(data.phaseIndex);
+          const idx = data.phaseIndex as number;
+          const existing = phaseMap.get(idx);
           if (existing) {
             existing.status = data.phaseStatus;
+          } else {
+            phaseMap.set(idx, {
+              index: idx,
+              label: data.phaseLabel ?? `Phase ${idx + 1}`,
+              status: data.phaseStatus,
+            });
           }
         } catch {
           // ignore
         }
       }
     }
+    if (phaseMap.size === 0) return undefined;
     return Array.from(phaseMap.values()).sort((a, b) => a.index - b.index);
-  }, [operation.phases, events]);
+  }, [events]);
 
   // Detect live status from SSE (complete event)
   const liveStatus = useMemo(() => {
@@ -115,7 +119,11 @@ export function OperationCard({
     return operation.status;
   }, [events, operation.status]);
 
-  const effectiveOperation = { ...operation, status: liveStatus, phases: livePhases };
+  const effectiveOperation = {
+    ...operation,
+    status: liveStatus,
+    ...(livePhases && { currentPhase: livePhases.find((p) => p.status === "running") }),
+  };
   const effectiveIsRunning = liveStatus === "running" && (connected || isRunning);
 
   // Extract result entries for summary display
@@ -188,7 +196,6 @@ export function OperationCard({
             operationId={operation.id}
             events={events}
             isRunning={effectiveIsRunning}
-            phases={livePhases}
           />
         </div>
       )}

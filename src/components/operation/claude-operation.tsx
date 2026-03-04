@@ -8,7 +8,7 @@ import { StatusBadge } from "../shared/status-badge";
 import { MarkdownRenderer } from "../shared/markdown-renderer";
 import { parseStreamEvent } from "@/lib/parsers/stream";
 import type { LogEntry } from "@/types/claude";
-import type { Operation, OperationType, OperationEvent, OperationContext } from "@/types/operation";
+import type { OperationListItem, OperationType, OperationEvent, OperationContext } from "@/types/operation";
 
 /**
  * Shared component for running Claude operations.
@@ -195,7 +195,7 @@ function CollapsibleOperationLog({
   isRunning,
   events,
 }: {
-  operation: Operation;
+  operation: OperationListItem;
   isRunning: boolean;
   events: OperationEvent[];
 }) {
@@ -248,7 +248,6 @@ function CollapsibleOperationLog({
         operationId={operation.id}
         events={events}
         isRunning={isRunning}
-        phases={operation.phases}
       />
     );
   }
@@ -285,7 +284,6 @@ function CollapsibleOperationLog({
             operationId={operation.id}
             events={events}
             isRunning={isRunning}
-            phases={operation.phases}
           />
         </div>
       )}
