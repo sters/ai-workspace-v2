@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cardVariants } from "@/components/shared/containers/card";
 
 const tools = [
   {
@@ -47,7 +48,7 @@ export default function UtilitiesPage() {
           <Link
             key={tool.href}
             href={tool.href}
-            className="block rounded-lg border p-4 hover:bg-accent"
+            className={cardVariants("default", "block hover:bg-accent")}
           >
             <h2 className="font-semibold">{tool.name}</h2>
             <p className="mt-1 text-sm text-muted-foreground">

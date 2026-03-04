@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ClaudeOperation } from "@/components/operation/claude-operation";
-import { SplitButton } from "@/components/shared/split-button";
+import { SplitButton } from "@/components/shared/buttons/split-button";
+import { buttonVariants } from "@/components/shared/buttons/button";
+import { Callout } from "@/components/shared/containers/callout";
 
 export default function NewWorkspacePage() {
   const [description, setDescription] = useState("");
@@ -105,7 +107,7 @@ function InitNextActions({ workspace }: { workspace: string }) {
   const wsEncoded = encodeURIComponent(workspace);
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/30">
+    <Callout variant="info">
       <p className="mb-2 text-sm font-medium text-foreground">Next steps</p>
       <div className="flex flex-wrap gap-2">
         <SplitButton
@@ -113,7 +115,6 @@ function InitNextActions({ workspace }: { workspace: string }) {
           onClick={() =>
             router.push(`/workspace/${wsEncoded}?action=execute`)
           }
-          className="rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           items={[
             {
               label: "Execute \u2192 Review",
@@ -147,11 +148,11 @@ function InitNextActions({ workspace }: { workspace: string }) {
         />
         <Link
           href={`/workspace/${wsEncoded}`}
-          className="rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
+          className={buttonVariants("outline", "bg-background px-3 py-1.5 text-sm text-foreground")}
         >
           View Workspace
         </Link>
       </div>
-    </div>
+    </Callout>
   );
 }

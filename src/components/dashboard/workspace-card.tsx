@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import type { WorkspaceSummary } from "@/types/workspace";
-import { ProgressBar } from "../shared/progress-bar";
-import { StatusBadge } from "../shared/status-badge";
+import { cardVariants } from "../shared/containers/card";
+import { ProgressBar } from "../shared/feedback/progress-bar";
+import { StatusBadge } from "../shared/feedback/status-badge";
 
 function formatShortDate(dateStr: string): string {
   if (!dateStr) return "—";
@@ -28,9 +29,9 @@ export function WorkspaceCard({
   return (
     <Link
       href={`/workspace/${encodeURIComponent(name)}`}
-      className={`block rounded-lg border p-4 transition-colors hover:bg-accent/50${
+      className={cardVariants("default", `block transition-colors hover:bg-accent/50${
         isRunning ? " border-primary/50" : ""
-      }`}
+      }`)}
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-2">

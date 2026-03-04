@@ -4,6 +4,7 @@ import { use, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import useSWR from "swr";
 import { OperationCard } from "@/components/workspace/operation-card";
+import { StatusText } from "@/components/shared/feedback/status-text";
 import type { OperationListItem, OperationType } from "@/types/operation";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -129,9 +130,9 @@ export default function OperationsPage({
 
   if (displayOps.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <StatusText>
         No operations for this workspace. Use the buttons above to start one.
-      </p>
+      </StatusText>
     );
   }
 

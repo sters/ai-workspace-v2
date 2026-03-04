@@ -5,8 +5,12 @@ import { useRouter } from "next/navigation";
 import type { TodoFile } from "@/types/workspace";
 import { TodoItemRow } from "./todo-item";
 import { SectionBlock } from "./todo-viewer";
-import { ProgressBar } from "../shared/progress-bar";
-import { SplitButton, type SplitButtonItem } from "../shared/split-button";
+import { Card } from "../shared/containers/card";
+import { ProgressBar } from "../shared/feedback/progress-bar";
+import { SplitButton, type SplitButtonItem } from "../shared/buttons/split-button";
+import { Button } from "../shared/buttons/button";
+import { Textarea } from "../shared/forms/textarea";
+import { StatusText } from "../shared/feedback/status-text";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import type { OperationType } from "@/types/operation";
 
@@ -37,7 +41,7 @@ function UpdateForm({
 
   return (
     <div className="space-y-2">
-      <textarea
+      <Textarea
         value={instruction}
         onChange={(e) => setInstruction(e.target.value)}
         onKeyDown={(e) => {
@@ -49,7 +53,6 @@ function UpdateForm({
         placeholder={placeholder}
         disabled={disabled}
         rows={2}
-        className="w-full min-h-[2lh] resize-y rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground disabled:opacity-50"
       />
       <div className="flex justify-end">
         {items ? (
@@ -60,13 +63,12 @@ function UpdateForm({
             items={items}
           />
         ) : (
-          <button
+          <Button
             onClick={handleSubmit}
             disabled={disabled || !instruction.trim()}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {label}
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -85,7 +87,7 @@ function RepoTodoCard({
   onStartAndNavigate: (type: OperationType, body: Record<string, string>) => void;
 }) {
   return (
-    <div className="rounded-lg border p-4">
+    <Card>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-semibold">{todo.repoName}</h3>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -168,7 +170,7 @@ function RepoTodoCard({
             ))
           : todo.items.map((item, i) => <TodoItemRow key={i} item={item} />)}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -205,15 +207,13 @@ export function TodoUpdater({
   );
 
   if (todos.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No TODO files found.</p>
-    );
+    return <StatusText>No TODO files found.</StatusText>;
   }
 
   return (
     <div className="space-y-6">
       {/* Workspace-wide update form */}
-      <div className="rounded-lg border border-dashed p-4">
+      <Card variant="dashed">
         <p className="mb-2 text-sm font-medium">Update workspace TODOs</p>
         <UpdateForm
           label="Update"
@@ -268,7 +268,7 @@ export function TodoUpdater({
             },
           ]}
         />
-      </div>
+      </Card>
 
       {/* Per-repo cards */}
       {todos.map((todo) => (

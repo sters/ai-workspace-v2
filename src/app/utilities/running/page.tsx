@@ -6,6 +6,10 @@ import useSWR from "swr";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import type { ChatSessionInfo } from "@/types/chat";
 import { OperationSummary, useNow } from "@/components/operation/operation-summary";
+import { Button, buttonVariants } from "@/components/shared/buttons/button";
+import { Card } from "@/components/shared/containers/card";
+import { PageHeader } from "@/components/shared/feedback/page-header";
+import { StatusText } from "@/components/shared/feedback/status-text";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -54,63 +58,45 @@ export default function RunningPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-3">
-        <h1 className="text-2xl font-bold">Running Operations</h1>
-        <button
-          onClick={() => mutate()}
-          className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
-        >
-          Refresh
-        </button>
-      </div>
-      <p className="mb-6 text-sm text-muted-foreground">
-        All currently running operations across workspaces.
-      </p>
+      <PageHeader
+        title="Running Operations"
+        description="All currently running operations across workspaces."
+        onRefresh={() => mutate()}
+      />
 
-      {isLoading && (
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      )}
+      {isLoading && <StatusText>Loading...</StatusText>}
       {error && (
-        <p className="text-sm text-destructive">
-          Failed to fetch operations.
-        </p>
+        <StatusText variant="error">Failed to fetch operations.</StatusText>
       )}
 
-      {nothingRunning && (
-        <p className="text-sm text-muted-foreground">
-          No running operations.
-        </p>
-      )}
+      {nothingRunning && <StatusText>No running operations.</StatusText>}
 
       {running.length > 0 && (
         <div className="grid gap-3">
           {running.map((op) => (
-            <div
+            <Card
               key={op.id}
-              className="flex items-center justify-between rounded-lg border p-4"
+              className="flex items-center justify-between"
             >
               <OperationSummary operation={op} now={now} />
               <div className="flex shrink-0 items-center gap-2">
                 {getViewHref(op) ? (
                   <Link
                     href={getViewHref(op)!}
-                    className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
+                    className={buttonVariants("outline-muted")}
                   >
                     View
                   </Link>
                 ) : (
-                  <span className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground">
+                  <span className={buttonVariants("outline-muted", "text-muted-foreground cursor-default hover:bg-transparent")}>
                     View
                   </span>
                 )}
-                <button
-                  onClick={() => kill(op.id)}
-                  className="rounded-md border border-destructive/50 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
-                >
+                <Button variant="destructive-sm" onClick={() => kill(op.id)}>
                   Cancel
-                </button>
+                </Button>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
       )}
@@ -121,9 +107,9 @@ export default function RunningPage() {
           <h2 className="mb-3 text-lg font-semibold">Active Chat Sessions</h2>
           <div className="grid gap-3">
             {activeChats.map((chat) => (
-              <div
+              <Card
                 key={chat.id}
-                className="flex items-center justify-between rounded-lg border p-4"
+                className="flex items-center justify-between"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -139,12 +125,12 @@ export default function RunningPage() {
                 <div className="flex shrink-0 items-center gap-2">
                   <Link
                     href={`/workspace/${encodeURIComponent(chat.workspaceId)}/chat`}
-                    className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
+                    className={buttonVariants("outline-muted")}
                   >
                     View
                   </Link>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </>

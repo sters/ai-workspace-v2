@@ -2,6 +2,11 @@
 
 import useSWR from "swr";
 import { ClaudeOperation } from "@/components/operation/claude-operation";
+import { Button } from "@/components/shared/buttons/button";
+import { Card } from "@/components/shared/containers/card";
+import { Callout } from "@/components/shared/containers/callout";
+import { PageHeader } from "@/components/shared/feedback/page-header";
+import { StatusText } from "@/components/shared/feedback/status-text";
 
 type AuthStatus = {
   loggedIn: boolean;
@@ -30,33 +35,23 @@ export default function ClaudeAuthPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-3">
-        <h1 className="text-2xl font-bold">Claude Auth</h1>
-        <button
-          onClick={() => mutate()}
-          className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
-        >
-          Refresh
-        </button>
-      </div>
-      <p className="mb-6 text-sm text-muted-foreground">
-        Manage Claude Code authentication. Runs{" "}
-        <code className="text-xs">claude auth login</code>.
-      </p>
+      <PageHeader
+        title="Claude Auth"
+        description={`Manage Claude Code authentication. Runs claude auth login.`}
+        onRefresh={() => mutate()}
+      />
 
       {/* Auth status */}
       {isLoading && (
-        <p className="mb-4 text-sm text-muted-foreground">
-          Checking auth status...
-        </p>
+        <StatusText className="mb-4">Checking auth status...</StatusText>
       )}
       {error && (
-        <p className="mb-4 text-sm text-destructive">
+        <StatusText variant="error" className="mb-4">
           Failed to check auth status.
-        </p>
+        </StatusText>
       )}
       {status && !status.error && (
-        <div className="mb-4 rounded-lg border p-4">
+        <Card className="mb-4">
           <div className="flex items-center gap-2">
             <span
               className={`inline-block h-2 w-2 rounded-full ${
@@ -90,12 +85,12 @@ export default function ClaudeAuthPage() {
               </p>
             )}
           </div>
-        </div>
+        </Card>
       )}
       {status?.error && (
-        <div className="mb-4 rounded-lg border border-destructive/50 p-4">
-          <p className="text-sm text-destructive">{status.error}</p>
-        </div>
+        <Callout variant="error" className="mb-4">
+          <StatusText variant="error">{status.error}</StatusText>
+        </Callout>
       )}
 
       {/* Login operation */}
@@ -105,13 +100,12 @@ export default function ClaudeAuthPage() {
         onRunningChange={() => mutate()}
       >
         {({ start, isRunning }) => (
-          <button
+          <Button
             onClick={() => start("claude-login", {})}
             disabled={isRunning || isLoading}
-            className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {loggedIn ? "Relogin" : "Login"}
-          </button>
+          </Button>
         )}
       </ClaudeOperation>
     </div>

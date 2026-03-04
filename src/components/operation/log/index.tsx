@@ -8,6 +8,7 @@ import { buildDisplayNodes, groupByChildLabel, findPendingAsk } from "./display-
 import { ChildGroupSection, SubAgentSection } from "./sections";
 import { EntryRow } from "./entries";
 import { AskInput } from "./ask-input";
+import { Button } from "../../shared/buttons/button";
 
 interface OperationLogProps {
   operationId: string;
@@ -216,31 +217,33 @@ function PhaseTabBar({
 
   return (
     <div className="flex flex-col gap-0.5 rounded-lg border bg-muted/30 p-1.5">
-      <button
+      <Button
+        variant="ghost-toggle"
         onClick={() => onTabClick("all")}
         className={`rounded-md px-2.5 py-1 text-left text-xs font-medium transition-colors ${
           activeTab === "all"
             ? "bg-background text-foreground shadow-sm"
-            : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+            : "hover:bg-background/50"
         }`}
       >
         All phases
-      </button>
+      </Button>
       {phases.map((phase) => (
-        <button
+        <Button
+          variant="ghost-toggle"
           key={phase.index}
           onClick={() => onTabClick(phase.index)}
           className={`flex items-center gap-2 rounded-md px-2.5 py-1 text-left text-xs font-medium transition-colors ${
             activeTab === phase.index
               ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground hover:bg-background/50"
+              : "hover:bg-background/50"
           }`}
         >
           <span className={`shrink-0 ${statusColor[phase.status]} ${phase.status === "running" ? "animate-pulse" : ""}`}>
             {statusIcon[phase.status]}
           </span>
           <span>Phase {phase.index + 1}: {phase.label}</span>
-        </button>
+        </Button>
       ))}
     </div>
   );

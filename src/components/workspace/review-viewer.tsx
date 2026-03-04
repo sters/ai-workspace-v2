@@ -6,7 +6,11 @@ import { useRouter } from "next/navigation";
 import { MessageSquare } from "lucide-react";
 import type { ReviewSession } from "@/types/workspace";
 import { useReviewDetail } from "@/hooks/use-workspace";
-import { MarkdownRenderer } from "../shared/markdown-renderer";
+import { Button } from "../shared/buttons/button";
+import { Card, cardVariants } from "../shared/containers/card";
+import { MarkdownRenderer } from "../shared/content/markdown-renderer";
+import { Textarea } from "../shared/forms/textarea";
+import { StatusText } from "../shared/feedback/status-text";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 
 export function ReviewViewer({
@@ -50,21 +54,20 @@ export function ReviewViewer({
   );
 
   if (reviews.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No reviews found.</p>
-    );
+    return <StatusText>No reviews found.</StatusText>;
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         {reviews.map((r) => (
-          <button
+          <Button
+            variant="ghost-toggle"
             key={r.timestamp}
             onClick={() => setSelected(r.timestamp)}
             className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
               selected === r.timestamp
-                ? "border-primary bg-primary/10"
+                ? "border-primary bg-primary/10 text-foreground"
                 : "hover:bg-accent"
             }`}
           >
@@ -77,25 +80,24 @@ export function ReviewViewer({
               <span>{r.warnings} warn</span>
               <span>{r.suggestions} suggest</span>
             </div>
-          </button>
+          </Button>
         ))}
       </div>
 
       {selected && (
         <div className="space-y-4">
-          <div className="rounded-lg border border-dashed p-4">
+          <Card variant="dashed">
             <h3 className="mb-2 text-sm font-medium">Create TODO</h3>
             <div className="space-y-2">
-              <textarea
+              <Textarea
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
                 placeholder="e.g. Focus on security issues only (leave empty for all)"
                 disabled={isRunning}
                 rows={2}
-                className="w-full min-h-[2lh] resize-y rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground disabled:opacity-50"
               />
               <div className="flex justify-end">
-                <button
+                <Button
                   onClick={() =>
                     startAndNavigate({
                       workspace: workspacePath,
@@ -104,16 +106,15 @@ export function ReviewViewer({
                     })
                   }
                   disabled={isRunning}
-                  className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   Create TODO
-                </button>
+                </Button>
               </div>
             </div>
-          </div>
+          </Card>
 
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
+            <StatusText>Loading...</StatusText>
           ) : (
             <>
               {summary && (
@@ -133,7 +134,7 @@ export function ReviewViewer({
               {files && files.length > 0 && (
                 <div className="space-y-4">
                   {files.map((f) => (
-                    <details key={f.name} className="rounded-lg border">
+                    <details key={f.name} className={cardVariants("flush")}>
                       <summary className="cursor-pointer px-4 py-2 font-medium hover:bg-accent">
                         {f.name}
                       </summary>

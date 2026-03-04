@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import type { LogEntry } from "@/types/claude";
-import { MarkdownRenderer } from "../../shared/markdown-renderer";
+import { Button } from "../../shared/buttons/button";
+import { MarkdownRenderer } from "../../shared/content/markdown-renderer";
+import { Callout } from "../../shared/containers/callout";
+import { ResultBox } from "../../shared/feedback/result-box";
 
 // ---------------------------------------------------------------------------
 // Entry renderers
@@ -37,7 +40,7 @@ export function EntryRow({ entry }: { entry: LogEntry }) {
       );
     case "ask":
       return (
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950">
+        <Callout variant="warning" className="rounded-md">
           {entry.questions.map((q, i) => (
             <div key={i} className="mb-2 last:mb-0">
               <p className="font-medium">{q.question}</p>
@@ -53,18 +56,15 @@ export function EntryRow({ entry }: { entry: LogEntry }) {
               )}
             </div>
           ))}
-        </div>
+        </Callout>
       );
     case "result":
       return (
-        <div className="rounded-md bg-green-50 p-2 text-green-800 dark:bg-green-950 dark:text-green-200">
-          <MarkdownRenderer content={entry.content} />
-          {(entry.cost || entry.duration) && (
-            <div className="mt-1 text-xs opacity-70">
-              {[entry.cost, entry.duration].filter(Boolean).join(" | ")}
-            </div>
-          )}
-        </div>
+        <ResultBox
+          content={entry.content}
+          cost={entry.cost}
+          duration={entry.duration}
+        />
       );
     case "system":
       return (
@@ -113,13 +113,14 @@ export function ThinkingRow({ content }: { content: string }) {
 
   return (
     <div className="rounded-md border border-purple-200 bg-purple-50 p-2 text-xs text-purple-800 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-200">
-      <button
+      <Button
+        variant="ghost-toggle"
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1 font-medium"
       >
         <span>{expanded ? "\u25BC" : "\u25B6"}</span>
         <span>Thinking</span>
-      </button>
+      </Button>
       {expanded && (
         <div className="mt-1 whitespace-pre-wrap">{content}</div>
       )}
@@ -143,7 +144,8 @@ export function CollapsibleRow({
 
   return (
     <div className={`font-mono text-xs ${className}`}>
-      <button
+      <Button
+        variant="ghost-toggle"
         onClick={() => setExpanded(!expanded)}
         className="flex items-center gap-1 font-medium"
       >
@@ -155,7 +157,7 @@ export function CollapsibleRow({
         <span className="shrink-0 text-muted-foreground">
           ({lines.length} lines)
         </span>
-      </button>
+      </Button>
       {expanded && (
         <div className="mt-1 max-h-96 overflow-auto whitespace-pre rounded border bg-muted/30 p-2">
           {content}

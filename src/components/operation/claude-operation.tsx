@@ -4,8 +4,10 @@ import { useEffect, useRef, useMemo, useState, type ReactNode } from "react";
 import { useOperation } from "@/hooks/use-operation";
 import { OperationLog } from "./log";
 import { NextActionSuggestions } from "./next-action-suggestions";
-import { StatusBadge } from "../shared/status-badge";
-import { MarkdownRenderer } from "../shared/markdown-renderer";
+import { StatusBadge } from "../shared/feedback/status-badge";
+import { Button } from "../shared/buttons/button";
+import { Spinner } from "../shared/feedback/spinner";
+import { ResultBox } from "../shared/feedback/result-box";
 import { parseStreamEvent } from "@/lib/parsers/stream";
 import type { LogEntry } from "@/types/claude";
 import type { OperationListItem, OperationType, OperationEvent, OperationContext } from "@/types/operation";
@@ -80,32 +82,26 @@ export function ClaudeOperation({
     <div className="flex items-center gap-2">
       <StatusBadge label={operation.status} variant={operation.status} />
       {isRunning ? (
-        <button
-          onClick={cancel}
-          className="rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
-        >
+        <Button variant="destructive-sm" onClick={cancel}>
           Cancel
-        </button>
+        </Button>
       ) : (
         <>
           {isDone && operation.type !== "delete" && (
-            <button
+            <Button
+              variant="outline"
               onClick={() =>
                 handleStart(operation.type, {
                   workspace: operation.workspace,
                 })
               }
-              className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent"
             >
               Retry
-            </button>
+            </Button>
           )}
-          <button
-            onClick={reset}
-            className="text-xs text-muted-foreground underline hover:text-foreground"
-          >
+          <Button variant="ghost" onClick={reset}>
             Clear
-          </button>
+          </Button>
         </>
       )}
     </div>
@@ -133,7 +129,7 @@ export function ClaudeOperation({
 
   const startingIndicator = showStarting && (
     <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
-      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      <Spinner />
       Operation starting…
     </div>
   );
@@ -293,14 +289,11 @@ function CollapsibleOperationLog({
         const last = resultEntries[resultEntries.length - 1];
         return (
           <div className="border-t p-2">
-            <div className="rounded-md bg-green-50 p-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
-              <MarkdownRenderer content={last.kind === "result" ? last.content : ""} />
-              {last.kind === "result" && (last.cost || last.duration) && (
-                <div className="mt-1 text-xs opacity-70">
-                  {[last.cost, last.duration].filter(Boolean).join(" | ")}
-                </div>
-              )}
-            </div>
+            <ResultBox
+              content={last.kind === "result" ? last.content : ""}
+              cost={last.kind === "result" ? last.cost : undefined}
+              duration={last.kind === "result" ? last.duration : undefined}
+            />
           </div>
         );
       })()}

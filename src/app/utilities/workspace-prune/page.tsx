@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ClaudeOperation } from "@/components/operation/claude-operation";
+import { Button } from "@/components/shared/buttons/button";
 
 export default function WorkspacePrunePage() {
   const [days, setDays] = useState("7");
@@ -27,17 +28,16 @@ export default function WorkspacePrunePage() {
                 className="w-32 rounded-md border bg-background px-2 py-1.5 text-sm disabled:opacity-50"
               />
             </div>
-            <button
+            <Button
               onClick={() =>
                 start("workspace-prune", {
                   days: String(Number(days) || 7),
                 })
               }
               disabled={isRunning}
-              className="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               Run
-            </button>
+            </Button>
           </div>
         )}
       </ClaudeOperation>

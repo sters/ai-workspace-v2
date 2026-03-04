@@ -4,7 +4,10 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { OperationSummary, useNow } from "@/components/operation/operation-summary";
 import { OperationLog } from "@/components/operation/log";
 import { NextActionSuggestions } from "@/components/operation/next-action-suggestions";
-import { MarkdownRenderer } from "@/components/shared/markdown-renderer";
+import { Button } from "@/components/shared/buttons/button";
+import { Card } from "@/components/shared/containers/card";
+import { Spinner } from "@/components/shared/feedback/spinner";
+import { ResultBox } from "@/components/shared/feedback/result-box";
 import { useSSE } from "@/hooks/use-sse";
 import { parseStreamEvent } from "@/lib/parsers/stream";
 import type { OperationListItem, OperationType, OperationPhaseInfo } from "@/types/operation";
@@ -146,44 +149,39 @@ export function OperationCard({
   const lastResult = resultEntries.length > 0 ? resultEntries[resultEntries.length - 1] : null;
 
   return (
-    <div className="rounded-lg border">
+    <Card variant="flush">
       {/* Header */}
       <div className="flex items-center gap-2 p-3">
-        <button
+        <Button
+          variant="ghost-toggle"
           onClick={() => setExpanded(!expanded)}
-          className="shrink-0 text-muted-foreground hover:text-foreground"
+          className="shrink-0"
         >
           {expanded ? "\u25BC" : "\u25B6"}
-        </button>
+        </Button>
         <OperationSummary operation={effectiveOperation} now={now} />
         <div className="flex shrink-0 items-center gap-2">
           {effectiveIsRunning ? (
-            <button
-              onClick={() => onCancel(operation.id)}
-              className="rounded-md border border-destructive/50 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10"
-            >
+            <Button variant="destructive-sm" onClick={() => onCancel(operation.id)}>
               Cancel
-            </button>
+            </Button>
           ) : isDone ? (
             <>
               {operation.type !== "delete" && (
-                <button
+                <Button
+                  variant="outline"
                   onClick={() =>
                     onStartOperation(operation.type, {
                       workspace: operation.workspace,
                     })
                   }
-                  className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent"
                 >
                   Retry
-                </button>
+                </Button>
               )}
-              <button
-                onClick={() => onClear(operation.id)}
-                className="text-xs text-muted-foreground underline hover:text-foreground"
-              >
+              <Button variant="ghost" onClick={() => onClear(operation.id)}>
                 Clear
-              </button>
+              </Button>
             </>
           ) : null}
         </div>
@@ -204,7 +202,7 @@ export function OperationCard({
       {expanded && effectiveIsRunning && events.length === 0 && (
         <div className="border-t p-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            <Spinner />
             Operation starting…
           </div>
         </div>
@@ -213,14 +211,11 @@ export function OperationCard({
       {/* Result summary (always visible when done, even when collapsed) */}
       {!effectiveIsRunning && lastResult && lastResult.kind === "result" && (
         <div className="border-t p-3">
-          <div className="rounded-md bg-green-50 p-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
-            <MarkdownRenderer content={lastResult.content} />
-            {(lastResult.cost || lastResult.duration) && (
-              <div className="mt-1 text-xs opacity-70">
-                {[lastResult.cost, lastResult.duration].filter(Boolean).join(" | ")}
-              </div>
-            )}
-          </div>
+          <ResultBox
+            content={lastResult.content}
+            cost={lastResult.cost}
+            duration={lastResult.duration}
+          />
         </div>
       )}
 
@@ -236,6 +231,6 @@ export function OperationCard({
           />
         </div>
       )}
-    </div>
+    </Card>
   );
 }
