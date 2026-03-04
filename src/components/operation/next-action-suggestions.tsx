@@ -166,6 +166,7 @@ export function NextActionSuggestions({
               <Link
                 key={action.label}
                 href={`${basePath}${action.linkSubPath}`}
+                onClick={() => setHidden(true)}
                 className="rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
               >
                 {action.label}
