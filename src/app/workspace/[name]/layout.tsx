@@ -61,10 +61,11 @@ function WorkspaceLayoutContent({
   useEffect(() => {
     const action = searchParams.get("action");
     const opId = searchParams.get("operationId");
+    const isOnOperations = pathname.endsWith("/operations");
 
-    if (opId) {
+    if (opId && !isOnOperations) {
       router.replace(`/workspace/${name}/operations?operationId=${encodeURIComponent(opId)}`, { scroll: false });
-    } else if (action && VALID_AUTO_ACTIONS.has(action)) {
+    } else if (action && VALID_AUTO_ACTIONS.has(action) && !isOnOperations) {
       const params = new URLSearchParams({ action });
       if (action === "batch") {
         for (const key of ["startWith", "mode", "instruction", "draft"]) {
@@ -74,7 +75,7 @@ function WorkspaceLayoutContent({
       }
       router.replace(`/workspace/${name}/operations?${params.toString()}`, { scroll: false });
     }
-  }, [searchParams, router, name]);
+  }, [searchParams, router, name, pathname]);
 
   // Redirect to dashboard when workspace disappears (e.g. after deletion)
   useEffect(() => {
