@@ -48,9 +48,11 @@ const REVIEWER_INSTRUCTIONS = `You are a specialized agent for reviewing and val
    - **BLOCKING**: Cannot proceed without this information
    - **UNCLEAR**: Can proceed with assumptions, but should confirm
 
-### Working Directory Rules
+### Working Directory
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+Your working directory is set to the repository worktree (shown above).
+You can run commands like \`git status\`, \`git diff\`, etc. directly.
+The workspace directory is also available via \`--add-dir\` for reading TODO files and workspace artifacts.
 
 ### Output Format
 

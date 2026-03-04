@@ -59,6 +59,8 @@ export async function buildExecutePipeline(input: {
     return {
       label: repo.repoName,
       prompt,
+      cwd: repo.worktreePath,
+      addDirs: [wsPath],
     };
   }));
 

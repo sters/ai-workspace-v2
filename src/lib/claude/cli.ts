@@ -164,7 +164,7 @@ export function runClaude(
   };
 
   log(operationId, "starting CLI query");
-  log(operationId, "cwd:", AI_WORKSPACE_ROOT);
+  log(operationId, "cwd:", options?.cwd ?? AI_WORKSPACE_ROOT);
   log(operationId, "prompt:", prompt.slice(0, 200) + (prompt.length > 200 ? "..." : ""));
   log(operationId, "getCliPath():", getCliPath());
 
@@ -181,6 +181,7 @@ export function runClaude(
       "--output-format", "stream-json",
       "--verbose",
       ...(options?.jsonSchema ? ["--json-schema", JSON.stringify(options.jsonSchema)] : []),
+      ...(options?.addDirs?.flatMap((dir) => ["--add-dir", dir]) ?? []),
       ...(resumeSessionId ? ["--resume", resumeSessionId] : []),
     ];
 
@@ -191,6 +192,7 @@ export function runClaude(
 
     const proc = spawnClaude({
       args: cliArgs,
+      cwd: options?.cwd,
       stdin: useStdin ? "pipe" : undefined,
     });
     currentProc = proc;

@@ -60,6 +60,8 @@ export async function buildReviewPipeline(input: {
         repoChanges: `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`,
         reviewFilePath: path.join(reviewDir, reviewFileName),
       }),
+      cwd: repo.worktreePath,
+      addDirs: [wsPath],
     });
 
     // TODO verifier
@@ -81,6 +83,8 @@ export async function buildReviewPipeline(input: {
         worktreePath: repo.worktreePath,
         verifyFilePath: path.join(reviewDir, verifyFileName),
       }),
+      cwd: repo.worktreePath,
+      addDirs: [wsPath],
     });
   }
 

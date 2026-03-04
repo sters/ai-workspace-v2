@@ -1,3 +1,4 @@
+import path from "node:path";
 import { getReadme } from "@/lib/workspace/reader";
 import { parseReadmeMeta } from "@/lib/parsers/readme";
 import {
@@ -7,6 +8,7 @@ import {
   checkExistingPR,
   readPRTemplate,
 } from "@/lib/workspace";
+import { WORKSPACE_DIR } from "@/lib/config";
 import { buildPRCreatorPrompt } from "@/lib/templates";
 import type { PipelinePhase } from "@/types/pipeline";
 
@@ -48,6 +50,8 @@ export async function buildCreatePrPipeline(input: {
     return {
       label: repo.repoName,
       prompt,
+      cwd: repo.worktreePath,
+      addDirs: [path.join(WORKSPACE_DIR, workspace)],
     };
   });
 

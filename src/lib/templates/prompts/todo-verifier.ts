@@ -45,7 +45,7 @@ function verifierInstructions(worktreePath: string, baseBranch: string): string 
 
 2. **Get Changed Files**:
    \`\`\`bash
-   git -C ${worktreePath} diff --name-only origin/${baseBranch}...HEAD
+   git diff --name-only origin/${baseBranch}...HEAD
    \`\`\`
 
 3. **Verify Each TODO Item**:
@@ -59,9 +59,11 @@ function verifierInstructions(worktreePath: string, baseBranch: string): string 
 
 5. **Write Verification Report** to the specified file path
 
-### Working Directory Rules
+### Working Directory
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+Your working directory is set to the repository worktree (\`${worktreePath}\`).
+You can run commands like \`git diff\`, \`git log\`, etc. directly.
+The workspace directory is also available via \`--add-dir\` for writing verification reports.
 
 ### Guidelines
 

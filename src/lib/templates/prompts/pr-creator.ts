@@ -80,19 +80,11 @@ const PR_CREATOR_INSTRUCTIONS = `You are a specialized agent for creating or upd
 5. **Push** latest changes: \`git push\`
 6. **Update** PR using \`gh pr edit\`
 
-### Working Directory Rules
+### Working Directory
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
-
-For git operations:
-\`\`\`bash
-git -C <worktree-path> push -u origin <branch>
-\`\`\`
-
-For gh operations, use \`--repo\` flag or run from the worktree:
-\`\`\`bash
-gh pr create --repo <owner/repo> ...
-\`\`\`
+Your working directory is set to the repository worktree (shown above).
+You can run \`git push\`, \`gh pr create\`, etc. directly.
+The workspace directory is also available via \`--add-dir\` for reading workspace artifacts.
 
 ### Guidelines
 

@@ -13,6 +13,10 @@ export interface ClaudeProcess {
 export interface RunClaudeOptions {
   /** JSON Schema to constrain the model's final text response via --json-schema. */
   jsonSchema?: Record<string, unknown>;
+  /** Working directory for the spawned process. Defaults to AI_WORKSPACE_ROOT. */
+  cwd?: string;
+  /** Additional directories to expose via --add-dir. */
+  addDirs?: string[];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

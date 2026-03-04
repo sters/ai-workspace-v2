@@ -458,9 +458,10 @@ export function startOperationPipeline(
             runChild: async (label, prompt, childOptions) => {
               const cid = `${id}-phase-${i}-fn-${childCounter++}`;
               operation.children!.push({ id: cid, label, status: "running" });
-              const claudeOpts: RunClaudeOptions | undefined = childOptions?.jsonSchema
-                ? { jsonSchema: childOptions.jsonSchema }
-                : undefined;
+              const claudeOpts: RunClaudeOptions | undefined =
+                (childOptions?.jsonSchema || childOptions?.cwd || childOptions?.addDirs)
+                  ? { jsonSchema: childOptions.jsonSchema, cwd: childOptions.cwd, addDirs: childOptions.addDirs }
+                  : undefined;
               const proc = runClaude(cid, prompt, claudeOpts);
               const result = await wireChild(managed, cid, label, proc, phaseExtra);
               if (result.resultText && childOptions?.onResultText) {
@@ -484,7 +485,11 @@ export function startOperationPipeline(
                 return sem.run(async () => {
                   const cid = `${id}-phase-${i}-fn-${childCounter++}`;
                   operation.children!.push({ id: cid, label: child.label, status: "running" });
-                  const proc = runClaude(cid, child.prompt);
+                  const claudeOpts: RunClaudeOptions | undefined =
+                    (child.cwd || child.addDirs)
+                      ? { cwd: child.cwd, addDirs: child.addDirs }
+                      : undefined;
+                  const proc = runClaude(cid, child.prompt, claudeOpts);
                   const result = await wireChild(managed, cid, child.label, proc, phaseExtra);
                   return result.success;
                 });
@@ -524,7 +529,11 @@ export function startOperationPipeline(
           return groupSem.run(async () => {
             const childId = `${id}-phase-${i}-child-${j}`;
             operation.children!.push({ id: childId, label: child.label, status: "running" });
-            const process = runClaude(childId, child.prompt);
+            const claudeOpts: RunClaudeOptions | undefined =
+              (child.cwd || child.addDirs)
+                ? { cwd: child.cwd, addDirs: child.addDirs }
+                : undefined;
+            const process = runClaude(childId, child.prompt, claudeOpts);
             const result = await wireChild(managed, childId, child.label, process, phaseExtra);
             return result.success;
           });

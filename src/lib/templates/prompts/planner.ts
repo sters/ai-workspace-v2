@@ -67,9 +67,11 @@ const PLANNER_INSTRUCTIONS = `You are a specialized agent for creating TODO item
 
 Write the TODO file to: workspace/{workspace-name}/TODO-{repository-name}.md
 
-### Working Directory Rules
+### Working Directory
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+Your working directory is set to the repository worktree (shown above).
+You can run commands like \`git status\`, \`git diff\`, etc. directly.
+The workspace directory is also available via \`--add-dir\` for reading/writing TODO templates and workspace artifacts.
 
 ### TODO Item Format
 
@@ -128,9 +130,11 @@ const RESEARCH_PLANNER_INSTRUCTIONS = `You are a specialized agent for creating 
 
 Write the TODO file to: workspace/{workspace-name}/TODO-{repository-name}.md
 
-### Working Directory Rules
+### Working Directory
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+Your working directory is set to the repository worktree (shown above).
+You can run commands like \`git status\`, \`git diff\`, etc. directly.
+The workspace directory is also available via \`--add-dir\` for reading/writing TODO templates and workspace artifacts.
 
 ### TODO Item Format
 
