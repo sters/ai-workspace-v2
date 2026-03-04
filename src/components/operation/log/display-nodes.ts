@@ -1,6 +1,9 @@
 import type { LogEntry, AskQuestion } from "@/types/claude";
 import type { DisplayNode } from "@/types/claude";
 
+/** Tool names that represent sub-agent spawns (CLI uses "Agent", SDK uses "Task"). */
+const SUBAGENT_TOOL_NAMES = new Set(["Task", "Agent"]);
+
 /** Extract output_file path from a background Task tool_result text. */
 function extractOutputFilePath(text: string): string | undefined {
   // SDK background task results contain "output_file" or "output file" followed by an absolute path
@@ -9,21 +12,18 @@ function extractOutputFilePath(text: string): string | undefined {
   return match?.[1];
 }
 
-export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
-  const nodes: DisplayNode[] = [];
+type TaskInfo = {
+  description: string;
+  status: "running" | "completed" | "failed" | "stopped";
+  summary?: string;
+  usage?: string;
+  taskId?: string;
+  outputFile?: string;
+};
 
-  // Collect task_started descriptions and task_notification data by toolUseId
-  const taskInfo = new Map<
-    string,
-    {
-      description: string;
-      status: "running" | "completed" | "failed" | "stopped";
-      summary?: string;
-      usage?: string;
-      taskId?: string;
-      outputFile?: string;
-    }
-  >();
+export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
+  // 1. Collect task info (descriptions, statuses) from system entries
+  const taskInfo = new Map<string, TaskInfo>();
 
   for (const e of entries) {
     if (e.kind === "system" && e.taskToolUseId) {
@@ -47,106 +47,137 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
     }
   }
 
-  // Find all Task tool_call ids (these are parent tool_use_ids for sub-agents)
+  // 2. Find all sub-agent tool_call ids (Task or Agent)
   const taskToolUseIds = new Set<string>();
   for (const e of entries) {
-    if (e.kind === "tool_call" && e.toolName === "Task") {
+    if (e.kind === "tool_call" && SUBAGENT_TOOL_NAMES.has(e.toolName)) {
       taskToolUseIds.add(e.toolId);
     }
   }
-  // Also add any parent IDs seen on entries
   for (const e of entries) {
     if (e.parentToolUseId) {
       taskToolUseIds.add(e.parentToolUseId);
     }
   }
-  // Also add task_started toolUseIds
   for (const id of taskInfo.keys()) {
     taskToolUseIds.add(id);
   }
 
-  // Extract output_file from background Task tool_results (returned immediately when
-  // run_in_background is true, before task_notification arrives)
+  // 3. Infer completion from tool_results when no task_notification was received.
+  //    The CLI's Agent tool may not emit task_notification, so the tool_result
+  //    for the Agent call is the only signal that the sub-agent finished.
+  const toolResultIds = new Set<string>();
+  const toolResultErrors = new Set<string>();
   for (const e of entries) {
-    if (e.kind === "tool_result" && taskToolUseIds.has(e.toolId) && e.content) {
-      const outputFile = extractOutputFilePath(e.content);
-      if (outputFile) {
-        const existing = taskInfo.get(e.toolId);
-        if (existing) {
-          existing.outputFile = existing.outputFile ?? outputFile;
+    if (e.kind === "tool_result" && taskToolUseIds.has(e.toolId)) {
+      toolResultIds.add(e.toolId);
+      if (e.isError) toolResultErrors.add(e.toolId);
+
+      // Extract output_file from background Task tool_results
+      if (e.content) {
+        const outputFile = extractOutputFilePath(e.content);
+        if (outputFile) {
+          const existing = taskInfo.get(e.toolId);
+          if (existing) {
+            existing.outputFile = existing.outputFile ?? outputFile;
+          }
         }
       }
     }
   }
 
-  // Bucket sub-agent entries
-  const subagentEntries = new Map<string, LogEntry[]>();
-  for (const id of taskToolUseIds) {
-    subagentEntries.set(id, []);
+  // Update taskInfo status for sub-agents that have a tool_result but no
+  // task_notification (status is still "running")
+  for (const id of toolResultIds) {
+    const info = taskInfo.get(id);
+    if (info && info.status === "running") {
+      info.status = toolResultErrors.has(id) ? "failed" : "completed";
+    }
   }
 
-  // Track which toolUseIds have their sub-agent section already emitted
-  const emitted = new Set<string>();
+  // 4. Bucket ALL entries by parentToolUseId (null key = top-level)
+  const buckets = new Map<string | null, LogEntry[]>();
+  buckets.set(null, []);
+  for (const id of taskToolUseIds) {
+    buckets.set(id, []);
+  }
 
   for (const e of entries) {
-    const pid = e.parentToolUseId;
-
-    // Skip task_started/task_notification system entries — they're shown in the section header
+    // Skip system task entries (shown in section header)
     if (e.kind === "system" && e.taskToolUseId && taskToolUseIds.has(e.taskToolUseId)) {
-      // If this is a task_notification (not running), ensure we still emit the group
-      if (!emitted.has(e.taskToolUseId)) {
-        // Don't emit here — it'll be emitted when we encounter the Task tool_call
-      }
       continue;
     }
-
-    // Sub-agent entry
-    if (pid && subagentEntries.has(pid)) {
-      subagentEntries.get(pid)!.push(e);
-      continue;
-    }
-
-    // Top-level Task tool_call → emit the sub-agent section
-    if (e.kind === "tool_call" && e.toolName === "Task" && !emitted.has(e.toolId)) {
-      emitted.add(e.toolId);
-      const info = taskInfo.get(e.toolId);
-      nodes.push({
-        type: "subagent",
-        toolUseId: e.toolId,
-        description: info?.description ?? e.summary,
-        status: info?.status ?? "running",
-        summary: info?.summary,
-        usage: info?.usage,
-        taskId: info?.taskId,
-        outputFile: info?.outputFile,
-        entries: subagentEntries.get(e.toolId) ?? [],
-      });
-      continue;
-    }
-
-    // Top-level tool_result for a Task — skip (already in the section header status)
-    if (e.kind === "tool_result" && taskToolUseIds.has(e.toolId)) {
-      continue;
-    }
-
-    // tool_progress for a task — skip (handled in section)
+    // Skip tool_progress for tasks (handled in section)
     if (e.kind === "tool_progress" && e.taskId) {
       continue;
     }
 
-    // Regular top-level entry
-    nodes.push({ type: "entry", entry: e });
+    const pid = e.parentToolUseId ?? null;
+    if (pid && buckets.has(pid)) {
+      buckets.get(pid)!.push(e);
+    } else {
+      buckets.get(null)!.push(e);
+    }
   }
 
-  // Emit any sub-agent groups that weren't tied to a Task tool_call
-  // (e.g., task_started arrived but no Task tool_call was seen yet)
+  // 5. Build nodes recursively from a bucket
+  function buildFromBucket(bucketKey: string | null): DisplayNode[] {
+    const bucketEntries = buckets.get(bucketKey) ?? [];
+    const nodes: DisplayNode[] = [];
+    const emitted = new Set<string>();
+
+    for (const e of bucketEntries) {
+      // Sub-agent tool_call → emit sub-agent section with recursively built children
+      if (e.kind === "tool_call" && SUBAGENT_TOOL_NAMES.has(e.toolName) && !emitted.has(e.toolId)) {
+        emitted.add(e.toolId);
+        const info = taskInfo.get(e.toolId);
+        nodes.push({
+          type: "subagent",
+          toolUseId: e.toolId,
+          description: info?.description ?? e.summary,
+          status: info?.status ?? "running",
+          summary: info?.summary,
+          usage: info?.usage,
+          taskId: info?.taskId,
+          outputFile: info?.outputFile,
+          children: buildFromBucket(e.toolId),
+        });
+        continue;
+      }
+
+      // tool_result for a sub-agent — skip (status shown in section header)
+      if (e.kind === "tool_result" && taskToolUseIds.has(e.toolId)) {
+        continue;
+      }
+
+      // Regular entry
+      nodes.push({ type: "entry", entry: e });
+    }
+
+    return nodes;
+  }
+
+  const nodes = buildFromBucket(null);
+
+  // 6. Emit orphan sub-agent groups (task_started arrived but no tool_call was seen)
+  const emittedInTree = new Set<string>();
+  function collectEmitted(nodeList: DisplayNode[]) {
+    for (const n of nodeList) {
+      if (n.type === "subagent") {
+        emittedInTree.add(n.toolUseId);
+        collectEmitted(n.children);
+      } else if (n.type === "child-group") {
+        collectEmitted(n.children);
+      }
+    }
+  }
+  collectEmitted(nodes);
+
   for (const id of taskToolUseIds) {
-    if (!emitted.has(id)) {
+    if (!emittedInTree.has(id)) {
       const info = taskInfo.get(id);
-      const childEntries = subagentEntries.get(id) ?? [];
-      // Only emit if we have task info or child entries
-      if (info || childEntries.length > 0) {
-        emitted.add(id);
+      const childNodes = buildFromBucket(id);
+      if (info || childNodes.length > 0) {
         nodes.push({
           type: "subagent",
           toolUseId: id,
@@ -156,7 +187,7 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
           usage: info?.usage,
           taskId: info?.taskId,
           outputFile: info?.outputFile,
-          entries: childEntries,
+          children: childNodes,
         });
       }
     }
@@ -172,8 +203,9 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
 function getChildLabel(node: DisplayNode): string | undefined {
   if (node.type === "entry") return node.entry.childLabel;
   if (node.type === "subagent") {
-    for (const entry of node.entries) {
-      if (entry.childLabel) return entry.childLabel;
+    for (const child of node.children) {
+      const label = getChildLabel(child);
+      if (label) return label;
     }
   }
   return undefined;

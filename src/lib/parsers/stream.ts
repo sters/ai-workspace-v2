@@ -16,6 +16,7 @@ function summarizeToolInput(name: string, input: any): string {
     case "Grep":
       return `/${input?.pattern ?? ""}/`;
     case "Task":
+    case "Agent":
       return input?.description ?? input?.prompt?.slice(0, 80) ?? "";
     case "WebFetch":
       return input?.url ?? "";

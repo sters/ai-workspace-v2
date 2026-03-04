@@ -94,8 +94,8 @@ export type DisplayNode =
       taskId?: string;
       /** Output file path for background tasks. */
       outputFile?: string;
-      /** Sub-agent messages (if any come through the SDK stream). */
-      entries: LogEntry[];
+      /** Child display nodes (sub-agent messages, including nested sub-agents). */
+      children: DisplayNode[];
     }
   | {
       type: "child-group";
