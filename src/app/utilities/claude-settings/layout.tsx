@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/shared/feedback/page-header";
 
 const TABS = [
   { label: "Project", segment: "project" },
@@ -22,11 +23,10 @@ export default function ClaudeSettingsLayout({
 
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-bold">Claude Settings</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        View and edit <code className="text-xs">.claude/settings*.json</code>{" "}
-        files across project, local, and user scopes.
-      </p>
+      <PageHeader
+        title="Claude Settings"
+        description={<>View and edit <code className="text-xs">.claude/settings*.json</code> files across project, local, and user scopes.</>}
+      />
 
       <div className="mb-4 flex border-b">
         {TABS.map((tab) => {

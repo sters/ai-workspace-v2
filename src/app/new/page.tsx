@@ -7,17 +7,17 @@ import { ClaudeOperation } from "@/components/operation/claude-operation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import { buttonVariants } from "@/components/shared/buttons/button";
 import { Callout } from "@/components/shared/containers/callout";
+import { PageHeader } from "@/components/shared/feedback/page-header";
 
 export default function NewWorkspacePage() {
   const [description, setDescription] = useState("");
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">New Workspace</h1>
-      <p className="mb-4 text-sm text-muted-foreground">
-        Describe the task, ticket, or feature. Claude will determine the task
-        type, repositories, and workspace name automatically.
-      </p>
+      <PageHeader
+        title="New Workspace"
+        description="Describe the task, ticket, or feature. Claude will determine the task type, repositories, and workspace name automatically."
+      />
 
       <div className="mb-4">
         <label className="mb-1 block text-xs font-medium">

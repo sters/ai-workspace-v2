@@ -9,7 +9,7 @@ export function PageHeader({
   action,
 }: {
   title: string;
-  description: string;
+  description?: ReactNode;
   onRefresh?: () => void;
   refreshLabel?: string;
   action?: ReactNode;
@@ -25,7 +25,9 @@ export function PageHeader({
         )}
         {action}
       </div>
-      <p className="mb-6 text-sm text-muted-foreground">{description}</p>
+      {description && (
+        <p className="mb-6 text-sm text-muted-foreground">{description}</p>
+      )}
     </>
   );
 }

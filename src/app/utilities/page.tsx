@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cardVariants } from "@/components/shared/containers/card";
+import { PageHeader } from "@/components/shared/feedback/page-header";
 
 const tools = [
   {
@@ -42,7 +43,7 @@ const tools = [
 export default function UtilitiesPage() {
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-bold">Utilities</h1>
+      <PageHeader title="Utilities" />
       <div className="grid gap-3">
         {tools.map((tool) => (
           <Link
