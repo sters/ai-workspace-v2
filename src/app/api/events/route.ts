@@ -55,8 +55,12 @@ export async function GET(request: Request) {
       // SSE comment to establish connection
       controller.enqueue(encoder.encode(":ok\n\n"));
 
-      // Send existing events
-      const existing = getOperationEvents(operationId);
+      // Send existing events (memory first, fall back to disk for completed ops)
+      let existing = getOperationEvents(operationId);
+      if (existing.length === 0 && operation.status !== "running") {
+        const stored = readOperationLog(operationId);
+        if (stored) existing = stored.events;
+      }
       console.log(`[sse][${operationId}] sending ${existing.length} existing events`);
       for (const event of existing) {
         controller.enqueue(
