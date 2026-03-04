@@ -12,7 +12,7 @@ export async function POST(request: Request) {
 
   try {
     const phases = buildInitPipeline(description);
-    const operation = startOperationPipeline("init", "", phases);
+    const operation = startOperationPipeline("init", "", phases, undefined, { description });
     return NextResponse.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {

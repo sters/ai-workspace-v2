@@ -51,6 +51,14 @@ export async function POST(request: Request) {
       "batch",
       startWith === "init" ? "" : workspace!,
       phases,
+      undefined,
+      {
+        mode,
+        startWith,
+        ...(description?.trim() && { description: description.trim() }),
+        ...(instruction && { instruction }),
+        ...(draft != null && { draft: String(draft) }),
+      },
     );
     return NextResponse.json(operation);
   } catch (err) {

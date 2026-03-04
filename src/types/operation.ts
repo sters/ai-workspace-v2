@@ -38,6 +38,8 @@ export interface Operation {
   completedAt?: string;
   children?: OperationChild[];
   phases?: OperationPhaseInfo[];
+  /** User-provided inputs when the operation was started (e.g. instruction, description). */
+  inputs?: Record<string, string>;
 }
 
 export interface OperationEvent {
