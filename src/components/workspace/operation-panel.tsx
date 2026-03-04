@@ -19,7 +19,7 @@ export function OperationPanel({
   repositories?: { alias: string; path: string }[];
 }) {
   const router = useRouter();
-  const { operations, isWorkspaceRunning } = useRunningOperations();
+  const { operations, isWorkspaceRunning, isWorkspaceTypeRunning } = useRunningOperations();
   const isRunning = isWorkspaceRunning(workspaceName);
 
   // Find the running operation for this workspace to link to
@@ -56,7 +56,7 @@ export function OperationPanel({
           onClick={() =>
             startAndNavigate("execute", { workspace: workspacePath })
           }
-          disabled={isRunning}
+          disabled={isWorkspaceTypeRunning(workspaceName, "execute")}
           items={[
             {
               label: "Execute \u2192 Review",
@@ -101,7 +101,7 @@ export function OperationPanel({
           onClick={() =>
             startAndNavigate("review", { workspace: workspacePath })
           }
-          disabled={isRunning}
+          disabled={isWorkspaceTypeRunning(workspaceName, "review")}
         >
           Review
         </Button>
@@ -110,7 +110,7 @@ export function OperationPanel({
           onClick={() =>
             startAndNavigate("create-pr", { workspace: workspacePath })
           }
-          disabled={isRunning}
+          disabled={isWorkspaceTypeRunning(workspaceName, "create-pr")}
         >
           Create PR
         </Button>
@@ -123,7 +123,7 @@ export function OperationPanel({
           onClick={() =>
             startAndNavigate("delete", { workspace: workspacePath })
           }
-          disabled={isRunning}
+          disabled={isWorkspaceTypeRunning(workspaceName, "delete")}
         >
           Delete workspace
         </Button>

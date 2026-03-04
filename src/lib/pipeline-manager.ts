@@ -595,6 +595,7 @@ function toSummary(op: Operation): OperationListItem {
     startedAt: op.startedAt,
     completedAt: op.completedAt,
     ...(currentPhase && { currentPhase }),
+    ...(op.inputs && { inputs: op.inputs }),
   };
 }
 

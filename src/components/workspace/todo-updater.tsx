@@ -184,8 +184,8 @@ export function TodoUpdater({
   workspaceName: string;
 }) {
   const router = useRouter();
-  const { isWorkspaceRunning } = useRunningOperations();
-  const isRunning = isWorkspaceRunning(workspaceName);
+  const { isWorkspaceTypeRunning } = useRunningOperations();
+  const isRunning = isWorkspaceTypeRunning(workspaceName, "update-todo");
 
   const startAndNavigate = useCallback(
     async (type: OperationType, body: Record<string, string>) => {
