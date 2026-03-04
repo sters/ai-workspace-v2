@@ -5,7 +5,28 @@ import { parseStreamEvent } from "@/lib/parsers/stream";
 import type { LogEntry } from "@/types/claude";
 import { useSubagentOutput } from "@/hooks/use-subagent-output";
 import type { DisplayNode } from "@/types/claude";
+import { buildDisplayNodes } from "./display-nodes";
 import { EntryRow } from "./entries";
+
+// ---------------------------------------------------------------------------
+// Render a list of DisplayNode[], dispatching to the correct component
+// ---------------------------------------------------------------------------
+
+function DisplayNodeList({ nodes }: { nodes: DisplayNode[] }) {
+  return (
+    <div className="space-y-1.5">
+      {nodes.map((node, i) =>
+        node.type === "entry" ? (
+          <EntryRow key={i} entry={node.entry} />
+        ) : node.type === "subagent" ? (
+          <SubAgentSection key={node.toolUseId} group={node} />
+        ) : (
+          <ChildGroupSection key={node.label} group={node} />
+        )
+      )}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Child-group section (for operation groups/pipelines)
@@ -64,17 +85,7 @@ export function ChildGroupSection({
 
       {expanded && otherNodes.length > 0 && (
         <div className="border-t border-teal-200 bg-teal-50/30 p-2 dark:border-teal-800 dark:bg-teal-950/20">
-          <div className="space-y-1.5">
-            {otherNodes.map((node, i) =>
-              node.type === "entry" ? (
-                <EntryRow key={i} entry={node.entry} />
-              ) : node.type === "subagent" ? (
-                <SubAgentSection key={node.toolUseId} group={node} />
-              ) : (
-                <ChildGroupSection key={node.label} group={node} />
-              )
-            )}
-          </div>
+          <DisplayNodeList nodes={otherNodes} />
         </div>
       )}
 
@@ -101,18 +112,18 @@ export function SubAgentSection({
   group: Extract<DisplayNode, { type: "subagent" }>;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const hasEntries = group.entries.length > 0;
+  const hasChildren = group.children.length > 0;
   const hasOutputFile = !!group.outputFile;
-  const isExpandable = hasEntries || hasOutputFile || group.status === "running";
+  const isExpandable = hasChildren || hasOutputFile || group.status === "running";
 
   const output = useSubagentOutput(
     group.outputFile,
     group.status === "running",
-    expanded && !hasEntries && hasOutputFile
+    expanded && !hasChildren && hasOutputFile
   );
 
-  // Parse output file content (JSON lines) into LogEntry[] just like the main stream
-  const outputEntries = useMemo(() => {
+  // Parse output file content (JSON lines) into DisplayNode[] just like the main stream
+  const outputNodes = useMemo(() => {
     if (!output.content) return [];
     const entries: LogEntry[] = [];
     for (const line of output.content.split("\n")) {
@@ -120,7 +131,7 @@ export function SubAgentSection({
       if (!trimmed) continue;
       entries.push(...parseStreamEvent(trimmed));
     }
-    return entries;
+    return buildDisplayNodes(entries);
   }, [output.content]);
 
   const statusColor = {
@@ -160,9 +171,9 @@ export function SubAgentSection({
         {group.usage && (
           <span className="text-muted-foreground">{group.usage}</span>
         )}
-        {hasEntries && (
+        {hasChildren && (
           <span className="text-muted-foreground">
-            ({group.entries.length} events)
+            ({group.children.length} events)
           </span>
         )}
         {group.status === "running" && (
@@ -177,31 +188,23 @@ export function SubAgentSection({
         </div>
       )}
 
-      {/* Expanded child entries (when SDK streams sub-agent messages) */}
-      {expanded && hasEntries && (
+      {/* Expanded children (sub-agent messages, nested sub-agents) */}
+      {expanded && hasChildren && (
         <div className="border-t border-indigo-200 bg-indigo-50/30 p-2 dark:border-indigo-800 dark:bg-indigo-950/20">
-          <div className="space-y-1.5">
-            {group.entries.map((entry, i) => (
-              <EntryRow key={i} entry={entry} />
-            ))}
-          </div>
+          <DisplayNodeList nodes={group.children} />
         </div>
       )}
 
       {/* Background task output file content (parsed like main log) */}
-      {expanded && !hasEntries && hasOutputFile && (
+      {expanded && !hasChildren && hasOutputFile && (
         <div className="border-t border-indigo-200 bg-indigo-50/30 p-2 dark:border-indigo-800 dark:bg-indigo-950/20">
-          {output.loading && outputEntries.length === 0 ? (
+          {output.loading && outputNodes.length === 0 ? (
             <div className="text-xs text-muted-foreground italic">Loading output...</div>
-          ) : output.error && outputEntries.length === 0 ? (
+          ) : output.error && outputNodes.length === 0 ? (
             <div className="text-xs text-red-500 italic">Failed to load output</div>
-          ) : outputEntries.length > 0 ? (
+          ) : outputNodes.length > 0 ? (
             <div className="max-h-96 overflow-auto">
-              <div className="space-y-1.5">
-                {outputEntries.map((entry, i) => (
-                  <EntryRow key={i} entry={entry} />
-                ))}
-              </div>
+              <DisplayNodeList nodes={outputNodes} />
             </div>
           ) : (
             <div className="text-xs text-muted-foreground italic">No output yet</div>
@@ -210,7 +213,7 @@ export function SubAgentSection({
       )}
 
       {/* Running background task with no output file yet */}
-      {expanded && !hasEntries && !hasOutputFile && group.status === "running" && (
+      {expanded && !hasChildren && !hasOutputFile && group.status === "running" && (
         <div className="border-t border-indigo-200 bg-indigo-50/30 p-2 dark:border-indigo-800 dark:bg-indigo-950/20">
           <div className="text-xs text-muted-foreground italic">
             Task running in background...
