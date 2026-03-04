@@ -13,14 +13,12 @@ interface OperationLogProps {
   operationId: string;
   events: OperationEvent[];
   isRunning: boolean;
-  phases?: OperationPhaseInfo[];
 }
 
 export function OperationLog({
   operationId,
   events,
   isRunning,
-  phases: initialPhases,
 }: OperationLogProps) {
   const [activePhaseTab, setActivePhaseTab] = useState<number | "all">("all");
   const userSelectedTabRef = useRef(false);
@@ -76,22 +74,24 @@ export function OperationLog({
     return result;
   }, [events]);
 
-  // Derive live phase statuses from __phaseUpdate events
+  // Derive live phase statuses from __phaseUpdate events in the stream
   const livePhases = useMemo(() => {
-    if (!initialPhases || initialPhases.length === 0) return undefined;
-
     const phaseMap = new Map<number, OperationPhaseInfo>();
-    for (const p of initialPhases) {
-      phaseMap.set(p.index, { ...p });
-    }
 
     for (const entry of entries) {
       if (entry.kind === "system" && entry.content.startsWith("__phaseUpdate:")) {
         try {
           const data = JSON.parse(entry.content.slice("__phaseUpdate:".length));
-          const existing = phaseMap.get(data.phaseIndex);
+          const idx = data.phaseIndex as number;
+          const existing = phaseMap.get(idx);
           if (existing) {
             existing.status = data.phaseStatus;
+          } else {
+            phaseMap.set(idx, {
+              index: idx,
+              label: data.phaseLabel ?? `Phase ${idx + 1}`,
+              status: data.phaseStatus,
+            });
           }
         } catch {
           // ignore parse errors
@@ -99,8 +99,9 @@ export function OperationLog({
       }
     }
 
+    if (phaseMap.size === 0) return undefined;
     return Array.from(phaseMap.values()).sort((a, b) => a.index - b.index);
-  }, [initialPhases, entries]);
+  }, [entries]);
 
   // Auto-switch to the latest running phase (unless user manually selected a tab)
   useEffect(() => {

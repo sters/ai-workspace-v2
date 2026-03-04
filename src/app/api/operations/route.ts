@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getOperations } from "@/lib/pipeline-manager";
+import { getOperationSummaries } from "@/lib/pipeline-manager";
 import { listStoredOperations } from "@/lib/operation-store";
+import type { OperationListItem } from "@/types/operation";
 
 export const dynamic = "force-dynamic";
 
@@ -8,13 +9,13 @@ export function GET(request: Request) {
   const url = new URL(request.url);
   const workspace = url.searchParams.get("workspace");
 
-  // Merge in-memory operations with disk-stored operations
-  const inMemory = getOperations();
+  // Merge in-memory summaries with disk-stored summaries
+  const inMemory = getOperationSummaries();
   const inMemoryIds = new Set(inMemory.map((op) => op.id));
 
   // When workspace is specified, only scan that directory on disk
   const stored = listStoredOperations(workspace ?? undefined).filter((op) => !inMemoryIds.has(op.id));
-  let merged = [...inMemory, ...stored];
+  let merged: OperationListItem[] = [...inMemory, ...stored];
 
   // Filter in-memory operations by workspace (disk ones are already filtered)
   if (workspace) {

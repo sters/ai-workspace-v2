@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Operation, OperationPhaseInfo } from "@/types/operation";
+import type { OperationListItem, OperationPhaseInfo } from "@/types/operation";
 
 export function formatRemaining(ms: number): string {
   if (ms <= 0) return "expired";
@@ -65,10 +65,10 @@ export function OperationSummary({
   operation,
   now,
 }: {
-  operation: Operation;
+  operation: OperationListItem;
   now: number;
 }) {
-  const currentPhase = operation.phases?.find((p) => p.status === "running");
+  const currentPhase = operation.currentPhase;
 
   return (
     <div className="min-w-0 flex-1">

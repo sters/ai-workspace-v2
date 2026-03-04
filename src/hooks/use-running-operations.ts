@@ -1,10 +1,10 @@
 import useSWR from "swr";
-import type { Operation } from "@/types/operation";
+import type { OperationListItem } from "@/types/operation";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function useRunningOperations() {
-  const { data, mutate } = useSWR<Operation[]>("/api/operations", fetcher, {
+  const { data, mutate } = useSWR<OperationListItem[]>("/api/operations", fetcher, {
     refreshInterval: 3000,
   });
 

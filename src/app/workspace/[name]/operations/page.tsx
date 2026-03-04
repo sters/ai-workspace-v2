@@ -4,7 +4,7 @@ import { use, useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import useSWR from "swr";
 import { OperationCard } from "@/components/workspace/operation-card";
-import type { Operation, OperationType } from "@/types/operation";
+import type { OperationListItem, OperationType } from "@/types/operation";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -27,15 +27,14 @@ export default function OperationsPage({
   const router = useRouter();
   const pathname = usePathname();
 
-  // Poll operations filtered by this workspace
-  const { data, mutate } = useSWR<Operation[]>(
-    "/api/operations",
+  // Poll operation summaries filtered by this workspace
+  const { data, mutate } = useSWR<OperationListItem[]>(
+    `/api/operations?workspace=${encodeURIComponent(decodedName)}`,
     fetcher,
     { refreshInterval: 3000 }
   );
 
-  const allOps = data ?? [];
-  const workspaceOps = allOps.filter((op) => op.workspace === decodedName);
+  const workspaceOps = data ?? [];
 
   // Sort: running first, then by start time descending
   const sortedOps = [...workspaceOps].sort((a, b) => {
@@ -45,7 +44,7 @@ export default function OperationsPage({
   });
 
   // Track locally-started operations so they appear immediately
-  const [localOps, setLocalOps] = useState<Operation[]>([]);
+  const [localOps, setLocalOps] = useState<OperationListItem[]>([]);
 
   // Merge local ops with server ops, deduplicating by ID
   const serverIds = new Set(sortedOps.map((op) => op.id));
@@ -81,7 +80,7 @@ export default function OperationsPage({
       body: JSON.stringify(body),
     })
       .then((res) => res.json())
-      .then((op: Operation) => {
+      .then((op: OperationListItem) => {
         setLocalOps((prev) => [op, ...prev]);
         mutate();
       })
@@ -96,7 +95,7 @@ export default function OperationsPage({
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(await res.text());
-      const op: Operation = await res.json();
+      const op: OperationListItem = await res.json();
       setLocalOps((prev) => [op, ...prev]);
       mutate();
     },

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { AI_WORKSPACE_ROOT } from "./config";
-import type { Operation, OperationEvent } from "@/types/operation";
+import type { Operation, OperationEvent, OperationListItem } from "@/types/operation";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -142,11 +142,12 @@ export function readOperationLog(operationId: string, workspace?: string): Store
 }
 
 /**
- * List stored operations. If workspace is provided, only scans that directory.
+ * List stored operations as lightweight summaries.
+ * If workspace is provided, only scans that directory.
  * Otherwise scans all workspace directories.
- * Returns operations sorted by startedAt descending (newest first).
+ * Returns summaries sorted by startedAt descending (newest first).
  */
-export function listStoredOperations(workspace?: string): Operation[] {
+export function listStoredOperations(workspace?: string): OperationListItem[] {
   if (!fs.existsSync(OPERATIONS_DIR)) return [];
 
   const dirs: string[] = [];
@@ -162,7 +163,7 @@ export function listStoredOperations(workspace?: string): Operation[] {
     }
   }
 
-  const ops: Operation[] = [];
+  const summaries: OperationListItem[] = [];
 
   for (const dir of dirs) {
     const files = fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl"));
@@ -174,7 +175,15 @@ export function listStoredOperations(workspace?: string): Operation[] {
         const firstLine = firstNewline === -1 ? content : content.slice(0, firstNewline);
         const header = JSON.parse(firstLine) as StoredHeader;
         if (header._type === "header" && header.operation) {
-          ops.push(header.operation);
+          const op = header.operation;
+          summaries.push({
+            id: op.id,
+            type: op.type,
+            workspace: op.workspace,
+            status: op.status,
+            startedAt: op.startedAt,
+            completedAt: op.completedAt,
+          });
         }
       } catch {
         // Skip corrupted files
@@ -183,8 +192,8 @@ export function listStoredOperations(workspace?: string): Operation[] {
   }
 
   // Sort by startedAt descending
-  ops.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-  return ops;
+  summaries.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+  return summaries;
 }
 
 /**

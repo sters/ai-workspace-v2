@@ -2,6 +2,7 @@ import type {
   Operation,
   OperationEvent,
   OperationPhaseInfo,
+  OperationListItem,
   OperationType,
 } from "@/types/operation";
 import type { PipelinePhase, PipelineOptions } from "@/types/pipeline";
@@ -582,6 +583,24 @@ export function startOperationPipeline(
 export function getOperations(): Operation[] {
   gcCompletedOperations();
   return Array.from(operations.values()).map((m) => m.operation);
+}
+
+function toSummary(op: Operation): OperationListItem {
+  const currentPhase = op.phases?.find((p) => p.status === "running");
+  return {
+    id: op.id,
+    type: op.type,
+    workspace: op.workspace,
+    status: op.status,
+    startedAt: op.startedAt,
+    completedAt: op.completedAt,
+    ...(currentPhase && { currentPhase }),
+  };
+}
+
+export function getOperationSummaries(): OperationListItem[] {
+  gcCompletedOperations();
+  return Array.from(operations.values()).map((m) => toSummary(m.operation));
 }
 
 export function getOperation(id: string): Operation | undefined {

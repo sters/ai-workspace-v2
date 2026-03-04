@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback } from "react";
 import useSWR from "swr";
-import type { Operation, OperationType } from "@/types/operation";
+import type { OperationListItem, OperationType } from "@/types/operation";
 import type { ChatSessionInfo } from "@/types/chat";
 import { OperationSummary, useNow } from "@/components/operation/operation-summary";
 
@@ -15,14 +15,14 @@ const UTILITY_TYPE_PATHS: Partial<Record<OperationType, string>> = {
   "claude-login": "/utilities/claude-auth",
 };
 
-function getViewHref(op: Operation): string | null {
+function getViewHref(op: OperationListItem): string | null {
   if (UTILITY_TYPE_PATHS[op.type]) return UTILITY_TYPE_PATHS[op.type]!;
   if (!op.workspace) return null;
   return `/workspace/${encodeURIComponent(op.workspace)}/operations?operationId=${encodeURIComponent(op.id)}`;
 }
 
 export default function RunningPage() {
-  const { data, error, isLoading, mutate } = useSWR<Operation[]>(
+  const { data, error, isLoading, mutate } = useSWR<OperationListItem[]>(
     "/api/operations",
     fetcher,
     { refreshInterval: 3000 }
