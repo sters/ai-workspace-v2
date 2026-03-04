@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { ProgressBar } from "@/components/shared/progress-bar";
+import { ProgressBar } from "@/components/shared/feedback/progress-bar";
 
 describe("ProgressBar", () => {
   it("displays the percentage label by default", () => {

@@ -4,7 +4,7 @@ import { TodoItemRow } from "@/components/workspace/todo-item";
 import type { TodoItem } from "@/types/workspace";
 
 // Mock the MarkdownRenderer since it has heavy dependencies (react-markdown)
-vi.mock("@/components/shared/markdown-renderer", () => ({
+vi.mock("@/components/shared/content/markdown-renderer", () => ({
   MarkdownRenderer: ({ content }: { content: string }) => (
     <div data-testid="markdown-renderer">{content}</div>
   ),
