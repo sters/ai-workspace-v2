@@ -115,6 +115,13 @@ function markComplete(managed: ManagedOperation, success: boolean) {
     timestamp: new Date().toISOString(),
   });
 
+  // Persist to disk (fire-and-forget)
+  const eventsSnapshot = managed.events.slice();
+  const operationSnapshot = { ...managed.operation };
+  import("./operation-store")
+    .then(({ writeOperationLog }) => writeOperationLog(operationSnapshot, eventsSnapshot))
+    .catch((err) => console.warn("[pipeline-manager] Failed to persist operation log:", err));
+
   // Release references to help GC
   managed.childProcesses.clear();
   managed.pendingAsks.clear();
