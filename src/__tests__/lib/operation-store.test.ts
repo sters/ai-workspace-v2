@@ -6,6 +6,7 @@ import {
   readOperationLog,
   listStoredOperations,
   deleteStoredOperation,
+  deleteStoredOperationsForWorkspace,
 } from "@/lib/operation-store";
 import type { Operation, OperationEvent } from "@/types/operation";
 import { AI_WORKSPACE_ROOT } from "@/lib/config";
@@ -207,6 +208,30 @@ describe("operation-store", () => {
 
     it("returns false for invalid ID", () => {
       expect(deleteStoredOperation("../../../etc/passwd")).toBe(false);
+    });
+  });
+
+  describe("deleteStoredOperationsForWorkspace", () => {
+    it("deletes all operations for a workspace", () => {
+      writeOperationLog(makeOperation("pipe-1-1000", { workspace: "ws-del" }), []);
+      writeOperationLog(makeOperation("pipe-2-2000", { workspace: "ws-del" }), []);
+      writeOperationLog(makeOperation("pipe-3-3000", { workspace: "ws-keep" }), []);
+
+      const deleted = deleteStoredOperationsForWorkspace("ws-del");
+      expect(deleted).toBe(true);
+
+      expect(listStoredOperations("ws-del")).toHaveLength(0);
+      expect(listStoredOperations("ws-keep")).toHaveLength(1);
+      // Workspace directory itself should be gone
+      expect(fs.existsSync(path.join(OPERATIONS_DIR, "ws-del"))).toBe(false);
+    });
+
+    it("returns false when workspace has no operations", () => {
+      expect(deleteStoredOperationsForWorkspace("nonexistent")).toBe(false);
+    });
+
+    it("returns false for invalid workspace name", () => {
+      expect(deleteStoredOperationsForWorkspace("../../../etc")).toBe(false);
     });
   });
 

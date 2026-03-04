@@ -197,6 +197,21 @@ export function listStoredOperations(workspace?: string): OperationListItem[] {
 }
 
 /**
+ * Delete all stored operation logs for a workspace.
+ * Removes the entire workspace subdirectory under `.operations/`.
+ * Returns true if the directory existed and was deleted.
+ */
+export function deleteStoredOperationsForWorkspace(workspace: string): boolean {
+  if (!validateWorkspace(workspace)) return false;
+
+  const dir = workspaceDir(workspace);
+  if (!fs.existsSync(dir)) return false;
+
+  fs.rmSync(dir, { recursive: true, force: true });
+  return true;
+}
+
+/**
  * Delete a stored operation log from disk.
  * If workspace is provided, looks directly in that directory.
  * Otherwise searches across all workspace directories.
