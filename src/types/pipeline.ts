@@ -4,6 +4,10 @@ import type { WorkspaceRepo } from "./workspace";
 export interface GroupChild {
   label: string;
   prompt: string;
+  /** Working directory for the spawned process. */
+  cwd?: string;
+  /** Additional directories to expose via --add-dir. */
+  addDirs?: string[];
 }
 
 export interface PipelinePhaseSingle {
@@ -24,6 +28,10 @@ export interface RunChildOptions {
   jsonSchema?: Record<string, unknown>;
   /** Called with the model's final text response when the child process completes. */
   onResultText?: (text: string) => void;
+  /** Working directory for the spawned process. */
+  cwd?: string;
+  /** Additional directories to expose via --add-dir. */
+  addDirs?: string[];
 }
 
 export interface PhaseFunctionContext {

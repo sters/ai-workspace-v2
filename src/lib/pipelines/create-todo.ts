@@ -44,6 +44,8 @@ export function buildCreateTodoPipeline(
             taskType: meta.taskType,
             instruction,
           }),
+          cwd: repo.worktreePath,
+          addDirs: [wsPath],
         }));
 
         ctx.emitStatus(`Creating TODOs from review for ${children.length} repositories`);

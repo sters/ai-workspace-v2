@@ -58,9 +58,11 @@ const CODE_REVIEWER_INSTRUCTIONS = `You are a specialized agent for reviewing co
 
 4. **Write Review Report** to the specified file path
 
-### Working Directory Rules
+### Working Directory
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+Your working directory is set to the repository worktree (shown above).
+You can run commands like \`git status\`, \`git diff\`, \`git log\`, etc. directly.
+The workspace directory is also available via \`--add-dir\` for writing review reports.
 
 ### Technical Checks
 

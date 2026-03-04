@@ -18,7 +18,7 @@ export function buildReviewTodosPhase(input: {
         return true;
       }
 
-      const children: { label: string; prompt: string }[] = [];
+      const children: { label: string; prompt: string; cwd?: string; addDirs?: string[] }[] = [];
       for (const repo of input.repos) {
         const todoFile = Bun.file(
           `${input.wsPath}/TODO-${repo.repoName}.md`,
@@ -35,6 +35,8 @@ export function buildReviewTodosPhase(input: {
             todoContent,
             worktreePath: repo.worktreePath,
           }),
+          cwd: repo.worktreePath,
+          addDirs: [input.wsPath],
         });
       }
 

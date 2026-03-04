@@ -76,15 +76,11 @@ function executorInstructions(worktreePath: string): string {
    - Makefile targets second
    - Language-specific defaults last
 
-### Working Directory Rules
+### Working Directory
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
-
-Examples:
-\`\`\`bash
-git -C ${worktreePath} status
-git -C ${worktreePath} add -A
-\`\`\`
+Your working directory is set to the repository worktree (\`${worktreePath}\`).
+You can run commands like \`make\`, \`go test\`, \`npm run build\`, \`git status\`, etc. directly — they will execute in the correct directory.
+The workspace directory is also available via \`--add-dir\` for reading/writing TODO files and other workspace artifacts.
 
 ### Scope Boundaries
 

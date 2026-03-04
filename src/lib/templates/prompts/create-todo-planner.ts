@@ -62,9 +62,11 @@ Write the TODO file to: workspace/${input.workspaceName}/TODO-${input.repoName}.
 
 If a TODO file already exists, preserve completed items and add new items for unaddressed review findings.
 
-### Working Directory Rules
+### Working Directory
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+Your working directory is set to the repository worktree (\`${input.worktreePath}\`).
+You can run commands like \`git status\`, \`git diff\`, etc. directly.
+The workspace directory is also available via \`--add-dir\` for reading review artifacts and writing TODO files.
 
 ### TODO Item Format
 
