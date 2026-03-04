@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import type { OperationType } from "@/types/operation";
@@ -130,11 +131,13 @@ export function NextActionSuggestions({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const [hidden, setHidden] = useState(false);
   const actions = getNextActions(operationType, workspace);
 
-  if (actions.length === 0) return null;
+  if (actions.length === 0 || hidden) return null;
 
   const handleClick = (action: NextAction | { type: OperationType; body: Record<string, string>; primary?: boolean }) => {
+    setHidden(true);
     if (useNavigation && OPERATIONS_TAB_ACTIONS.has(action.type)) {
       // Navigate to the operations sub-route with ?action= to auto-trigger
       // pathname may be /workspace/[name] or /workspace/[name]/todo etc.
