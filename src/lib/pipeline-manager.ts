@@ -115,11 +115,15 @@ function markComplete(managed: ManagedOperation, success: boolean) {
     timestamp: new Date().toISOString(),
   });
 
-  // Persist to disk (fire-and-forget)
+  // Persist to disk, then release events from memory
   const eventsSnapshot = managed.events.slice();
   const operationSnapshot = { ...managed.operation };
   import("./operation-store")
-    .then(({ writeOperationLog }) => writeOperationLog(operationSnapshot, eventsSnapshot))
+    .then(({ writeOperationLog }) => {
+      writeOperationLog(operationSnapshot, eventsSnapshot);
+      // Events are now on disk — free them from memory
+      managed.events.length = 0;
+    })
     .catch((err) => console.warn("[pipeline-manager] Failed to persist operation log:", err));
 
   // Release references to help GC
@@ -133,10 +137,10 @@ function markComplete(managed: ManagedOperation, success: boolean) {
 // GC — clean up completed operations to prevent memory leaks
 // ---------------------------------------------------------------------------
 
-/** Max age in ms for completed operations before GC (30 minutes). */
-const GC_MAX_AGE_MS = 30 * 60 * 1000;
-/** Max number of completed operations to keep. */
-const GC_MAX_COMPLETED = 50;
+/** Max age in ms for completed operations before GC (5 minutes). Logs are persisted to disk. */
+const GC_MAX_AGE_MS = 5 * 60 * 1000;
+/** Max number of completed operations to keep in memory. Logs are persisted to disk. */
+const GC_MAX_COMPLETED = 10;
 
 /** Exported for testing. */
 export const _gc = { GC_MAX_AGE_MS, GC_MAX_COMPLETED };

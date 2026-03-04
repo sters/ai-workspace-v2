@@ -8,6 +8,7 @@ import {
   startOperationPipeline,
   getOperations,
   killOperation,
+  subscribeToOperation,
   ConcurrencyLimitError,
   MAX_CONCURRENT_OPERATIONS,
   DEFAULT_CLAUDE_TIMEOUT_MS,
@@ -225,6 +226,9 @@ describe("pipeline-manager phase timeout", () => {
   });
 
   it("function phase times out and fails the pipeline", async () => {
+    // Capture events via subscription since they may be cleared from memory after completion
+    const capturedEvents: Array<{ data: string }> = [];
+
     const op = startOperationPipeline("workspace-prune", "test", [
       {
         kind: "function",
@@ -246,14 +250,17 @@ describe("pipeline-manager phase timeout", () => {
       },
     ]);
 
+    subscribeToOperation(op.id, (event) => {
+      capturedEvents.push(event);
+    });
+
     // Wait for the timeout to fire and the pipeline to complete
     await new Promise((r) => setTimeout(r, 200));
 
     expect(op.status).toBe("failed");
 
     // Verify the timeout message was emitted
-    const managed = getGlobalOps().get(op.id) as { events: Array<{ data: string }> };
-    const timedOutEvent = managed.events.find((e) =>
+    const timedOutEvent = capturedEvents.find((e) =>
       e.data.includes("timed out after 50ms"),
     );
     expect(timedOutEvent).toBeDefined();
