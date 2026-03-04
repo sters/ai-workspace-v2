@@ -252,6 +252,7 @@ export function startOperationPipeline(
   workspace: string,
   phases: PipelinePhase[],
   pipelineOptions?: PipelineOptions,
+  inputs?: Record<string, string>,
 ): Operation {
   gcCompletedOperations();
 
@@ -273,6 +274,13 @@ export function startOperationPipeline(
     status: "pending" as const,
   }));
 
+  // Filter out empty/internal fields to keep only meaningful user inputs
+  const filteredInputs = inputs
+    ? Object.fromEntries(
+        Object.entries(inputs).filter(([, v]) => v != null && v !== ""),
+      )
+    : undefined;
+
   const operation: Operation = {
     id,
     type,
@@ -281,6 +289,7 @@ export function startOperationPipeline(
     startedAt: new Date().toISOString(),
     children: [],
     phases: phaseInfos,
+    ...(filteredInputs && Object.keys(filteredInputs).length > 0 && { inputs: filteredInputs }),
   };
 
   const managed: ManagedOperation = {

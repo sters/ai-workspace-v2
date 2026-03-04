@@ -24,7 +24,9 @@ export async function POST(request: Request) {
 
   try {
     const phases = await buildCreatePrPipeline({ workspace, draft: draft !== false });
-    const operation = startOperationPipeline("create-pr", workspace, phases);
+    const operation = startOperationPipeline("create-pr", workspace, phases, undefined, {
+      ...(draft === false && { draft: "false" }),
+    });
     return NextResponse.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {

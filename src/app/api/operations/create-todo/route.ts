@@ -36,7 +36,10 @@ export async function POST(request: Request) {
 
   try {
     const phases = buildCreateTodoPipeline(workspace, reviewTimestamp, instruction);
-    const operation = startOperationPipeline("create-todo", workspace, phases);
+    const operation = startOperationPipeline("create-todo", workspace, phases, undefined, {
+      reviewTimestamp,
+      ...(instruction && { instruction }),
+    });
     return NextResponse.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {
