@@ -3,6 +3,7 @@
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { WorkspaceCard } from "./workspace-card";
+import { StatusText } from "../shared/feedback/status-text";
 
 export function WorkspaceList() {
   const { workspaces, isLoading, error } = useWorkspaces();
@@ -23,18 +24,16 @@ export function WorkspaceList() {
 
   if (error) {
     return (
-      <p className="text-sm text-destructive">
-        Failed to load workspaces.
-      </p>
+      <StatusText variant="error">Failed to load workspaces.</StatusText>
     );
   }
 
   if (workspaces.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <StatusText>
         No workspaces found. Create one using <code>/workspace-init</code> in
         Claude Code.
-      </p>
+      </StatusText>
     );
   }
 

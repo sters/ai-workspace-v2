@@ -2,8 +2,10 @@
 
 import type { TodoFile, TodoSection } from "@/types/workspace";
 import { TodoItemRow } from "./todo-item";
-import { ProgressBar } from "../shared/progress-bar";
-import { MarkdownRenderer } from "../shared/markdown-renderer";
+import { Card } from "../shared/containers/card";
+import { ProgressBar } from "../shared/feedback/progress-bar";
+import { MarkdownRenderer } from "../shared/content/markdown-renderer";
+import { StatusText } from "../shared/feedback/status-text";
 
 const NOTE_SECTION_RE = /notes/i;
 
@@ -49,15 +51,13 @@ export function SectionBlock({ section }: { section: TodoSection }) {
 
 export function TodoViewer({ todos }: { todos: TodoFile[] }) {
   if (todos.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No TODO files found.</p>
-    );
+    return <StatusText>No TODO files found.</StatusText>;
   }
 
   return (
     <div className="space-y-6">
       {todos.map((todo) => (
-        <div key={todo.filename} className="rounded-lg border p-4">
+        <Card key={todo.filename}>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-semibold">{todo.repoName}</h3>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -82,7 +82,7 @@ export function TodoViewer({ todos }: { todos: TodoFile[] }) {
                   <TodoItemRow key={i} item={item} />
                 ))}
           </div>
-        </div>
+        </Card>
       ))}
     </div>
   );

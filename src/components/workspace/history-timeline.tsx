@@ -3,7 +3,9 @@
 import { useState, useCallback, useEffect } from "react";
 import type { HistoryEntry } from "@/types/workspace";
 import { useHistory } from "@/hooks/use-workspace";
-import { MonacoEditorLazy } from "@/components/shared/monaco-editor-lazy";
+import { Button } from "@/components/shared/buttons/button";
+import { MonacoEditorLazy } from "@/components/shared/content/monaco-editor-lazy";
+import { StatusText } from "@/components/shared/feedback/status-text";
 import type { BeforeMount } from "@monaco-editor/react";
 
 const DIFF_THEME = "unified-diff-theme";
@@ -70,21 +72,15 @@ function CommitDiff({
   }, [workspaceName, hash]);
 
   if (loading) {
-    return (
-      <p className="py-2 text-xs text-muted-foreground">Loading diff...</p>
-    );
+    return <StatusText className="py-2 text-xs">Loading diff...</StatusText>;
   }
 
   if (error || diff === null) {
-    return (
-      <p className="py-2 text-xs text-red-500">Failed to load diff.</p>
-    );
+    return <StatusText variant="error" className="py-2 text-xs">Failed to load diff.</StatusText>;
   }
 
   if (diff.trim() === "") {
-    return (
-      <p className="py-2 text-xs text-muted-foreground">No changes in this commit.</p>
-    );
+    return <StatusText className="py-2 text-xs">No changes in this commit.</StatusText>;
   }
 
   return <DiffViewer diff={diff} />;
@@ -121,18 +117,19 @@ export function HistoryTimeline({ workspaceName }: { workspaceName: string }) {
   }, []);
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading...</p>;
+    return <StatusText>Loading...</StatusText>;
   }
 
   if (history.length === 0) {
-    return <p className="text-sm text-muted-foreground">No history found.</p>;
+    return <StatusText>No history found.</StatusText>;
   }
 
   return (
     <div className="space-y-0">
       {history.map((entry: HistoryEntry) => (
         <div key={entry.hash} className="border-l-2 border-border py-2 pl-4">
-          <button
+          <Button
+            variant="ghost-toggle"
             type="button"
             className="flex w-full cursor-pointer gap-3 text-left hover:bg-muted/50 rounded px-1 -mx-1 transition-colors"
             onClick={() => toggleDiff(entry.hash)}
@@ -144,10 +141,10 @@ export function HistoryTimeline({ workspaceName }: { workspaceName: string }) {
                 {new Date(entry.date).toLocaleString()}
               </p>
             </div>
-            <span className="text-xs text-muted-foreground self-center">
+            <span className="text-xs self-center">
               {expandedHash === entry.hash ? "\u25B2" : "\u25BC"}
             </span>
-          </button>
+          </Button>
           {expandedHash === entry.hash && (
             <CommitDiff workspaceName={workspaceName} hash={entry.hash} />
           )}

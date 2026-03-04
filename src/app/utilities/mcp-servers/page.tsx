@@ -4,6 +4,10 @@ import { useCallback, useEffect, useRef } from "react";
 import useSWR from "swr";
 import { useOperation } from "@/hooks/use-operation";
 import { McpAuthTerminal } from "@/components/operation/mcp-auth-terminal";
+import { Button } from "@/components/shared/buttons/button";
+import { Card } from "@/components/shared/containers/card";
+import { PageHeader } from "@/components/shared/feedback/page-header";
+import { StatusText } from "@/components/shared/feedback/status-text";
 import type { McpServerEntry, McpConnectionStatus } from "@/types/claude";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -70,31 +74,20 @@ export default function McpServersPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-3">
-        <h1 className="text-2xl font-bold">MCP Servers</h1>
-        <button
-          onClick={() => mutateStatus()}
-          className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted"
-        >
-          Check Status
-        </button>
-      </div>
-      <p className="mb-6 text-sm text-muted-foreground">
-        MCP servers configured for Claude Code across user, project, and local
-        scopes.
-      </p>
+      <PageHeader
+        title="MCP Servers"
+        description="MCP servers configured for Claude Code across user, project, and local scopes."
+        onRefresh={() => mutateStatus()}
+        refreshLabel="Check Status"
+      />
 
-      {isLoading && (
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      )}
+      {isLoading && <StatusText>Loading...</StatusText>}
       {error && (
-        <p className="text-sm text-destructive">
-          Failed to load MCP servers.
-        </p>
+        <StatusText variant="error">Failed to load MCP servers.</StatusText>
       )}
 
       {data && data.servers.length === 0 && (
-        <div className="rounded-lg border border-dashed p-8 text-center">
+        <Card variant="dashed" className="p-8 text-center">
           <p className="text-muted-foreground">
             No MCP servers configured. Add servers to{" "}
             <code className="text-xs">~/.claude/settings.json</code> or your
@@ -102,7 +95,7 @@ export default function McpServersPage() {
             <code className="text-xs">.claude/settings.json</code> to see them
             here.
           </p>
-        </div>
+        </Card>
       )}
 
       {data && data.servers.length > 0 && (
@@ -166,38 +159,33 @@ function ServerCard({
   }, [mcpAuth.isRunning]);
 
   return (
-    <div className="rounded-lg border p-4">
+    <Card>
       <div className="flex items-center gap-2">
         <h2 className="font-semibold">{server.name}</h2>
         <ConnectionBadge connectionStatus={connectionStatus} />
         <div className="ml-auto flex items-center gap-2">
           {!mcpAuth.isRunning && !mcpAuth.operation && (
-            <button
+            <Button
+              variant="outline"
               onClick={handleLogin}
-              className={`rounded-md border px-2 py-0.5 text-xs font-medium ${
+              className={`py-0.5 ${
                 needsAuth
                   ? "border-blue-300 text-blue-700 hover:bg-blue-50"
                   : "border-gray-300 text-gray-600 hover:bg-gray-50"
               }`}
             >
               {needsAuth ? "Login" : "Reauth"}
-            </button>
+            </Button>
           )}
           {mcpAuth.isRunning && (
-            <button
-              onClick={mcpAuth.cancel}
-              className="rounded-md border border-red-300 px-2 py-0.5 text-xs font-medium text-red-600 hover:bg-red-50"
-            >
+            <Button variant="destructive-sm" onClick={mcpAuth.cancel}>
               Cancel
-            </button>
+            </Button>
           )}
           {mcpAuth.operation && !mcpAuth.isRunning && (
-            <button
-              onClick={mcpAuth.reset}
-              className="text-xs text-muted-foreground underline hover:text-foreground"
-            >
+            <Button variant="ghost" onClick={mcpAuth.reset}>
               Clear
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -235,6 +223,6 @@ function ServerCard({
           />
         </div>
       )}
-    </div>
+    </Card>
   );
 }

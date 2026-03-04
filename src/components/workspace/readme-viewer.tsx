@@ -1,12 +1,11 @@
 "use client";
 
-import { MarkdownRenderer } from "../shared/markdown-renderer";
+import { MarkdownRenderer } from "../shared/content/markdown-renderer";
+import { StatusText } from "../shared/feedback/status-text";
 
 export function ReadmeViewer({ content }: { content: string }) {
   if (!content) {
-    return (
-      <p className="text-sm text-muted-foreground">No README found.</p>
-    );
+    return <StatusText>No README found.</StatusText>;
   }
 
   return <MarkdownRenderer content={content} />;

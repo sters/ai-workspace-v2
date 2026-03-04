@@ -2,7 +2,10 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import useSWR from "swr";
-import { MonacoEditorLazy } from "@/components/shared/monaco-editor-lazy";
+import { MonacoEditorLazy } from "@/components/shared/content/monaco-editor-lazy";
+import { Button } from "@/components/shared/buttons/button";
+import { Card } from "@/components/shared/containers/card";
+import { StatusText } from "@/components/shared/feedback/status-text";
 import type { editor } from "monaco-editor";
 
 type SettingsEntry = {
@@ -24,11 +27,9 @@ export function SettingsEditor({ scope }: { scope: "project" | "local" | "user" 
 
   return (
     <div>
-      {isLoading && (
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      )}
+      {isLoading && <StatusText>Loading...</StatusText>}
       {error && (
-        <p className="text-sm text-destructive">Failed to load settings.</p>
+        <StatusText variant="error">Failed to load settings.</StatusText>
       )}
       {entry && <EditorCard entry={entry} onSaved={() => mutate()} />}
     </div>
@@ -86,7 +87,7 @@ function EditorCard({
   }, [entry.scope, value, onSaved]);
 
   return (
-    <div className="rounded-lg border p-4">
+    <Card>
       <div className="mb-3 flex items-center gap-2">
         <code className="text-xs text-muted-foreground">{entry.filePath}</code>
         {!entry.exists && (
@@ -118,17 +119,13 @@ function EditorCard({
       )}
 
       <div className="mt-2 flex items-center gap-2">
-        <button
-          onClick={handleSave}
-          disabled={saving || !valid}
-          className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
+        <Button onClick={handleSave} disabled={saving || !valid}>
           {saving ? "Saving..." : "Save"}
-        </button>
+        </Button>
         {value.trim() && !valid && (
           <span className="text-xs text-red-500">Invalid JSON</span>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

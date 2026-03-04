@@ -4,8 +4,9 @@ import { Suspense, use, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { ProgressBar } from "@/components/shared/progress-bar";
-import { StatusBadge } from "@/components/shared/status-badge";
+import { Card } from "@/components/shared/containers/card";
+import { ProgressBar } from "@/components/shared/feedback/progress-bar";
+import { StatusBadge } from "@/components/shared/feedback/status-badge";
 import { OperationPanel } from "@/components/workspace/operation-panel";
 import { cn } from "@/lib/utils";
 
@@ -135,7 +136,7 @@ function WorkspaceLayoutContent({
       </div>
 
       {/* Progress summary */}
-      <div className="mb-6 rounded-lg border p-4">
+      <Card className="mb-6">
         <div className="mb-2 flex items-center justify-between text-sm">
           <span>
             Overall Progress: {workspace.totalCompleted}/{workspace.totalItems}{" "}
@@ -146,7 +147,7 @@ function WorkspaceLayoutContent({
           </span>
         </div>
         <ProgressBar value={workspace.overallProgress} />
-      </div>
+      </Card>
 
       {/* Operations */}
       <div className="mb-6">

@@ -3,7 +3,8 @@
 import { useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { SplitButton } from "../shared/split-button";
+import { SplitButton } from "../shared/buttons/split-button";
+import { Button } from "../shared/buttons/button";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import type { OperationType } from "@/types/operation";
 
@@ -56,7 +57,6 @@ export function OperationPanel({
             startAndNavigate("execute", { workspace: workspacePath })
           }
           disabled={isRunning}
-          className="rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           items={[
             {
               label: "Execute \u2192 Review",
@@ -96,37 +96,37 @@ export function OperationPanel({
             },
           ]}
         />
-        <button
+        <Button
+          variant="secondary"
           onClick={() =>
             startAndNavigate("review", { workspace: workspacePath })
           }
           disabled={isRunning}
-          className="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
         >
           Review
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="secondary"
           onClick={() =>
             startAndNavigate("create-pr", { workspace: workspacePath })
           }
           disabled={isRunning}
-          className="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
         >
           Create PR
-        </button>
+        </Button>
         <OpenVSCodeButton
           workspacePath={workspacePath}
           repositories={repositories}
         />
-        <button
+        <Button
+          variant="destructive"
           onClick={() =>
             startAndNavigate("delete", { workspace: workspacePath })
           }
           disabled={isRunning}
-          className="rounded-md border border-red-300 bg-transparent px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
         >
           Delete workspace
-        </button>
+        </Button>
       </div>
       {isRunning && runningOp && (
         <p className="text-sm text-muted-foreground">
@@ -180,12 +180,9 @@ function OpenVSCodeButton({
 
   if (repoItems.length === 0) {
     return (
-      <button
-        onClick={handleClick}
-        className="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
-      >
+      <Button variant="secondary" onClick={handleClick}>
         Open in VS Code
-      </button>
+      </Button>
     );
   }
 
@@ -193,8 +190,7 @@ function OpenVSCodeButton({
     <SplitButton
       label="Open in VS Code"
       onClick={handleClick}
-      className="rounded-l-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
-      dropdownClassName="rounded-r-md border-l border-secondary-foreground/20 bg-secondary px-1.5 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80"
+      variant="secondary"
       items={repoItems}
     />
   );

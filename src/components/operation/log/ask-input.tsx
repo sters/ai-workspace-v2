@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from "react";
 import type { AskQuestion } from "@/types/claude";
+import { Button } from "../../shared/buttons/button";
+import { Callout } from "../../shared/containers/callout";
 
 export function AskInput({
   operationId,
@@ -82,7 +84,7 @@ export function AskInput({
   );
 
   return (
-    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 dark:border-amber-700 dark:bg-amber-950">
+    <Callout variant="warning">
       <p className="mb-2 text-sm font-medium">Input required</p>
 
       {questions.map((q, qi) => (
@@ -116,30 +118,31 @@ export function AskInput({
                     </label>
                   );
                 })}
-                <button
+                <Button
+                  className="mt-1"
                   onClick={() => handleMultiSelectSubmit(q.question)}
                   disabled={
                     submitting ||
                     !selectedOptions[q.question] ||
                     selectedOptions[q.question].size === 0
                   }
-                  className="mt-1 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   Submit
-                </button>
+                </Button>
               </div>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {q.options.map((o, oi) => (
-                  <button
+                  <Button
+                    variant="outline"
                     key={oi}
                     onClick={() => handleOptionClick(q.question, o.label)}
                     disabled={submitting}
-                    className="rounded-md border bg-background px-3 py-1 text-sm hover:bg-accent disabled:opacity-50"
+                    className="bg-background px-3 py-1 text-sm font-normal"
                     title={o.description}
                   >
                     {o.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
             ))}
@@ -157,15 +160,14 @@ export function AskInput({
             className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm disabled:opacity-50"
             autoFocus
           />
-          <button
+          <Button
             type="submit"
             disabled={!value.trim() || submitting}
-            className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             Send
-          </button>
+          </Button>
         </form>
       )}
-    </div>
+    </Callout>
   );
 }

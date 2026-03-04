@@ -4,7 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import type { OperationType } from "@/types/operation";
-import { SplitButton } from "../shared/split-button";
+import { SplitButton } from "../shared/buttons/split-button";
+import { Button, buttonVariants } from "../shared/buttons/button";
+import { Callout } from "../shared/containers/callout";
 
 interface NextAction {
   label: string;
@@ -160,7 +162,7 @@ export function NextActionSuggestions({
   };
 
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 dark:border-blue-800 dark:bg-blue-950/30">
+    <Callout variant="info">
       <p className="mb-2 text-sm font-medium text-foreground">Next steps</p>
       <div className="flex flex-wrap gap-2">
         {actions.map((action) => {
@@ -171,7 +173,7 @@ export function NextActionSuggestions({
                 key={action.label}
                 href={`${basePath}${action.linkSubPath}`}
                 onClick={() => { setHidden(true); onHide?.(); }}
-                className="rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
+                className={buttonVariants("outline", "bg-background px-3 py-1.5 text-sm text-foreground")}
               >
                 {action.label}
               </Link>
@@ -184,11 +186,7 @@ export function NextActionSuggestions({
                 label={action.label}
                 onClick={() => handleClick(action)}
                 disabled={isRunning}
-                className={
-                  action.primary
-                    ? "rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                    : "rounded-l-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
-                }
+                variant={action.primary ? "primary" : "outline"}
                 items={action.batchItems.map((bi) => ({
                   label: bi.label,
                   onClick: () => handleClick({ ...bi, primary: false }),
@@ -197,21 +195,18 @@ export function NextActionSuggestions({
             );
           }
           return (
-            <button
+            <Button
               key={action.type}
+              variant={action.primary ? "primary" : "outline"}
+              className={action.primary ? undefined : "bg-background px-3 py-1.5 text-sm text-foreground"}
               onClick={() => handleClick(action)}
               disabled={isRunning}
-              className={
-                action.primary
-                  ? "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-                  : "rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50"
-              }
             >
               {action.label}
-            </button>
+            </Button>
           );
         })}
       </div>
-    </div>
+    </Callout>
   );
 }
