@@ -10,8 +10,28 @@ import { parseStreamEvent } from "@/lib/parsers/stream";
 import type { Operation, OperationType, OperationPhaseInfo } from "@/types/operation";
 import type { LogEntry } from "@/types/claude";
 
-/** Track which operations have had their next-steps dismissed (survives client-side navigation). */
-const hiddenNextStepsIds = new Set<string>();
+/** Track which operations have had their next-steps dismissed (persists across page reloads via sessionStorage). */
+const HIDDEN_NEXT_STEPS_KEY = "aiw-hidden-next-steps";
+
+function getHiddenNextStepsIds(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const raw = sessionStorage.getItem(HIDDEN_NEXT_STEPS_KEY);
+    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function addHiddenNextStepsId(id: string) {
+  const ids = getHiddenNextStepsIds();
+  ids.add(id);
+  try {
+    sessionStorage.setItem(HIDDEN_NEXT_STEPS_KEY, JSON.stringify([...ids]));
+  } catch {
+    // ignore
+  }
+}
 
 interface OperationCardProps {
   operation: Operation;
@@ -35,11 +55,11 @@ export function OperationCard({
   const isRunning = operation.status === "running";
   const isDone = operation.status === "completed" || operation.status === "failed";
   const [expanded, setExpanded] = useState(defaultExpanded ?? isRunning);
-  const [nextStepsHidden, setNextStepsHidden] = useState(() => hiddenNextStepsIds.has(operation.id));
+  const [nextStepsHidden, setNextStepsHidden] = useState(() => getHiddenNextStepsIds().has(operation.id));
   const now = useNow(isRunning ? 1000 : 0);
 
   const hideNextSteps = useCallback(() => {
-    hiddenNextStepsIds.add(operation.id);
+    addHiddenNextStepsId(operation.id);
     setNextStepsHidden(true);
   }, [operation.id]);
 
