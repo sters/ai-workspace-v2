@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { OperationSummary, useNow } from "@/components/operation/operation-summary";
 import { OperationLog } from "@/components/operation/log";
 import { NextActionSuggestions } from "@/components/operation/next-action-suggestions";
@@ -9,6 +9,9 @@ import { useSSE } from "@/hooks/use-sse";
 import { parseStreamEvent } from "@/lib/parsers/stream";
 import type { Operation, OperationType, OperationPhaseInfo } from "@/types/operation";
 import type { LogEntry } from "@/types/claude";
+
+/** Track which operations have had their next-steps dismissed (survives client-side navigation). */
+const hiddenNextStepsIds = new Set<string>();
 
 interface OperationCardProps {
   operation: Operation;
@@ -32,7 +35,13 @@ export function OperationCard({
   const isRunning = operation.status === "running";
   const isDone = operation.status === "completed" || operation.status === "failed";
   const [expanded, setExpanded] = useState(defaultExpanded ?? isRunning);
+  const [nextStepsHidden, setNextStepsHidden] = useState(() => hiddenNextStepsIds.has(operation.id));
   const now = useNow(isRunning ? 1000 : 0);
+
+  const hideNextSteps = useCallback(() => {
+    hiddenNextStepsIds.add(operation.id);
+    setNextStepsHidden(true);
+  }, [operation.id]);
 
   // Collapse when the operation finishes
   const wasRunningRef = useRef(isRunning);
@@ -189,13 +198,14 @@ export function OperationCard({
       )}
 
       {/* Next action suggestions */}
-      {!effectiveIsRunning && liveStatus !== "running" && liveStatus !== "failed" && operation.workspace && (
+      {!nextStepsHidden && !effectiveIsRunning && liveStatus !== "running" && liveStatus !== "failed" && operation.workspace && (
         <div className="border-t p-3">
           <NextActionSuggestions
             operationType={operation.type}
             workspace={operation.workspace}
             onStart={onStartOperation}
             isRunning={false}
+            onHide={hideNextSteps}
           />
         </div>
       )}

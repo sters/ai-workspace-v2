@@ -121,6 +121,7 @@ export function NextActionSuggestions({
   onStart,
   isRunning,
   useNavigation,
+  onHide,
 }: {
   operationType: OperationType;
   workspace: string;
@@ -128,6 +129,8 @@ export function NextActionSuggestions({
   isRunning: boolean;
   /** When true, use URL navigation (?action=) instead of calling onStart directly for Operations-tab actions. */
   useNavigation?: boolean;
+  /** Called when the user clicks any next-step action to signal the parent to hide this component. */
+  onHide?: () => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -138,6 +141,7 @@ export function NextActionSuggestions({
 
   const handleClick = (action: NextAction | { type: OperationType; body: Record<string, string>; primary?: boolean }) => {
     setHidden(true);
+    onHide?.();
     if (useNavigation && OPERATIONS_TAB_ACTIONS.has(action.type)) {
       // Navigate to the operations sub-route with ?action= to auto-trigger
       // pathname may be /workspace/[name] or /workspace/[name]/todo etc.
@@ -166,7 +170,7 @@ export function NextActionSuggestions({
               <Link
                 key={action.label}
                 href={`${basePath}${action.linkSubPath}`}
-                onClick={() => setHidden(true)}
+                onClick={() => { setHidden(true); onHide?.(); }}
                 className="rounded-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent"
               >
                 {action.label}
