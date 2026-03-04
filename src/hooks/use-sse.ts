@@ -27,6 +27,10 @@ export function useSSE(operationId: string | null) {
     let retryCount = 0;
 
     const connect = async () => {
+      // Clear stale events before (re)connecting — the server replays all events
+      dispatch({ type: "clear" });
+      batchRef.current = [];
+
       const controller = new AbortController();
       abortRef.current = controller;
 
