@@ -81,8 +81,13 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
   // Generation counter: incremented before each async session init.
   // After the await, if the counter has moved on, this call is stale.
   const generationRef = useRef(0);
+  const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cleanup = useCallback(() => {
+    if (resumeTimeoutRef.current) {
+      clearTimeout(resumeTimeoutRef.current);
+      resumeTimeoutRef.current = null;
+    }
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
@@ -139,6 +144,16 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
       let resumedExited = false;
       let resumedExitCode: number | undefined;
 
+      // Timeout: if resume doesn't complete in 5s, give up and go idle
+      resumeTimeoutRef.current = setTimeout(() => {
+        if (stateRef.current === "resuming") {
+          clearChatSession(workspaceId);
+          setError(null);
+          setState("idle");
+          cleanup();
+        }
+      }, 5000);
+
       ws.onopen = () => {
         ws.send(JSON.stringify({ type: "resume", sessionId }));
       };
@@ -162,6 +177,10 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
             }
             break;
           case "replay_done":
+            if (resumeTimeoutRef.current) {
+              clearTimeout(resumeTimeoutRef.current);
+              resumeTimeoutRef.current = null;
+            }
             if (resumedExited) {
               setState("exited");
               setExitCode(resumedExitCode ?? -1);
@@ -284,6 +303,13 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
     });
   }, [workspaceId, cleanup, init, dispose, termRef]);
 
+  const cancelResume = useCallback(() => {
+    clearChatSession(workspaceId);
+    setError(null);
+    setState("idle");
+    cleanup();
+  }, [workspaceId, cleanup]);
+
   const stopSession = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: "kill" }));
@@ -303,7 +329,10 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
           <StatusText>Connecting...</StatusText>
         )}
         {state === "resuming" && (
-          <StatusText>Reconnecting...</StatusText>
+          <>
+            <StatusText>Reconnecting...</StatusText>
+            <Button variant="ghost" onClick={cancelResume}>Cancel</Button>
+          </>
         )}
         {state === "running" && (
           <Button variant="destructive" onClick={stopSession}>Stop</Button>
