@@ -1,5 +1,6 @@
 import useSWR from "swr";
 import type { WorkspaceDetail, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
+import { SWR_REFRESH_INTERVAL } from "@/lib/constants";
 
 const fetcher = async (url: string) => {
   const r = await fetch(url);
@@ -11,7 +12,7 @@ export function useWorkspace(name: string) {
   const { data, error, isLoading, mutate } = useSWR<WorkspaceDetail>(
     name ? `/api/workspaces/${encodeURIComponent(name)}` : null,
     fetcher,
-    { refreshInterval: 5000 }
+    { refreshInterval: SWR_REFRESH_INTERVAL }
   );
 
   return { workspace: data, isLoading, error, refresh: mutate };
@@ -21,7 +22,7 @@ export function useTodos(name: string) {
   const { data, error, isLoading } = useSWR<TodoFile[]>(
     name ? `/api/workspaces/${encodeURIComponent(name)}/todos` : null,
     fetcher,
-    { refreshInterval: 5000 }
+    { refreshInterval: SWR_REFRESH_INTERVAL }
   );
 
   return { todos: data ?? [], isLoading, error };
@@ -31,7 +32,7 @@ export function useReviews(name: string) {
   const { data, error, isLoading } = useSWR<ReviewSession[]>(
     name ? `/api/workspaces/${encodeURIComponent(name)}/reviews` : null,
     fetcher,
-    { refreshInterval: 10000 }
+    { refreshInterval: SWR_REFRESH_INTERVAL }
   );
 
   return { reviews: data ?? [], isLoading, error };
