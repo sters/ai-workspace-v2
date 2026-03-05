@@ -1,10 +1,11 @@
 #!/usr/bin/env bun
 
-import { existsSync, mkdirSync, cpSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, rmSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import { INITIAL_SETTINGS_LOCAL } from "../src/lib/templates/settings";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let packageDir = resolve(__dirname, "..");
@@ -87,6 +88,14 @@ if (missingDirs.length > 0) {
   for (const dir of missingDirs) {
     mkdirSync(dir, { recursive: true });
     console.log(`Created: ${dir}`);
+  }
+
+  // Create initial .claude/settings.local.json if it doesn't exist
+  const settingsLocalPath = resolve(root, ".claude", "settings.local.json");
+  if (!existsSync(settingsLocalPath)) {
+    mkdirSync(resolve(root, ".claude"), { recursive: true });
+    writeFileSync(settingsLocalPath, JSON.stringify(INITIAL_SETTINGS_LOCAL, null, 2) + "\n");
+    console.log(`Created: ${settingsLocalPath}`);
   }
 }
 
