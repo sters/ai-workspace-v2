@@ -515,7 +515,10 @@ export function startOperationPipeline(
         emitStatus(managed, `Phase ${phaseNum}/${phases.length}: ${phase.label}`, phaseExtra);
         const childId = `${id}-phase-${i}`;
         operation.children!.push({ id: childId, label: phase.label, status: "running" });
-        const process = runClaude(childId, phase.prompt);
+        const singleOpts = (phase.cwd || phase.addDirs)
+          ? { cwd: phase.cwd, addDirs: phase.addDirs }
+          : undefined;
+        const process = runClaude(childId, phase.prompt, singleOpts);
         const result = await wireChild(managed, childId, phase.label, process, phaseExtra);
         phaseSuccess = result.success;
 
