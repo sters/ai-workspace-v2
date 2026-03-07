@@ -14,6 +14,10 @@ export interface PipelinePhaseSingle {
   kind: "single";
   label: string;
   prompt: string;
+  /** Working directory for the spawned process. */
+  cwd?: string;
+  /** Additional directories to expose via --add-dir. */
+  addDirs?: string[];
   timeoutMs?: number;
 }
 
