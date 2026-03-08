@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useMemo, useState } from "react";
 import type { OperationEvent, OperationPhaseInfo } from "@/types/operation";
-import { parseStreamEvent } from "@/lib/parsers/stream";
+import { parseStreamEvent, enrichPermissionDenials } from "@/lib/parsers/stream";
 import type { LogEntry } from "@/types/claude";
 import { buildDisplayNodes, groupByChildLabel, findPendingAsk } from "./display-nodes";
 import { ChildGroupSection, SubAgentSection } from "./sections";
@@ -72,7 +72,7 @@ export function OperationLog({
         });
       }
     }
-    return result;
+    return enrichPermissionDenials(result);
   }, [events]);
 
   // Derive live phase statuses from __phaseUpdate events in the stream

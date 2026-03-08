@@ -2,6 +2,77 @@
 
 import type { LogEntry } from "@/types/claude";
 
+/**
+ * Build a permission string suitable for `settings.local.json` `permissions.allow`.
+ * For Bash, extracts the command prefix: `Bash(git:*)`.
+ * For other tools, returns the tool name as-is: `Edit`, `Write`, etc.
+ * @param bashCommand - The raw bash command string (for Bash tools only).
+ */
+export function buildPermissionString(toolName: string, bashCommand?: string): string {
+  if (toolName === "Bash" && bashCommand) {
+    const prefix = bashCommand.split(/\s+/)[0];
+    if (prefix) return `Bash(${prefix}:*)`;
+  }
+  return toolName;
+}
+
+/**
+ * Detect whether a tool_result error message indicates a permission denial.
+ * Matches patterns emitted by Claude Code CLI when a tool is not in the allow list.
+ */
+const PERMISSION_DENIAL_PATTERNS = [
+  /requires? (?:explicit )?approval/i,
+  /haven't granted it yet/i,
+  /was blocked/i,
+];
+
+export function isPermissionDenialMessage(text: string): boolean {
+  // Exclude sibling-error wrappers
+  if (text.includes("Sibling tool call errored")) return false;
+  return PERMISSION_DENIAL_PATTERNS.some((p) => p.test(text));
+}
+
+/**
+ * Post-process entries to detect permission denials from tool_result errors.
+ * Correlates tool_result (is_error) with the preceding tool_call by toolId
+ * to produce `permission_denial` entries with actionable information.
+ */
+export function enrichPermissionDenials(entries: LogEntry[]): LogEntry[] {
+  // Build map: toolId → { toolName, summary }
+  const toolCalls = new Map<string, { toolName: string; summary: string }>();
+  for (const e of entries) {
+    if (e.kind === "tool_call") {
+      toolCalls.set(e.toolId, { toolName: e.toolName, summary: e.summary });
+    }
+  }
+
+  const result: LogEntry[] = [];
+  for (const e of entries) {
+    if (e.kind === "tool_result" && e.isError && isPermissionDenialMessage(e.content)) {
+      const call = toolCalls.get(e.toolId);
+      if (call) {
+        // Extract bash command from summary ("$ cmd args..." → "cmd args...")
+        const bashCmd = call.toolName === "Bash"
+          ? call.summary.replace(/^\$\s*/, "")
+          : undefined;
+        result.push({
+          kind: "permission_denial",
+          toolName: call.toolName,
+          permissionString: buildPermissionString(call.toolName, bashCmd),
+          summary: call.summary,
+          parentToolUseId: e.parentToolUseId,
+          childLabel: e.childLabel,
+          phaseIndex: e.phaseIndex,
+          phaseLabel: e.phaseLabel,
+        });
+        continue;
+      }
+    }
+    result.push(e);
+  }
+  return result;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function summarizeToolInput(name: string, input: any): string {
   switch (name) {
@@ -160,6 +231,21 @@ export function parseStreamEvent(raw: string): LogEntry[] {
         cost,
         duration,
       });
+    }
+
+    // Parse permission denials from result event (if CLI includes them)
+    if (Array.isArray(parsed.permission_denials)) {
+      for (const denial of parsed.permission_denials) {
+        const toolName: string = denial.tool_name ?? "Unknown";
+        const toolInput: Record<string, unknown> = denial.tool_input ?? {};
+        entries.push({
+          kind: "permission_denial",
+          toolName,
+          toolInput,
+          permissionString: buildPermissionString(toolName, toolInput?.command as string | undefined),
+          summary: summarizeToolInput(toolName, toolInput),
+        });
+      }
     }
   }
   // SDK system messages

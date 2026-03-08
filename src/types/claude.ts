@@ -66,6 +66,13 @@ export type LogEntry = LogEntryBase &
         elapsed: number;
         taskId?: string;
       }
+    | {
+        kind: "permission_denial";
+        toolName: string;
+        toolInput?: Record<string, unknown>;
+        permissionString: string;
+        summary: string;
+      }
   );
 
 export interface AskQuestionOption {
