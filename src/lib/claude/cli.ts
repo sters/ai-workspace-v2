@@ -176,16 +176,46 @@ export function runClaude(
   function spawnAndStream(promptOrAnswer: string, resumeSessionId?: string) {
     const useStdin = promptOrAnswer.length > MAX_PROMPT_ARG_LENGTH;
 
+    // When addDirs are specified, auto-allow Edit/Write scoped to those
+    // directories plus Bash(git:*) so Claude can modify files and run git
+    // commands there in non-interactive (-p) mode.
+    const addDirAllowedTools = options?.addDirs?.length
+      ? ["--allowedTools", [
+          ...options.addDirs.flatMap((dir) => {
+            // Claude CLI uses // prefix for absolute filesystem paths.
+            // /path means project-root-relative, //path means absolute.
+            const absPrefix = dir.startsWith("/") ? "/" : "//";
+            return [
+              `Edit(${absPrefix}${dir}/**)`,
+              `Write(${absPrefix}${dir}/**)`,
+            ];
+          }),
+          "Bash(git:*)",
+        ].join(",")]
+      : [];
+
     const cliArgs = [
       "-p", useStdin ? "-" : promptOrAnswer,
       "--output-format", "stream-json",
       "--verbose",
       ...(options?.jsonSchema ? ["--json-schema", JSON.stringify(options.jsonSchema)] : []),
       ...(options?.addDirs?.flatMap((dir) => ["--add-dir", dir]) ?? []),
+      ...addDirAllowedTools,
       ...(resumeSessionId ? ["--resume", resumeSessionId] : []),
     ];
 
-    log(operationId, "spawning:", [getCliPath(), ...cliArgs].join(" ").slice(0, 300));
+    const fullCmd = [getCliPath(), ...cliArgs].join(" ");
+    log(operationId, "spawning:", fullCmd.slice(0, 300));
+    if (addDirAllowedTools.length) {
+      const allowedToolsValue = addDirAllowedTools.join(" ");
+      log(operationId, "allowedTools:", allowedToolsValue);
+      emit({
+        type: "output",
+        operationId,
+        data: `[debug] allowedTools: ${allowedToolsValue}`,
+        timestamp: new Date().toISOString(),
+      });
+    }
     if (useStdin) {
       log(operationId, "using stdin for prompt (length:", promptOrAnswer.length, ")");
     }

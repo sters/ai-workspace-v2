@@ -11,6 +11,7 @@ export interface RepoPromptInput extends WorkspaceRepo {
 export interface ExecutorInput extends RepoPromptInput {
   readmeContent: string;
   todoContent: string;
+  workspacePath: string;
 }
 
 export interface PlannerInput extends RepoPromptInput {

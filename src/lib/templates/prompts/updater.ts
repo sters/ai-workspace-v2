@@ -6,11 +6,12 @@
 import type { UpdaterInput } from "@/types/prompts";
 
 export function buildUpdaterPrompt(input: UpdaterInput): string {
+  const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
+
   return `# Task: Update TODO items for ${input.repoName}
 
 ## Workspace: ${input.workspaceName}
-## Workspace Path: ${input.workspacePath}
-## Repository Worktree: ${input.worktreePath}
+## TODO File: ${todoFilePath}
 ${input.interactive ? "## Mode: interactive" : ""}
 
 ## Update Request
@@ -27,11 +28,13 @@ ${input.todoContent}
 
 ## Instructions
 
-${UPDATER_INSTRUCTIONS}
+${updaterInstructions(todoFilePath, input.workspacePath)}
 `;
 }
 
-const UPDATER_INSTRUCTIONS = `You are a specialized agent for updating TODO items in a workspace repository. Your role is to apply user-requested changes to the TODO file.
+function updaterInstructions(todoFilePath: string, workspacePath: string): string {
+  const todoFileName = todoFilePath.split("/").pop()!;
+  return `You are a specialized agent for updating TODO items in a workspace repository. Your role is to apply user-requested changes to the TODO file.
 
 **Your mission: Apply the requested changes to the TODO file.**
 
@@ -52,7 +55,9 @@ const UPDATER_INSTRUCTIONS = `You are a specialized agent for updating TODO item
    - New items MUST follow the structured format
 
 4. **Commit Changes**:
-   - Stage and commit TODO file changes in the workspace git repo
+   - Stage and commit TODO file changes using separate commands:
+     1. \`git -C ${workspacePath} add ${todoFileName}\`
+     2. \`git -C ${workspacePath} commit -m "message"\`
 
 ### TODO Item Format (Required)
 
@@ -64,9 +69,17 @@ const UPDATER_INSTRUCTIONS = `You are a specialized agent for updating TODO item
   - Verify: (optional) How to verify
 \`\`\`
 
-### Working Directory Rules
+### Working Directory
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+Your working directory is the repository root. Run all repo commands directly (no \`-C\` flags needed).
+The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path.
+
+### Bash Sandbox Restrictions
+
+The following patterns are blocked by the security sandbox:
+- \`$(...)\` command substitution in arguments
+- \`cd <dir> && git ...\` compound commands
+- Use separate \`git -C <dir>\` commands instead of compound commands
 
 ### Interactive Mode
 
@@ -79,3 +92,4 @@ If Mode is "interactive", preview changes before applying and ask for user appro
 3. Be precise: only make requested changes
 4. Validate: ensure valid markdown after updates
 `;
+}

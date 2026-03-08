@@ -88,6 +88,7 @@ export function OperationSummary({
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
         Started {new Date(operation.startedAt).toLocaleString()}
+        <span className="ml-2 font-mono select-all">{operation.id}</span>
         {currentPhase && (
           <span className="ml-2">
             — Phase: {currentPhase.label}

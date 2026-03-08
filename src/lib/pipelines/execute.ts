@@ -54,6 +54,7 @@ export async function buildExecutePipeline(input: {
       readmeContent,
       todoContent,
       worktreePath: repo.worktreePath,
+      workspacePath: wsPath,
     });
 
     return {
