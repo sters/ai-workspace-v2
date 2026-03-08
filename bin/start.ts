@@ -1,20 +1,62 @@
 #!/usr/bin/env bun
 
-import { existsSync, mkdirSync, cpSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, rmSync, writeFileSync, readdirSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { INITIAL_SETTINGS_LOCAL } from "../src/lib/templates/settings";
 
+const GITHUB_REPO_URL = "https://github.com/sters/ai-workspace-v2.git";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let packageDir = resolve(__dirname, "..");
+const isBunx = packageDir.includes(`${sep}node_modules${sep}`);
+
+// Handle --self-update: clear all caches and re-run bunx to get the latest version
+if (process.argv.includes("--self-update")) {
+  if (!isBunx) {
+    console.log("--self-update is only available when running via bunx.");
+    console.log("For local development, use: git pull && bun install");
+    process.exit(1);
+  }
+
+  console.log("Updating ai-workspace-v2...");
+
+  // 1. Clear temp build caches (/tmp/ai-workspace-v2-app-*)
+  const tempBase = tmpdir();
+  for (const entry of readdirSync(tempBase)) {
+    if (entry.startsWith("ai-workspace-v2-app-")) {
+      const p = resolve(tempBase, entry);
+      console.log(`  Removing build cache: ${p}`);
+      rmSync(p, { recursive: true, force: true });
+    }
+  }
+
+  // 2. Clear the bunx install directory (parent of node_modules containing this package)
+  const bunxDir = resolve(packageDir, "..", "..");
+  if (existsSync(resolve(bunxDir, "bun.lock"))) {
+    console.log(`  Removing bunx cache: ${bunxDir}`);
+    rmSync(bunxDir, { recursive: true, force: true });
+  }
+
+  console.log("Cache cleared. Restarting...\n");
+
+  // Re-exec bunx without --self-update
+  const restArgs = process.argv.slice(2).filter((a) => a !== "--self-update");
+  const child = Bun.spawn(["bunx", "ai-workspace-v2", ...restArgs], {
+    stdio: ["inherit", "inherit", "inherit"],
+  });
+  process.on("SIGINT", () => child.kill("SIGINT"));
+  process.on("SIGTERM", () => child.kill("SIGTERM"));
+  process.exit(await child.exited ?? 0);
+}
 
 // When run via bunx, the package lives inside node_modules/ which breaks
 // Next.js TypeScript compilation (SWC skips TS for node_modules files).
 // Copy the project to a temp directory and install deps fresh.
 let resolvedGitHash = "";
-if (packageDir.includes(`${sep}node_modules${sep}`)) {
+if (isBunx) {
   // Extract git hash from bunx temp bun.lock (e.g. "...#abc1234")
   try {
     const lockPath = resolve(packageDir, "..", "..", "bun.lock");
@@ -54,6 +96,32 @@ if (packageDir.includes(`${sep}node_modules${sep}`)) {
 
     packageDir = tempDir;
   }
+}
+
+// Check for updates when running via bunx (non-blocking with timeout)
+if (isBunx && resolvedGitHash) {
+  const checkForUpdate = async () => {
+    try {
+      const proc = Bun.spawn(
+        ["git", "ls-remote", GITHUB_REPO_URL, "HEAD"],
+        { stdout: "pipe", stderr: "pipe" }
+      );
+      const output = await new Response(proc.stdout).text();
+      const exitCode = await proc.exited;
+      if (exitCode !== 0) return;
+
+      const latestHash = output.trim().split("\t")[0];
+      if (latestHash && !latestHash.startsWith(resolvedGitHash)) {
+        console.log(
+          `\nUpdate available! (current: ${resolvedGitHash}, latest: ${latestHash.slice(0, 7)})\n` +
+          `  Run: bunx ai-workspace-v2 --self-update\n`
+        );
+      }
+    } catch {
+      // Network error — skip check silently
+    }
+  };
+  await Promise.race([checkForUpdate(), Bun.sleep(3000)]);
 }
 
 // Resolve AI_WORKSPACE_ROOT: args > env > cwd
