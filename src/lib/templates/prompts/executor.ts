@@ -6,11 +6,13 @@
 import type { ExecutorInput } from "@/types/prompts";
 
 export function buildExecutorPrompt(input: ExecutorInput): string {
+  const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
+
   return `# Task: Execute TODO items for ${input.repoName}
 
 ## Workspace: ${input.workspaceName}
 ## Repository: ${input.repoPath}
-## Worktree: ${input.worktreePath}
+## TODO File: ${todoFilePath}
 
 ## Workspace README
 
@@ -22,11 +24,11 @@ ${input.todoContent}
 
 ## Instructions
 
-${executorInstructions(input.worktreePath)}
+${executorInstructions(todoFilePath)}
 `;
 }
 
-function executorInstructions(worktreePath: string): string {
+function executorInstructions(todoFilePath: string): string {
   return `You are a specialized agent for executing TODO items for a specific repository within a workspace directory. Your role is to autonomously consume and complete TODO tasks defined in the TODO file above.
 
 **Your mission is simple and unwavering: Complete all uncompleted items in the TODO file above.**
@@ -78,14 +80,28 @@ function executorInstructions(worktreePath: string): string {
 
 ### Working Directory
 
-Your working directory is set to the repository worktree (\`${worktreePath}\`).
-You can run commands like \`make\`, \`go test\`, \`npm run build\`, \`git status\`, etc. directly — they will execute in the correct directory.
-The workspace directory is also available via \`--add-dir\` for reading/writing TODO files and other workspace artifacts.
+Your working directory is the repository root. Run all commands directly:
+- \`git status\`, \`git commit\`, etc. — NOT \`git -C <path>\`
+- \`make lint\`, \`make test\`, etc. — NOT \`make -C <path>\`
+- **NEVER use \`-C\` flags or absolute paths for repository commands.**
+
+The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path to access it.
+
+### Bash Sandbox Restrictions
+
+The following patterns are blocked by the security sandbox:
+- \`$(...)\` command substitution in arguments
+- \`cd <dir> && git ...\` compound commands
+- File I/O redirects (\`>\`, \`>>\`) to paths outside the working directory
+
+To commit changes to the workspace (TODO file updates), use separate commands:
+1. \`git -C <workspace_dir> add <file>\`
+2. \`git -C <workspace_dir> commit -m "message"\`
 
 ### Scope Boundaries
 
 **DO**:
-- Work only on files within the repository worktree
+- Work only on files within the repository
 - Complete TODO items as specified
 - Make commits to the feature/fix branch
 

@@ -178,62 +178,22 @@ export function CollapsibleRow({
 function PermissionDenialRow({
   toolName,
   summary,
-  permissionString,
 }: {
   toolName: string;
   summary: string;
   permissionString: string;
 }) {
-  const [state, setState] = useState<"idle" | "adding" | "added" | "error">("idle");
-
-  async function handleAllow() {
-    setState("adding");
-    try {
-      const res = await fetch("/api/claude-settings/add-permission", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ permission: permissionString }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setState("added");
-    } catch {
-      setState("error");
-    }
-  }
-
   return (
     <Callout variant="warning" className="rounded-md">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-medium">
-            Permission denied: {toolName}
+      <div className="min-w-0">
+        <p className="text-sm font-medium">
+          Permission denied: {toolName}
+        </p>
+        {summary && (
+          <p className="truncate font-mono text-xs text-muted-foreground">
+            {summary}
           </p>
-          {summary && (
-            <p className="truncate font-mono text-xs text-muted-foreground">
-              {summary}
-            </p>
-          )}
-        </div>
-        <div className="shrink-0">
-          {state === "idle" && (
-            <Button variant="outline" onClick={handleAllow}>
-              Allow {permissionString}
-            </Button>
-          )}
-          {state === "adding" && (
-            <Button variant="outline" disabled>
-              Adding...
-            </Button>
-          )}
-          {state === "added" && (
-            <span className="text-xs font-medium text-green-600">Added</span>
-          )}
-          {state === "error" && (
-            <Button variant="outline" onClick={handleAllow}>
-              Retry
-            </Button>
-          )}
-        </div>
+        )}
       </div>
     </Callout>
   );
