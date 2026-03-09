@@ -43,8 +43,9 @@ if (process.argv.includes("--self-update")) {
   console.log("Cache cleared. Restarting...\n");
 
   // Re-exec bunx without --self-update
+  // Use github: specifier since this package is not published on npm
   const restArgs = process.argv.slice(2).filter((a) => a !== "--self-update");
-  const child = Bun.spawn(["bunx", "ai-workspace-v2", ...restArgs], {
+  const child = Bun.spawn(["bunx", "github:sters/ai-workspace-v2", ...restArgs], {
     stdio: ["inherit", "inherit", "inherit"],
   });
   process.on("SIGINT", () => child.kill("SIGINT"));
@@ -114,7 +115,7 @@ if (isBunx && resolvedGitHash) {
       if (latestHash && !latestHash.startsWith(resolvedGitHash)) {
         console.log(
           `\nUpdate available! (current: ${resolvedGitHash}, latest: ${latestHash.slice(0, 7)})\n` +
-          `  Run: bunx ai-workspace-v2 --self-update\n`
+          `  Run: bunx github:sters/ai-workspace-v2 --self-update\n`
         );
       }
     } catch {

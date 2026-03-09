@@ -8,19 +8,19 @@ Provides a browser interface on `localhost:3741` to view workspace status, TODO 
 
 ```bash
 # Run from the ai-workspace root directory
-bunx ai-workspace-v2
+bunx github:sters/ai-workspace-v2
 
 # Or specify the path explicitly
-bunx ai-workspace-v2 /path/to/ai-workspace
+bunx github:sters/ai-workspace-v2 /path/to/ai-workspace
 
 # Or use an environment variable
-AI_WORKSPACE_ROOT=/path/to/ai-workspace bunx ai-workspace-v2
+AI_WORKSPACE_ROOT=/path/to/ai-workspace bunx github:sters/ai-workspace-v2
 
 # Force update to latest version (bunx users)
-bunx ai-workspace-v2 --self-update
+bunx github:sters/ai-workspace-v2 --self-update
 
 # Development mode (hot reload)
-bunx ai-workspace-v2 --dev
+bunx github:sters/ai-workspace-v2 --dev
 ```
 
 The UI starts on **http://localhost:3741**.
@@ -29,7 +29,7 @@ The UI starts on **http://localhost:3741**.
 
 `AI_WORKSPACE_ROOT` is resolved in this order:
 
-1. CLI argument: `bunx ai-workspace-v2 /path/to/ai-workspace`
+1. CLI argument: `bunx github:sters/ai-workspace-v2 /path/to/ai-workspace`
 2. Environment variable: `AI_WORKSPACE_ROOT`
 3. Current working directory
 
