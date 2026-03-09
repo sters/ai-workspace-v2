@@ -1,8 +1,8 @@
 "use client";
 
-import { use } from "react";
+import { use, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { ReviewViewer } from "@/components/workspace/review-viewer";
 
 export default function WorkspaceReviewPage({
   params,
@@ -12,14 +12,15 @@ export default function WorkspaceReviewPage({
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
   const { workspace } = useWorkspace(decodedName);
+  const router = useRouter();
 
-  if (!workspace) return null;
+  useEffect(() => {
+    if (workspace && workspace.reviews.length > 0) {
+      router.replace(
+        `/workspace/${name}/review/${workspace.reviews[0].timestamp}`
+      );
+    }
+  }, [workspace, router, name]);
 
-  return (
-    <ReviewViewer
-      workspaceName={decodedName}
-      workspacePath={workspace.path}
-      reviews={workspace.reviews}
-    />
-  );
+  return null;
 }
