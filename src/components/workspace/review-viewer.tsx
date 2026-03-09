@@ -121,7 +121,7 @@ export function ReviewViewer({
                 <div>
                   <div className="mb-2 flex items-center justify-end">
                     <Link
-                      href={`/workspace/${encodeURIComponent(workspaceName)}/chat?reviewTimestamp=${selected}`}
+                      href={`/workspace/${encodeURIComponent(workspaceName)}/chat/interactive?reviewTimestamp=${selected}`}
                       className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
                     >
                       <MessageSquare className="h-4 w-4" />

@@ -11,12 +11,12 @@ import { OperationPanel } from "@/components/workspace/operation-panel";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { label: "Overview", segment: "" },
-  { label: "TODOs", segment: "todo" },
-  { label: "Reviews", segment: "review" },
-  { label: "History", segment: "history" },
-  { label: "Operations", segment: "operations" },
-  { label: "Chat", segment: "chat" },
+  { label: "Overview", segment: "", href: "" },
+  { label: "TODOs", segment: "todo", href: "todo" },
+  { label: "Reviews", segment: "review", href: "review" },
+  { label: "History", segment: "history", href: "history" },
+  { label: "Operations", segment: "operations", href: "operations" },
+  { label: "Chat", segment: "chat", href: "chat/quick" },
 ] as const;
 
 const VALID_AUTO_ACTIONS = new Set<string>(["execute", "review", "create-pr", "create-todo", "batch"]);
@@ -162,19 +162,22 @@ function WorkspaceLayoutContent({
       <div className="mb-4 flex border-b">
         {TABS.map((tab) => {
           const href =
-            tab.segment === "" ? basePath : `${basePath}/${tab.segment}`;
-          const isActive = activeSegment === tab.segment;
-          return (
-            <Link
-              key={tab.segment}
-              href={href}
-              className={cn(
-                "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              )}
-            >
+            tab.href === "" ? basePath : `${basePath}/${tab.href}`;
+          const isActive = tab.segment === ""
+            ? activeSegment === ""
+            : activeSegment === tab.segment;
+          const cls = cn(
+            "border-b-2 px-4 py-2 text-sm font-medium transition-colors",
+            isActive
+              ? "border-primary text-foreground"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          );
+          return isActive ? (
+            <span key={tab.segment} className={cls}>
+              {tab.label}
+            </span>
+          ) : (
+            <Link key={tab.segment} href={href} className={cls}>
               {tab.label}
             </Link>
           );

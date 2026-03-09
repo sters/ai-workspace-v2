@@ -61,6 +61,11 @@ export const searchSchema = z.object({
   query: z.string().min(1, "query is required"),
 });
 
+export const quickAskSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  question: z.string().min(1, "question is required"),
+});
+
 export const mcpAuthSchema = z.object({
   serverName: z.string().min(1, "serverName is required"),
   forceReauth: z.union([z.boolean(), z.string()]).optional(),
