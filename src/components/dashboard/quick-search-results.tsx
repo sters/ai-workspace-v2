@@ -1,6 +1,6 @@
 "use client";
 
-import type { QuickSearchResponse, QuickSearchResult, DeepSearchResponse, DeepSearchResult } from "@/types/search";
+import type { QuickSearchResponse, QuickSearchResult, DeepSearchResponse } from "@/types/search";
 import type { WorkspaceSummary } from "@/types/workspace";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { StatusText } from "@/components/shared/feedback/status-text";

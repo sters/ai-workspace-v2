@@ -4,6 +4,7 @@ export { buildCoordinatorPrompt } from "./coordinator";
 export { buildReviewerPrompt } from "./reviewer";
 export { buildCodeReviewerPrompt } from "./code-reviewer";
 export { buildTodoVerifierPrompt } from "./todo-verifier";
+export { buildReadmeVerifierPrompt } from "./readme-verifier";
 export { buildPRCreatorPrompt } from "./pr-creator";
 export { buildResearcherPrompt } from "./researcher";
 export { buildUpdaterPrompt } from "./updater";

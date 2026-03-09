@@ -12,6 +12,7 @@ import {
 import {
   buildCodeReviewerPrompt,
   buildTodoVerifierPrompt,
+  buildReadmeVerifierPrompt,
   buildCollectorPrompt,
 } from "@/lib/templates";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
@@ -82,6 +83,24 @@ export async function buildReviewPipeline(input: {
         verifyFilePath: path.join(reviewDir, verifyFileName),
       }),
     });
+
+    // README verifier
+    const readmeVerifyFileName = `VERIFY-README-${orgName}_${repo.repoName}.md`;
+    reviewChildren.push({
+      label: `verify-readme-${repo.repoName}`,
+      prompt: buildReadmeVerifierPrompt({
+        workspaceName: workspace,
+        repoPath: repo.repoPath,
+        repoName: repo.repoName,
+        baseBranch,
+        reviewTimestamp,
+        readmeContent,
+        worktreePath: repo.worktreePath,
+        repoChanges: `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`,
+        ticketId: meta.ticketId ?? "",
+        verifyFilePath: path.join(reviewDir, readmeVerifyFileName),
+      }),
+    });
   }
 
   return [
@@ -99,8 +118,13 @@ export async function buildReviewPipeline(input: {
         // List actual review/verify files using Bun.Glob
         const reviewGlob = new Bun.Glob("REVIEW-*");
         const verifyGlob = new Bun.Glob("VERIFY-*");
+        const readmeVerifyGlob = new Bun.Glob("VERIFY-README-*");
         const actualReviewFiles = [...reviewGlob.scanSync({ cwd: reviewDir })];
-        const actualVerifyFiles = [...verifyGlob.scanSync({ cwd: reviewDir })];
+        const actualReadmeVerifyFiles = new Set([...readmeVerifyGlob.scanSync({ cwd: reviewDir })]);
+        // Exclude VERIFY-README-* from TODO verify files
+        const actualVerifyFiles = [...verifyGlob.scanSync({ cwd: reviewDir })].filter(
+          (f) => !actualReadmeVerifyFiles.has(f),
+        );
 
         const prompt = buildCollectorPrompt({
           workspaceName: workspace,
@@ -108,6 +132,7 @@ export async function buildReviewPipeline(input: {
           reviewDir,
           reviewFiles: actualReviewFiles.map((f) => path.join(reviewDir, f)),
           verifyFiles: actualVerifyFiles.map((f) => path.join(reviewDir, f)),
+          readmeVerifyFiles: [...actualReadmeVerifyFiles].map((f) => path.join(reviewDir, f)),
         });
 
         return ctx.runChild("Collect reviews", prompt);

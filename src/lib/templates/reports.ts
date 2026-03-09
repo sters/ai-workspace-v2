@@ -159,9 +159,49 @@ export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
 ## Conclusion
 `;
 
+export const README_VERIFICATION_REPORT_TEMPLATE = `# README Verification: {repository_name}
+
+**Task**: {task_name}
+**Repository**: {repository_path}
+**Base Branch**: {base_branch}
+**Verification Date**: {timestamp}
+
+## Summary
+
+| Status | Count |
+|--------|-------|
+| Satisfied | {count} |
+| Unsatisfied | {count} |
+| Partial | {count} |
+
+**Satisfaction Rate**: {pct}% ({satisfied} / {total})
+
+## Requirements
+
+### Extracted Requirements
+
+{List of requirements extracted from README}
+
+## Satisfied Requirements
+
+## Partial Requirements
+
+## Unsatisfied Requirements
+
+## Evidence
+
+### {Requirement}
+- **Status**: {SATISFIED/PARTIAL/UNSATISFIED}
+- **Evidence**: {file paths, code references}
+- **Notes**: {additional context}
+
+## Recommendations
+`;
+
 export const REPORT_TEMPLATES = {
   "review-report-template.md": REVIEW_REPORT_TEMPLATE,
   "verification-report-template.md": VERIFICATION_REPORT_TEMPLATE,
+  "readme-verification-report-template.md": README_VERIFICATION_REPORT_TEMPLATE,
   "research-report-template.md": RESEARCH_REPORT_TEMPLATE,
   "summary-report-template.md": SUMMARY_REPORT_TEMPLATE,
 } as const;
