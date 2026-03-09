@@ -43,7 +43,7 @@ export function buildCoordinateTodosPhase(input: {
       });
 
       ctx.emitStatus("Coordinating TODOs across repositories");
-      return ctx.runChild("Coordinate TODOs", prompt);
+      return ctx.runChild("Coordinate TODOs", prompt, { addDirs: [input.wsPath] });
     },
   };
 }

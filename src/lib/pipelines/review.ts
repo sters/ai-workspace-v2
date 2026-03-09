@@ -61,6 +61,7 @@ export async function buildReviewPipeline(input: {
         repoChanges: `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`,
         reviewFilePath: path.join(reviewDir, reviewFileName),
       }),
+      addDirs: [reviewDir],
     });
 
     // TODO verifier
@@ -82,6 +83,7 @@ export async function buildReviewPipeline(input: {
         worktreePath: repo.worktreePath,
         verifyFilePath: path.join(reviewDir, verifyFileName),
       }),
+      addDirs: [reviewDir],
     });
 
     // README verifier
@@ -99,6 +101,7 @@ export async function buildReviewPipeline(input: {
         repoChanges: `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`,
         verifyFilePath: path.join(reviewDir, readmeVerifyFileName),
       }),
+      addDirs: [reviewDir],
     });
   }
 
@@ -131,7 +134,7 @@ export async function buildReviewPipeline(input: {
           readmeVerifyFiles: [...actualReadmeVerifyFiles].map((f) => path.join(reviewDir, f)),
         });
 
-        return ctx.runChild("Collect reviews", prompt);
+        return ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir] });
       },
     },
   ];
