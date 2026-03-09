@@ -1,23 +1,20 @@
-import Link from "next/link";
+"use client";
+
+import { useState } from "react";
 import { WorkspaceList } from "@/components/dashboard/workspace-list";
+import { WorkspaceSearch } from "@/components/dashboard/workspace-search";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 
 export default function DashboardPage() {
+  const [searchActive, setSearchActive] = useState(false);
+
   return (
     <div>
-      <PageHeader
-        title="Workspaces"
-        action={
-          <Link
-            href="/new"
-            className="ml-auto rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            New Workspace
-          </Link>
-        }
-      />
+      <PageHeader title="Workspaces" />
 
-      <WorkspaceList />
+      <WorkspaceSearch onSearchActiveChange={setSearchActive} />
+
+      {!searchActive && <WorkspaceList />}
     </div>
   );
 }

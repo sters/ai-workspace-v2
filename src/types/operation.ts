@@ -9,7 +9,8 @@ export type OperationType =
   | "workspace-prune"
   | "mcp-auth"
   | "claude-login"
-  | "batch";
+  | "batch"
+  | "search";
 
 export type OperationStatus = "running" | "completed" | "failed";
 
