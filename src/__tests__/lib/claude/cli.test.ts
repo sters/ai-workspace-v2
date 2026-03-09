@@ -110,8 +110,11 @@ describe("getCliPath", () => {
 
   it("returns 'claude' when Bun.which returns null", () => {
     mockWhich.mockReturnValue(null);
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     expect(getCliPath()).toBe("claude");
+
+    spy.mockRestore();
   });
 
   it("caches the result (lazy evaluation)", () => {
