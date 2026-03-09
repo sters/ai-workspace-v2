@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import { Button } from "@/components/shared/buttons/button";
 import { Spinner } from "@/components/shared/feedback/spinner";
@@ -11,9 +12,25 @@ import type { QuickSearchResponse, DeepSearchResponse, DeepSearchResult } from "
 
 type SearchMode = "quick" | "deep" | null;
 
+function updateURL(q: string | null, mode: SearchMode) {
+  const url = new URL(window.location.href);
+  if (q && mode) {
+    url.searchParams.set("q", q);
+    url.searchParams.set("mode", mode);
+  } else {
+    url.searchParams.delete("q");
+    url.searchParams.delete("mode");
+  }
+  window.history.replaceState(null, "", url.toString());
+}
+
 export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange?: (active: boolean) => void }) {
-  const [query, setQuery] = useState("");
-  const [activeMode, setActiveMode] = useState<SearchMode>(null);
+  const searchParams = useSearchParams();
+  const initialQ = searchParams.get("q") ?? "";
+  const initialMode = (searchParams.get("mode") as SearchMode) || null;
+
+  const [query, setQuery] = useState(initialQ);
+  const [activeMode, setActiveMode] = useState<SearchMode>(initialMode);
 
   // Quick search state
   const [quickData, setQuickData] = useState<QuickSearchResponse | null>(null);
@@ -23,6 +40,18 @@ export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange
   // Deep search state
   const { operation, events, isRunning, start, cancel, reset } =
     useOperation("dashboard-search");
+
+  // Auto-run search from URL params on mount
+  const initialRunRef = useRef(false);
+  useEffect(() => {
+    if (initialRunRef.current || !initialQ || !initialMode) return;
+    initialRunRef.current = true;
+    if (initialMode === "quick") {
+      runQuickSearchWith(initialQ);
+    }
+    // Deep search from URL: don't auto-start (it's expensive), just restore the query
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Parse deep search structured results from SSE events
   const deepData = useMemo<DeepSearchResponse | null>(() => {
@@ -51,9 +80,7 @@ export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange
   const deepError = useMemo<string | null>(() => {
     if (activeMode !== "deep" || isRunning || events.length === 0) return null;
     if (deepData) return null;
-    // Check if operation failed
     if (operation?.status === "failed") return "Deep search failed";
-    // Check for error in result
     for (const event of events) {
       if (event.type === "output") {
         const parsed = parseStreamEvent(event.data);
@@ -72,14 +99,12 @@ export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange
     return null;
   }, [activeMode, isRunning, events, operation?.status, deepData]);
 
-  const runQuickSearch = useCallback(async () => {
-    const q = query.trim();
-    if (!q) return;
-
+  const runQuickSearchWith = useCallback(async (q: string) => {
     setActiveMode("quick");
     setQuickLoading(true);
     setQuickError(null);
     setQuickData(null);
+    updateURL(q, "quick");
 
     try {
       const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
@@ -93,13 +118,20 @@ export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange
     } finally {
       setQuickLoading(false);
     }
-  }, [query]);
+  }, []);
+
+  const runQuickSearch = useCallback(async () => {
+    const q = query.trim();
+    if (!q) return;
+    await runQuickSearchWith(q);
+  }, [query, runQuickSearchWith]);
 
   const runDeepSearch = useCallback(async () => {
     const q = query.trim();
     if (!q) return;
 
     setActiveMode("deep");
+    updateURL(q, "deep");
     await start("search", { query: q });
   }, [query, start]);
 
@@ -108,6 +140,7 @@ export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange
     setQuickData(null);
     setQuickError(null);
     reset();
+    updateURL(null, null);
   }, [reset]);
 
   const handleKeyDown = useCallback(
