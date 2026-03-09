@@ -51,12 +51,11 @@ function reviewerInstructions(worktreePath: string): string {
 
 ### Working Directory
 
-**IMPORTANT: Before running any commands, first change to the repository directory:**
+**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
 \`\`\`bash
 cd ${worktreePath}
 \`\`\`
-
-After \`cd\`, run commands like \`git status\`, \`git diff\`, etc. directly.
+After that, run commands like \`git status\`, \`git diff\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
 
 ### Output Format
 
