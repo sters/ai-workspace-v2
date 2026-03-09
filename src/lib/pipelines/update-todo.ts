@@ -43,6 +43,6 @@ export async function buildUpdateTodoPipeline(input: {
           .join("\n\n---\n\n");
 
   return [
-    { kind: "single", label: "Update TODOs", prompt },
+    { kind: "single", label: "Update TODOs", prompt, addDirs: [workspacePath] },
   ];
 }

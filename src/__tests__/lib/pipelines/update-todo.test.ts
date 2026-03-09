@@ -64,11 +64,11 @@ describe("buildUpdateTodoPipeline", () => {
       expect(phase.cwd).toBeUndefined();
     });
 
-    it("phase does not set addDirs", async () => {
+    it("phase sets addDirs to workspace path", async () => {
       const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
       const phase = phases[0];
       if (phase.kind !== "single") throw new Error("expected single");
-      expect(phase.addDirs).toBeUndefined();
+      expect(phase.addDirs).toEqual([expect.stringContaining("test-ws")]);
     });
 
     it("label is 'Update TODOs'", async () => {
@@ -100,12 +100,12 @@ describe("buildUpdateTodoPipeline", () => {
       expect(phases).toHaveLength(1);
     });
 
-    it("phase does not set cwd or addDirs", async () => {
+    it("phase does not set cwd but sets addDirs", async () => {
       const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
       const phase = phases[0];
       if (phase.kind !== "single") throw new Error("expected single");
       expect(phase.cwd).toBeUndefined();
-      expect(phase.addDirs).toBeUndefined();
+      expect(phase.addDirs).toEqual([expect.stringContaining("test-ws")]);
     });
   });
 });
