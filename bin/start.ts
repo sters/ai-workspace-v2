@@ -169,6 +169,7 @@ const sharedEnv = {
   ...process.env,
   AI_WORKSPACE_ROOT: root,
   ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
+  ...(isBunx ? { BUNX_MODE: "1" } : {}),
 };
 
 // Start Next.js server
