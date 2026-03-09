@@ -4,10 +4,10 @@
 
 export const REVIEW_REPORT_TEMPLATE = `# Code Review: {repository_name}
 
-**Task**: {task_name}
-**Repository**: {repository_path}
-**Base Branch**: {base_branch}
-**Review Date**: {timestamp}
+- **Task**: {task_name}
+- **Repository**: {repository_path}
+- **Base Branch**: {base_branch}
+- **Review Date**: {timestamp}
 
 ## Summary
 
@@ -53,10 +53,10 @@ export const REVIEW_REPORT_TEMPLATE = `# Code Review: {repository_name}
 
 export const VERIFICATION_REPORT_TEMPLATE = `# TODO Verification: {repository_name}
 
-**Task**: {task_name}
-**Repository**: {repository_path}
-**Base Branch**: {base_branch}
-**Verification Date**: {timestamp}
+- **Task**: {task_name}
+- **Repository**: {repository_path}
+- **Base Branch**: {base_branch}
+- **Verification Date**: {timestamp}
 
 ## Summary
 
@@ -92,8 +92,8 @@ export const VERIFICATION_REPORT_TEMPLATE = `# TODO Verification: {repository_na
 
 export const RESEARCH_REPORT_TEMPLATE = `# Research Report
 
-**Workspace**: {workspace_name}
-**Date**: {date}
+- **Workspace**: {workspace_name}
+- **Date**: {date}
 
 ## Research Objectives
 
@@ -128,9 +128,8 @@ export const RESEARCH_REPORT_TEMPLATE = `# Research Report
 
 export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
 
-**Workspace**: {workspace-name}
-**Review Date**: {timestamp}
-**Repositories Reviewed**: {count}
+- **Review Date**: {timestamp}
+- **Repositories Reviewed**: {count}
 
 ## Overview
 
@@ -141,16 +140,41 @@ export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
 ### {Repository Name}
 
 - **Review File**: [{filename}](./{filename})
-- **Overall Assessment**: {assessment}
-- **Critical Issues**: {count}
-- **Warnings**: {count}
-- **Suggestions**: {count}
+- **TODO Verification**: [{filename}](./{filename})
+- **README Verification**: [{filename}](./{filename})
 
-## Aggregate Statistics
+#### Code Review
 
-- **Total Critical Issues**: {sum}
-- **Total Warnings**: {sum}
-- **Total Suggestions**: {sum}
+| Metric | Count |
+|--------|-------|
+| Overall Assessment | {assessment} |
+| Critical Issues | {count} |
+| Warnings | {count} |
+| Suggestions | {count} |
+
+{Warning descriptions as numbered list, no heading needed}
+
+#### TODO Verification
+
+| Status | Count |
+|--------|-------|
+| Verified | {count} |
+| Unverified | {count} |
+| Partial | {count} |
+| Incomplete | {count} |
+| Skipped | {count} |
+
+**Completion Rate**: {pct}% ({completed} / {total})
+
+#### README Verification
+
+| Status | Count |
+|--------|-------|
+| Satisfied | {count} |
+| Unsatisfied | {count} |
+| Partial | {count} |
+
+**Satisfaction Rate**: {pct}% ({satisfied} / {total})
 
 ## Top Priority Issues
 
@@ -161,10 +185,10 @@ export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
 
 export const README_VERIFICATION_REPORT_TEMPLATE = `# README Verification: {repository_name}
 
-**Task**: {task_name}
-**Repository**: {repository_path}
-**Base Branch**: {base_branch}
-**Verification Date**: {timestamp}
+- **Task**: {task_name}
+- **Repository**: {repository_path}
+- **Base Branch**: {base_branch}
+- **Verification Date**: {timestamp}
 
 ## Summary
 
@@ -176,21 +200,8 @@ export const README_VERIFICATION_REPORT_TEMPLATE = `# README Verification: {repo
 
 **Satisfaction Rate**: {pct}% ({satisfied} / {total})
 
-## Requirements
+## {Extracted Requirement}
 
-### Extracted Requirements
-
-{List of requirements extracted from README}
-
-## Satisfied Requirements
-
-## Partial Requirements
-
-## Unsatisfied Requirements
-
-## Evidence
-
-### {Requirement}
 - **Status**: {SATISFIED/PARTIAL/UNSATISFIED}
 - **Evidence**: {file paths, code references}
 - **Notes**: {additional context}

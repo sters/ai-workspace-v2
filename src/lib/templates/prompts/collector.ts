@@ -43,17 +43,17 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
 ### Execution Steps
 
 1. **Read Each Review File**:
-   - Code Reviews: Extract repository name, assessment, critical/warning/suggestion counts
-   - TODO Verifications: Extract verified/unverified/partial/incomplete counts
-   - README Verifications: Extract satisfied/unsatisfied/partial counts
+   - Code Reviews: Extract repository name, overall assessment, critical/warning/suggestion counts, and individual warning descriptions
+   - TODO Verifications: Extract verified/unverified/partial/incomplete/skipped counts and completion rate
+   - README Verifications: Extract satisfied/unsatisfied/partial counts and satisfaction rate
 
-2. **Aggregate Statistics**:
-   - Total critical issues, warnings, suggestions across all repos
-   - Total verified, unverified, incomplete items
-   - Total satisfied, unsatisfied, partial README requirements
-   - Average completion rate
-
-3. **Create Summary Report** at the specified path
+2. **Create Summary Report** at the specified path following the template structure:
+   - Per-repository sections with links to all review/verification files
+   - Code Review metrics as a table (Overall Assessment, Critical Issues, Warnings, Suggestions)
+   - Warning descriptions as a numbered list directly after the Code Review table (no separate heading)
+   - TODO Verification status as a table with completion rate
+   - README Verification status as a table with satisfaction rate
+   - Do NOT include an Aggregate Statistics section
 
 ### Working Directory Rules
 
@@ -65,4 +65,5 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
 - Extract counts from patterns like "Critical Issues: X"
 - Prioritize critical issues in top priority list
 - Use relative paths in SUMMARY.md for markdown links
+- Omit TODO/README Verification subsections for repos that have no corresponding verification files
 `;
