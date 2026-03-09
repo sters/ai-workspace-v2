@@ -136,6 +136,7 @@ export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange
   }, [query, start]);
 
   const handleClear = useCallback(() => {
+    setQuery("");
     setActiveMode(null);
     setQuickData(null);
     setQuickError(null);
