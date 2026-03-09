@@ -145,20 +145,16 @@ export function OperationPanel({
 }
 
 function openInVSCode(targetPath: string) {
-  fetch("/api/operations/open-vscode", {
+  return fetch("/api/operations/open-vscode", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ workspace: targetPath }),
-  })
-    .then(async (res) => {
-      if (!res.ok) {
-        const data = await res.json();
-        console.error("Failed to open VS Code:", data.error);
-      }
-    })
-    .catch((e) => {
-      console.error("Failed to open VS Code:", e);
-    });
+  }).then(async (res) => {
+    if (!res.ok) {
+      const data = await res.json();
+      console.error("Failed to open VS Code:", data.error);
+    }
+  });
 }
 
 function OpenVSCodeButton({
