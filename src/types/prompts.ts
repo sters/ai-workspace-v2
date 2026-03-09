@@ -55,7 +55,6 @@ export interface ReadmeVerifierInput extends RepoPromptInput {
   reviewTimestamp: string;
   readmeContent: string;
   repoChanges: string;
-  ticketId: string;
   verifyFilePath: string;
 }
 

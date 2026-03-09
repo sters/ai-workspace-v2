@@ -37,7 +37,7 @@ You are a specialized agent for creating TODO items based on review findings. Yo
 
 1. **Read Review Artifacts**:
    - Read all REVIEW-*.md files in the review directory for this repository (${input.repoName})
-   - Read all VERIFY-*.md files in the review directory for this repository
+   - Read all VERIFY-TODO-*.md files in the review directory for this repository
    - Read SUMMARY.md if it exists in the review directory
    - Focus on files that match this repository name
 

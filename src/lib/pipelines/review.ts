@@ -45,7 +45,7 @@ export async function buildReviewPipeline(input: {
 
     const orgName = repo.repoPath.split("/").slice(0, -1).join("_") || "local";
     const reviewFileName = `REVIEW-${orgName}_${repo.repoName}.md`;
-    const verifyFileName = `VERIFY-${orgName}_${repo.repoName}.md`;
+    const verifyFileName = `VERIFY-TODO-${orgName}_${repo.repoName}.md`;
 
     // Code reviewer
     reviewChildren.push({
@@ -97,7 +97,6 @@ export async function buildReviewPipeline(input: {
         readmeContent,
         worktreePath: repo.worktreePath,
         repoChanges: `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`,
-        ticketId: meta.ticketId ?? "",
         verifyFilePath: path.join(reviewDir, readmeVerifyFileName),
       }),
     });
@@ -117,14 +116,11 @@ export async function buildReviewPipeline(input: {
       fn: async (ctx) => {
         // List actual review/verify files using Bun.Glob
         const reviewGlob = new Bun.Glob("REVIEW-*");
-        const verifyGlob = new Bun.Glob("VERIFY-*");
+        const verifyGlob = new Bun.Glob("VERIFY-TODO-*");
         const readmeVerifyGlob = new Bun.Glob("VERIFY-README-*");
         const actualReviewFiles = [...reviewGlob.scanSync({ cwd: reviewDir })];
         const actualReadmeVerifyFiles = new Set([...readmeVerifyGlob.scanSync({ cwd: reviewDir })]);
-        // Exclude VERIFY-README-* from TODO verify files
-        const actualVerifyFiles = [...verifyGlob.scanSync({ cwd: reviewDir })].filter(
-          (f) => !actualReadmeVerifyFiles.has(f),
-        );
+        const actualVerifyFiles = [...verifyGlob.scanSync({ cwd: reviewDir })];
 
         const prompt = buildCollectorPrompt({
           workspaceName: workspace,

@@ -5,17 +5,33 @@ export function parseReviewSummary(
   content: string
 ): ReviewSession {
   const reposMatch = content.match(/\*\*Repositories Reviewed\*\*:\s*(\d+)/);
-  const criticalMatch = content.match(/\*\*Total Critical Issues\*\*:\s*(\d+)/);
-  const warningsMatch = content.match(/\*\*Total Warnings\*\*:\s*(\d+)/);
-  const suggestionsMatch = content.match(
-    /\*\*Total Suggestions\*\*:\s*(\d+)/
+
+  // Sum counts from per-repo Code Review tables:
+  // | Critical Issues | {count} |
+  // | Warnings | {count} |
+  // | Suggestions | {count} |
+  const criticalMatches = content.matchAll(
+    /\|\s*Critical Issues\s*\|\s*(\d+)\s*\|/g
   );
+  const warningMatches = content.matchAll(
+    /\|\s*Warnings\s*\|\s*(\d+)\s*\|/g
+  );
+  const suggestionMatches = content.matchAll(
+    /\|\s*Suggestions\s*\|\s*(\d+)\s*\|/g
+  );
+
+  let critical = 0;
+  for (const m of criticalMatches) critical += parseInt(m[1], 10);
+  let warnings = 0;
+  for (const m of warningMatches) warnings += parseInt(m[1], 10);
+  let suggestions = 0;
+  for (const m of suggestionMatches) suggestions += parseInt(m[1], 10);
 
   return {
     timestamp,
     repos: parseInt(reposMatch?.[1] ?? "0", 10),
-    critical: parseInt(criticalMatch?.[1] ?? "0", 10),
-    warnings: parseInt(warningsMatch?.[1] ?? "0", 10),
-    suggestions: parseInt(suggestionsMatch?.[1] ?? "0", 10),
+    critical,
+    warnings,
+    suggestions,
   };
 }

@@ -13,7 +13,6 @@ export function buildReadmeVerifierPrompt(input: ReadmeVerifierInput): string {
 ## Base Branch: ${input.baseBranch}
 ## Review Timestamp: ${input.reviewTimestamp}
 ## Worktree: ${input.worktreePath}
-${input.ticketId ? `## Ticket ID: ${input.ticketId}` : ""}
 
 ## README Content
 
@@ -32,29 +31,11 @@ Use it as the base structure for the report.
 
 ## Instructions
 
-${readmeVerifierInstructions(input.worktreePath, input.baseBranch, input.ticketId)}
+${readmeVerifierInstructions(input.worktreePath, input.baseBranch)}
 `;
 }
 
-function readmeVerifierInstructions(worktreePath: string, baseBranch: string, ticketId: string): string {
-  const ticketSection = ticketId
-    ? `
-### Ticket Requirements
-
-A ticket ID has been provided: ${ticketId}
-
-- If it looks like a GitHub Issue (e.g. \`owner/repo#123\` or a numeric ID), run:
-  \`\`\`bash
-  gh issue view ${ticketId}
-  \`\`\`
-- If it looks like a GitHub PR URL or reference, run:
-  \`\`\`bash
-  gh pr view ${ticketId}
-  \`\`\`
-- Extract any additional requirements from the ticket and include them in the verification.
-`
-    : "";
-
+function readmeVerifierInstructions(worktreePath: string, baseBranch: string): string {
   return `You are a specialized agent for verifying that README requirements have been fulfilled by the implementation. Your role is to compare the README's stated goals, scope, and expected outcomes against actual code changes.
 
 **IMPORTANT: Scope Limitation**
@@ -69,7 +50,8 @@ A ticket ID has been provided: ${ticketId}
    - Scope (what should be changed)
    - Expected outcomes / deliverables
    - Any acceptance criteria
-${ticketSection}
+   - If the README references external resources (tickets, issues, PRs, etc.) as sources of requirements, access and review them to extract those requirements
+
 2. **Get Changed Files**:
    \`\`\`bash
    git diff --name-only origin/${baseBranch}...HEAD
@@ -90,6 +72,8 @@ ${ticketSection}
      - **UNSATISFIED**: No evidence the requirement was addressed
 
 5. **Write Verification Report** to the specified file path
+   - Each extracted requirement becomes its own h2 section (## {Requirement})
+   - Under each h2, include Status, Evidence, and Notes
 
 ### Working Directory
 
