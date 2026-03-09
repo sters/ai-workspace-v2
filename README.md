@@ -1,5 +1,3 @@
-test
-
 # ai-workspace-v2
 
 Web UI dashboard for [ai-workspace](https://github.com/sters/ai-workspace), a multi-repository workspace manager for Claude Code.
