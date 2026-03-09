@@ -8,12 +8,16 @@ import {
 
 describe("parseStreamEvent", () => {
   it("returns raw entry for unparseable JSON", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
     const entries = parseStreamEvent("not json at all");
     expect(entries).toHaveLength(1);
     expect(entries[0].kind).toBe("raw");
     if (entries[0].kind === "raw") {
       expect(entries[0].content).toBe("not json at all");
     }
+
+    spy.mockRestore();
   });
 
   describe("auth_status messages", () => {
