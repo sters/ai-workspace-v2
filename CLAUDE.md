@@ -65,7 +65,11 @@ Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes 
   - `sdk.ts` — Legacy SDK wrapper using `@anthropic-ai/claude-agent-sdk`'s `query()` function. Resolves the `claude` CLI path, auto-approves all tools via `canUseTool`.
   - `login.ts` — Claude auth status checking and login via `Bun.spawn`.
   - `version.ts` — Claude CLI version checking.
-- **`src/lib/process-manager.ts`** — Pipeline orchestration engine. Each operation is a sequence of `PipelinePhase`s (single child, parallel group, or TypeScript function). Function phases get a rich context (`ctx`) with helpers: `emitStatus`, `emitResult`, `emitAsk` (prompt user and await answer), `runChild`, `runChildGroup`, `setWorkspace`. Stores all state (`ManagedOperation` map, counter) on `globalThis` to survive HMR in dev.
+  - `mcp.ts` — MCP server discovery and status from `.mcp.json` (project) and `~/.claude.json` (user). Parses `claude mcp list` output.
+  - `settings.ts` — Reads/writes Claude settings from three scopes: project (`.claude/settings.json`), local (`.claude/settings.local.json`), and user (`~/.claude/settings.json`).
+- **`src/lib/pipeline-manager.ts`** — Pipeline orchestration engine. Each operation is a sequence of `PipelinePhase`s (single child, parallel group, or TypeScript function). Function phases get a rich context (`ctx`) with helpers: `emitStatus`, `emitResult`, `emitAsk` (prompt user and await answer), `runChild`, `runChildGroup`, `setWorkspace`. Stores all state (`ManagedOperation` map, counter) on `globalThis` to survive HMR in dev. Max 3 concurrent operations; phase timeouts default to 20min (Claude) / 3min (functions).
+- **`src/lib/operation-store.ts`** — File-based operation persistence. Stores operation events as JSONL files in `.operations/` directory.
+- **`src/lib/schemas.ts`** — Zod validation schemas for all operation request bodies (init, execute, review, create-pr, update-todo, create-todo, batch, mcp-auth, etc.).
 - **`src/lib/workspace/`** — TypeScript equivalents of shell scripts. All paths relative to `AI_WORKSPACE_ROOT`:
   - `index.ts` — Barrel export for all workspace modules.
   - `helpers.ts` — `exec()`, `repoDir()`, `sanitizeSlug()`, staleness utilities.
@@ -97,7 +101,9 @@ Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes 
 
 - `/` — Dashboard listing all workspaces
 - `/workspace/[name]` — Workspace detail with tabs: Overview, TODOs, Reviews, History, Operations
-- `/utilities` — Utility operations (permissions-suggest, workspace-prune)
+- `/workspace/[name]/chat` — Chat interface for workspace
+- `/workspace/[name]/todo` — TODO management
+- `/utilities` — Utility hub: claude-auth, claude-version, claude-settings (project/user/local), mcp-servers, running operations, workspace-prune
 
 ### API Routes
 
@@ -108,11 +114,18 @@ Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes 
 - `GET /api/workspaces/[name]/reviews` — Review sessions
 - `GET /api/workspaces/[name]/reviews/[timestamp]` — Review detail
 - `GET /api/workspaces/[name]/history` — Git log
-- `POST /api/operations/{init,execute,review,create-pr,update-todo,delete}` — Start operations
+- `POST /api/operations/{init,execute,review,create-pr,update-todo,create-todo,delete,batch,mcp-auth}` — Start operations
 - `POST /api/operations/answer` — Submit AskUserQuestion answers
 - `POST /api/operations/kill` — Kill a running operation
+- `POST /api/operations/open-vscode` — Open workspace in VS Code
 - `GET /api/operations` — List operations
 - `GET /api/events?operationId=` — SSE stream for operation output
+- `GET /api/claude-auth` — Claude authentication status
+- `GET /api/claude-version` — Claude CLI version
+- `GET /api/claude-settings` — Read Claude settings (all scopes)
+- `POST /api/claude-settings/add-permission` — Add tool permission
+- `GET /api/mcp-servers` — List MCP server configurations
+- `GET /api/mcp-servers/status` — MCP server connection statuses
 
 ## Styling
 
@@ -127,7 +140,7 @@ Uses Tailwind with a shadcn/ui-style CSS variable theme system (`hsl(var(--prima
 
 - Path alias: `@/*` maps to `./src/*` (configured in `tsconfig.json`).
 - Types live in `src/types/` — `operation.ts` (Operation, OperationEvent, OperationType, OperationPhaseInfo), `workspace.ts` (TodoItem, TodoFile, WorkspaceMeta, WorkspaceSummary, WorkspaceDetail, ReviewSession, HistoryEntry), `claude.ts` (ClaudeProcess, RunClaudeOptions, LogEntry types), `pipeline.ts` (PipelinePhase, PhaseFunctionContext), `prompts.ts` (prompt input interfaces), `pty.ts` (DataListener).
-- `bin/start.mjs` is the CLI entry point. Resolves `AI_WORKSPACE_ROOT` from args/env/cwd, validates workspace directory exists, then spawns `bun run dev` or `bun run start`.
+- `bin/start.ts` is the CLI entry point. Resolves `AI_WORKSPACE_ROOT` from args/env/cwd, validates workspace directory exists, then spawns `bun run dev` or `bun run start`. Supports `--self-update` flag for bunx users. Additional entry points: `bin/chat-server.ts` (standalone chat), `bin/next-server.ts` (direct Next.js server).
 - `NEXT_PUBLIC_GIT_HASH` is injected at build time by `next.config.ts` for display in the sidebar.
 - ESLint uses flat config (`eslint.config.ts`) with typescript-eslint. Unused vars must be prefixed with `_` (both args and vars).
 
