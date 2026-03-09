@@ -21,7 +21,7 @@ if (!isDev && !isHot && !existsSync(resolve(projectDir, ".next"))) {
   console.log("Building...");
   Bun.spawnSync(["bun", "--bun", "next", "build"], {
     cwd: projectDir,
-    stdio: ["inherit", "inherit", "inherit"],
+    stdio: ["ignore", "inherit", "inherit"],
     env: process.env,
   });
 }
