@@ -1,5 +1,4 @@
 import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
-import path from "node:path";
 
 vi.mock("@/lib/config", () => ({
   WORKSPACE_DIR: "/ws",
@@ -58,18 +57,18 @@ describe("buildUpdateTodoPipeline", () => {
       expect(phases[0].kind).toBe("single");
     });
 
-    it("phase has cwd set to repo worktreePath", async () => {
+    it("phase does not set cwd (uses AI_WORKSPACE_ROOT default)", async () => {
       const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
       const phase = phases[0];
       if (phase.kind !== "single") throw new Error("expected single");
-      expect(phase.cwd).toBe("/repos/my-repo/worktrees/test-ws");
+      expect(phase.cwd).toBeUndefined();
     });
 
-    it("phase has addDirs containing workspace path", async () => {
+    it("phase does not set addDirs", async () => {
       const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
       const phase = phases[0];
       if (phase.kind !== "single") throw new Error("expected single");
-      expect(phase.addDirs).toContain(path.join("/ws", "test-ws"));
+      expect(phase.addDirs).toBeUndefined();
     });
 
     it("label is 'Update TODOs'", async () => {
@@ -101,19 +100,12 @@ describe("buildUpdateTodoPipeline", () => {
       expect(phases).toHaveLength(1);
     });
 
-    it("phase has addDirs containing workspace path", async () => {
+    it("phase does not set cwd or addDirs", async () => {
       const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
       const phase = phases[0];
       if (phase.kind !== "single") throw new Error("expected single");
-      expect(phase.addDirs).toContain(path.join("/ws", "test-ws"));
-    });
-
-    it("phase has addDirs containing all repo worktree paths", async () => {
-      const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-      const phase = phases[0];
-      if (phase.kind !== "single") throw new Error("expected single");
-      expect(phase.addDirs).toContain("/repos/repo-a/worktrees/test-ws");
-      expect(phase.addDirs).toContain("/repos/repo-b/worktrees/test-ws");
+      expect(phase.cwd).toBeUndefined();
+      expect(phase.addDirs).toBeUndefined();
     });
   });
 });

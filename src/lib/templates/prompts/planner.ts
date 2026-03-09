@@ -7,7 +7,9 @@ import type { PlannerInput } from "@/types/prompts";
 
 export function buildPlannerPrompt(input: PlannerInput): string {
   const isResearch = input.taskType === "research";
-  const instructions = isResearch ? RESEARCH_PLANNER_INSTRUCTIONS : PLANNER_INSTRUCTIONS;
+  const instructions = isResearch
+    ? researchPlannerInstructions(input.worktreePath)
+    : plannerInstructions(input.worktreePath);
 
   return `# Task: Plan TODO items for ${input.repoName}
 
@@ -32,7 +34,8 @@ ${instructions}
 `;
 }
 
-const PLANNER_INSTRUCTIONS = `You are a specialized agent for creating TODO items. Your role is to understand the workspace objectives, assess how much repository analysis is needed, and create actionable TODO items that guide the executor.
+function plannerInstructions(worktreePath: string): string {
+  return `You are a specialized agent for creating TODO items. Your role is to understand the workspace objectives, assess how much repository analysis is needed, and create actionable TODO items that guide the executor.
 
 **Your mission is simple and unwavering: Create a TODO file that tells the executor what to do.**
 
@@ -69,9 +72,12 @@ Write the TODO file to: workspace/{workspace-name}/TODO-{repository-name}.md
 
 ### Working Directory
 
-Your working directory is set to the repository worktree (shown above).
-You can run commands like \`git status\`, \`git diff\`, etc. directly.
-The workspace directory is also available via \`--add-dir\` for reading/writing TODO templates and workspace artifacts.
+**IMPORTANT: Before running any commands, first change to the repository directory:**
+\`\`\`bash
+cd ${worktreePath}
+\`\`\`
+
+After \`cd\`, run commands like \`git status\`, \`git diff\`, etc. directly.
 
 ### TODO Item Format
 
@@ -99,8 +105,10 @@ If Mode is "interactive", pause at two checkpoints:
 1. After analysis, present findings and proposed approach (ask user before creating TODOs)
 2. After creating draft TODOs, present for review (ask user before finalizing)
 `;
+}
 
-const RESEARCH_PLANNER_INSTRUCTIONS = `You are a specialized agent for creating TODO items for a **research/investigation task**. Your role is to outline what needs to be investigated — NOT to perform the investigation itself.
+function researchPlannerInstructions(worktreePath: string): string {
+  return `You are a specialized agent for creating TODO items for a **research/investigation task**. Your role is to outline what needs to be investigated — NOT to perform the investigation itself.
 
 **CRITICAL: Do NOT analyze source code, read implementation files, or investigate the codebase. The executor will do that. Your job is only to create a TODO list of what to look into.**
 
@@ -132,9 +140,12 @@ Write the TODO file to: workspace/{workspace-name}/TODO-{repository-name}.md
 
 ### Working Directory
 
-Your working directory is set to the repository worktree (shown above).
-You can run commands like \`git status\`, \`git diff\`, etc. directly.
-The workspace directory is also available via \`--add-dir\` for reading/writing TODO templates and workspace artifacts.
+**IMPORTANT: Before running any commands, first change to the repository directory:**
+\`\`\`bash
+cd ${worktreePath}
+\`\`\`
+
+After \`cd\`, run commands like \`git status\`, \`git diff\`, etc. directly.
 
 ### TODO Item Format
 
@@ -153,3 +164,4 @@ Each TODO item MUST follow this structured format:
 3. Order by priority: most important research questions first
 4. Include a final TODO to document findings in the workspace README
 `;
+}

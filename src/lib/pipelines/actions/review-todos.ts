@@ -35,8 +35,6 @@ export function buildReviewTodosPhase(input: {
             todoContent,
             worktreePath: repo.worktreePath,
           }),
-          cwd: repo.worktreePath,
-          addDirs: [input.wsPath],
         });
       }
 

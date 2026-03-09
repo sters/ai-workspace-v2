@@ -61,9 +61,12 @@ function verifierInstructions(worktreePath: string, baseBranch: string): string 
 
 ### Working Directory
 
-Your working directory is set to the repository worktree (\`${worktreePath}\`).
-You can run commands like \`git diff\`, \`git log\`, etc. directly.
-The workspace directory is also available via \`--add-dir\` for writing verification reports.
+**IMPORTANT: Before running any commands, first change to the repository directory:**
+\`\`\`bash
+cd ${worktreePath}
+\`\`\`
+
+After \`cd\`, run commands like \`git diff\`, \`git log\`, etc. directly.
 
 ### Guidelines
 
