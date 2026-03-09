@@ -5,10 +5,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const currentHash = process.env.NEXT_PUBLIC_GIT_HASH || "";
+  const isBunx = !!process.env.BUNX_MODE;
 
-  if (!currentHash) {
+  if (!isBunx) {
     return NextResponse.json({
-      currentHash: "",
+      currentHash: currentHash || "",
       latestHash: null,
       updateAvailable: false,
       devMode: true,
@@ -24,7 +25,7 @@ export async function GET() {
 }
 
 export async function POST() {
-  if (!process.env.NEXT_PUBLIC_GIT_HASH) {
+  if (!process.env.BUNX_MODE) {
     return NextResponse.json(
       { error: "Self-update is only available when running via bunx." },
       { status: 400 }
