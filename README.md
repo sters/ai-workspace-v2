@@ -16,6 +16,9 @@ bunx ai-workspace-v2 /path/to/ai-workspace
 # Or use an environment variable
 AI_WORKSPACE_ROOT=/path/to/ai-workspace bunx ai-workspace-v2
 
+# Force update to latest version (bunx users)
+bunx ai-workspace-v2 --self-update
+
 # Development mode (hot reload)
 bunx ai-workspace-v2 --dev
 ```
@@ -39,7 +42,7 @@ The root directory must contain `workspace/` and `repositories/` subdirectories.
 ### Server-side
 
 - **Workspace state**: API routes under `src/app/api/` read workspace data directly from the filesystem (`workspace/` directory in `AI_WORKSPACE_ROOT`). Core reading logic is in `src/lib/workspace/reader.ts`.
-- **Claude Code execution**: Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes via `Bun.spawn` with `claude -p --output-format stream-json`. The process manager (`src/lib/process-manager.ts`) orchestrates multi-phase pipelines. Legacy SDK fallback is available via `CLAUDE_USE_CLI=false`.
+- **Claude Code execution**: Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes via `Bun.spawn` with `claude -p --output-format stream-json`. The pipeline manager (`src/lib/pipeline-manager.ts`) orchestrates multi-phase pipelines. Legacy SDK fallback is available via `CLAUDE_USE_CLI=false`.
 - **Parsers** (`src/lib/parsers/`): Extract structured data from markdown — TODO items, README metadata, review summaries, and stream-json log entries.
 
 ### Client-side
