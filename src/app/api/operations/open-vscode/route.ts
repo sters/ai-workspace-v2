@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   if (proc.exitCode !== 0) {
     const stderr = await new Response(proc.stderr).text();
     return NextResponse.json(
-      { error: stderr || "Failed to open vscode" },
+      { error: stderr || "Failed to open editor" },
       { status: 500 },
     );
   }
