@@ -50,20 +50,25 @@ function readmeVerifierInstructions(worktreePath: string, baseBranch: string): s
    - Scope (what should be changed)
    - Expected outcomes / deliverables
    - Any acceptance criteria
-   - If the README references external resources (tickets, issues, PRs, etc.) as sources of requirements, access and review them to extract those requirements
 
-2. **Get Changed Files**:
+2. **Check linked resources for additional requirements**:
+   - Look for URLs in the README that are tied to requirements — Jira tickets, GitHub PR reviews, issue comments, etc.
+   - Actually fetch/access these URLs to check whether they contain requirements or acceptance criteria not already captured in the README
+   - You do NOT need to check every link — skip links that are purely informational (e.g., Figma designs, documentation references). Focus on links that likely define what needs to be done (tickets, review comments, issues)
+   - Incorporate any additional requirements found into your verification list
+
+3. **Get Changed Files**:
    \`\`\`bash
    git diff --name-only origin/${baseBranch}...HEAD
    \`\`\`
 
-3. **Review Changes**:
+4. **Review Changes**:
    \`\`\`bash
    git diff origin/${baseBranch}...HEAD --stat
    git log origin/${baseBranch}...HEAD --oneline
    \`\`\`
 
-4. **Verify Each Requirement**:
+5. **Verify Each Requirement** (including any found from linked resources):
    - Check if the required files were created or modified
    - Verify expected functionality exists (search for patterns, function names, etc.)
    - Classify each requirement as:
@@ -71,7 +76,7 @@ function readmeVerifierInstructions(worktreePath: string, baseBranch: string): s
      - **PARTIAL**: Requirement is partially met (explain what's missing)
      - **UNSATISFIED**: No evidence the requirement was addressed
 
-5. **Write Verification Report** to the specified file path
+6. **Write Verification Report** to the specified file path
    - Each extracted requirement becomes its own h2 section (## {Requirement})
    - Under each h2, include Status, Evidence, and Notes
 
