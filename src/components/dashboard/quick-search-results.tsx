@@ -1,9 +1,62 @@
 "use client";
 
-import Link from "next/link";
-import type { QuickSearchResponse, DeepSearchResponse } from "@/types/search";
+import type { QuickSearchResponse, QuickSearchResult, DeepSearchResponse, DeepSearchResult } from "@/types/search";
+import type { WorkspaceSummary } from "@/types/workspace";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { StatusText } from "@/components/shared/feedback/status-text";
+import { WorkspaceCard } from "./workspace-card";
+import { useWorkspaces } from "@/hooks/use-workspaces";
+import { useRunningOperations } from "@/hooks/use-running-operations";
+
+function SearchMatchLines({ matches }: { matches: QuickSearchResult["matches"] }) {
+  return (
+    <div className="mt-2 space-y-0.5 border-t pt-2">
+      {matches.slice(0, 5).map((match) => (
+        <div
+          key={match.lineNumber}
+          className="flex gap-2 text-xs font-mono"
+        >
+          <span className="shrink-0 text-muted-foreground w-6 text-right">
+            {match.lineNumber}
+          </span>
+          <span className="truncate">{match.line}</span>
+        </div>
+      ))}
+      {matches.length > 5 && (
+        <div className="text-xs text-muted-foreground">
+          ...and {matches.length - 5} more match{matches.length - 5 !== 1 ? "es" : ""}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SearchExcerpts({ excerpts }: { excerpts: string[] }) {
+  return (
+    <div className="mt-2 space-y-0.5 border-t pt-2">
+      {excerpts.slice(0, 5).map((excerpt, i) => (
+        <div key={i} className="text-xs text-muted-foreground">
+          {excerpt}
+        </div>
+      ))}
+      {excerpts.length > 5 && (
+        <div className="text-xs text-muted-foreground">
+          ...and {excerpts.length - 5} more
+        </div>
+      )}
+    </div>
+  );
+}
+
+function useWorkspaceMap() {
+  const { workspaces } = useWorkspaces();
+  const { runningWorkspaces } = useRunningOperations();
+  const wsMap = new Map<string, WorkspaceSummary>();
+  for (const ws of workspaces) {
+    wsMap.set(ws.name, ws);
+  }
+  return { wsMap, runningWorkspaces };
+}
 
 export function QuickSearchResults({
   data,
@@ -14,6 +67,8 @@ export function QuickSearchResults({
   isLoading: boolean;
   error: string | null;
 }) {
+  const { wsMap, runningWorkspaces } = useWorkspaceMap();
+
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
@@ -38,39 +93,24 @@ export function QuickSearchResults({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
         {data.totalMatches} match{data.totalMatches !== 1 ? "es" : ""} in{" "}
         {data.results.length} workspace{data.results.length !== 1 ? "s" : ""}
       </p>
-      {data.results.map((result) => (
-        <Link
-          key={result.workspaceName}
-          href={`/workspace/${result.workspaceName}`}
-          className="block rounded-lg border p-3 hover:bg-accent/50 transition-colors"
-        >
-          <div className="font-medium text-sm">{result.title}</div>
-          <div className="text-xs text-muted-foreground">{result.workspaceName}</div>
-          <div className="mt-1.5 space-y-0.5">
-            {result.matches.slice(0, 5).map((match) => (
-              <div
-                key={match.lineNumber}
-                className="flex gap-2 text-xs font-mono"
-              >
-                <span className="shrink-0 text-muted-foreground w-6 text-right">
-                  {match.lineNumber}
-                </span>
-                <span className="truncate">{match.line}</span>
-              </div>
-            ))}
-            {result.matches.length > 5 && (
-              <div className="text-xs text-muted-foreground">
-                ...and {result.matches.length - 5} more match{result.matches.length - 5 !== 1 ? "es" : ""}
-              </div>
-            )}
-          </div>
-        </Link>
-      ))}
+      {data.results.map((result) => {
+        const ws = wsMap.get(result.workspaceName);
+        if (!ws) return null;
+        return (
+          <WorkspaceCard
+            key={result.workspaceName}
+            workspace={ws}
+            isRunning={runningWorkspaces.has(result.workspaceName)}
+          >
+            <SearchMatchLines matches={result.matches} />
+          </WorkspaceCard>
+        );
+      })}
     </div>
   );
 }
@@ -82,6 +122,8 @@ export function DeepSearchResults({
   data: DeepSearchResponse | null;
   error: string | null;
 }) {
+  const { wsMap, runningWorkspaces } = useWorkspaceMap();
+
   if (error) {
     return <StatusText variant="error">{error}</StatusText>;
   }
@@ -97,32 +139,23 @@ export function DeepSearchResults({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <p className="text-xs text-muted-foreground">
         {data.results.length} workspace{data.results.length !== 1 ? "s" : ""} found
       </p>
-      {data.results.map((result) => (
-        <Link
-          key={result.workspaceName}
-          href={`/workspace/${result.workspaceName}`}
-          className="block rounded-lg border p-3 hover:bg-accent/50 transition-colors"
-        >
-          <div className="font-medium text-sm">{result.title}</div>
-          <div className="text-xs text-muted-foreground">{result.workspaceName}</div>
-          <div className="mt-1.5 space-y-0.5">
-            {result.excerpts.slice(0, 5).map((excerpt, i) => (
-              <div key={i} className="text-xs text-muted-foreground">
-                {excerpt}
-              </div>
-            ))}
-            {result.excerpts.length > 5 && (
-              <div className="text-xs text-muted-foreground">
-                ...and {result.excerpts.length - 5} more
-              </div>
-            )}
-          </div>
-        </Link>
-      ))}
+      {data.results.map((result) => {
+        const ws = wsMap.get(result.workspaceName);
+        if (!ws) return null;
+        return (
+          <WorkspaceCard
+            key={result.workspaceName}
+            workspace={ws}
+            isRunning={runningWorkspaces.has(result.workspaceName)}
+          >
+            <SearchExcerpts excerpts={result.excerpts} />
+          </WorkspaceCard>
+        );
+      })}
     </div>
   );
 }

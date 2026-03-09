@@ -19,9 +19,11 @@ function formatShortDate(dateStr: string): string {
 export function WorkspaceCard({
   workspace,
   isRunning,
+  children,
 }: {
   workspace: WorkspaceSummary;
   isRunning?: boolean;
+  children?: React.ReactNode;
 }) {
   const { name, meta, overallProgress, totalCompleted, totalItems, lastModified } =
     workspace;
@@ -57,6 +59,8 @@ export function WorkspaceCard({
           {totalCompleted}/{totalItems} items
         </span>
       </div>
+
+      {children}
     </Link>
   );
 }
