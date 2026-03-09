@@ -57,6 +57,10 @@ export const operationAnswerSchema = z.object({
   answers: z.record(z.string(), z.string()),
 });
 
+export const searchSchema = z.object({
+  query: z.string().min(1, "query is required"),
+});
+
 export const mcpAuthSchema = z.object({
   serverName: z.string().min(1, "serverName is required"),
   forceReauth: z.union([z.boolean(), z.string()]).optional(),

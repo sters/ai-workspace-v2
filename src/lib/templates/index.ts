@@ -21,4 +21,6 @@ export {
   buildInitPrompt,
   buildReviewChatPrompt,
   buildCreateTodoFromReviewPrompt,
+  buildSearchPrompt,
+  DEEP_SEARCH_SCHEMA,
 } from "./prompts";

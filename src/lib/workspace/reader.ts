@@ -11,6 +11,7 @@ import type {
   ReviewSession,
   HistoryEntry,
 } from "@/types/workspace";
+import type { QuickSearchResult } from "@/types/search";
 
 export async function listWorkspaces(): Promise<WorkspaceSummary[]> {
   if (!existsSync(WORKSPACE_DIR)) return [];
@@ -187,6 +188,53 @@ export function getCommitDiff(name: string, hash: string): string | null {
   } catch {
     return null;
   }
+}
+
+export async function quickSearchWorkspaces(query: string): Promise<QuickSearchResult[]> {
+  if (!existsSync(WORKSPACE_DIR)) return [];
+
+  const entries = readdirSync(WORKSPACE_DIR, { withFileTypes: true });
+  const results: QuickSearchResult[] = [];
+  const lowerQuery = query.toLowerCase();
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const readmePath = path.join(WORKSPACE_DIR, entry.name, "README.md");
+    if (!existsSync(readmePath)) continue;
+
+    try {
+      const content = await Bun.file(readmePath).text();
+      const lines = content.split("\n");
+      const matches: { lineNumber: number; line: string }[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].toLowerCase().includes(lowerQuery)) {
+          matches.push({ lineNumber: i + 1, line: lines[i] });
+        }
+      }
+
+      if (matches.length > 0) {
+        const meta = parseReadmeMeta(content);
+        const wsPath = path.join(WORKSPACE_DIR, entry.name);
+        const stat = statSync(wsPath);
+        results.push({
+          workspaceName: entry.name,
+          title: meta.title || entry.name,
+          lastModified: stat.mtime.toISOString(),
+          matches,
+        });
+      }
+    } catch {
+      // skip unreadable files
+    }
+  }
+
+  // Sort by last modified (most recent first), same as listWorkspaces()
+  results.sort(
+    (a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+  );
+
+  return results;
 }
 
 export function getHistory(name: string): HistoryEntry[] {
