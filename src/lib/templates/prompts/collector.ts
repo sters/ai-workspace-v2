@@ -20,6 +20,9 @@ ${input.reviewFiles.map((f) => `- ${f}`).join("\n") || "(none)"}
 ### TODO Verifications
 ${input.verifyFiles.map((f) => `- ${f}`).join("\n") || "(none)"}
 
+### README Verifications
+${input.readmeVerifyFiles.map((f) => `- ${f}`).join("\n") || "(none)"}
+
 ## Summary Report Template
 
 Write the summary to: ${input.reviewDir}/SUMMARY.md
@@ -42,10 +45,12 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
 1. **Read Each Review File**:
    - Code Reviews: Extract repository name, assessment, critical/warning/suggestion counts
    - TODO Verifications: Extract verified/unverified/partial/incomplete counts
+   - README Verifications: Extract satisfied/unsatisfied/partial counts
 
 2. **Aggregate Statistics**:
    - Total critical issues, warnings, suggestions across all repos
    - Total verified, unverified, incomplete items
+   - Total satisfied, unsatisfied, partial README requirements
    - Average completion rate
 
 3. **Create Summary Report** at the specified path

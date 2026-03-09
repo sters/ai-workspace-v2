@@ -50,6 +50,15 @@ export interface TodoVerifierInput extends RepoPromptInput {
   verifyFilePath: string;
 }
 
+export interface ReadmeVerifierInput extends RepoPromptInput {
+  baseBranch: string;
+  reviewTimestamp: string;
+  readmeContent: string;
+  repoChanges: string;
+  ticketId: string;
+  verifyFilePath: string;
+}
+
 export interface PRCreatorInput extends RepoPromptInput {
   baseBranch: string;
   readmeContent: string;
@@ -88,6 +97,7 @@ export interface CollectorInput {
   reviewDir: string;
   reviewFiles: string[];
   verifyFiles: string[];
+  readmeVerifyFiles: string[];
 }
 
 export interface InitAnalyzeAndReadmeInput {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import { Button } from "@/components/shared/buttons/button";
 import { Spinner } from "@/components/shared/feedback/spinner";
