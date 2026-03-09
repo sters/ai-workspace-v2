@@ -71,12 +71,11 @@ function updaterInstructions(todoFilePath: string, workspacePath: string, worktr
 
 ### Working Directory
 
-**IMPORTANT: Before running any commands, first change to the repository directory:**
+**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
 \`\`\`bash
 cd ${worktreePath}
 \`\`\`
-
-After \`cd\`, run all repo commands directly (no \`-C\` flags needed).
+After that, run all repo commands as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
 The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path.
 
 ### Bash Sandbox Restrictions
@@ -84,7 +83,7 @@ The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path.
 The following patterns are blocked by the security sandbox:
 - \`$(...)\` command substitution in arguments
 - \`cd <dir> && git ...\` compound commands
-- Use separate \`git -C <dir>\` commands instead of compound commands
+- Since you already \`cd\`'d into the repo, just run \`git\` directly — do NOT use \`git -C\`
 
 ### Interactive Mode
 
