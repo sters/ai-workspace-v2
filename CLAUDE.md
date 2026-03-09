@@ -10,7 +10,7 @@ Web UI dashboard for [ai-workspace](https://github.com/sters/ai-workspace), a mu
 
 ```bash
 # Run via bunx (from ai-workspace root, or specify path)
-bunx ai-workspace-v2 [/path/to/ai-workspace]
+bunx github:sters/ai-workspace-v2 [/path/to/ai-workspace]
 
 # Install dependencies
 bun install
