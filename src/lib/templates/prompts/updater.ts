@@ -28,11 +28,11 @@ ${input.todoContent}
 
 ## Instructions
 
-${updaterInstructions(todoFilePath, input.workspacePath)}
+${updaterInstructions(todoFilePath, input.workspacePath, input.worktreePath)}
 `;
 }
 
-function updaterInstructions(todoFilePath: string, workspacePath: string): string {
+function updaterInstructions(todoFilePath: string, workspacePath: string, worktreePath: string): string {
   const todoFileName = todoFilePath.split("/").pop()!;
   return `You are a specialized agent for updating TODO items in a workspace repository. Your role is to apply user-requested changes to the TODO file.
 
@@ -71,7 +71,12 @@ function updaterInstructions(todoFilePath: string, workspacePath: string): strin
 
 ### Working Directory
 
-Your working directory is the repository root. Run all repo commands directly (no \`-C\` flags needed).
+**IMPORTANT: Before running any commands, first change to the repository directory:**
+\`\`\`bash
+cd ${worktreePath}
+\`\`\`
+
+After \`cd\`, run all repo commands directly (no \`-C\` flags needed).
 The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path.
 
 ### Bash Sandbox Restrictions

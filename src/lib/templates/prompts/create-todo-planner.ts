@@ -64,9 +64,12 @@ If a TODO file already exists, preserve completed items and add new items for un
 
 ### Working Directory
 
-Your working directory is set to the repository worktree (\`${input.worktreePath}\`).
-You can run commands like \`git status\`, \`git diff\`, etc. directly.
-The workspace directory is also available via \`--add-dir\` for reading review artifacts and writing TODO files.
+**IMPORTANT: Before running any commands, first change to the repository directory:**
+\`\`\`bash
+cd ${input.worktreePath}
+\`\`\`
+
+After \`cd\`, run commands like \`git status\`, \`git diff\`, etc. directly.
 
 ### TODO Item Format
 

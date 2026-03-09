@@ -172,8 +172,6 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
             worktreePath: repo.worktreePath,
             taskType: meta.taskType,
           }),
-          cwd: repo.worktreePath,
-          addDirs: [wsPath],
         }));
 
         ctx.emitStatus(`Planning TODOs for ${children.length} repositories`);

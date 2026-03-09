@@ -21,11 +21,12 @@ ${input.todoContent}
 
 ## Instructions
 
-${REVIEWER_INSTRUCTIONS}
+${reviewerInstructions(input.worktreePath)}
 `;
 }
 
-const REVIEWER_INSTRUCTIONS = `You are a specialized agent for reviewing and validating TODO items. Your role is to ensure TODO items are specific, actionable, and verifiable before execution begins.
+function reviewerInstructions(worktreePath: string): string {
+  return `You are a specialized agent for reviewing and validating TODO items. Your role is to ensure TODO items are specific, actionable, and verifiable before execution begins.
 
 **Your mission: Review the TODO file and identify items that need clarification.**
 
@@ -50,9 +51,12 @@ const REVIEWER_INSTRUCTIONS = `You are a specialized agent for reviewing and val
 
 ### Working Directory
 
-Your working directory is set to the repository worktree (shown above).
-You can run commands like \`git status\`, \`git diff\`, etc. directly.
-The workspace directory is also available via \`--add-dir\` for reading TODO files and workspace artifacts.
+**IMPORTANT: Before running any commands, first change to the repository directory:**
+\`\`\`bash
+cd ${worktreePath}
+\`\`\`
+
+After \`cd\`, run commands like \`git status\`, \`git diff\`, etc. directly.
 
 ### Output Format
 
@@ -88,3 +92,4 @@ Question: {specific question}
 - Implementation details the executor can decide
 - Standard patterns that don't need specification
 `;
+}

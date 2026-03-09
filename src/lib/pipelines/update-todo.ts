@@ -42,10 +42,7 @@ export async function buildUpdateTodoPipeline(input: {
           .map((p, i) => `# Repo ${i + 1} of ${prompts.length}\n\n${p}`)
           .join("\n\n---\n\n");
 
-  const cwd = repos.length === 1 ? repos[0].worktreePath : undefined;
-  const addDirs = [workspacePath, ...repos.map((r) => r.worktreePath)];
-
   return [
-    { kind: "single", label: "Update TODOs", prompt, cwd, addDirs },
+    { kind: "single", label: "Update TODOs", prompt },
   ];
 }
