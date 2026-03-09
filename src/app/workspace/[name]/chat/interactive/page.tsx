@@ -4,7 +4,7 @@ import { use } from "react";
 import { useSearchParams } from "next/navigation";
 import { ChatTerminal } from "@/components/workspace/chat-terminal";
 
-export default function WorkspaceChatPage({
+export default function ChatInteractivePage({
   params,
 }: {
   params: Promise<{ name: string }>;
@@ -15,7 +15,7 @@ export default function WorkspaceChatPage({
   const reviewTimestamp = searchParams.get("reviewTimestamp") ?? undefined;
 
   return (
-    <div className="h-[calc(100vh-20rem)]">
+    <div className="h-[calc(100vh-24rem)]">
       <ChatTerminal workspaceId={decodedName} reviewTimestamp={reviewTimestamp} />
     </div>
   );

@@ -13,3 +13,4 @@ export { buildInitAnalyzeAndReadmePrompt, INIT_ANALYSIS_SCHEMA } from "./init-re
 export { buildInitPrompt, buildReviewChatPrompt } from "./chat";
 export { buildCreateTodoFromReviewPrompt } from "./create-todo-planner";
 export { buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "./search";
+export { buildQuickAskPrompt } from "./quick-ask";
