@@ -71,7 +71,7 @@ export async function buildReviewPipeline(input: {
       : "";
 
     reviewChildren.push({
-      label: `verify-${repo.repoName}`,
+      label: `verify-todo-${repo.repoName}`,
       prompt: buildTodoVerifierPrompt({
         workspaceName: workspace,
         repoPath: repo.repoPath,
