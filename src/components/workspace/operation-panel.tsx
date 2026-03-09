@@ -15,7 +15,7 @@ export function OperationPanel({
 }: {
   workspaceName: string;
   workspacePath: string;
-  /** Repository metadata from workspace README for "Open in VS Code" dropdown. */
+  /** Repository metadata from workspace README for "Open in vscode" dropdown. */
   repositories?: { alias: string; path: string }[];
 }) {
   const router = useRouter();
@@ -152,7 +152,7 @@ function openInVSCode(targetPath: string) {
   }).then(async (res) => {
     if (!res.ok) {
       const data = await res.json();
-      console.error("Failed to open VS Code:", data.error);
+      console.error("Failed to open vscode:", data.error);
     }
   });
 }
@@ -177,14 +177,14 @@ function OpenVSCodeButton({
   if (repoItems.length === 0) {
     return (
       <Button variant="secondary" onClick={handleClick}>
-        Open in VS Code
+        Open in vscode
       </Button>
     );
   }
 
   return (
     <SplitButton
-      label="Open in VS Code"
+      label="Open in vscode"
       onClick={handleClick}
       variant="secondary"
       items={repoItems}
