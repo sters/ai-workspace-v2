@@ -41,7 +41,6 @@ export default function RunningPage() {
   const running = data?.filter((op) => op.status === "running") ?? [];
   const activeChats = chatSessions ?? [];
   const now = useNow(running.length > 0 || activeChats.length > 0 ? 1000 : 0);
-
   const kill = useCallback(
     async (operationId: string) => {
       await fetch("/api/operations/kill", {

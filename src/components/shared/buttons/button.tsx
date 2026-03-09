@@ -1,5 +1,8 @@
+"use client";
+
 import { type ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
+import { useAsyncCallback } from "@/hooks/use-async-callback";
 
 const variants = {
   primary:
@@ -29,11 +32,20 @@ export function buttonVariants(variant: ButtonVariant = "primary", className?: s
 export function Button({
   variant = "primary",
   className,
+  onClick,
+  disabled,
   ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
+}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> & {
   variant?: ButtonVariant;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void | Promise<unknown>;
 }) {
+  const [wrappedOnClick, pending] = useAsyncCallback(onClick);
   return (
-    <button className={cn(variants[variant], className)} {...props} />
+    <button
+      className={cn(variants[variant], className)}
+      onClick={wrappedOnClick}
+      disabled={disabled || pending}
+      {...props}
+    />
   );
 }

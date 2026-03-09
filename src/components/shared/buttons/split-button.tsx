@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useAsyncCallback } from "@/hooks/use-async-callback";
 
 export interface SplitButtonItem {
   label: string;
-  onClick: () => void;
+  onClick: () => void | Promise<unknown>;
 }
 
 const splitVariants = {
@@ -37,7 +38,7 @@ export function SplitButton({
   dropdownClassName,
 }: {
   label: string;
-  onClick: () => void;
+  onClick: () => void | Promise<unknown>;
   items: SplitButtonItem[];
   disabled?: boolean;
   variant?: SplitButtonVariant;
@@ -46,6 +47,10 @@ export function SplitButton({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const [wrappedOnClick, mainPending] = useAsyncCallback(onClick);
+  const [itemPending, setItemPending] = useState(false);
+
+  const pending = mainPending || itemPending;
 
   useEffect(() => {
     if (!open) return;
@@ -64,15 +69,15 @@ export function SplitButton({
   return (
     <div ref={ref} className="relative inline-flex">
       <button
-        onClick={onClick}
-        disabled={disabled}
+        onClick={wrappedOnClick}
+        disabled={disabled || pending}
         className={mainClass}
       >
         {label}
       </button>
       <button
         onClick={() => setOpen(!open)}
-        disabled={disabled}
+        disabled={disabled || pending}
         className={dropClass}
         aria-label="More options"
       >
@@ -97,7 +102,11 @@ export function SplitButton({
               key={item.label}
               onClick={() => {
                 setOpen(false);
-                item.onClick();
+                const result = item.onClick();
+                if (result && typeof (result as Promise<unknown>).then === "function") {
+                  setItemPending(true);
+                  (result as Promise<unknown>).finally(() => setItemPending(false));
+                }
               }}
               className="w-full px-3 py-1.5 text-left text-sm text-foreground hover:bg-accent"
             >
