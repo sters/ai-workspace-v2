@@ -118,6 +118,10 @@ export function OperationPanel({
           workspacePath={workspacePath}
           repositories={repositories}
         />
+        <OpenTerminalButton
+          workspacePath={workspacePath}
+          repositories={repositories}
+        />
         <Button
           variant="destructive"
           onClick={() =>
@@ -157,6 +161,19 @@ function openInVSCode(targetPath: string) {
   });
 }
 
+function openInTerminal(targetPath: string) {
+  return fetch("/api/operations/open-terminal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace: targetPath }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const data = await res.json();
+      console.error("Failed to open terminal:", data.error);
+    }
+  });
+}
+
 function OpenVSCodeButton({
   workspacePath,
   repositories,
@@ -185,6 +202,41 @@ function OpenVSCodeButton({
   return (
     <SplitButton
       label="Open in editor"
+      onClick={handleClick}
+      variant="secondary"
+      items={repoItems}
+    />
+  );
+}
+
+function OpenTerminalButton({
+  workspacePath,
+  repositories,
+}: {
+  workspacePath: string;
+  repositories?: { alias: string; path: string }[];
+}) {
+  const handleClick = useCallback(
+    () => openInTerminal(workspacePath),
+    [workspacePath]
+  );
+
+  const repoItems = (repositories ?? []).map((repo) => ({
+    label: repo.alias || repo.path.split("/").pop() || repo.path,
+    onClick: () => openInTerminal(`${workspacePath}/${repo.path}`),
+  }));
+
+  if (repoItems.length === 0) {
+    return (
+      <Button variant="secondary" onClick={handleClick}>
+        Open in terminal
+      </Button>
+    );
+  }
+
+  return (
+    <SplitButton
+      label="Open in terminal"
       onClick={handleClick}
       variant="secondary"
       items={repoItems}
