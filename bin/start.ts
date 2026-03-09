@@ -227,15 +227,19 @@ chatServer.kill();
 // responses arrive on stdin with no process to consume them, so the shell
 // displays them as garbage text. Drain any pending responses before exiting.
 if (process.stdin.isTTY) {
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-  process.stdin.once("readable", () => {
-    // discard whatever is buffered
-    while (process.stdin.read() !== null) {}
-  });
-  await Bun.sleep(100);
-  process.stdin.pause();
-  process.stdin.setRawMode(false);
+  try {
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.once("readable", () => {
+      // discard whatever is buffered
+      while (process.stdin.read() !== null) {}
+    });
+    await Bun.sleep(100);
+    process.stdin.pause();
+    process.stdin.setRawMode(false);
+  } catch {
+    // setRawMode can fail if stdin fd is already closed (e.g. bunx environment)
+  }
 }
 
 process.exit(nextExitCode ?? 0);
