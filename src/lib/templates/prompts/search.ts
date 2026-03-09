@@ -27,7 +27,8 @@ Return results as JSON matching the schema provided. For each matching workspace
 - "title": the workspace title from README.md (the text after "# Task: ")
 - "excerpts": array of strings, each explaining WHY this workspace is relevant to the search query. Each excerpt should be a concise sentence describing the connection, e.g. "README mentions implementing OAuth2 authentication flow" or "TODO-feature.md has a pending task to add rate limiting to the API". Do not just paste raw file contents — summarize the relevance.
 
-Only include workspaces that are relevant to the search query. Be thorough but precise.`;
+Only include workspaces that are relevant to the search query. Be thorough but precise.
+Write the excerpts in the same language as the search query. For example, if the query is in Japanese, write excerpts in Japanese.`;
 }
 
 export const DEEP_SEARCH_SCHEMA = {
