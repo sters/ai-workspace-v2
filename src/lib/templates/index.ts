@@ -7,6 +7,7 @@ export { INITIAL_SETTINGS_LOCAL } from "./settings";
 // Prompts
 export {
   buildExecutorPrompt,
+  buildBatchedExecutorPrompt,
   buildPlannerPrompt,
   buildCoordinatorPrompt,
   buildReviewerPrompt,
