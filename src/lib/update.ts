@@ -1,22 +1,7 @@
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
-import { resolve } from "node:path";
 
 export const GITHUB_REPO_URL =
   "https://github.com/sters/ai-workspace-v2.git";
-
-export const UPDATE_FLAG_FILE = ".update-requested";
-
-export function getUpdateFlagPath(): string {
-  return resolve(
-    process.env.AI_WORKSPACE_ROOT || process.cwd(),
-    UPDATE_FLAG_FILE
-  );
-}
-
-export function requestSelfUpdate(): void {
-  writeFileSync(getUpdateFlagPath(), Date.now().toString());
-}
 
 export interface UpdateCheckResult {
   currentHash: string;
