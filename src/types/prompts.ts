@@ -14,6 +14,15 @@ export interface ExecutorInput extends RepoPromptInput {
   workspacePath: string;
 }
 
+export interface BatchedExecutorInput extends ExecutorInput {
+  batchIndex: number;
+  totalBatches: number;
+  /** Markdown of the current batch's TODO items only. */
+  batchTodoContent: string;
+  /** Summary of previously completed items (if any). */
+  completedSummary?: string;
+}
+
 export interface PlannerInput extends RepoPromptInput {
   readmeContent: string;
   taskType: string;

@@ -1,5 +1,87 @@
 import type { TodoItem, TodoFile, TodoSection } from "@/types/workspace";
 
+// ---------------------------------------------------------------------------
+// Batch utilities
+// ---------------------------------------------------------------------------
+
+export interface TodoItemGroup {
+  parent: TodoItem;
+  subItems: TodoItem[];
+}
+
+/**
+ * Group flat TodoItem[] into parent/sub-item groups.
+ * indent=0 items become parents; indent>0 items attach to the preceding parent.
+ */
+export function groupTodoItemsWithParents(items: TodoItem[]): TodoItemGroup[] {
+  const groups: TodoItemGroup[] = [];
+  for (const item of items) {
+    if (item.indent === 0) {
+      groups.push({ parent: item, subItems: [] });
+    } else if (groups.length > 0) {
+      groups[groups.length - 1].subItems.push(item);
+    }
+  }
+  return groups;
+}
+
+/**
+ * Extract pending/in_progress groups and split into batches of `batchSize`.
+ * A group is considered actionable if the parent is pending or in_progress.
+ */
+export function batchTodoGroups(
+  groups: TodoItemGroup[],
+  batchSize: number,
+): TodoItemGroup[][] {
+  const actionable = groups.filter(
+    (g) => g.parent.status === "pending" || g.parent.status === "in_progress",
+  );
+  if (actionable.length === 0) return [];
+
+  const batches: TodoItemGroup[][] = [];
+  for (let i = 0; i < actionable.length; i += batchSize) {
+    batches.push(actionable.slice(i, i + batchSize));
+  }
+  return batches;
+}
+
+export function statusToMarker(status: TodoItem["status"]): string {
+  switch (status) {
+    case "completed":
+      return "x";
+    case "pending":
+      return " ";
+    case "blocked":
+      return "!";
+    case "in_progress":
+      return "~";
+  }
+}
+
+/**
+ * Render TodoItemGroup[] back into markdown checkbox syntax.
+ */
+export function renderTodoGroupsAsMarkdown(groups: TodoItemGroup[]): string {
+  const lines: string[] = [];
+  for (const group of groups) {
+    const indent = " ".repeat(group.parent.indent);
+    lines.push(
+      `${indent}- [${statusToMarker(group.parent.status)}] ${group.parent.text}`,
+    );
+    for (const child of group.parent.children) {
+      lines.push(`${indent}  ${child}`);
+    }
+    for (const sub of group.subItems) {
+      const subIndent = " ".repeat(sub.indent);
+      lines.push(`${subIndent}- [${statusToMarker(sub.status)}] ${sub.text}`);
+      for (const child of sub.children) {
+        lines.push(`${subIndent}  ${child}`);
+      }
+    }
+  }
+  return lines.join("\n");
+}
+
 const STATUS_PATTERNS: [RegExp, TodoItem["status"]][] = [
   [/^(\s*)- \[x\]\s+(.*)/, "completed"],
   [/^(\s*)- \[ \]\s+(.*)/, "pending"],

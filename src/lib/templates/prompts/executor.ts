@@ -3,7 +3,7 @@
  * Executes TODO items for a specific repository within a workspace.
  */
 
-import type { ExecutorInput } from "@/types/prompts";
+import type { ExecutorInput, BatchedExecutorInput } from "@/types/prompts";
 
 export function buildExecutorPrompt(input: ExecutorInput): string {
   const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
@@ -25,6 +25,35 @@ ${input.todoContent}
 ## Instructions
 
 ${executorInstructions(todoFilePath)}
+`;
+}
+
+export function buildBatchedExecutorPrompt(input: BatchedExecutorInput): string {
+  const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
+
+  const completedSection = input.completedSummary
+    ? `\n## Previously Completed Items\n\n${input.completedSummary}\n`
+    : "";
+
+  return `# Task: Execute TODO items for ${input.repoName} — Batch ${input.batchIndex + 1}/${input.totalBatches}
+
+## Workspace: ${input.workspaceName}
+## Repository: ${input.repoPath}
+## TODO File: ${todoFilePath}
+
+## Workspace README
+
+${input.readmeContent}
+
+## Current Batch (${input.batchIndex + 1} of ${input.totalBatches})
+
+${input.batchTodoContent}
+${completedSection}
+## Instructions
+
+${executorInstructions(todoFilePath)}
+
+**IMPORTANT: Focus only on the items listed in the "Current Batch" section above. Do not work on items outside this batch.**
 `;
 }
 

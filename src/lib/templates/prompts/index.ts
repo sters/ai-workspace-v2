@@ -1,4 +1,4 @@
-export { buildExecutorPrompt } from "./executor";
+export { buildExecutorPrompt, buildBatchedExecutorPrompt } from "./executor";
 export { buildPlannerPrompt } from "./planner";
 export { buildCoordinatorPrompt } from "./coordinator";
 export { buildReviewerPrompt } from "./reviewer";

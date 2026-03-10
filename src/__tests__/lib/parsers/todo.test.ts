@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { parseTodoFile, parseTodoItems, parseTodoSections } from "@/lib/parsers/todo";
+import {
+  parseTodoFile,
+  parseTodoItems,
+  parseTodoSections,
+  groupTodoItemsWithParents,
+  batchTodoGroups,
+  renderTodoGroupsAsMarkdown,
+  statusToMarker,
+} from "@/lib/parsers/todo";
 
 describe("parseTodoItems", () => {
   it("parses completed items", () => {
@@ -235,5 +243,136 @@ describe("parseTodoFile", () => {
     const file = parseTodoFile("TODO-test.md", content);
     expect(file.items).toHaveLength(2);
     expect(file.sections).toHaveLength(2);
+  });
+});
+
+describe("groupTodoItemsWithParents", () => {
+  it("groups indent=0 as parents with indent>0 as sub-items", () => {
+    const items = parseTodoItems(`- [ ] Parent 1
+  - [ ] Sub 1a
+  - [ ] Sub 1b
+- [ ] Parent 2
+  - [ ] Sub 2a`);
+    const groups = groupTodoItemsWithParents(items);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].parent.text).toBe("Parent 1");
+    expect(groups[0].subItems).toHaveLength(2);
+    expect(groups[0].subItems[0].text).toBe("Sub 1a");
+    expect(groups[0].subItems[1].text).toBe("Sub 1b");
+    expect(groups[1].parent.text).toBe("Parent 2");
+    expect(groups[1].subItems).toHaveLength(1);
+  });
+
+  it("handles items with no sub-items", () => {
+    const items = parseTodoItems(`- [x] Task A
+- [ ] Task B`);
+    const groups = groupTodoItemsWithParents(items);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].subItems).toHaveLength(0);
+    expect(groups[1].subItems).toHaveLength(0);
+  });
+
+  it("returns empty array for empty input", () => {
+    const groups = groupTodoItemsWithParents([]);
+    expect(groups).toEqual([]);
+  });
+
+  it("ignores leading sub-items without a parent", () => {
+    const items = parseTodoItems(`  - [ ] Orphan sub
+- [ ] Parent`);
+    const groups = groupTodoItemsWithParents(items);
+    // The orphan sub-item (indent=2) has no parent before it, so it's skipped
+    // Parent (indent=0) becomes a group
+    expect(groups).toHaveLength(1);
+    expect(groups[0].parent.text).toBe("Parent");
+  });
+});
+
+describe("batchTodoGroups", () => {
+  it("splits actionable groups into batches of given size", () => {
+    const items = parseTodoItems(`- [ ] Task 1
+- [ ] Task 2
+- [ ] Task 3
+- [ ] Task 4
+- [ ] Task 5`);
+    const groups = groupTodoItemsWithParents(items);
+    const batches = batchTodoGroups(groups, 2);
+    expect(batches).toHaveLength(3);
+    expect(batches[0]).toHaveLength(2);
+    expect(batches[1]).toHaveLength(2);
+    expect(batches[2]).toHaveLength(1);
+  });
+
+  it("filters out completed and blocked groups", () => {
+    const items = parseTodoItems(`- [x] Done
+- [ ] Pending
+- [!] Blocked
+- [~] In progress`);
+    const groups = groupTodoItemsWithParents(items);
+    const batches = batchTodoGroups(groups, 10);
+    expect(batches).toHaveLength(1);
+    expect(batches[0]).toHaveLength(2); // pending + in_progress
+    expect(batches[0][0].parent.text).toBe("Pending");
+    expect(batches[0][1].parent.text).toBe("In progress");
+  });
+
+  it("returns empty array when all items are completed", () => {
+    const items = parseTodoItems(`- [x] Done 1
+- [x] Done 2`);
+    const groups = groupTodoItemsWithParents(items);
+    const batches = batchTodoGroups(groups, 3);
+    expect(batches).toEqual([]);
+  });
+
+  it("returns empty array for empty groups", () => {
+    const batches = batchTodoGroups([], 3);
+    expect(batches).toEqual([]);
+  });
+});
+
+describe("renderTodoGroupsAsMarkdown", () => {
+  it("renders groups back to markdown with correct markers", () => {
+    const items = parseTodoItems(`- [ ] Pending task
+- [x] Completed task
+- [!] Blocked task
+- [~] In progress task`);
+    const groups = groupTodoItemsWithParents(items);
+    const md = renderTodoGroupsAsMarkdown(groups);
+    expect(md).toContain("- [ ] Pending task");
+    expect(md).toContain("- [x] Completed task");
+    expect(md).toContain("- [!] Blocked task");
+    expect(md).toContain("- [~] In progress task");
+  });
+
+  it("renders sub-items with correct indentation", () => {
+    const items = parseTodoItems(`- [ ] Parent
+  - [ ] Sub item`);
+    const groups = groupTodoItemsWithParents(items);
+    const md = renderTodoGroupsAsMarkdown(groups);
+    expect(md).toBe("- [ ] Parent\n  - [ ] Sub item");
+  });
+
+  it("renders children (non-checkbox text) under items", () => {
+    const items = parseTodoItems(`- [ ] Task with detail
+  Some detail text
+  More detail`);
+    const groups = groupTodoItemsWithParents(items);
+    const md = renderTodoGroupsAsMarkdown(groups);
+    expect(md).toContain("- [ ] Task with detail");
+    expect(md).toContain("  Some detail text");
+    expect(md).toContain("  More detail");
+  });
+
+  it("returns empty string for empty groups", () => {
+    expect(renderTodoGroupsAsMarkdown([])).toBe("");
+  });
+});
+
+describe("statusToMarker", () => {
+  it("maps all statuses correctly", () => {
+    expect(statusToMarker("completed")).toBe("x");
+    expect(statusToMarker("pending")).toBe(" ");
+    expect(statusToMarker("blocked")).toBe("!");
+    expect(statusToMarker("in_progress")).toBe("~");
   });
 });
