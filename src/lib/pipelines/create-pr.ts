@@ -50,7 +50,6 @@ export async function buildCreatePrPipeline(input: {
     return {
       label: repo.repoName,
       prompt,
-      cwd: repo.worktreePath,
       addDirs: [path.join(WORKSPACE_DIR, workspace)],
     };
   });

@@ -55,9 +55,11 @@ function updaterInstructions(todoFilePath: string, workspacePath: string, worktr
    - New items MUST follow the structured format
 
 4. **Commit Changes**:
-   - Stage and commit TODO file changes using separate commands:
-     1. \`git -C ${workspacePath} add ${todoFileName}\`
-     2. \`git -C ${workspacePath} commit -m "message"\`
+   - \`cd\` to the workspace directory, then stage and commit:
+     1. \`cd ${workspacePath}\`
+     2. \`git add ${todoFileName}\`
+     3. \`git commit -m "message"\`
+     4. \`cd ${worktreePath}\` (return to the repo directory)
 
 ### TODO Item Format (Required)
 
@@ -83,7 +85,7 @@ The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path.
 The following patterns are blocked by the security sandbox:
 - \`$(...)\` command substitution in arguments
 - \`cd <dir> && git ...\` compound commands
-- Since you already \`cd\`'d into the repo, just run \`git\` directly — do NOT use \`git -C\`
+- Do NOT use \`git -C\` — always \`cd\` into the target directory first, then run \`git\` directly
 
 ### Interactive Mode
 

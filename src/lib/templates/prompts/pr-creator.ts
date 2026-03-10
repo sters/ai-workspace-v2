@@ -50,11 +50,12 @@ ${existingPRSection}
 ${prTemplateSection}
 ## Instructions
 
-${PR_CREATOR_INSTRUCTIONS}
+${prCreatorInstructions(input.worktreePath)}
 `;
 }
 
-const PR_CREATOR_INSTRUCTIONS = `You are a specialized agent for creating or updating a pull request for a repository.
+function prCreatorInstructions(worktreePath: string): string {
+  return `You are a specialized agent for creating or updating a pull request for a repository.
 
 **Your mission: Create or update a pull request based on the changes and context above.**
 
@@ -82,8 +83,11 @@ const PR_CREATOR_INSTRUCTIONS = `You are a specialized agent for creating or upd
 
 ### Working Directory
 
-Your working directory is set to the repository worktree (shown above).
-You can run \`git push\`, \`gh pr create\`, etc. directly.
+**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
+\`\`\`bash
+cd ${worktreePath}
+\`\`\`
+After that, run commands like \`git push\`, \`gh pr create\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
 The workspace directory is also available via \`--add-dir\` for reading workspace artifacts.
 
 ### Guidelines
@@ -94,3 +98,4 @@ The workspace directory is also available via \`--add-dir\` for reading workspac
 - Include all commits in summary, not just the latest
 - Always include full ticket URLs (not just IDs)
 `;
+}

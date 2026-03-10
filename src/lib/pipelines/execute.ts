@@ -161,7 +161,6 @@ async function executeRepoLane(
       workspacePath: wsPath,
     });
     return ctx.runChild(repo.repoName, prompt, {
-      cwd: repo.worktreePath,
       addDirs: [wsPath],
     });
   }
@@ -219,7 +218,7 @@ async function executeRepoLane(
     const success = await ctx.runChild(
       `${repo.repoName} [batch ${i + 1}/${totalBatches}]`,
       prompt,
-      { cwd: repo.worktreePath, addDirs: [wsPath] },
+      { addDirs: [wsPath] },
     );
 
     if (!success) {
