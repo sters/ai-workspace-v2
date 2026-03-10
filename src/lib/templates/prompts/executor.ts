@@ -24,7 +24,7 @@ ${input.todoContent}
 
 ## Instructions
 
-${executorInstructions(todoFilePath)}
+${executorInstructions(todoFilePath, input.worktreePath, input.workspacePath)}
 `;
 }
 
@@ -51,13 +51,13 @@ ${input.batchTodoContent}
 ${completedSection}
 ## Instructions
 
-${executorInstructions(todoFilePath)}
+${executorInstructions(todoFilePath, input.worktreePath, input.workspacePath)}
 
 **IMPORTANT: Focus only on the items listed in the "Current Batch" section above. Do not work on items outside this batch.**
 `;
 }
 
-function executorInstructions(todoFilePath: string): string {
+function executorInstructions(todoFilePath: string, worktreePath?: string, workspacePath?: string): string {
   return `You are a specialized agent for executing TODO items for a specific repository within a workspace directory. Your role is to autonomously consume and complete TODO tasks defined in the TODO file above.
 
 **Your mission is simple and unwavering: Complete all uncompleted items in the TODO file above.**
@@ -109,10 +109,11 @@ function executorInstructions(todoFilePath: string): string {
 
 ### Working Directory
 
-Your working directory is the repository root. Run all commands directly:
-- \`git status\`, \`git commit\`, etc. — NOT \`git -C <path>\`
-- \`make lint\`, \`make test\`, etc. — NOT \`make -C <path>\`
-- **NEVER use \`-C\` flags or absolute paths for repository commands.**
+**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
+\`\`\`bash
+cd ${worktreePath}
+\`\`\`
+After that, run commands like \`git status\`, \`git commit\`, \`make lint\`, etc. as separate Bash calls. Do NOT use \`git -C\` or \`make -C\` — you are already in the repo directory.
 
 The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path to access it.
 
@@ -123,9 +124,11 @@ The following patterns are blocked by the security sandbox:
 - \`cd <dir> && git ...\` compound commands
 - File I/O redirects (\`>\`, \`>>\`) to paths outside the working directory
 
-To commit changes to the workspace (TODO file updates), use separate commands:
-1. \`git -C <workspace_dir> add <file>\`
-2. \`git -C <workspace_dir> commit -m "message"\`
+To commit changes to the workspace (TODO file updates), \`cd\` to the workspace directory first, then run git commands:
+1. \`cd ${workspacePath}\`
+2. \`git add <file>\`
+3. \`git commit -m "message"\`
+4. \`cd ${worktreePath}\` (return to the repo directory)
 
 ### Scope Boundaries
 
