@@ -1,19 +1,25 @@
 #!/usr/bin/env bun
 
-import { existsSync, mkdirSync, cpSync, rmSync, writeFileSync, readdirSync, watch, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, rmSync, writeFileSync, readdirSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { resolve, dirname, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { INITIAL_SETTINGS_LOCAL } from "../src/lib/templates/settings";
-import { checkForUpdate, GITHUB_REPO_URL, UPDATE_FLAG_FILE } from "../src/lib/update";
+import { checkForUpdate, GITHUB_REPO_URL } from "../src/lib/update";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let packageDir = resolve(__dirname, "..");
 const isBunx = packageDir.includes(`${sep}node_modules${sep}`);
 
-// Clear caches and re-exec bunx to get the latest version
-function performSelfUpdate(extraArgs: string[]): never | Promise<never> {
+// Handle --self-update: clear all caches and re-run bunx to get the latest version
+if (process.argv.includes("--self-update")) {
+  if (!isBunx) {
+    console.log("--self-update is only available when running via bunx.");
+    console.log("For local development, use: git pull && bun install");
+    process.exit(1);
+  }
+
   console.log("Updating ai-workspace-v2...");
 
   // 1. Clear temp build caches (/tmp/ai-workspace-v2-app-*)
@@ -35,25 +41,15 @@ function performSelfUpdate(extraArgs: string[]): never | Promise<never> {
 
   console.log("Cache cleared. Restarting...\n");
 
-  // Re-exec bunx. Use github: specifier since this package is not published on npm
-  const child = Bun.spawn(["bunx", "github:sters/ai-workspace-v2", ...extraArgs], {
+  // Re-exec bunx without --self-update
+  // Use github: specifier since this package is not published on npm
+  const restArgs = process.argv.slice(2).filter((a) => a !== "--self-update");
+  const child = Bun.spawn(["bunx", "github:sters/ai-workspace-v2", ...restArgs], {
     stdio: ["inherit", "inherit", "inherit"],
   });
   process.on("SIGINT", () => child.kill("SIGINT"));
   process.on("SIGTERM", () => child.kill("SIGTERM"));
-  return child.exited.then((code) => process.exit(code ?? 0));
-}
-
-// Handle --self-update: clear all caches and re-run bunx to get the latest version
-if (process.argv.includes("--self-update")) {
-  if (!isBunx) {
-    console.log("--self-update is only available when running via bunx.");
-    console.log("For local development, use: git pull && bun install");
-    process.exit(1);
-  }
-
-  const restArgs = process.argv.slice(2).filter((a) => a !== "--self-update");
-  await performSelfUpdate(restArgs);
+  process.exit(await child.exited ?? 0);
 }
 
 // When run via bunx, the package lives inside node_modules/ which breaks
@@ -169,7 +165,6 @@ const sharedEnv = {
   ...process.env,
   AI_WORKSPACE_ROOT: root,
   ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
-  ...(isBunx ? { BUNX_MODE: "1" } : {}),
 };
 
 // Start Next.js server
@@ -194,29 +189,6 @@ function killAll() {
 
 process.on("SIGINT", killAll);
 process.on("SIGTERM", killAll);
-
-// Watch for update flag file (written by POST /api/check-update)
-if (isBunx) {
-  const updateFlagPath = resolve(root, UPDATE_FLAG_FILE);
-  try {
-    const watcher = watch(root, (_event, filename) => {
-      if (filename !== UPDATE_FLAG_FILE) return;
-      if (!existsSync(updateFlagPath)) return;
-
-      console.log("\nUpdate requested via UI. Restarting...");
-      watcher.close();
-
-      try { unlinkSync(updateFlagPath); } catch {}
-
-      killAll();
-
-      const restArgs = process.argv.slice(2).filter((a) => a !== "--self-update");
-      performSelfUpdate(restArgs);
-    });
-  } catch {
-    // fs.watch may fail on some platforms; non-critical
-  }
-}
 
 // Wait for Next.js to exit, then clean up chat server
 const nextExitCode = await nextServer.exited;
