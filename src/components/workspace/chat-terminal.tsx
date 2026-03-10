@@ -126,7 +126,13 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
       setExitCode(null);
       setError(null);
 
-      await init();
+      try {
+        await init();
+      } catch {
+        clearChatSession(workspaceId);
+        setState("idle");
+        return;
+      }
 
       // If another session init started while we awaited, abandon this one.
       if (generationRef.current !== gen) {
@@ -135,7 +141,11 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
       }
 
       const term = termRef.current;
-      if (!term) return;
+      if (!term) {
+        clearChatSession(workspaceId);
+        setState("idle");
+        return;
+      }
 
       const ws = new WebSocket(CHAT_WS_URL);
       wsRef.current = ws;
@@ -209,8 +219,16 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
       };
 
       ws.onclose = () => {
-        if (stateRef.current === "running" || stateRef.current === "resuming") {
+        if (stateRef.current === "running") {
           setState("exited");
+        } else if (stateRef.current === "resuming") {
+          // Resume failed — clear saved session and go idle so user can start fresh
+          clearChatSession(workspaceId);
+          if (resumeTimeoutRef.current) {
+            clearTimeout(resumeTimeoutRef.current);
+            resumeTimeoutRef.current = null;
+          }
+          setState("idle");
         }
       };
 
@@ -231,7 +249,13 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
     setExitCode(null);
     setError(null);
 
-    await init();
+    try {
+      await init();
+    } catch {
+      setError("Failed to initialize terminal");
+      setState("exited");
+      return;
+    }
 
     // If another session init started while we awaited, abandon this one.
     if (generationRef.current !== gen) {
@@ -240,7 +264,11 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
     }
 
     const term = termRef.current;
-    if (!term) return;
+    if (!term) {
+      setError("Failed to initialize terminal");
+      setState("exited");
+      return;
+    }
 
     // Connect WebSocket
     const ws = new WebSocket(CHAT_WS_URL);
