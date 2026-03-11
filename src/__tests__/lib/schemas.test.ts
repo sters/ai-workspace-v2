@@ -50,6 +50,18 @@ describe("createPrSchema", () => {
     expect(result.success).toBe(true);
     if (result.success) expect(result.data.draft).toBe(true);
   });
+
+  it("accepts optional repository", () => {
+    const result = createPrSchema.safeParse({ workspace: "test", repository: "owner/repo" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.repository).toBe("owner/repo");
+  });
+
+  it("accepts without repository", () => {
+    const result = createPrSchema.safeParse({ workspace: "test" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.repository).toBeUndefined();
+  });
 });
 
 describe("updateTodoSchema", () => {

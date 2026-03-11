@@ -15,11 +15,15 @@ import type { PipelinePhase } from "@/types/pipeline";
 export async function buildCreatePrPipeline(input: {
   workspace: string;
   draft: boolean;
+  repository?: string;
 }): Promise<PipelinePhase[]> {
-  const { workspace, draft } = input;
+  const { workspace, draft, repository } = input;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const repos = listWorkspaceRepos(workspace);
+  const allRepos = listWorkspaceRepos(workspace);
+  const repos = repository
+    ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
+    : allRepos;
 
   const children = repos.map((repo) => {
     // Detect base branch from README metadata or repo itself

@@ -15,6 +15,7 @@ export const reviewSchema = workspaceSchema;
 export const createPrSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   draft: z.coerce.boolean().optional(),
+  repository: z.string().optional(),
 });
 
 export const updateTodoSchema = z.object({

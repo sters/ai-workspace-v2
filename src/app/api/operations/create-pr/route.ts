@@ -13,6 +13,7 @@ export async function POST(request: Request) {
 
   const workspace = resolveWorkspaceName(parsed.data.workspace);
   const draft = parsed.data.draft;
+  const repository = parsed.data.repository;
   const repos = listWorkspaceRepos(workspace);
 
   if (repos.length === 0) {
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const phases = await buildCreatePrPipeline({ workspace, draft: draft !== false });
+    const phases = await buildCreatePrPipeline({ workspace, draft: draft !== false, repository });
     const operation = startOperationPipeline("create-pr", workspace, phases, undefined, {
       ...(draft === false && { draft: "false" }),
     });
