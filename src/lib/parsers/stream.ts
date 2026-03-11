@@ -1,6 +1,7 @@
 // Parse stream-json messages from `claude -p --output-format stream-json` (or SDK) into displayable log entries.
 
 import type { LogEntry } from "@/types/claude";
+import type { OperationEvent } from "@/types/operation";
 
 /**
  * Build a permission string suitable for `settings.local.json` `permissions.allow`.
@@ -295,4 +296,25 @@ export function parseStreamEvent(raw: string): LogEntry[] {
   }
 
   return entries;
+}
+
+/**
+ * Extract the last result (content, cost, duration) from a list of OperationEvents.
+ * Scans events in reverse to find the last "result" entry efficiently.
+ */
+export function extractLastResult(
+  events: OperationEvent[],
+): { content: string; cost?: string; duration?: string } | undefined {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const event = events[i];
+    if (event.type !== "output") continue;
+    const entries = parseStreamEvent(event.data);
+    for (let j = entries.length - 1; j >= 0; j--) {
+      const entry = entries[j];
+      if (entry.kind === "result") {
+        return { content: entry.content, cost: entry.cost, duration: entry.duration };
+      }
+    }
+  }
+  return undefined;
 }

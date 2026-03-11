@@ -27,27 +27,27 @@ function expandBatchTypes(inputs?: Record<string, string>): OperationType[] {
 }
 
 export function useRunningOperations() {
-  const { data, mutate } = useSWR<OperationListItem[]>("/api/operations", fetcher, {
-    refreshInterval: 3000,
-  });
+  const { data, mutate } = useSWR<OperationListItem[]>(
+    "/api/operations?status=running",
+    fetcher,
+    { refreshInterval: 3000 },
+  );
 
   const operations = data ?? [];
 
   const runningWorkspaces = new Set<string>();
   const runningWorkspaceTypes = new Map<string, Set<OperationType>>();
   for (const op of operations) {
-    if (op.status === "running") {
-      runningWorkspaces.add(op.workspace);
-      let types = runningWorkspaceTypes.get(op.workspace);
-      if (!types) {
-        types = new Set();
-        runningWorkspaceTypes.set(op.workspace, types);
-      }
-      if (op.type === "batch") {
-        for (const t of expandBatchTypes(op.inputs)) types.add(t);
-      } else {
-        types.add(op.type);
-      }
+    runningWorkspaces.add(op.workspace);
+    let types = runningWorkspaceTypes.get(op.workspace);
+    if (!types) {
+      types = new Set();
+      runningWorkspaceTypes.set(op.workspace, types);
+    }
+    if (op.type === "batch") {
+      for (const t of expandBatchTypes(op.inputs)) types.add(t);
+    } else {
+      types.add(op.type);
     }
   }
 

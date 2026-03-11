@@ -27,7 +27,7 @@ function getViewHref(op: OperationListItem): string | null {
 
 export default function RunningPage() {
   const { data, error, isLoading, mutate } = useSWR<OperationListItem[]>(
-    "/api/operations",
+    "/api/operations?status=running",
     fetcher,
     { refreshInterval: 3000 }
   );
@@ -38,7 +38,7 @@ export default function RunningPage() {
     { refreshInterval: 3000 }
   );
 
-  const running = data?.filter((op) => op.status === "running") ?? [];
+  const running = data ?? [];
   const activeChats = chatSessions ?? [];
   const now = useNow(running.length > 0 || activeChats.length > 0 ? 1000 : 0);
   const kill = useCallback(

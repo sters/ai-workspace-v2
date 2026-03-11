@@ -55,6 +55,8 @@ export interface OperationListItem {
   currentPhase?: Pick<OperationPhaseInfo, "index" | "label" | "status" | "timeoutMs" | "startedAt">;
   /** User-provided inputs (present when created locally via POST, absent from list API). */
   inputs?: Record<string, string>;
+  /** Last result text from the operation (populated for completed/failed operations). */
+  resultSummary?: { content: string; cost?: string; duration?: string };
 }
 
 export interface OperationEvent {

@@ -4,7 +4,6 @@ import { useEffect, useRef, useMemo, useState, type ReactNode } from "react";
 import { useOperation } from "@/hooks/use-operation";
 import { OperationLog } from "./log";
 import { OperationInputs } from "./operation-inputs";
-import { NextActionSuggestions } from "./next-action-suggestions";
 import { StatusBadge } from "../shared/feedback/status-badge";
 import { Button } from "../shared/buttons/button";
 import { Spinner } from "../shared/feedback/spinner";
@@ -27,20 +26,14 @@ export function ClaudeOperation({
   storageKey,
   children,
   vertical,
-  workspace,
   onRunningChange,
-  navigateNextActions,
   initialOperationId,
 }: {
   storageKey: string;
   children: (ctx: OperationContext) => ReactNode;
   vertical?: boolean;
-  /** Workspace path — when provided, shows next action suggestions after completion. */
-  workspace?: string;
   /** Called when the running state changes. Useful for coordinating multiple independent operations. */
   onRunningChange?: (running: boolean) => void;
-  /** When true, next action buttons navigate via URL (?action=) instead of triggering inline. */
-  navigateNextActions?: boolean;
   /** When provided, reconnect to an existing operation by ID (e.g. from Running Operations page). */
   initialOperationId?: string;
 }) {
@@ -70,12 +63,6 @@ export function ClaudeOperation({
   useEffect(() => {
     onRunningChangeRef.current?.(effectiveRunning);
   }, [effectiveRunning]);
-
-  const showNextActions =
-    workspace &&
-    operation &&
-    operation.status === "completed" &&
-    !effectiveRunning;
 
   const isDone = !effectiveRunning && operation && (operation.status === "completed" || operation.status === "failed");
 
@@ -116,16 +103,6 @@ export function ClaudeOperation({
     status: operation?.status,
   });
 
-  const nextActions = showNextActions && (
-    <NextActionSuggestions
-      operationType={operation.type}
-      workspace={workspace}
-      onStart={handleStart}
-      isRunning={effectiveRunning}
-      useNavigation={navigateNextActions}
-    />
-  );
-
   const showStarting = effectiveRunning && events.length === 0;
 
   const startingIndicator = showStarting && (
@@ -155,7 +132,6 @@ export function ClaudeOperation({
             events={events}
           />
         )}
-        {nextActions}
       </div>
     );
   }
@@ -176,15 +152,13 @@ export function ClaudeOperation({
           events={events}
         />
       )}
-      {nextActions}
     </div>
   );
 }
 
 /**
  * Wraps OperationLog with collapse/expand behavior.
- * - Expanded while running
- * - Collapsed by default after completion/failure
+ * - Expanded by default (stays expanded after completion)
  * - Result entries (green output) are always visible outside the fold
  */
 function CollapsibleOperationLog({
@@ -197,15 +171,6 @@ function CollapsibleOperationLog({
   events: OperationEvent[];
 }) {
   const [expanded, setExpanded] = useState(true);
-  const wasRunningRef = useRef(isRunning);
-
-  // Auto-collapse when operation finishes
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
 
   const isDone = !isRunning && (operation.status === "completed" || operation.status === "failed");
 

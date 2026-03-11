@@ -1,41 +1,15 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { OperationSummary, useNow } from "@/components/operation/operation-summary";
 import { OperationInputs } from "@/components/operation/operation-inputs";
 import { OperationLog } from "@/components/operation/log";
-import { NextActionSuggestions } from "@/components/operation/next-action-suggestions";
 import { Button } from "@/components/shared/buttons/button";
 import { Card } from "@/components/shared/containers/card";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { ResultBox } from "@/components/shared/feedback/result-box";
 import { useSSE } from "@/hooks/use-sse";
-import { parseStreamEvent } from "@/lib/parsers/stream";
 import type { OperationListItem, OperationType, OperationPhaseInfo } from "@/types/operation";
-import type { LogEntry } from "@/types/claude";
-
-/** Track which operations have had their next-steps dismissed (persists across page reloads via sessionStorage). */
-const HIDDEN_NEXT_STEPS_KEY = "aiw-hidden-next-steps";
-
-function getHiddenNextStepsIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
-  try {
-    const raw = sessionStorage.getItem(HIDDEN_NEXT_STEPS_KEY);
-    return raw ? new Set(JSON.parse(raw) as string[]) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function addHiddenNextStepsId(id: string) {
-  const ids = getHiddenNextStepsIds();
-  ids.add(id);
-  try {
-    sessionStorage.setItem(HIDDEN_NEXT_STEPS_KEY, JSON.stringify([...ids]));
-  } catch {
-    // ignore
-  }
-}
 
 interface OperationCardProps {
   operation: OperationListItem;
@@ -56,24 +30,9 @@ export function OperationCard({
   const isRunning = operation.status === "running";
   const isDone = operation.status === "completed" || operation.status === "failed";
   const [expanded, setExpanded] = useState(defaultExpanded ?? isRunning);
-  const [nextStepsHidden, setNextStepsHidden] = useState(() => getHiddenNextStepsIds().has(operation.id));
   const now = useNow(isRunning ? 1000 : 0);
 
-  const hideNextSteps = useCallback(() => {
-    addHiddenNextStepsId(operation.id);
-    setNextStepsHidden(true);
-  }, [operation.id]);
-
-  // Collapse when the operation finishes
-  const wasRunningRef = useRef(isRunning);
-  useEffect(() => {
-    if (wasRunningRef.current && !isRunning) {
-      setExpanded(false);
-    }
-    wasRunningRef.current = isRunning;
-  }, [isRunning]);
-
-  // Only connect SSE when expanded
+  // Only connect SSE when expanded (for log viewing)
   const sseOperationId = expanded ? operation.id : null;
   const { events, connected } = useSSE(sseOperationId);
 
@@ -127,24 +86,8 @@ export function OperationCard({
   };
   const effectiveIsRunning = liveStatus === "running" && (connected || isRunning);
 
-  // Extract result entries for summary display
-  const resultEntries = useMemo(() => {
-    if (effectiveIsRunning) return [];
-    const results: LogEntry[] = [];
-    for (const event of events) {
-      if (event.type === "output") {
-        const parsed = parseStreamEvent(event.data);
-        for (const entry of parsed) {
-          if (entry.kind === "result") {
-            results.push(entry);
-          }
-        }
-      }
-    }
-    return results;
-  }, [effectiveIsRunning, events]);
-
-  const lastResult = resultEntries.length > 0 ? resultEntries[resultEntries.length - 1] : null;
+  // Use resultSummary from the operation list item (no SSE needed for results)
+  const resultSummary = operation.resultSummary;
 
   return (
     <Card variant="flush">
@@ -212,28 +155,16 @@ export function OperationCard({
       )}
 
       {/* Result summary (always visible when done, even when collapsed) */}
-      {!effectiveIsRunning && lastResult && lastResult.kind === "result" && (
+      {!effectiveIsRunning && resultSummary && (
         <div className="border-t p-3">
           <ResultBox
-            content={lastResult.content}
-            cost={lastResult.cost}
-            duration={lastResult.duration}
+            content={resultSummary.content}
+            cost={resultSummary.cost}
+            duration={resultSummary.duration}
           />
         </div>
       )}
 
-      {/* Next action suggestions */}
-      {!nextStepsHidden && !effectiveIsRunning && liveStatus !== "running" && liveStatus !== "failed" && operation.workspace && (
-        <div className="border-t p-3">
-          <NextActionSuggestions
-            operationType={operation.type}
-            workspace={operation.workspace}
-            onStart={onStartOperation}
-            isRunning={false}
-            onHide={hideNextSteps}
-          />
-        </div>
-      )}
     </Card>
   );
 }
