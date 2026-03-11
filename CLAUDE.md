@@ -135,6 +135,7 @@ Uses Tailwind with a shadcn/ui-style CSS variable theme system (`hsl(var(--prima
 
 - **TDD (Test-Driven Development)**: Write or update tests before implementing production code. When adding a new feature or fixing a bug, first write a failing test that defines the expected behavior, then implement the code to make it pass.
 - **Pre-commit checks**: Always run `bun run lint` and `bun run test` before creating a git commit. Both must pass with zero errors.
+- **Git commands**: Run `git add`, `git commit`, and `git push` as separate commands — never chain them into a single line. Do not use subcommand substitution `$()` in git commands (e.g., avoid `git commit -m "$(cat <<'EOF' ... EOF)"`).
 
 ## Conventions
 
