@@ -30,7 +30,7 @@ export function useRunningOperations() {
   const { data, mutate } = useSWR<OperationListItem[]>(
     "/api/operations?status=running",
     fetcher,
-    { refreshInterval: 3000 },
+    { refreshInterval: 10000 },
   );
 
   const operations = data ?? [];

@@ -30,17 +30,18 @@ export default function OperationsPage({
 
   const wsParam = encodeURIComponent(decodedName);
 
-  // Poll only running operations (lightweight, no disk I/O)
+  // Poll running operations: fast when active, slow when idle
   const { data: runningOps, mutate: mutateRunning } = useSWR<OperationListItem[]>(
     `/api/operations?workspace=${wsParam}&status=running`,
     fetcher,
-    { refreshInterval: 3000 },
+    { refreshInterval: 10000 },
   );
 
-  // Fetch all operations once (includes completed from disk)
+  // Fetch all operations once (includes completed from disk); no polling needed
   const { data: allOps, mutate: mutateAll } = useSWR<OperationListItem[]>(
     `/api/operations?workspace=${wsParam}`,
     fetcher,
+    { refreshInterval: 60000, revalidateOnFocus: false, revalidateOnReconnect: false },
   );
 
   const mutate = useCallback(() => {
