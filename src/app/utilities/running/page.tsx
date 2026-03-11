@@ -29,13 +29,13 @@ export default function RunningPage() {
   const { data, error, isLoading, mutate } = useSWR<OperationListItem[]>(
     "/api/operations?status=running",
     fetcher,
-    { refreshInterval: 3000 }
+    { refreshInterval: 10000 }
   );
 
   const { data: chatSessions, mutate: mutateChatSessions } = useSWR<ChatSessionInfo[]>(
     "/api/chat-sessions",
     fetcher,
-    { refreshInterval: 3000 }
+    { refreshInterval: 10000 }
   );
 
   const running = data ?? [];
