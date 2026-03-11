@@ -32,7 +32,7 @@ export default function RunningPage() {
     { refreshInterval: 3000 }
   );
 
-  const { data: chatSessions } = useSWR<ChatSessionInfo[]>(
+  const { data: chatSessions, mutate: mutateChatSessions } = useSWR<ChatSessionInfo[]>(
     "/api/chat-sessions",
     fetcher,
     { refreshInterval: 3000 }
@@ -51,6 +51,18 @@ export default function RunningPage() {
       mutate();
     },
     [mutate]
+  );
+
+  const killChat = useCallback(
+    async (sessionId: string) => {
+      await fetch("/api/chat-sessions/kill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId }),
+      });
+      mutateChatSessions();
+    },
+    [mutateChatSessions]
   );
 
   const nothingRunning = !isLoading && !error && running.length === 0 && activeChats.length === 0;
@@ -128,6 +140,9 @@ export default function RunningPage() {
                   >
                     View
                   </Link>
+                  <Button variant="destructive-sm" onClick={() => killChat(chat.id)}>
+                    Stop
+                  </Button>
                 </div>
               </Card>
             ))}
