@@ -8,6 +8,7 @@ import type {
 import type { PipelinePhase, PipelineOptions } from "@/types/pipeline";
 import { runClaude } from "./claude";
 import type { ClaudeProcess, RunClaudeOptions } from "@/types/claude";
+import { extractLastResult } from "./parsers/stream";
 import { Semaphore } from "./semaphore";
 
 // ---------------------------------------------------------------------------
@@ -597,8 +598,11 @@ export function getOperations(): Operation[] {
   return Array.from(operations.values()).map((m) => m.operation);
 }
 
-function toSummary(op: Operation): OperationListItem {
+function toSummary(op: Operation, events?: OperationEvent[]): OperationListItem {
   const currentPhase = op.phases?.find((p) => p.status === "running");
+  const resultSummary = op.status !== "running" && events
+    ? extractLastResult(events)
+    : undefined;
   return {
     id: op.id,
     type: op.type,
@@ -608,12 +612,13 @@ function toSummary(op: Operation): OperationListItem {
     completedAt: op.completedAt,
     ...(currentPhase && { currentPhase }),
     ...(op.inputs && { inputs: op.inputs }),
+    ...(resultSummary && { resultSummary }),
   };
 }
 
 export function getOperationSummaries(): OperationListItem[] {
   gcCompletedOperations();
-  return Array.from(operations.values()).map((m) => toSummary(m.operation));
+  return Array.from(operations.values()).map((m) => toSummary(m.operation, m.events));
 }
 
 export function getOperation(id: string): Operation | undefined {

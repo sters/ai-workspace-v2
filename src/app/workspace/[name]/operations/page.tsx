@@ -28,17 +28,38 @@ export default function OperationsPage({
   const router = useRouter();
   const pathname = usePathname();
 
-  // Poll operation summaries filtered by this workspace
-  const { data, mutate } = useSWR<OperationListItem[]>(
-    `/api/operations?workspace=${encodeURIComponent(decodedName)}`,
+  const wsParam = encodeURIComponent(decodedName);
+
+  // Poll only running operations (lightweight, no disk I/O)
+  const { data: runningOps, mutate: mutateRunning } = useSWR<OperationListItem[]>(
+    `/api/operations?workspace=${wsParam}&status=running`,
     fetcher,
-    { refreshInterval: 3000 }
+    { refreshInterval: 3000 },
   );
 
-  const workspaceOps = data ?? [];
+  // Fetch all operations once (includes completed from disk)
+  const { data: allOps, mutate: mutateAll } = useSWR<OperationListItem[]>(
+    `/api/operations?workspace=${wsParam}`,
+    fetcher,
+  );
+
+  const mutate = useCallback(() => {
+    mutateRunning();
+    mutateAll();
+  }, [mutateRunning, mutateAll]);
+
+  // Merge: running operations (fresh) override stale entries from allOps
+  const mergedOps = (() => {
+    const running = runningOps ?? [];
+    const all = allOps ?? [];
+    const runningIds = new Set(running.map((op) => op.id));
+    // Replace stale entries with fresh running data
+    const completed = all.filter((op) => !runningIds.has(op.id));
+    return [...running, ...completed];
+  })();
 
   // Sort: running first, then by start time descending
-  const sortedOps = [...workspaceOps].sort((a, b) => {
+  const sortedOps = [...mergedOps].sort((a, b) => {
     if (a.status === "running" && b.status !== "running") return -1;
     if (a.status !== "running" && b.status === "running") return 1;
     return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();

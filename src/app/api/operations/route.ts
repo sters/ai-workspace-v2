@@ -8,8 +8,19 @@ export const dynamic = "force-dynamic";
 export function GET(request: Request) {
   const url = new URL(request.url);
   const workspace = url.searchParams.get("workspace");
+  const status = url.searchParams.get("status");
 
-  // Merge in-memory summaries with disk-stored summaries
+  // Fast path: only return in-memory running operations (no disk I/O)
+  if (status === "running") {
+    let running = getOperationSummaries().filter((op) => op.status === "running");
+    if (workspace) {
+      running = running.filter((op) => op.workspace === workspace);
+    }
+    running.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
+    return NextResponse.json(running);
+  }
+
+  // Full listing: merge in-memory summaries with disk-stored summaries
   const inMemory = getOperationSummaries();
   const inMemoryIds = new Set(inMemory.map((op) => op.id));
 

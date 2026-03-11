@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { AI_WORKSPACE_ROOT } from "./config";
+import { extractLastResult } from "./parsers/stream";
 import type { Operation, OperationEvent, OperationListItem } from "@/types/operation";
 
 // ---------------------------------------------------------------------------
@@ -176,6 +177,20 @@ export function listStoredOperations(workspace?: string): OperationListItem[] {
         const header = JSON.parse(firstLine) as StoredHeader;
         if (header._type === "header" && header.operation) {
           const op = header.operation;
+          // Parse event lines to extract the last result
+          const lines = content.trim().split("\n");
+          const events: OperationEvent[] = [];
+          for (let i = 1; i < lines.length; i++) {
+            try {
+              const parsed = JSON.parse(lines[i]) as StoredEvent;
+              if (parsed._type === "event") {
+                const { _type: _, ...event } = parsed;
+                events.push(event as unknown as OperationEvent);
+              }
+            } catch {
+              // skip
+            }
+          }
           summaries.push({
             id: op.id,
             type: op.type,
@@ -184,6 +199,7 @@ export function listStoredOperations(workspace?: string): OperationListItem[] {
             startedAt: op.startedAt,
             completedAt: op.completedAt,
             ...(op.inputs && Object.keys(op.inputs).length > 0 && { inputs: op.inputs }),
+            resultSummary: extractLastResult(events),
           });
         }
       } catch {
