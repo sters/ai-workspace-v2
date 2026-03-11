@@ -4,8 +4,8 @@ import { useEffect, useRef, useMemo, useState } from "react";
 import type { OperationEvent, OperationPhaseInfo } from "@/types/operation";
 import { parseStreamEvent, enrichPermissionDenials } from "@/lib/parsers/stream";
 import type { LogEntry } from "@/types/claude";
-import { buildDisplayNodes, groupByChildLabel, findPendingAsk } from "./display-nodes";
-import { ChildGroupSection, SubAgentSection } from "./sections";
+import { buildDisplayNodes, groupByChildLabel, groupByPhase, findPendingAsk } from "./display-nodes";
+import { ChildGroupSection, SubAgentSection, PhaseGroupSection } from "./sections";
 import { EntryRow } from "./entries";
 import { AskInput } from "./ask-input";
 import { Button } from "../../shared/buttons/button";
@@ -132,7 +132,12 @@ export function OperationLog({
     const cleanEntries = activePhaseTab === "all" && livePhases
       ? entries.filter((e) => !(e.kind === "system" && e.content.startsWith("__phaseUpdate:")))
       : filteredEntries;
-    return groupByChildLabel(buildDisplayNodes(cleanEntries));
+    const grouped = groupByChildLabel(buildDisplayNodes(cleanEntries));
+    // In "all" view with multiple phases, group nodes into phase sections
+    if (activePhaseTab === "all" && livePhases && livePhases.length > 1) {
+      return groupByPhase(grouped);
+    }
+    return grouped;
   }, [entries, filteredEntries, activePhaseTab, livePhases]);
 
 
@@ -163,13 +168,15 @@ export function OperationLog({
       >
         <div className="space-y-1.5">
           {nodes.map((node, i) =>
-            node.type === "entry" ? (
+            node.type === "phase-group" ? (
+              <PhaseGroupSection key={`phase-${node.phaseIndex}`} group={node} />
+            ) : node.type === "entry" ? (
               <EntryRow key={i} entry={node.entry} />
             ) : node.type === "subagent" ? (
               <SubAgentSection key={node.toolUseId} group={node} />
-            ) : (
+            ) : node.type === "child-group" ? (
               <ChildGroupSection key={node.label} group={node} />
-            )
+            ) : null
           )}
         </div>
       </div>
