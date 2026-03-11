@@ -43,8 +43,6 @@ interface OperationCardProps {
   onStartOperation: (type: OperationType, body: Record<string, string>) => Promise<void>;
   /** Called when user clicks Cancel on a running operation. */
   onCancel: (operationId: string) => void;
-  /** Called when user clicks Clear on a finished operation. */
-  onClear: (operationId: string) => void;
   /** Whether this card should be expanded by default. */
   defaultExpanded?: boolean;
 }
@@ -53,7 +51,6 @@ export function OperationCard({
   operation,
   onStartOperation,
   onCancel,
-  onClear,
   defaultExpanded,
 }: OperationCardProps) {
   const isRunning = operation.status === "running";
@@ -174,15 +171,13 @@ export function OperationCard({
                   onClick={() =>
                     onStartOperation(operation.type, {
                       workspace: operation.workspace,
+                      ...operation.inputs,
                     })
                   }
                 >
                   Retry
                 </Button>
               )}
-              <Button variant="ghost" onClick={() => onClear(operation.id)}>
-                Clear
-              </Button>
             </>
           ) : null}
         </div>

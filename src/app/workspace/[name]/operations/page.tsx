@@ -115,18 +115,6 @@ export default function OperationsPage({
     [mutate]
   );
 
-  const handleClear = useCallback(
-    async (operationId: string) => {
-      await fetch("/api/operations/clear", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operationId }),
-      });
-      setLocalOps((prev) => prev.filter((op) => op.id !== operationId));
-      mutate();
-    },
-    [mutate]
-  );
 
   if (displayOps.length === 0) {
     return (
@@ -144,7 +132,6 @@ export default function OperationsPage({
           operation={op}
           onStartOperation={handleStartOperation}
           onCancel={handleCancel}
-          onClear={handleClear}
           defaultExpanded={
             op.status === "running" || op.id === expandOperationId
           }
