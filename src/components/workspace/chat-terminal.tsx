@@ -126,6 +126,11 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
       setExitCode(null);
       setError(null);
 
+      // Wait one frame so React commits the state update and the container
+      // becomes visible (switches from display:none to display:block).
+      await new Promise<void>(r => requestAnimationFrame(() => r()));
+      if (generationRef.current !== gen) { dispose(); return; }
+
       try {
         await init();
       } catch {
@@ -248,6 +253,12 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
     setState("connecting");
     setExitCode(null);
     setError(null);
+
+    // Wait one frame so React commits the state update and the container
+    // becomes visible (switches from display:none to display:block).
+    // xterm.js needs a visible container with non-zero dimensions to init.
+    await new Promise<void>(r => requestAnimationFrame(() => r()));
+    if (generationRef.current !== gen) { dispose(); return; }
 
     try {
       await init();
