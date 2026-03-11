@@ -29,7 +29,10 @@ async function runSubPhases(
 
     if (phase.kind === "single") {
       ctx.emitStatus(`Running: ${phase.label}`);
-      const ok = await ctx.runChild(phase.label, phase.prompt);
+      const ok = await ctx.runChild(phase.label, phase.prompt, {
+        cwd: phase.cwd,
+        addDirs: phase.addDirs,
+      });
       if (!ok) return false;
     } else if (phase.kind === "group") {
       ctx.emitStatus(
