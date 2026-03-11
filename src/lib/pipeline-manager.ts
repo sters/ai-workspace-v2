@@ -57,20 +57,16 @@ export const DEFAULT_FUNCTION_TIMEOUT_MS = 3 * 60 * 1000;
 
 const globalStore = globalThis as unknown as {
   __aiWorkspaceOps?: Map<string, ManagedOperation>;
-  __aiWorkspaceCounter?: number;
 };
 
 if (!globalStore.__aiWorkspaceOps) {
   globalStore.__aiWorkspaceOps = new Map();
 }
-if (globalStore.__aiWorkspaceCounter == null) {
-  globalStore.__aiWorkspaceCounter = 0;
-}
 
 const operations = globalStore.__aiWorkspaceOps;
 
-function nextId(prefix: string): string {
-  return `${prefix}-${++globalStore.__aiWorkspaceCounter!}-${Date.now()}`;
+function nextId(): string {
+  return crypto.randomUUID();
 }
 
 // ---------------------------------------------------------------------------
@@ -278,7 +274,7 @@ export function startOperationPipeline(
     throw new ConcurrencyLimitError(running);
   }
 
-  const id = nextId("pipe");
+  const id = nextId();
 
   // Build phase info array
   const phaseInfos: OperationPhaseInfo[] = phases.map((phase, i) => ({
