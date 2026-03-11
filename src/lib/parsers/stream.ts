@@ -104,6 +104,11 @@ function summarizeToolInput(name: string, input: any): string {
 }
 
 export function parseStreamEvent(raw: string): LogEntry[] {
+  // Skip debug lines from Claude CLI (not valid JSON)
+  if (raw.startsWith("[debug]")) {
+    return [];
+  }
+
   let parsed;
   try {
     parsed = JSON.parse(raw);
