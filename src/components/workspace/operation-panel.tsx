@@ -105,15 +105,12 @@ export function OperationPanel({
         >
           Review
         </Button>
-        <Button
-          variant="secondary"
-          onClick={() =>
-            startAndNavigate("create-pr", { workspace: workspacePath })
-          }
+        <CreatePRButton
+          workspacePath={workspacePath}
+          repositories={repositories}
           disabled={isWorkspaceTypeRunning(workspaceName, "create-pr")}
-        >
-          Create PR
-        </Button>
+          onStartAndNavigate={startAndNavigate}
+        />
         <OpenVSCodeButton
           workspacePath={workspacePath}
           repositories={repositories}
@@ -172,6 +169,50 @@ function openInTerminal(targetPath: string) {
       console.error("Failed to open terminal:", data.error);
     }
   });
+}
+
+function CreatePRButton({
+  workspacePath,
+  repositories,
+  disabled,
+  onStartAndNavigate,
+}: {
+  workspacePath: string;
+  repositories?: { alias: string; path: string }[];
+  disabled: boolean;
+  onStartAndNavigate: (type: OperationType, body: Record<string, string>) => Promise<void>;
+}) {
+  const handleClick = useCallback(
+    () => onStartAndNavigate("create-pr", { workspace: workspacePath }),
+    [onStartAndNavigate, workspacePath]
+  );
+
+  const repoItems = (repositories ?? []).map((repo) => ({
+    label: repo.alias || repo.path.split("/").pop() || repo.path,
+    onClick: () =>
+      onStartAndNavigate("create-pr", {
+        workspace: workspacePath,
+        repository: repo.path,
+      }),
+  }));
+
+  if (repoItems.length === 0) {
+    return (
+      <Button variant="secondary" onClick={handleClick} disabled={disabled}>
+        Create PR
+      </Button>
+    );
+  }
+
+  return (
+    <SplitButton
+      label="Create PR"
+      onClick={handleClick}
+      variant="secondary"
+      disabled={disabled}
+      items={repoItems}
+    />
+  );
 }
 
 function OpenVSCodeButton({
