@@ -9,7 +9,7 @@ import type { Operation, OperationEvent, OperationListItem } from "@/types/opera
 // ---------------------------------------------------------------------------
 
 const OPERATIONS_DIR = path.join(AI_WORKSPACE_ROOT, ".operations");
-const VALID_ID_RE = /^pipe-\d+-\d+$/;
+const VALID_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** Workspace names are directory basenames — disallow path separators and traversal. */
 const VALID_WORKSPACE_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 

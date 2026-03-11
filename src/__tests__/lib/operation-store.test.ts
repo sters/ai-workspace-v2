@@ -13,6 +13,11 @@ import { AI_WORKSPACE_ROOT } from "@/lib/config";
 
 const OPERATIONS_DIR = path.join(AI_WORKSPACE_ROOT, ".operations");
 
+// Deterministic UUIDs for test use
+const ID1 = "00000000-0000-4000-8000-000000000001";
+const ID2 = "00000000-0000-4000-8000-000000000002";
+const ID3 = "00000000-0000-4000-8000-000000000003";
+
 function rmrf(dir: string) {
   if (!fs.existsSync(dir)) return;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -58,15 +63,15 @@ describe("operation-store", () => {
 
   describe("writeOperationLog + readOperationLog roundtrip", () => {
     it("writes and reads back an operation with events", () => {
-      const op = makeOperation("pipe-1-1000");
+      const op = makeOperation(ID1);
       const events = [
-        makeEvent("pipe-1-1000", "status"),
-        makeEvent("pipe-1-1000", "output"),
-        makeEvent("pipe-1-1000", "complete"),
+        makeEvent(ID1, "status"),
+        makeEvent(ID1, "output"),
+        makeEvent(ID1, "complete"),
       ];
 
       writeOperationLog(op, events);
-      const result = readOperationLog("pipe-1-1000");
+      const result = readOperationLog(ID1);
 
       expect(result).not.toBeNull();
       expect(result!.operation).toEqual(op);
@@ -77,18 +82,18 @@ describe("operation-store", () => {
     });
 
     it("stores file under workspace subdirectory", () => {
-      const op = makeOperation("pipe-1-1000", { workspace: "my-project" });
+      const op = makeOperation(ID1, { workspace: "my-project" });
       writeOperationLog(op, []);
 
-      expect(fs.existsSync(path.join(OPERATIONS_DIR, "my-project", "pipe-1-1000.jsonl"))).toBe(true);
+      expect(fs.existsSync(path.join(OPERATIONS_DIR, "my-project", `${ID1}.jsonl`))).toBe(true);
     });
 
     it("preserves event fields through roundtrip", () => {
-      const op = makeOperation("pipe-2-2000");
+      const op = makeOperation(ID2);
       const events: OperationEvent[] = [
         {
           type: "status",
-          operationId: "pipe-2-2000",
+          operationId: ID2,
           data: "Phase 1/2: Setup",
           timestamp: "2024-01-01T00:00:00.000Z",
           childLabel: "setup",
@@ -98,27 +103,27 @@ describe("operation-store", () => {
       ];
 
       writeOperationLog(op, events);
-      const result = readOperationLog("pipe-2-2000");
+      const result = readOperationLog(ID2);
 
       expect(result!.events[0]).toEqual(events[0]);
     });
 
     it("reads with explicit workspace without scanning all dirs", () => {
-      const op = makeOperation("pipe-1-1000", { workspace: "ws-a" });
-      writeOperationLog(op, [makeEvent("pipe-1-1000")]);
+      const op = makeOperation(ID1, { workspace: "ws-a" });
+      writeOperationLog(op, [makeEvent(ID1)]);
 
       // Read with correct workspace
-      expect(readOperationLog("pipe-1-1000", "ws-a")).not.toBeNull();
+      expect(readOperationLog(ID1, "ws-a")).not.toBeNull();
       // Read with wrong workspace
-      expect(readOperationLog("pipe-1-1000", "ws-b")).toBeNull();
+      expect(readOperationLog(ID1, "ws-b")).toBeNull();
       // Read without workspace (scans all)
-      expect(readOperationLog("pipe-1-1000")).not.toBeNull();
+      expect(readOperationLog(ID1)).not.toBeNull();
     });
   });
 
   describe("readOperationLog", () => {
     it("returns null for nonexistent file", () => {
-      expect(readOperationLog("pipe-999-9999")).toBeNull();
+      expect(readOperationLog("00000000-0000-4000-8000-000000999999")).toBeNull();
     });
 
     it("returns null for invalid operation ID", () => {
@@ -129,13 +134,13 @@ describe("operation-store", () => {
 
   describe("listStoredOperations", () => {
     it("returns operations sorted by startedAt descending", () => {
-      const op1 = makeOperation("pipe-1-1000", {
+      const op1 = makeOperation(ID1, {
         startedAt: "2024-01-01T00:00:00.000Z",
       });
-      const op2 = makeOperation("pipe-2-2000", {
+      const op2 = makeOperation(ID2, {
         startedAt: "2024-01-03T00:00:00.000Z",
       });
-      const op3 = makeOperation("pipe-3-3000", {
+      const op3 = makeOperation(ID3, {
         startedAt: "2024-01-02T00:00:00.000Z",
       });
 
@@ -145,15 +150,15 @@ describe("operation-store", () => {
 
       const ops = listStoredOperations();
       expect(ops).toHaveLength(3);
-      expect(ops[0].id).toBe("pipe-2-2000"); // newest
-      expect(ops[1].id).toBe("pipe-3-3000");
-      expect(ops[2].id).toBe("pipe-1-1000"); // oldest
+      expect(ops[0].id).toBe(ID2); // newest
+      expect(ops[1].id).toBe(ID3);
+      expect(ops[2].id).toBe(ID1); // oldest
     });
 
     it("filters by workspace when provided", () => {
-      writeOperationLog(makeOperation("pipe-1-1000", { workspace: "ws-a" }), []);
-      writeOperationLog(makeOperation("pipe-2-2000", { workspace: "ws-b" }), []);
-      writeOperationLog(makeOperation("pipe-3-3000", { workspace: "ws-a" }), []);
+      writeOperationLog(makeOperation(ID1, { workspace: "ws-a" }), []);
+      writeOperationLog(makeOperation(ID2, { workspace: "ws-b" }), []);
+      writeOperationLog(makeOperation(ID3, { workspace: "ws-a" }), []);
 
       const opsA = listStoredOperations("ws-a");
       expect(opsA).toHaveLength(2);
@@ -168,16 +173,16 @@ describe("operation-store", () => {
     });
 
     it("skips corrupted files", () => {
-      const op = makeOperation("pipe-1-1000");
+      const op = makeOperation(ID1);
       writeOperationLog(op, []);
 
       // Write a corrupted file in the same workspace dir
       const wsDir = path.join(OPERATIONS_DIR, "test-workspace");
-      fs.writeFileSync(path.join(wsDir, "pipe-2-2000.jsonl"), "not valid json\n");
+      fs.writeFileSync(path.join(wsDir, `${ID2}.jsonl`), "not valid json\n");
 
       const ops = listStoredOperations("test-workspace");
       expect(ops).toHaveLength(1);
-      expect(ops[0].id).toBe("pipe-1-1000");
+      expect(ops[0].id).toBe(ID1);
     });
 
     it("returns empty array when directory does not exist", () => {
@@ -185,7 +190,7 @@ describe("operation-store", () => {
     });
 
     it("includes inputs in summaries when present", () => {
-      const op = makeOperation("pipe-1-1000", {
+      const op = makeOperation(ID1, {
         inputs: { instruction: "Do something", description: "Details here" },
       });
       writeOperationLog(op, []);
@@ -196,7 +201,7 @@ describe("operation-store", () => {
     });
 
     it("omits inputs when operation has no inputs", () => {
-      const op = makeOperation("pipe-1-1000");
+      const op = makeOperation(ID1);
       writeOperationLog(op, []);
 
       const ops = listStoredOperations();
@@ -207,23 +212,23 @@ describe("operation-store", () => {
 
   describe("deleteStoredOperation", () => {
     it("deletes an existing operation file", () => {
-      const op = makeOperation("pipe-1-1000");
-      writeOperationLog(op, [makeEvent("pipe-1-1000")]);
+      const op = makeOperation(ID1);
+      writeOperationLog(op, [makeEvent(ID1)]);
 
-      expect(deleteStoredOperation("pipe-1-1000")).toBe(true);
-      expect(readOperationLog("pipe-1-1000")).toBeNull();
+      expect(deleteStoredOperation(ID1)).toBe(true);
+      expect(readOperationLog(ID1)).toBeNull();
     });
 
     it("deletes with explicit workspace", () => {
-      const op = makeOperation("pipe-1-1000", { workspace: "ws-x" });
+      const op = makeOperation(ID1, { workspace: "ws-x" });
       writeOperationLog(op, []);
 
-      expect(deleteStoredOperation("pipe-1-1000", "ws-x")).toBe(true);
-      expect(readOperationLog("pipe-1-1000", "ws-x")).toBeNull();
+      expect(deleteStoredOperation(ID1, "ws-x")).toBe(true);
+      expect(readOperationLog(ID1, "ws-x")).toBeNull();
     });
 
     it("returns false for nonexistent operation", () => {
-      expect(deleteStoredOperation("pipe-999-9999")).toBe(false);
+      expect(deleteStoredOperation("00000000-0000-4000-8000-000000999999")).toBe(false);
     });
 
     it("returns false for invalid ID", () => {
@@ -233,9 +238,9 @@ describe("operation-store", () => {
 
   describe("deleteStoredOperationsForWorkspace", () => {
     it("deletes all operations for a workspace", () => {
-      writeOperationLog(makeOperation("pipe-1-1000", { workspace: "ws-del" }), []);
-      writeOperationLog(makeOperation("pipe-2-2000", { workspace: "ws-del" }), []);
-      writeOperationLog(makeOperation("pipe-3-3000", { workspace: "ws-keep" }), []);
+      writeOperationLog(makeOperation(ID1, { workspace: "ws-del" }), []);
+      writeOperationLog(makeOperation(ID2, { workspace: "ws-del" }), []);
+      writeOperationLog(makeOperation(ID3, { workspace: "ws-keep" }), []);
 
       const deleted = deleteStoredOperationsForWorkspace("ws-del");
       expect(deleted).toBe(true);
@@ -263,7 +268,7 @@ describe("operation-store", () => {
     });
 
     it("rejects path traversal in workspace name", () => {
-      const op = makeOperation("pipe-1-1000", { workspace: "../../../etc" });
+      const op = makeOperation(ID1, { workspace: "../../../etc" });
       writeOperationLog(op, []);
       expect(fs.existsSync(OPERATIONS_DIR)).toBe(false);
     });
@@ -275,10 +280,10 @@ describe("operation-store", () => {
       expect(deleteStoredOperation("hack/../../../etc")).toBe(false);
     });
 
-    it("accepts valid pipe IDs", () => {
-      const op = makeOperation("pipe-42-1709312345678");
+    it("accepts valid UUID IDs", () => {
+      const op = makeOperation("a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d");
       writeOperationLog(op, []);
-      expect(readOperationLog("pipe-42-1709312345678")).not.toBeNull();
+      expect(readOperationLog("a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d")).not.toBeNull();
     });
   });
 });
