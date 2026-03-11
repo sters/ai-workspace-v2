@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { OperationSummary, useNow } from "@/components/operation/operation-summary";
+import { OperationInputs } from "@/components/operation/operation-inputs";
 import { OperationLog } from "@/components/operation/log";
 import { NextActionSuggestions } from "@/components/operation/next-action-suggestions";
 import { Button } from "@/components/shared/buttons/button";
@@ -186,6 +187,13 @@ export function OperationCard({
           ) : null}
         </div>
       </div>
+
+      {/* Inputs (shown when expanded) */}
+      {expanded && operation.inputs && Object.keys(operation.inputs).length > 0 && (
+        <div className="border-t p-3">
+          <OperationInputs inputs={operation.inputs} />
+        </div>
+      )}
 
       {/* Expanded body: full OperationLog */}
       {expanded && events.length > 0 && (

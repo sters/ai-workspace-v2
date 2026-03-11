@@ -183,6 +183,26 @@ describe("operation-store", () => {
     it("returns empty array when directory does not exist", () => {
       expect(listStoredOperations()).toEqual([]);
     });
+
+    it("includes inputs in summaries when present", () => {
+      const op = makeOperation("pipe-1-1000", {
+        inputs: { instruction: "Do something", description: "Details here" },
+      });
+      writeOperationLog(op, []);
+
+      const ops = listStoredOperations();
+      expect(ops).toHaveLength(1);
+      expect(ops[0].inputs).toEqual({ instruction: "Do something", description: "Details here" });
+    });
+
+    it("omits inputs when operation has no inputs", () => {
+      const op = makeOperation("pipe-1-1000");
+      writeOperationLog(op, []);
+
+      const ops = listStoredOperations();
+      expect(ops).toHaveLength(1);
+      expect(ops[0].inputs).toBeUndefined();
+    });
   });
 
   describe("deleteStoredOperation", () => {

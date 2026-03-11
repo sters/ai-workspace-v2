@@ -183,6 +183,7 @@ export function listStoredOperations(workspace?: string): OperationListItem[] {
             status: op.status,
             startedAt: op.startedAt,
             completedAt: op.completedAt,
+            ...(op.inputs && Object.keys(op.inputs).length > 0 && { inputs: op.inputs }),
           });
         }
       } catch {
