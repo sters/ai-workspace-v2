@@ -252,6 +252,7 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
     try {
       await init();
     } catch {
+      clearChatSession(workspaceId);
       setError("Failed to initialize terminal");
       setState("exited");
       return;
@@ -265,6 +266,7 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
 
     const term = termRef.current;
     if (!term) {
+      clearChatSession(workspaceId);
       setError("Failed to initialize terminal");
       setState("exited");
       return;
@@ -306,6 +308,7 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
           setExitCode(msg.code ?? -1);
           break;
         case "error":
+          clearChatSession(workspaceId);
           setError(msg.message ?? "Unknown error");
           setState("exited");
           break;
@@ -313,6 +316,7 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
     };
 
     ws.onerror = () => {
+      clearChatSession(workspaceId);
       setError("WebSocket connection failed. Is the chat server running?");
       setState("exited");
     };
