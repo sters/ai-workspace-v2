@@ -216,7 +216,7 @@ export function startChatServer(port: number) {
 
   const server = Bun.serve<WsData>({
     port,
-    fetch(req, server) {
+    async fetch(req, server) {
       // Upgrade HTTP to WebSocket
       const url = new URL(req.url);
       if (url.pathname === "/ws") {
@@ -229,6 +229,29 @@ export function startChatServer(port: number) {
       // Health check
       if (url.pathname === "/health") {
         return new Response("ok");
+      }
+      // Kill a chat session
+      if (url.pathname === "/sessions/kill" && req.method === "POST") {
+        const body = await req.json().catch(() => null);
+        const sessionId = body?.sessionId;
+        if (!sessionId) {
+          return new Response(JSON.stringify({ error: "sessionId is required" }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        const session = store.__chatSessions!.get(sessionId);
+        if (!session || session.exited) {
+          return new Response(JSON.stringify({ error: "Session not found or already exited" }), {
+            status: 404,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        session.proc.kill();
+        store.__chatSessions!.delete(sessionId);
+        return new Response(JSON.stringify({ ok: true }), {
+          headers: { "Content-Type": "application/json" },
+        });
       }
       // Active chat sessions
       if (url.pathname === "/sessions") {
