@@ -113,6 +113,12 @@ export type DisplayNode =
       label: string;
       status: OperationStatus;
       children: DisplayNode[];
+    }
+  | {
+      type: "phase-group";
+      phaseIndex: number;
+      phaseLabel: string;
+      children: DisplayNode[];
     };
 
 // ---------------------------------------------------------------------------

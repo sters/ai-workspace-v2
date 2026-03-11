@@ -255,6 +255,80 @@ export function groupByChildLabel(nodes: DisplayNode[]): DisplayNode[] {
 }
 
 // ---------------------------------------------------------------------------
+// Group by phase (for "all phases" view)
+// ---------------------------------------------------------------------------
+
+/** Get the phaseIndex of the first entry within a display node tree. */
+function getNodePhaseIndex(node: DisplayNode): number | undefined {
+  if (node.type === "entry") return node.entry.phaseIndex;
+  if (node.type === "phase-group") return node.phaseIndex;
+  if (node.type === "subagent" || node.type === "child-group") {
+    for (const child of node.children) {
+      const idx = getNodePhaseIndex(child);
+      if (idx != null) return idx;
+    }
+  }
+  return undefined;
+}
+
+/** Get the phaseLabel of the first entry within a display node tree. */
+function getNodePhaseLabel(node: DisplayNode): string | undefined {
+  if (node.type === "entry") return node.entry.phaseLabel;
+  if (node.type === "phase-group") return node.phaseLabel;
+  if (node.type === "subagent" || node.type === "child-group") {
+    for (const child of node.children) {
+      const label = getNodePhaseLabel(child);
+      if (label) return label;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Group display nodes by phaseIndex into phase-group sections.
+ * Nodes without a phaseIndex are placed before any phase groups.
+ */
+export function groupByPhase(nodes: DisplayNode[]): DisplayNode[] {
+  if (nodes.length === 0) return nodes;
+
+  const phaseOrder: number[] = [];
+  const phaseNodes = new Map<number, DisplayNode[]>();
+  const phaseLabels = new Map<number, string>();
+  const ungrouped: DisplayNode[] = [];
+
+  for (const node of nodes) {
+    const phaseIndex = getNodePhaseIndex(node);
+    if (phaseIndex == null) {
+      ungrouped.push(node);
+      continue;
+    }
+    if (!phaseNodes.has(phaseIndex)) {
+      phaseOrder.push(phaseIndex);
+      phaseNodes.set(phaseIndex, []);
+    }
+    phaseNodes.get(phaseIndex)!.push(node);
+    if (!phaseLabels.has(phaseIndex)) {
+      const label = getNodePhaseLabel(node);
+      if (label) phaseLabels.set(phaseIndex, label);
+    }
+  }
+
+  // If no phases found, return as-is
+  if (phaseOrder.length === 0) return nodes;
+
+  const result: DisplayNode[] = [...ungrouped];
+  for (const idx of phaseOrder) {
+    result.push({
+      type: "phase-group",
+      phaseIndex: idx,
+      phaseLabel: phaseLabels.get(idx) ?? `Phase ${idx + 1}`,
+      children: phaseNodes.get(idx)!,
+    });
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Find pending ask
 // ---------------------------------------------------------------------------
 

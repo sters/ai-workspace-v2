@@ -20,10 +20,33 @@ function DisplayNodeList({ nodes }: { nodes: DisplayNode[] }) {
           <EntryRow key={i} entry={node.entry} />
         ) : node.type === "subagent" ? (
           <SubAgentSection key={node.toolUseId} group={node} />
-        ) : (
+        ) : node.type === "child-group" ? (
           <ChildGroupSection key={node.label} group={node} />
-        )
+        ) : null
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Phase-group section (for "all phases" view)
+// ---------------------------------------------------------------------------
+
+export function PhaseGroupSection({
+  group,
+}: {
+  group: Extract<DisplayNode, { type: "phase-group" }>;
+}) {
+  return (
+    <div className="rounded-md border">
+      <div className="flex items-center gap-2 px-2.5 py-1.5 text-xs bg-muted/30">
+        <span className="font-medium text-foreground">
+          Phase {group.phaseIndex + 1}: {group.phaseLabel}
+        </span>
+      </div>
+      <div className="border-t p-2">
+        <DisplayNodeList nodes={group.children} />
+      </div>
     </div>
   );
 }
