@@ -22,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const phases = await buildExecutePipeline({ workspace });
+    const phases = await buildExecutePipeline({ workspace, repository: parsed.data.repository });
     const operation = startOperationPipeline("execute", workspace, phases);
     return NextResponse.json(operation);
   } catch (err) {

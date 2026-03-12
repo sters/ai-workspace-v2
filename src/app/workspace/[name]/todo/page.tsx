@@ -20,6 +20,7 @@ export default function WorkspaceTodoPage({
       todos={workspace.todos}
       workspacePath={workspace.path}
       workspaceName={decodedName}
+      repositories={workspace.meta.repositories}
     />
   );
 }

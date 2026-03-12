@@ -23,11 +23,15 @@ const DEFAULT_BATCH_SIZE = 3;
 export async function buildExecutePipeline(input: {
   workspace: string;
   batchSize?: number;
+  repository?: string;
 }): Promise<PipelinePhase[]> {
-  const { workspace, batchSize = DEFAULT_BATCH_SIZE } = input;
+  const { workspace, batchSize = DEFAULT_BATCH_SIZE, repository } = input;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const repos = listWorkspaceRepos(workspace);
+  const allRepos = listWorkspaceRepos(workspace);
+  const repos = repository
+    ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
+    : allRepos;
   const wsPath = path.join(WORKSPACE_DIR, workspace);
 
   const isResearch = meta.taskType === "research";
