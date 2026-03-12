@@ -12,5 +12,7 @@ export async function GET(
   if (readme === null) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ content: readme });
+  return new NextResponse(readme, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
 }
