@@ -50,9 +50,12 @@ function plannerInstructions(worktreePath: string): string {
    - Write the template to the workspace as the TODO file
    - Replace \`{{REPOSITORY_NAME}}\` with the actual repository name
 
-3. **Read Repository Documentation**:
+3. **Read Repository Documentation and Discover Task Runner Commands**:
    - Read CLAUDE.md, README.md, CONTRIBUTING.md from the repository
    - Extract build/test/lint commands and coding conventions
+   - Check for task runners: Makefile, package.json scripts, Taskfile.yml, Justfile, etc.
+   - Identify available targets (e.g. \`make lint\`, \`npm run test\`, \`bun run build\`)
+   - Prefer task runner commands over direct tool invocation in TODO items (e.g. \`make lint\` instead of \`golangci-lint\`, \`npm run lint\` instead of \`eslint\`)
 
 4. **Assess Whether Source Code Analysis Is Needed**:
    Decide based on the task's nature:
@@ -96,7 +99,8 @@ Each TODO item MUST follow this structured format:
 2. Be actionable: each TODO should be something the executor can act on
 3. Match the depth of analysis to the task — simple tasks need less investigation, complex implementation tasks need more
 4. Include commands: specify exact build/test/lint commands from repository docs
-5. Order logically: dependencies first, then implementation, then tests
+5. Prefer task runner commands: use \`make lint\` / \`npm run test\` etc. over direct tool invocation. Only fall back to direct commands (e.g. \`golangci-lint\`, \`tsc\`) if no task runner target exists
+6. Order logically: dependencies first, then implementation, then tests
 
 ### Interactive Mode
 
