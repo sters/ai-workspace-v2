@@ -42,6 +42,10 @@ export const workspacePruneSchema = z.object({
   days: z.coerce.number().positive().optional(),
 });
 
+export const operationPruneSchema = z.object({
+  days: z.coerce.number().positive().optional(),
+});
+
 export const operationKillSchema = z.object({
   operationId: z.string().min(1, "operationId is required"),
 });

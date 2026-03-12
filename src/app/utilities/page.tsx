@@ -10,6 +10,12 @@ const tools = [
       "Delete workspaces not modified within the specified number of days.",
   },
   {
+    href: "/utilities/operation-prune",
+    name: "Operation Log Prune",
+    description:
+      "Delete operation logs older than the specified number of days.",
+  },
+  {
     href: "/utilities/mcp-servers",
     name: "MCP Servers",
     description:

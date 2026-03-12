@@ -15,6 +15,7 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const UTILITY_TYPE_PATHS: Partial<Record<OperationType, string>> = {
   "workspace-prune": "/utilities/workspace-prune",
+  "operation-prune": "/utilities/operation-prune",
   "mcp-auth": "/utilities/mcp-servers",
   "claude-login": "/utilities/claude-auth",
 };
