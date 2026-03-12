@@ -30,6 +30,7 @@ export function OperationCard({
   const isRunning = operation.status === "running";
   const isDone = operation.status === "completed" || operation.status === "failed";
   const [expanded, setExpanded] = useState(defaultExpanded ?? isRunning);
+  const [retrying, setRetrying] = useState(false);
   const now = useNow(isRunning ? 1000 : 0);
 
   // Only connect SSE when expanded (for log viewing)
@@ -111,14 +112,20 @@ export function OperationCard({
               {operation.type !== "delete" && (
                 <Button
                   variant="outline"
-                  onClick={() =>
-                    onStartOperation(operation.type, {
-                      workspace: operation.workspace,
-                      ...operation.inputs,
-                    })
-                  }
+                  disabled={retrying}
+                  onClick={async () => {
+                    setRetrying(true);
+                    try {
+                      await onStartOperation(operation.type, {
+                        workspace: operation.workspace,
+                        ...operation.inputs,
+                      });
+                    } finally {
+                      setRetrying(false);
+                    }
+                  }}
                 >
-                  Retry
+                  {retrying ? "Starting…" : "Retry"}
                 </Button>
               )}
             </>
