@@ -51,11 +51,6 @@ export interface WorkspaceSummary {
   lastModified: string;
 }
 
-export interface WorkspaceDetail extends WorkspaceSummary {
-  readme: string;
-  reviews: ReviewSession[];
-}
-
 export interface HistoryEntry {
   hash: string;
   date: string;

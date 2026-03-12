@@ -3,7 +3,7 @@
 import { use } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useWorkspace } from "@/hooks/use-workspace";
+import { useReviews } from "@/hooks/use-workspace";
 import { cn } from "@/lib/utils";
 import { StatusText } from "@/components/shared/feedback/status-text";
 
@@ -16,12 +16,8 @@ export default function ReviewLayout({
 }) {
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
-  const { workspace } = useWorkspace(decodedName);
+  const { reviews } = useReviews(decodedName);
   const pathname = usePathname();
-
-  if (!workspace) return null;
-
-  const reviews = workspace.reviews;
   const basePath = `/workspace/${name}/review`;
   const activeTimestamp = pathname.replace(basePath, "").replace(/^\//, "") || null;
 

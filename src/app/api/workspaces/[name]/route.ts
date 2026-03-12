@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getWorkspaceDetail } from "@/lib/workspace/reader";
+import { getWorkspaceSummary } from "@/lib/workspace/reader";
 
 export const dynamic = "force-dynamic";
 
@@ -8,9 +8,9 @@ export async function GET(
   { params }: { params: Promise<{ name: string }> }
 ) {
   const { name } = await params;
-  const detail = await getWorkspaceDetail(name);
-  if (!detail) {
+  const summary = await getWorkspaceSummary(name);
+  if (!summary) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json(detail);
+  return NextResponse.json(summary);
 }

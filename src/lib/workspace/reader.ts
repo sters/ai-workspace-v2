@@ -6,7 +6,6 @@ import { parseReadmeMeta } from "../parsers/readme";
 import { parseReviewSummary } from "../parsers/review";
 import type {
   WorkspaceSummary,
-  WorkspaceDetail,
   TodoFile,
   ReviewSession,
   HistoryEntry,
@@ -42,19 +41,11 @@ export async function listWorkspaces(): Promise<WorkspaceSummary[]> {
   return workspaces;
 }
 
-export async function getWorkspaceDetail(name: string): Promise<WorkspaceDetail | null> {
+export async function getWorkspaceSummary(name: string): Promise<WorkspaceSummary | null> {
   const wsPath = path.join(WORKSPACE_DIR, name);
   if (!existsSync(wsPath)) return null;
 
-  const summary = await buildWorkspaceSummary(name, wsPath);
-  const readmeFile = Bun.file(path.join(wsPath, "README.md"));
-  const readme = (await readmeFile.exists())
-    ? await readmeFile.text()
-    : "";
-
-  const reviews = await listReviewSessions(wsPath);
-
-  return { ...summary, readme, reviews };
+  return buildWorkspaceSummary(name, wsPath);
 }
 
 async function buildWorkspaceSummary(
