@@ -7,8 +7,9 @@ import type { PipelinePhase } from "@/types/pipeline";
 export async function buildUpdateTodoPipeline(input: {
   workspace: string;
   instruction: string;
+  repo?: string;
 }): Promise<PipelinePhase[]> {
-  const { workspace, instruction } = input;
+  const { workspace, instruction, repo } = input;
   const workspacePath = path.join(WORKSPACE_DIR, workspace);
 
   const readmeFile = Bun.file(path.join(workspacePath, "README.md"));
@@ -16,7 +17,10 @@ export async function buildUpdateTodoPipeline(input: {
     ? await readmeFile.text()
     : "";
 
-  const repos = listWorkspaceRepos(workspace);
+  const allRepos = listWorkspaceRepos(workspace);
+  const repos = repo
+    ? allRepos.filter((r) => r.repoName === repo)
+    : allRepos;
 
   const prompts = await Promise.all(repos.map(async (repo) => {
     const todoFile = Bun.file(path.join(workspacePath, `TODO-${repo.repoName}.md`));

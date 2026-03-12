@@ -11,10 +11,10 @@ export async function POST(request: Request) {
   if (!parsed.success) return parsed.response;
 
   const workspace = resolveWorkspaceName(parsed.data.workspace);
-  const { instruction } = parsed.data;
+  const { instruction, repo } = parsed.data;
 
   try {
-    const phases = await buildUpdateTodoPipeline({ workspace, instruction });
+    const phases = await buildUpdateTodoPipeline({ workspace, instruction, repo });
     const operation = startOperationPipeline("update-todo", workspace, phases, undefined, { instruction });
     return NextResponse.json(operation);
   } catch (err) {
