@@ -99,8 +99,10 @@ export function spawnClaudeTerminal(options: SpawnClaudeTerminalOptions): Termin
   );
 }
 
-// Maximum argument length before falling back to stdin (ARG_MAX safety margin)
-const MAX_PROMPT_ARG_LENGTH = 200_000;
+// Always pass prompts via stdin to avoid exposing them in the process list.
+// Previously used a 200k char threshold, but even short prompts are visible
+// in `ps` output when passed as command-line arguments.
+const MAX_PROMPT_ARG_LENGTH = 0;
 
 /** Patterns that indicate a fatal API error that should stop the process immediately. */
 const FATAL_ERROR_PATTERNS = [/API Error:\s*401/i, /authentication_failed/i];
