@@ -87,6 +87,7 @@ function executorInstructions(todoFilePath: string, worktreePath?: string, works
      - **IMPORTANT**: Read the TODO file again before updating it (it may have been modified by other processes)
      - Update the TODO file immediately: \`- [ ]\` -> \`- [x]\`
      - Commit your changes if applicable
+   - **If only partially completed**: Do NOT mark as \`[x]\`. Keep the item as \`[~]\` (in-progress) and add a note describing what was done and what remains. Only mark \`[x]\` when the item is **fully** completed.
    - If blocked:
      - Mark the item as blocked: \`- [ ]\` -> \`- [!]\`
      - Document the blocker in the Notes section
