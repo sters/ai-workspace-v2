@@ -59,6 +59,16 @@ function prCreatorInstructions(worktreePath: string): string {
 
 **Your mission: Create or update a pull request based on the changes and context above.**
 
+### Commit Uncommitted Changes First
+
+Before pushing or creating a PR, **always check for uncommitted changes** — the user may have edited files directly.
+
+1. Run \`git status\` to check for uncommitted or untracked files
+2. If there are any changes:
+   - Stage them: \`git add -A\`
+   - Commit with a descriptive message summarizing the changes: \`git commit -m "..."\`
+3. If the working tree is clean, proceed to the next step
+
 ### If Creating a New PR
 
 1. **Compose PR Content**:
@@ -74,12 +84,13 @@ function prCreatorInstructions(worktreePath: string): string {
 
 ### If Updating an Existing PR
 
-1. **Use the Existing PR Body as the base template** — preserve its structure and formatting
-2. **Update only sections that describe code changes** (summary, changed files, implementation details) with the latest "Repository Changes" info above
-3. **Keep everything else unchanged** — do NOT remove or rewrite QA results, review notes, manual annotations, or any human-added content
-4. **Update the title** if the scope of changes has significantly shifted
-5. **Push** latest changes: \`git push\`
-6. **Update** PR using \`gh pr edit\`
+1. **Use the Existing PR Body as the base** — preserve its structure, formatting, and any content the user has manually added
+2. **Update only the sections that describe what this PR is** (summary, changed files, implementation details) to reflect the current full set of changes. The description should explain "what this PR is", not log each update or review feedback.
+3. **Do NOT add** update history, incremental change logs, or review feedback sections
+4. **Keep everything else unchanged** — do NOT remove or rewrite user-added notes, QA results, manual annotations, or any human-added content
+5. **Update the title** if the scope of changes has significantly shifted
+6. **Push** latest changes: \`git push\`
+7. **Update** PR using \`gh pr edit\`
 
 ### Working Directory
 
