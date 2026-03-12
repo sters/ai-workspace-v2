@@ -42,7 +42,7 @@ export function McpAuthTerminal({
     }
 
     writtenCountRef.current = terminalEvents.length;
-  }, [events]);
+  }, [events, termRef]);
 
   // Status log messages (debug info)
   const statusLogs = useMemo(
