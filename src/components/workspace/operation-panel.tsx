@@ -7,6 +7,14 @@ import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import type { OperationType } from "@/types/operation";
+import {
+  Play,
+  ClipboardCheck,
+  GitPullRequest,
+  CodeXml,
+  Terminal,
+  Trash2,
+} from "lucide-react";
 
 export function OperationPanel({
   workspaceName,
@@ -52,7 +60,7 @@ export function OperationPanel({
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <SplitButton
-          label="Execute"
+          label={<><Play className="h-3.5 w-3.5" /> Execute</>}
           onClick={() =>
             startAndNavigate("execute", { workspace: workspacePath })
           }
@@ -98,12 +106,13 @@ export function OperationPanel({
         />
         <Button
           variant="secondary"
+          className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
           onClick={() =>
             startAndNavigate("review", { workspace: workspacePath })
           }
           disabled={isWorkspaceTypeRunning(workspaceName, "review")}
         >
-          Review
+          <ClipboardCheck className="h-3.5 w-3.5" /> Review
         </Button>
         <CreatePRButton
           workspacePath={workspacePath}
@@ -121,12 +130,13 @@ export function OperationPanel({
         />
         <Button
           variant="destructive"
+          className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-transparent px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
           onClick={() =>
             startAndNavigate("delete", { workspace: workspacePath })
           }
           disabled={isWorkspaceTypeRunning(workspaceName, "delete")}
         >
-          Delete workspace
+          <Trash2 className="h-3.5 w-3.5" /> Delete workspace
         </Button>
       </div>
       {isRunning && runningOp && (
@@ -196,17 +206,24 @@ function CreatePRButton({
       }),
   }));
 
+  const labelNode = <><GitPullRequest className="h-3.5 w-3.5" /> Create PR</>;
+
   if (repoItems.length === 0) {
     return (
-      <Button variant="secondary" onClick={handleClick} disabled={disabled}>
-        Create PR
+      <Button
+        variant="secondary"
+        className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
+        onClick={handleClick}
+        disabled={disabled}
+      >
+        {labelNode}
       </Button>
     );
   }
 
   return (
     <SplitButton
-      label="Create PR"
+      label={labelNode}
       onClick={handleClick}
       variant="secondary"
       disabled={disabled}
@@ -232,17 +249,23 @@ function OpenVSCodeButton({
     onClick: () => openInVSCode(`${workspacePath}/${repo.path}`),
   }));
 
+  const labelNode = <><CodeXml className="h-3.5 w-3.5" /> Open in editor</>;
+
   if (repoItems.length === 0) {
     return (
-      <Button variant="secondary" onClick={handleClick}>
-        Open in editor
+      <Button
+        variant="secondary"
+        className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
+        onClick={handleClick}
+      >
+        {labelNode}
       </Button>
     );
   }
 
   return (
     <SplitButton
-      label="Open in editor"
+      label={labelNode}
       onClick={handleClick}
       variant="secondary"
       items={repoItems}
@@ -267,17 +290,23 @@ function OpenTerminalButton({
     onClick: () => openInTerminal(`${workspacePath}/${repo.path}`),
   }));
 
+  const labelNode = <><Terminal className="h-3.5 w-3.5" /> Open in terminal</>;
+
   if (repoItems.length === 0) {
     return (
-      <Button variant="secondary" onClick={handleClick}>
-        Open in terminal
+      <Button
+        variant="secondary"
+        className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
+        onClick={handleClick}
+      >
+        {labelNode}
       </Button>
     );
   }
 
   return (
     <SplitButton
-      label="Open in terminal"
+      label={labelNode}
       onClick={handleClick}
       variant="secondary"
       items={repoItems}

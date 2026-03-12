@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { type ReactNode, useState, useRef, useEffect } from "react";
 import { useAsyncCallback } from "@/hooks/use-async-callback";
 
 export interface SplitButtonItem {
@@ -10,17 +10,17 @@ export interface SplitButtonItem {
 
 const splitVariants = {
   primary: {
-    main: "rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50",
+    main: "inline-flex items-center gap-1.5 rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50",
     dropdown:
       "rounded-r-md border-l border-primary-foreground/20 bg-primary px-1.5 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50",
   },
   secondary: {
-    main: "rounded-l-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50",
+    main: "inline-flex items-center gap-1.5 rounded-l-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50",
     dropdown:
       "rounded-r-md border-l border-secondary-foreground/20 bg-secondary px-1.5 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50",
   },
   outline: {
-    main: "rounded-l-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50",
+    main: "inline-flex items-center gap-1.5 rounded-l-md border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50",
     dropdown:
       "rounded-r-md border border-l-0 bg-background px-1.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50",
   },
@@ -37,7 +37,7 @@ export function SplitButton({
   className,
   dropdownClassName,
 }: {
-  label: string;
+  label: ReactNode;
   onClick: () => void | Promise<unknown>;
   items: SplitButtonItem[];
   disabled?: boolean;

@@ -13,6 +13,13 @@ import { Textarea } from "../shared/forms/textarea";
 import { StatusText } from "../shared/feedback/status-text";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import type { OperationType } from "@/types/operation";
+import {
+  Play,
+  ClipboardCheck,
+  GitPullRequest,
+  CodeXml,
+  Terminal,
+} from "lucide-react";
 
 function UpdateForm({
   label,
@@ -75,21 +82,120 @@ function UpdateForm({
   );
 }
 
+function openInVSCode(targetPath: string) {
+  return fetch("/api/operations/open-vscode", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace: targetPath }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const data = await res.json();
+      console.error("Failed to open editor:", data.error);
+    }
+  });
+}
+
+function openInTerminal(targetPath: string) {
+  return fetch("/api/operations/open-terminal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace: targetPath }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const data = await res.json();
+      console.error("Failed to open terminal:", data.error);
+    }
+  });
+}
+
 function RepoTodoCard({
   todo,
   workspacePath,
   disabled,
+  repoPath,
   onStartAndNavigate,
 }: {
   todo: TodoFile;
   workspacePath: string;
   disabled: boolean;
+  /** Full repository path (e.g. "github.com/org/repo") for per-repo operations. */
+  repoPath: string | undefined;
   onStartAndNavigate: (type: OperationType, body: Record<string, string>) => void;
 }) {
+  const repoFullPath = repoPath
+    ? `${workspacePath}/${repoPath}`
+    : undefined;
+
   return (
     <Card>
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-semibold">{todo.repoName}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold">{todo.repoName}</h3>
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost-toggle"
+              className="h-6 w-6 p-0"
+              disabled={disabled}
+              title="Execute"
+              onClick={() =>
+                onStartAndNavigate("execute", {
+                  workspace: workspacePath,
+                  ...(repoPath ? { repository: repoPath } : {}),
+                })
+              }
+            >
+              <Play className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost-toggle"
+              className="h-6 w-6 p-0"
+              disabled={disabled}
+              title="Review"
+              onClick={() =>
+                onStartAndNavigate("review", {
+                  workspace: workspacePath,
+                  ...(repoPath ? { repository: repoPath } : {}),
+                })
+              }
+            >
+              <ClipboardCheck className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost-toggle"
+              className="h-6 w-6 p-0"
+              disabled={disabled}
+              title="Create PR"
+              onClick={() =>
+                onStartAndNavigate("create-pr", {
+                  workspace: workspacePath,
+                  ...(repoPath ? { repository: repoPath } : {}),
+                })
+              }
+            >
+              <GitPullRequest className="h-3.5 w-3.5" />
+            </Button>
+            {repoFullPath && (
+              <>
+                <Button
+                  variant="ghost-toggle"
+                  className="h-6 w-6 p-0"
+                  title="Open in editor"
+                  onClick={() => openInVSCode(repoFullPath)}
+                >
+                  <CodeXml className="h-3.5 w-3.5" />
+                </Button>
+                <Button
+                  variant="ghost-toggle"
+                  className="h-6 w-6 p-0"
+                  title="Open in terminal"
+                  onClick={() => openInTerminal(repoFullPath)}
+                >
+                  <Terminal className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span>
             {todo.completed}/{todo.total} done
@@ -174,14 +280,28 @@ function RepoTodoCard({
   );
 }
 
+function findRepoPath(
+  repoName: string,
+  repositories: { alias: string; path: string }[],
+): string | undefined {
+  for (const repo of repositories) {
+    if (repo.alias === repoName) return repo.path;
+    const lastSegment = repo.path.split("/").pop();
+    if (lastSegment === repoName) return repo.path;
+  }
+  return undefined;
+}
+
 export function TodoUpdater({
   todos,
   workspacePath,
   workspaceName,
+  repositories,
 }: {
   todos: TodoFile[];
   workspacePath: string;
   workspaceName: string;
+  repositories?: { alias: string; path: string }[];
 }) {
   const router = useRouter();
   const { isWorkspaceTypeRunning } = useRunningOperations();
@@ -277,6 +397,7 @@ export function TodoUpdater({
           todo={todo}
           workspacePath={workspacePath}
           disabled={isRunning}
+          repoPath={findRepoPath(todo.repoName, repositories ?? [])}
           onStartAndNavigate={startAndNavigate}
         />
       ))}

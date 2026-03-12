@@ -8,9 +8,15 @@ export const workspaceSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
 });
 
-export const executeSchema = workspaceSchema;
+export const executeSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  repository: z.string().optional(),
+});
 
-export const reviewSchema = workspaceSchema;
+export const reviewSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  repository: z.string().optional(),
+});
 
 export const createPrSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),

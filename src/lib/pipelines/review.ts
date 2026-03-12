@@ -20,11 +20,15 @@ import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
 
 export async function buildReviewPipeline(input: {
   workspace: string;
+  repository?: string;
 }): Promise<PipelinePhase[]> {
-  const { workspace } = input;
+  const { workspace, repository } = input;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const repos = listWorkspaceRepos(workspace);
+  const allRepos = listWorkspaceRepos(workspace);
+  const repos = repository
+    ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
+    : allRepos;
   const wsPath = path.join(WORKSPACE_DIR, workspace);
 
   // Write report templates (idempotent — ensures templates exist for older workspaces)
