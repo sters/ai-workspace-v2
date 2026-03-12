@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import { useWorkspace } from "@/hooks/use-workspace";
+import { useReadme } from "@/hooks/use-workspace";
 import { ReadmeViewer } from "@/components/workspace/readme-viewer";
 
 export default function WorkspaceOverviewPage({
@@ -11,9 +11,7 @@ export default function WorkspaceOverviewPage({
 }) {
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
-  const { workspace } = useWorkspace(decodedName);
+  const { readme } = useReadme(decodedName);
 
-  if (!workspace) return null;
-
-  return <ReadmeViewer content={workspace.readme} />;
+  return <ReadmeViewer content={readme} />;
 }

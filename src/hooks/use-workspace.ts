@@ -1,5 +1,5 @@
 import useSWR from "swr";
-import type { WorkspaceDetail, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
+import type { WorkspaceSummary, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";
 
 const fetcher = async (url: string) => {
@@ -9,13 +9,26 @@ const fetcher = async (url: string) => {
 };
 
 export function useWorkspace(name: string) {
-  const { data, error, isLoading, mutate } = useSWR<WorkspaceDetail>(
+  const { data, error, isLoading, mutate } = useSWR<WorkspaceSummary>(
     name ? `/api/workspaces/${encodeURIComponent(name)}` : null,
     fetcher,
     { refreshInterval: SWR_REFRESH_INTERVAL }
   );
 
   return { workspace: data, isLoading, error, refresh: mutate };
+}
+
+export function useReadme(name: string) {
+  const { data, error, isLoading } = useSWR<string>(
+    name ? `/api/workspaces/${encodeURIComponent(name)}/readme` : null,
+    async (url: string) => {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`${r.status}`);
+      return r.text();
+    },
+  );
+
+  return { readme: data ?? "", isLoading, error };
 }
 
 export function useTodos(name: string) {

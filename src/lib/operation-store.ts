@@ -5,6 +5,9 @@ import { extractLastResult } from "./parsers/stream";
 import type { Operation, OperationEvent, OperationListItem } from "@/types/operation";
 import { storedHeaderSchema, storedEventSchema } from "./runtime-schemas";
 
+/** Bytes to read from the tail of a JSONL file when extracting resultSummary. */
+const TAIL_READ_BYTES = 16 * 1024;
+
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
@@ -144,10 +147,79 @@ export function readOperationLog(operationId: string, workspace?: string): Store
 }
 
 /**
+ * Read only the first line (header) of a JSONL file without loading the rest.
+ * Uses a small fixed buffer to avoid reading the entire file.
+ */
+function readHeader(fp: string): Operation | null {
+  const fd = fs.openSync(fp, "r");
+  try {
+    // Header lines are typically under 2KB; read up to 8KB to be safe
+    const buf = Buffer.alloc(8192);
+    const bytesRead = fs.readSync(fd, buf, 0, buf.length, 0);
+    if (bytesRead === 0) return null;
+
+    const chunk = buf.toString("utf-8", 0, bytesRead);
+    const newlineIdx = chunk.indexOf("\n");
+    const firstLine = newlineIdx === -1 ? chunk : chunk.slice(0, newlineIdx);
+    const headerResult = storedHeaderSchema.safeParse(JSON.parse(firstLine));
+    return headerResult.success ? (headerResult.data.operation as Operation) : null;
+  } catch {
+    return null;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
+ * Extract resultSummary by reading only the tail of a JSONL file.
+ * Seeks to (fileSize - TAIL_READ_BYTES) and parses lines backwards to find
+ * the last result event, avoiding loading the entire file into memory.
+ */
+function readResultSummaryFromTail(
+  fp: string,
+): ReturnType<typeof extractLastResult> {
+  const stat = fs.statSync(fp);
+  if (stat.size === 0) return undefined;
+
+  const fd = fs.openSync(fp, "r");
+  try {
+    const readSize = Math.min(stat.size, TAIL_READ_BYTES);
+    const offset = stat.size - readSize;
+    const buf = Buffer.alloc(readSize);
+    fs.readSync(fd, buf, 0, readSize, offset);
+    const tail = buf.toString("utf-8");
+
+    // Split into lines and scan backwards for the last result event
+    const lines = tail.split("\n");
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      try {
+        const eventResult = storedEventSchema.safeParse(JSON.parse(line));
+        if (!eventResult.success) continue;
+        const { _type: _, ...event } = eventResult.data;
+        const result = extractLastResult([event as unknown as OperationEvent]);
+        if (result) return result;
+      } catch {
+        // skip malformed lines (including partial first line from seek offset)
+      }
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
  * List stored operations as lightweight summaries.
  * If workspace is provided, only scans that directory.
  * Otherwise scans all workspace directories.
  * Returns summaries sorted by startedAt descending (newest first).
+ *
+ * Only reads the header (first line) and tail of each JSONL file to avoid
+ * loading entire operation logs into memory.
  */
 export function listStoredOperations(workspace?: string): OperationListItem[] {
   if (!fs.existsSync(OPERATIONS_DIR)) return [];
@@ -172,37 +244,19 @@ export function listStoredOperations(workspace?: string): OperationListItem[] {
     for (const file of files) {
       try {
         const fp = path.join(dir, file);
-        const content = fs.readFileSync(fp, "utf-8");
-        const firstNewline = content.indexOf("\n");
-        const firstLine = firstNewline === -1 ? content : content.slice(0, firstNewline);
-        const headerResult = storedHeaderSchema.safeParse(JSON.parse(firstLine));
-        if (headerResult.success) {
-          const op = headerResult.data.operation as Operation;
-          // Parse event lines to extract the last result
-          const lines = content.trim().split("\n");
-          const events: OperationEvent[] = [];
-          for (let i = 1; i < lines.length; i++) {
-            try {
-              const eventResult = storedEventSchema.safeParse(JSON.parse(lines[i]));
-              if (eventResult.success) {
-                const { _type: _, ...event } = eventResult.data;
-                events.push(event as unknown as OperationEvent);
-              }
-            } catch {
-              // skip
-            }
-          }
-          summaries.push({
-            id: op.id,
-            type: op.type,
-            workspace: op.workspace,
-            status: op.status,
-            startedAt: op.startedAt,
-            completedAt: op.completedAt,
-            ...(op.inputs && Object.keys(op.inputs).length > 0 && { inputs: op.inputs }),
-            resultSummary: extractLastResult(events),
-          });
-        }
+        const op = readHeader(fp);
+        if (!op) continue;
+
+        summaries.push({
+          id: op.id,
+          type: op.type,
+          workspace: op.workspace,
+          status: op.status,
+          startedAt: op.startedAt,
+          completedAt: op.completedAt,
+          ...(op.inputs && Object.keys(op.inputs).length > 0 && { inputs: op.inputs }),
+          resultSummary: readResultSummaryFromTail(fp),
+        });
       } catch {
         // Skip corrupted files
       }
