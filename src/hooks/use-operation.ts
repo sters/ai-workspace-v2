@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import { useSSE } from "./use-sse";
+import { operationListItemSchema } from "@/lib/runtime-schemas";
 
 const STORAGE_PREFIX = "aiw-op:";
 
@@ -36,10 +37,9 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
     try {
       const raw = localStorage.getItem(`${STORAGE_PREFIX}${storageKey}`);
       if (!raw) return;
-      const stored: OperationListItem = JSON.parse(raw);
-      // Only restore running operations (completed ones can be shown too)
-      if (stored?.id) {
-        setOperation(stored);
+      const result = operationListItemSchema.safeParse(JSON.parse(raw));
+      if (result.success) {
+        setOperation(result.data as OperationListItem);
       }
     } catch (err) {
       console.warn("[use-operation] localStorage restore failed:", err);

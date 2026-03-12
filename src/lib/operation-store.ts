@@ -3,6 +3,7 @@ import path from "node:path";
 import { AI_WORKSPACE_ROOT } from "./config";
 import { extractLastResult } from "./parsers/stream";
 import type { Operation, OperationEvent, OperationListItem } from "@/types/operation";
+import { storedHeaderSchema, storedEventSchema } from "./runtime-schemas";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -120,15 +121,15 @@ export function readOperationLog(operationId: string, workspace?: string): Store
     const lines = content.trim().split("\n");
     if (lines.length === 0) return null;
 
-    const header = JSON.parse(lines[0]) as StoredHeader;
-    if (header._type !== "header" || !header.operation) return null;
+    const headerResult = storedHeaderSchema.safeParse(JSON.parse(lines[0]));
+    if (!headerResult.success) return null;
 
     const events: OperationEvent[] = [];
     for (let i = 1; i < lines.length; i++) {
       try {
-        const parsed = JSON.parse(lines[i]) as StoredEvent;
-        if (parsed._type === "event") {
-          const { _type: _, ...event } = parsed;
+        const eventResult = storedEventSchema.safeParse(JSON.parse(lines[i]));
+        if (eventResult.success) {
+          const { _type: _, ...event } = eventResult.data;
           events.push(event as unknown as OperationEvent);
         }
       } catch {
@@ -136,7 +137,7 @@ export function readOperationLog(operationId: string, workspace?: string): Store
       }
     }
 
-    return { operation: header.operation, events };
+    return { operation: headerResult.data.operation as Operation, events };
   } catch {
     return null;
   }
@@ -174,17 +175,17 @@ export function listStoredOperations(workspace?: string): OperationListItem[] {
         const content = fs.readFileSync(fp, "utf-8");
         const firstNewline = content.indexOf("\n");
         const firstLine = firstNewline === -1 ? content : content.slice(0, firstNewline);
-        const header = JSON.parse(firstLine) as StoredHeader;
-        if (header._type === "header" && header.operation) {
-          const op = header.operation;
+        const headerResult = storedHeaderSchema.safeParse(JSON.parse(firstLine));
+        if (headerResult.success) {
+          const op = headerResult.data.operation as Operation;
           // Parse event lines to extract the last result
           const lines = content.trim().split("\n");
           const events: OperationEvent[] = [];
           for (let i = 1; i < lines.length; i++) {
             try {
-              const parsed = JSON.parse(lines[i]) as StoredEvent;
-              if (parsed._type === "event") {
-                const { _type: _, ...event } = parsed;
+              const eventResult = storedEventSchema.safeParse(JSON.parse(lines[i]));
+              if (eventResult.success) {
+                const { _type: _, ...event } = eventResult.data;
                 events.push(event as unknown as OperationEvent);
               }
             } catch {

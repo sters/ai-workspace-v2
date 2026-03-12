@@ -1,30 +1,15 @@
 import { NextResponse } from "next/server";
 import { spawnClaudeSync } from "@/lib/claude/cli";
+import { mcpAddSchema } from "@/lib/schemas";
+import { parseBody } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { name, transport, scope, url } = body as {
-    name?: string;
-    transport?: string;
-    scope?: string;
-    url?: string;
-  };
-
-  if (!name || !transport || !url) {
-    return NextResponse.json(
-      { error: "name, transport, and url are required" },
-      { status: 400 }
-    );
-  }
-
-  if (!["stdio", "sse", "http"].includes(transport)) {
-    return NextResponse.json(
-      { error: "transport must be one of: stdio, sse, http" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(mcpAddSchema, body);
+  if (!parsed.success) return parsed.response;
+  const { name, transport, url, scope } = parsed.data;
 
   const resolvedScope = scope === "local" ? "local" : "project";
 
