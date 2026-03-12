@@ -107,5 +107,29 @@ describe("buildUpdateTodoPipeline", () => {
       expect(phase.cwd).toBeUndefined();
       expect(phase.addDirs).toEqual([expect.stringContaining("test-ws")]);
     });
+
+    it("filters to specified repo when repo parameter is provided", async () => {
+      const { buildUpdaterPrompt } = await import("@/lib/templates");
+      const mockBuildUpdaterPrompt = vi.mocked(buildUpdaterPrompt);
+      mockBuildUpdaterPrompt.mockClear();
+
+      await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests", repo: "repo-b" });
+
+      // Should only be called once for repo-b, not for both repos
+      expect(mockBuildUpdaterPrompt).toHaveBeenCalledTimes(1);
+      expect(mockBuildUpdaterPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ repoName: "repo-b" }),
+      );
+    });
+
+    it("processes all repos when repo parameter is omitted", async () => {
+      const { buildUpdaterPrompt } = await import("@/lib/templates");
+      const mockBuildUpdaterPrompt = vi.mocked(buildUpdaterPrompt);
+      mockBuildUpdaterPrompt.mockClear();
+
+      await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
+
+      expect(mockBuildUpdaterPrompt).toHaveBeenCalledTimes(2);
+    });
   });
 });

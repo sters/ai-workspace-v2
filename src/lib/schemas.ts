@@ -21,6 +21,7 @@ export const createPrSchema = z.object({
 export const updateTodoSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   instruction: z.string().min(1, "instruction is required"),
+  repo: z.string().optional(),
 });
 
 export const createTodoSchema = z.object({
