@@ -11,6 +11,7 @@ import type {
   McpStdioServerConfig,
   McpHttpServerConfig,
 } from "@/types/claude";
+import { mcpFileSchema, mcpServerConfigSchema, claudeJsonProjectSchema } from "../runtime-schemas";
 
 function computeAuthStatus(config: McpServerConfig): McpAuthStatus {
   const type = config.type ?? "stdio";
@@ -40,18 +41,14 @@ async function readMcpServersFromFile(
 ): Promise<McpServerEntry[]> {
   try {
     const content = await Bun.file(filePath).text();
-    const data = JSON.parse(content);
-    const mcpServers = data.mcpServers;
-    if (!mcpServers || typeof mcpServers !== "object") return [];
+    const fileResult = mcpFileSchema.safeParse(JSON.parse(content));
+    if (!fileResult.success) return [];
 
-    return Object.entries(mcpServers).map(([name, config]) => {
-      const cfg = config as McpServerConfig;
-      return {
-        name,
-        scope,
-        config: cfg,
-        authStatus: computeAuthStatus(cfg),
-      };
+    return Object.entries(fileResult.data.mcpServers).flatMap(([name, raw]) => {
+      const cfgResult = mcpServerConfigSchema.safeParse(raw);
+      if (!cfgResult.success) return [];
+      const cfg = cfgResult.data as McpServerConfig;
+      return [{ name, scope, config: cfg, authStatus: computeAuthStatus(cfg) }];
     });
   } catch {
     return [];
@@ -72,17 +69,14 @@ async function readLocalMcpServers(): Promise<McpServerEntry[]> {
     // AI_WORKSPACE_ROOT may be relative; resolve to absolute to match the key
     const absRoot = path.resolve(AI_WORKSPACE_ROOT);
     const projectConfig = projects[absRoot];
-    if (!projectConfig?.mcpServers) return [];
+    const projResult = claudeJsonProjectSchema.safeParse(projectConfig);
+    if (!projResult.success) return [];
 
-    const mcpServers = projectConfig.mcpServers;
-    return Object.entries(mcpServers).map(([name, config]) => {
-      const cfg = config as McpServerConfig;
-      return {
-        name,
-        scope: "local" as const,
-        config: cfg,
-        authStatus: computeAuthStatus(cfg),
-      };
+    return Object.entries(projResult.data.mcpServers).flatMap(([name, raw]) => {
+      const cfgResult = mcpServerConfigSchema.safeParse(raw);
+      if (!cfgResult.success) return [];
+      const cfg = cfgResult.data as McpServerConfig;
+      return [{ name, scope: "local" as const, config: cfg, authStatus: computeAuthStatus(cfg) }];
     });
   } catch {
     return [];

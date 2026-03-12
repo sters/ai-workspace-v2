@@ -2,6 +2,7 @@
 
 import type { LogEntry } from "@/types/claude";
 import type { OperationEvent } from "@/types/operation";
+import { askQuestionItemSchema, permissionDenialItemSchema } from "../runtime-schemas";
 
 /**
  * Build a permission string suitable for `settings.local.json` `permissions.allow`.
@@ -152,17 +153,15 @@ export function parseStreamEvent(raw: string): LogEntry[] {
         entries.push({ kind: "text", content: block.text, parentToolUseId: parentId });
       } else if (block.type === "tool_use") {
         if (block.name === "AskUserQuestion" && block.input?.questions) {
+          const rawQuestions: unknown[] = Array.isArray(block.input.questions) ? block.input.questions : [];
+          const questions = rawQuestions.flatMap((q) => {
+            const r = askQuestionItemSchema.safeParse(q);
+            return r.success ? [r.data] : [];
+          });
           entries.push({
             kind: "ask",
             toolId: block.id,
-            questions: block.input.questions.map(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (q: any) => ({
-                question: q.question,
-                options: q.options ?? [],
-                multiSelect: q.multiSelect ?? false,
-              })
-            ),
+            questions,
             allowFreeText: block.input.allowFreeText ?? true,
             parentToolUseId: parentId,
           });
@@ -189,8 +188,7 @@ export function parseStreamEvent(raw: string): LogEntry[] {
             ? block.content
             : Array.isArray(block.content)
               ? block.content
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  .map((c: any) => c.text ?? "")
+                  .map((c: unknown) => (c && typeof c === "object" && "text" in c ? (c as { text: string }).text : ""))
                   .filter(Boolean)
                   .join("\n")
               : "";
@@ -241,9 +239,11 @@ export function parseStreamEvent(raw: string): LogEntry[] {
 
     // Parse permission denials from result event (if CLI includes them)
     if (Array.isArray(parsed.permission_denials)) {
-      for (const denial of parsed.permission_denials) {
-        const toolName: string = denial.tool_name ?? "Unknown";
-        const toolInput: Record<string, unknown> = denial.tool_input ?? {};
+      for (const raw of parsed.permission_denials) {
+        const r = permissionDenialItemSchema.safeParse(raw);
+        if (!r.success) continue;
+        const toolName = r.data.tool_name;
+        const toolInput: Record<string, unknown> = (r.data.tool_input as Record<string, unknown>) ?? {};
         entries.push({
           kind: "permission_denial",
           toolName,

@@ -72,3 +72,32 @@ export const mcpAuthSchema = z.object({
   serverName: z.string().min(1, "serverName is required"),
   forceReauth: z.union([z.boolean(), z.string()]).optional(),
 });
+
+export const mcpAddSchema = z.object({
+  name: z.string().min(1, "name is required"),
+  transport: z.enum(["stdio", "sse", "http"], {
+    errorMap: () => ({ message: "transport must be one of: stdio, sse, http" }),
+  }),
+  url: z.string().min(1, "url is required"),
+  scope: z.enum(["project", "local"]).optional(),
+});
+
+export const mcpRemoveSchema = z.object({
+  name: z.string().min(1, "name is required"),
+  scope: z.enum(["project", "local", "user"]).optional(),
+});
+
+export const chatSessionKillSchema = z.object({
+  sessionId: z.string().min(1, "sessionId is required"),
+});
+
+export const claudeSettingsWriteSchema = z.object({
+  scope: z.enum(["project", "local", "user"], {
+    errorMap: () => ({ message: "Invalid scope. Must be one of: project, local, user" }),
+  }),
+  content: z.string().min(1, "content is required"),
+});
+
+export const addPermissionSchema = z.object({
+  permission: z.string().min(1, "permission is required"),
+});

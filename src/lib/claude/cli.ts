@@ -8,6 +8,7 @@ import type { TerminalSubprocess } from "@/types/pty";
 import { AI_WORKSPACE_ROOT } from "../config";
 import type { OperationEvent } from "@/types/operation";
 import { spawnTerminal } from "../pty";
+import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
 
 // ---------------------------------------------------------------------------
 // CLI path resolution (moved from cli-path.ts)
@@ -286,10 +287,11 @@ export function runClaude(
 
             // Check result for AskUserQuestion permission denial
             if (parsed.type === "result" && pendingAskToolUseId) {
-              const hasAskDenial = parsed.permission_denials?.some(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (d: any) => d.tool_name === "AskUserQuestion"
-              );
+              const denials = Array.isArray(parsed.permission_denials) ? parsed.permission_denials : [];
+              const hasAskDenial = denials.some((d: unknown) => {
+                const r = permissionDenialItemSchema.safeParse(d);
+                return r.success && r.data.tool_name === "AskUserQuestion";
+              });
               if (hasAskDenial) {
                 log(operationId, "AskUserQuestion permission denied, will wait for answer");
               }
@@ -305,13 +307,10 @@ export function runClaude(
               const blocks = Array.isArray(parsed.message.content)
                 ? parsed.message.content
                 : [];
-              const isAskAutoError = blocks.some(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (b: any) =>
-                  b.type === "tool_result" &&
-                  b.tool_use_id === pendingAskToolUseId &&
-                  b.is_error,
-              );
+              const isAskAutoError = blocks.some((b: unknown) => {
+                const r = toolResultBlockSchema.safeParse(b);
+                return r.success && r.data.tool_use_id === pendingAskToolUseId && r.data.is_error;
+              });
               if (isAskAutoError) {
                 log(operationId, "suppressing CLI auto-error for AskUserQuestion, killing process");
                 askKilled = true;

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useReducer, useState, useCallback } from "react";
 import type { OperationEvent } from "@/types/operation";
+import { operationEventSchema } from "@/lib/runtime-schemas";
 
 type EventAction = { type: "append"; events: OperationEvent[] } | { type: "clear" };
 
@@ -81,7 +82,9 @@ export function useSSE(operationId: string | null) {
           for (const line of lines) {
             if (!line.startsWith("data: ")) continue;
             try {
-              const event: OperationEvent = JSON.parse(line.slice(6));
+              const parsed = operationEventSchema.safeParse(JSON.parse(line.slice(6)));
+              if (!parsed.success) continue;
+              const event = parsed.data as OperationEvent;
               batchRef.current.push(event);
               if (!rafRef.current) {
                 rafRef.current = requestAnimationFrame(() => {

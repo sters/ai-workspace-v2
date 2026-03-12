@@ -1,17 +1,14 @@
 import { NextResponse } from "next/server";
+import { chatSessionKillSchema } from "@/lib/schemas";
+import { parseBody } from "@/lib/validate";
 
 const CHAT_WS_PORT = process.env.CHAT_WS_PORT || "3742";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { sessionId } = body;
-
-  if (!sessionId) {
-    return NextResponse.json(
-      { error: "sessionId is required" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(chatSessionKillSchema, body);
+  if (!parsed.success) return parsed.response;
+  const { sessionId } = parsed.data;
 
   try {
     const res = await fetch(`http://localhost:${CHAT_WS_PORT}/sessions/kill`, {

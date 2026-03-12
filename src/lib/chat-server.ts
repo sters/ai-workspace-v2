@@ -11,6 +11,7 @@ import path from "node:path";
 import { spawnClaudeTerminal } from "./claude/cli";
 import type { DataListener, TerminalSubprocess } from "@/types/pty";
 import { buildInitPrompt, buildReviewChatPrompt } from "@/lib/templates";
+import { clientMessageSchema } from "./runtime-schemas";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -233,7 +234,7 @@ export function startChatServer(port: number) {
       // Kill a chat session
       if (url.pathname === "/sessions/kill" && req.method === "POST") {
         const body = await req.json().catch(() => null);
-        const sessionId = body?.sessionId;
+        const sessionId = typeof body?.sessionId === "string" && body.sessionId ? body.sessionId : null;
         if (!sessionId) {
           return new Response(JSON.stringify({ error: "sessionId is required" }), {
             status: 400,
@@ -278,7 +279,14 @@ export function startChatServer(port: number) {
       message(ws, raw) {
         let msg: ClientMessage;
         try {
-          msg = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw));
+          const parsed = JSON.parse(typeof raw === "string" ? raw : new TextDecoder().decode(raw));
+          const result = clientMessageSchema.safeParse(parsed);
+          if (!result.success) {
+            const issues = result.error.issues.map((i) => i.message).join("; ");
+            send(ws, { type: "error", message: `Invalid message: ${issues}` });
+            return;
+          }
+          msg = result.data;
         } catch {
           send(ws, { type: "error", message: "Invalid JSON" });
           return;

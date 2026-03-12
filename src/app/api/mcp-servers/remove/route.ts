@@ -1,21 +1,18 @@
 import { NextResponse } from "next/server";
 import { spawnClaudeSync } from "@/lib/claude/cli";
+import { mcpRemoveSchema } from "@/lib/schemas";
+import { parseBody } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { name, scope } = body as { name?: string; scope?: string };
-
-  if (!name) {
-    return NextResponse.json(
-      { error: "name is required" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(mcpRemoveSchema, body);
+  if (!parsed.success) return parsed.response;
+  const { name, scope } = parsed.data;
 
   const args = ["mcp", "remove"];
-  if (scope && ["local", "project", "user"].includes(scope)) {
+  if (scope) {
     args.push("--scope", scope);
   }
   args.push(name);

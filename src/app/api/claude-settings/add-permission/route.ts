@@ -2,17 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSettingsFilePath } from "@/lib/claude/settings";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { addPermissionSchema } from "@/lib/schemas";
+import { parseBody } from "@/lib/validate";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { permission } = body;
-
-  if (!permission || typeof permission !== "string") {
-    return NextResponse.json(
-      { error: "permission (string) is required" },
-      { status: 400 }
-    );
-  }
+  const parsed = parseBody(addPermissionSchema, body);
+  if (!parsed.success) return parsed.response;
+  const { permission } = parsed.data;
 
   const filePath = getSettingsFilePath("local");
 
