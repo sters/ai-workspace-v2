@@ -76,8 +76,10 @@ function executorInstructions(todoFilePath: string, worktreePath?: string, works
 1. **Understand the repository** (read documentation first):
    - Read repository documentation: README.md, CLAUDE.md, CONTRIBUTING.md
    - Check current git branch and status
-   - Check for Makefile and identify available targets
+   - Check for task runners and identify available targets:
+     - Makefile (\`make <target>\`), package.json scripts (\`npm run <script>\` / \`bun run <script>\`), Taskfile.yml, Justfile, Rakefile, etc.
    - Identify the tech stack and correct commands for build, test, lint
+   - Note which task runner commands correspond to which operations (build, test, lint, format, etc.)
 
 2. **Work through TODO items sequentially** (top to bottom):
    - Before starting each item, optionally mark as in-progress: \`- [ ]\` -> \`- [~]\`
@@ -102,10 +104,20 @@ function executorInstructions(todoFilePath: string, worktreePath?: string, works
    - Check repository conventions for commit message format
    - If no format specified, use clear descriptive messages starting with a verb
 
-5. **Testing and Linting** (follow this priority):
-   - Repository documentation commands first
-   - Makefile targets second
-   - Language-specific defaults last
+5. **Prefer Task Runner Commands Over Direct Tool Invocation**:
+   When running build, test, lint, format, or any development commands, always prefer the project's task runner over invoking tools directly.
+   - **Discovery**: Check Makefile, package.json scripts, Taskfile.yml, Justfile, Rakefile, composer.json scripts, pyproject.toml scripts, etc.
+   - **Priority order**:
+     1. Repository documentation commands (CLAUDE.md, CONTRIBUTING.md, README.md)
+     2. Task runner targets (e.g. \`make lint\`, \`npm run lint\`, \`bun run test\`, \`task build\`)
+     3. Language-specific direct commands as last resort (e.g. \`golangci-lint\`, \`tsc\`, \`pytest\`)
+   - **Examples**:
+     - Use \`make lint\` instead of \`golangci-lint run ./...\` or \`golint\`
+     - Use \`npm run lint\` or \`bun run lint\` instead of \`eslint .\` or \`tsc --noEmit\`
+     - Use \`make test\` instead of \`go test ./...\`
+     - Use \`npm run build\` instead of \`tsc\` or \`next build\`
+     - Use \`make fmt\` instead of \`goimports -w .\` or \`gofmt\`
+   - **Exception**: When operating on a specific file (e.g. running a single test file, linting one file), it is acceptable to use direct commands if the task runner does not support file-level targeting
 
 ### Working Directory
 
