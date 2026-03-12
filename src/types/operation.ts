@@ -7,6 +7,7 @@ export type OperationType =
   | "create-todo"
   | "delete"
   | "workspace-prune"
+  | "operation-prune"
   | "mcp-auth"
   | "claude-login"
   | "batch"
