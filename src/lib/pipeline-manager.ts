@@ -10,6 +10,7 @@ import { runClaude } from "./claude";
 import type { ClaudeProcess, RunClaudeOptions } from "@/types/claude";
 import { extractLastResult } from "./parsers/stream";
 import { Semaphore } from "./semaphore";
+import { getConfig } from "./app-config";
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -40,7 +41,7 @@ interface ManagedOperation {
 // Concurrency limits
 // ---------------------------------------------------------------------------
 
-export const MAX_CONCURRENT_OPERATIONS = 3;
+export const MAX_CONCURRENT_OPERATIONS = getConfig().operations.maxConcurrent;
 
 export class ConcurrencyLimitError extends Error {
   constructor(running: number) {
@@ -53,10 +54,10 @@ export class ConcurrencyLimitError extends Error {
 // Phase timeout defaults
 // ---------------------------------------------------------------------------
 
-/** Default timeout for Claude execution phases (single/group): 20 minutes. */
-export const DEFAULT_CLAUDE_TIMEOUT_MS = 20 * 60 * 1000;
-/** Default timeout for function phases: 3 minutes. */
-export const DEFAULT_FUNCTION_TIMEOUT_MS = 3 * 60 * 1000;
+/** Default timeout for Claude execution phases (single/group). */
+export const DEFAULT_CLAUDE_TIMEOUT_MS = getConfig().operations.claudeTimeoutMinutes * 60 * 1000;
+/** Default timeout for function phases. */
+export const DEFAULT_FUNCTION_TIMEOUT_MS = getConfig().operations.functionTimeoutMinutes * 60 * 1000;
 
 // ---------------------------------------------------------------------------
 // Global store (survives HMR in dev mode)

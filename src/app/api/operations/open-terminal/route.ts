@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { workspaceSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
+import { getConfig } from "@/lib/app-config";
 
 export async function POST(request: Request) {
   const body = await request.json();
   const parsed = parseBody(workspaceSchema, body);
   if (!parsed.success) return parsed.response;
 
-  const targetPath = parsed.data.workspace;
+  const terminalCmd = getConfig().terminal.replace("{path}", parsed.data.workspace);
+  const args = terminalCmd.split(/\s+/);
 
-  const proc = Bun.spawn(["open", "-a", "Terminal", targetPath], {
+  const proc = Bun.spawn(args, {
     stdout: "ignore",
     stderr: "pipe",
   });

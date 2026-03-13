@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { ChatSessionInfo } from "@/types/chat";
+import { getConfig } from "@/lib/app-config";
 
-const CHAT_WS_PORT = process.env.CHAT_WS_PORT || "3742";
+const CHAT_WS_PORT = getConfig().server.chatPort;
 
 export async function GET() {
   try {

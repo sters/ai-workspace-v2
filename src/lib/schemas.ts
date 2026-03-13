@@ -1,6 +1,7 @@
 import z from "zod";
+import { getConfig } from "./app-config";
 
-export const interactionLevelSchema = z.enum(["low", "mid", "high"]).default("mid");
+export const interactionLevelSchema = z.enum(["low", "mid", "high"]).default(getConfig().operations.defaultInteractionLevel);
 
 export const initSchema = z.object({
   description: z.string().min(1, "description is required"),

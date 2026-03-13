@@ -9,6 +9,7 @@ import { AI_WORKSPACE_ROOT } from "../config";
 import type { OperationEvent } from "@/types/operation";
 import { spawnTerminal } from "../pty";
 import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
+import { getConfig } from "../app-config";
 
 // ---------------------------------------------------------------------------
 // CLI path resolution (moved from cli-path.ts)
@@ -20,6 +21,11 @@ function resolveCliPath(): string {
   // Allow explicit override via CLAUDE_PATH env var
   if (process.env.CLAUDE_PATH) {
     return process.env.CLAUDE_PATH;
+  }
+  // Check config file for claude.path
+  const configPath = getConfig().claude.path;
+  if (configPath) {
+    return configPath;
   }
 
   const bin = Bun.which("claude");
