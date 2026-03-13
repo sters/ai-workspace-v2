@@ -1,5 +1,7 @@
 import type { WorkspaceRepo } from "./workspace";
 
+export type InteractionLevel = "low" | "mid" | "high";
+
 /**
  * Base for prompt inputs that target a specific repo within a workspace.
  * Combines workspace identity with the repo location fields from WorkspaceRepo.
@@ -111,6 +113,7 @@ export interface CollectorInput {
 export interface InitAnalyzeAndReadmeInput {
   description: string;
   readmeTemplate: string;
+  interactionLevel?: InteractionLevel;
 }
 
 export interface CreateTodoPlannerInput extends RepoPromptInput {

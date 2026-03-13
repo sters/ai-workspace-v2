@@ -9,6 +9,7 @@ const INPUT_LABELS: Record<string, string> = {
   startWith: "Start with",
   draft: "Draft PR",
   repository: "Repository",
+  interactionLevel: "Interaction Level",
 };
 
 /** Collapsible display for user-provided operation inputs. */

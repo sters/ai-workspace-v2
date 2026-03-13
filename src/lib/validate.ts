@@ -5,7 +5,7 @@ type ParseResult<T> =
   | { success: true; data: T }
   | { success: false; response: NextResponse };
 
-export function parseBody<T>(schema: z.ZodType<T>, body: unknown): ParseResult<T> {
+export function parseBody<S extends z.ZodTypeAny>(schema: S, body: unknown): ParseResult<z.output<S>> {
   const result = schema.safeParse(body);
   if (!result.success) {
     const message = result.error.issues.map((i) => i.message).join("; ");
