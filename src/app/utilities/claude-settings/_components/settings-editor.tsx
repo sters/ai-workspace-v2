@@ -101,7 +101,7 @@ function EditorCard({
         <p className="mb-2 text-xs text-destructive">{entry.error}</p>
       )}
 
-      <div className={`h-80 rounded-md border ${value.trim() && !valid ? "border-red-500" : ""}`}>
+      <div className={`h-[32rem] rounded-md border ${value.trim() && !valid ? "border-red-500" : ""}`}>
         <MonacoEditorLazy
           language="json"
           value={value}
