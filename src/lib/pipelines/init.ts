@@ -22,6 +22,7 @@ import type { InteractionLevel } from "@/types/prompts";
 import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
 import { buildCommitSnapshotPhase } from "./actions/commit-snapshot";
 import { buildCoordinateTodosPhase } from "./actions/coordinate-todos";
+import { buildDiscoverConstraintsPhase } from "./actions/discover-constraints";
 import { buildReviewTodosPhase } from "./actions/review-todos";
 
 export function buildInitPipeline(description: string, interactionLevel?: InteractionLevel): PipelinePhase[] {
@@ -151,7 +152,21 @@ export function buildInitPipeline(description: string, interactionLevel?: Intera
         return true;
       },
     },
-    // Phase C: Plan TODOs for each repo (parallel)
+    // Phase C: Discover repo constraints (lint/test/build) and append to README
+    {
+      kind: "function",
+      label: "Discover repo constraints",
+      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
+      fn: (ctx) => buildDiscoverConstraintsPhase({
+        workspace: wsName,
+        wsPath,
+        repos: repoResults.map((r) => ({
+          repoName: r.repoName,
+          worktreePath: r.worktreePath,
+        })),
+      }).fn(ctx),
+    },
+    // Phase D: Plan TODOs for each repo (parallel)
     {
       kind: "function",
       label: "Plan TODO items",

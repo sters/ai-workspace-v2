@@ -14,3 +14,4 @@ export { buildInitPrompt, buildReviewChatPrompt } from "./chat";
 export { buildCreateTodoFromReviewPrompt } from "./create-todo-planner";
 export { buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "./search";
 export { buildQuickAskPrompt } from "./quick-ask";
+export { buildRepoConstraintsPrompt } from "./repo-constraints";
