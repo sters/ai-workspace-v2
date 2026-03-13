@@ -208,22 +208,35 @@ export function mergeConfig(
 }
 
 // ---------------------------------------------------------------------------
-// Cached singleton
+// Cached singleton (stored on globalThis to survive Next.js module isolation)
 // ---------------------------------------------------------------------------
 
-let _config: AppConfig | null = null;
+const globalStore = globalThis as unknown as {
+  __aiwAppConfig?: AppConfig | null;
+  __aiwConfigFilePath?: string;
+};
 
 /**
  * Get the resolved app config (cached). Priority: env > config.yml > defaults.
  */
 export function getConfig(): AppConfig {
-  if (_config) return _config;
-  const fileConfig = loadConfigFile(CONFIG_FILE_PATH);
-  _config = mergeConfig(CONFIG_DEFAULTS, fileConfig, envOverrides());
-  return _config;
+  if (globalStore.__aiwAppConfig) return globalStore.__aiwAppConfig;
+  const filePath = globalStore.__aiwConfigFilePath ?? CONFIG_FILE_PATH;
+  const fileConfig = loadConfigFile(filePath);
+  globalStore.__aiwAppConfig = mergeConfig(CONFIG_DEFAULTS, fileConfig, envOverrides());
+  return globalStore.__aiwAppConfig;
 }
 
-/** Reset the cached config (for testing). */
+/** Reset the cached config so the next getConfig() call reloads from disk. */
 export function _resetConfig(): void {
-  _config = null;
+  globalStore.__aiwAppConfig = null;
+}
+
+/** Override the config file path (for testing). Pass null to restore default. */
+export function _setConfigFilePath(p: string | null): void {
+  if (p === null) {
+    delete globalStore.__aiwConfigFilePath;
+  } else {
+    globalStore.__aiwConfigFilePath = p;
+  }
 }
