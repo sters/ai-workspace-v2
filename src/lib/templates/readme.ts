@@ -46,6 +46,10 @@ This workspace is a git repository. Changes to \`README.md\`, \`TODO-*.md\`, and
 
 <!-- Specific requirements and acceptance criteria -->
 
+## Repository Constraints
+
+<!-- Auto-populated by constraint discovery: lint, test, build commands per repository -->
+
 ## Related Resources
 
 <!-- Links to issues, documentation, etc. -->

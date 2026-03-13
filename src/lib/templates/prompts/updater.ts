@@ -91,11 +91,16 @@ The following patterns are blocked by the security sandbox:
 
 If Mode is "interactive", preview changes before applying and ask for user approval.
 
+### Repository Constraints
+
+Check the workspace README's **## Repository Constraints** section. If it lists constraints for this repository (lint, test, build commands, etc.), ensure the TODO file includes corresponding verification items. When adding implementation or bugfix items, add or preserve verification items for these constraints. Do NOT remove constraint-based verification items unless the user explicitly asks.
+
 ### Guidelines
 
 1. Auto-compact: always remove completed items
 2. Match style: follow existing formatting conventions
 3. Be precise: only make requested changes
 4. Validate: ensure valid markdown after updates
+5. Honour Repository Constraints: if the workspace README lists constraints, ensure they appear as verification items
 `;
 }

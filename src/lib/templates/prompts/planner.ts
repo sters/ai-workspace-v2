@@ -93,6 +93,10 @@ Each TODO item MUST follow this structured format:
   - Verify: (optional) How to verify the change is correct
 \`\`\`
 
+### Repository Constraints
+
+Check the workspace README's **## Repository Constraints** section. If it lists constraints for this repository (lint, test, build commands, etc.), you MUST include corresponding verification TODO items in the Verification section. These constraints are non-negotiable — every implementation or bugfix task must pass them.
+
 ### Guidelines
 
 1. Focus on this repository only
@@ -101,6 +105,7 @@ Each TODO item MUST follow this structured format:
 4. Include commands: specify exact build/test/lint commands from repository docs
 5. Prefer task runner commands: use \`make lint\` / \`npm run test\` etc. over direct tool invocation. Only fall back to direct commands (e.g. \`golangci-lint\`, \`tsc\`) if no task runner target exists
 6. Order logically: dependencies first, then implementation, then tests
+7. Honour Repository Constraints: if the workspace README lists constraints, they MUST appear as verification items
 
 ### Interactive Mode
 

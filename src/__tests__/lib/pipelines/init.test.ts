@@ -24,9 +24,9 @@ vi.mock("@/lib/templates", () => ({
 }));
 
 describe("buildInitPipeline", () => {
-  it("returns 6 phases", () => {
+  it("returns 7 phases", () => {
     const phases = buildInitPipeline("test description");
-    expect(phases).toHaveLength(6);
+    expect(phases).toHaveLength(7);
   });
 
   it("all phases are function kind", () => {
@@ -45,6 +45,7 @@ describe("buildInitPipeline", () => {
     expect(labels).toEqual([
       "Analyze & draft README",
       "Setup workspace",
+      "Discover repo constraints",
       "Plan TODO items",
       "Coordinate TODOs",
       "Review TODOs",
