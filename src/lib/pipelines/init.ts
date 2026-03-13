@@ -18,12 +18,13 @@ import {
   buildPlannerPrompt,
 } from "@/lib/templates";
 import type { PipelinePhase } from "@/types/pipeline";
+import type { InteractionLevel } from "@/types/prompts";
 import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
 import { buildCommitSnapshotPhase } from "./actions/commit-snapshot";
 import { buildCoordinateTodosPhase } from "./actions/coordinate-todos";
 import { buildReviewTodosPhase } from "./actions/review-todos";
 
-export function buildInitPipeline(description: string): PipelinePhase[] {
+export function buildInitPipeline(description: string, interactionLevel?: InteractionLevel): PipelinePhase[] {
   // Shared mutable state across pipeline phases
   let wsName = "";
   let wsPath = "";
@@ -44,6 +45,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
         const prompt = buildInitAnalyzeAndReadmePrompt({
           description,
           readmeTemplate,
+          interactionLevel,
         });
 
         return ctx.runChild("Analyze & draft README", prompt, {
@@ -171,6 +173,7 @@ export function buildInitPipeline(description: string): PipelinePhase[] {
             readmeContent,
             worktreePath: repo.worktreePath,
             taskType: meta.taskType,
+            interactive: interactionLevel === "high",
           }),
           addDirs: [wsPath],
         }));

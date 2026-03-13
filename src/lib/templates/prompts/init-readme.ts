@@ -4,7 +4,35 @@
  * The analysis result is returned as structured JSON output via --json-schema.
  */
 
-import type { InitAnalyzeAndReadmeInput } from "@/types/prompts";
+import type { InitAnalyzeAndReadmeInput, InteractionLevel } from "@/types/prompts";
+
+function buildInteractionGuidance(level?: InteractionLevel): string {
+  switch (level) {
+    case "low":
+      return `### User Interaction Policy: LOW (autonomous)
+
+- Make your best judgment for all decisions. Do NOT use AskUserQuestion unless absolutely critical information is missing (e.g., no repositories can be determined at all and the description gives zero hints).
+- If the description is ambiguous, choose the most reasonable interpretation and proceed.
+- Prefer to fill in reasonable defaults rather than asking.`;
+    case "high":
+      return `### User Interaction Policy: HIGH (collaborative)
+
+- Use AskUserQuestion proactively to confirm and refine details before finalizing:
+  1. If repositories are not explicitly mentioned, ask which repositories to work on.
+  2. Confirm the task type and scope with the user (e.g., "I'm interpreting this as a feature task targeting X and Y — is that correct?").
+  3. Ask about requirements, constraints, or edge cases that aren't specified but could affect the approach.
+  4. Ask about the desired implementation approach if multiple strategies are viable.
+  5. Ask about priority and acceptance criteria if not specified.
+- The goal is to produce a thorough, well-aligned README that accurately captures the user's intent with no ambiguity.`;
+    default: // "mid"
+      return `### User Interaction Policy: MID (balanced)
+
+- Use AskUserQuestion when important information is missing or ambiguous:
+  1. If no repositories can be determined from the description, ask the user which repositories to work on.
+  2. If anything else is unclear that would significantly affect the workspace setup, ask the user.
+- Do NOT ask about minor details — use your best judgment for those.`;
+  }
+}
 
 /**
  * JSON Schema for the analysis result, used with --json-schema to constrain
@@ -79,8 +107,8 @@ Edit this template and return the full edited content in the \`readmeContent\` f
 5. **List repositories** in the Repositories section using the format:
    \`- **repoName**: \\\`repoPath\\\` (base: \\\`main\\\`)\`
    (Use \`main\` as default base branch since repos aren't set up yet)
-6. If no repositories can be determined from the description, use AskUserQuestion to ask the user which repositories to work on
-7. If anything else is unclear, use AskUserQuestion to ask the user
+
+${buildInteractionGuidance(input.interactionLevel)}
 
 ### Important Notes
 

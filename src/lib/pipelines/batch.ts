@@ -6,6 +6,7 @@ import { buildReviewPipeline } from "./review";
 import { buildCreatePrPipeline } from "./create-pr";
 import { buildUpdateTodoPipeline } from "./update-todo";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
+import type { InteractionLevel } from "@/types/prompts";
 
 type BatchMode =
   | "execute-review"
@@ -62,8 +63,9 @@ export function buildBatchPipeline(input: {
   workspace?: string;
   instruction?: string;
   draft?: boolean;
+  interactionLevel?: InteractionLevel;
 }): PipelinePhase[] {
-  const { mode, startWith, description, workspace, instruction, draft } = input;
+  const { mode, startWith, description, workspace, instruction, draft, interactionLevel } = input;
   const phases: PipelinePhase[] = [];
 
   // ------------------------------------------------------------------
@@ -72,7 +74,7 @@ export function buildBatchPipeline(input: {
 
   if (startWith === "init") {
     // Inline all init phases — they share closures for wsName etc.
-    const initPhases = buildInitPipeline(description ?? "");
+    const initPhases = buildInitPipeline(description ?? "", interactionLevel);
     phases.push(...initPhases);
   } else if (startWith === "update-todo") {
     // update-todo: single phase built upfront

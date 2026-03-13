@@ -1,7 +1,10 @@
 import z from "zod";
 
+export const interactionLevelSchema = z.enum(["low", "mid", "high"]).default("mid");
+
 export const initSchema = z.object({
   description: z.string().min(1, "description is required"),
+  interactionLevel: interactionLevelSchema,
 });
 
 export const workspaceSchema = z.object({
@@ -61,6 +64,7 @@ export const batchSchema = z.object({
   workspace: z.string().optional(),
   instruction: z.string().optional(),
   draft: z.coerce.boolean().optional(),
+  interactionLevel: interactionLevelSchema,
 });
 
 export const operationAnswerSchema = z.object({
