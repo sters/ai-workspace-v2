@@ -32,12 +32,14 @@ export const updateTodoSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   instruction: z.string().min(1, "instruction is required"),
   repo: z.string().optional(),
+  interactionLevel: interactionLevelSchema,
 });
 
 export const createTodoSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   reviewTimestamp: z.string().min(1, "reviewTimestamp is required"),
   instruction: z.string().optional(),
+  interactionLevel: interactionLevelSchema,
 });
 
 export const deleteSchema = workspaceSchema;

@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return parsed.response;
 
   const workspace = resolveWorkspaceName(parsed.data.workspace);
-  const { reviewTimestamp, instruction } = parsed.data;
+  const { reviewTimestamp, instruction, interactionLevel } = parsed.data;
   const wsPath = path.join(WORKSPACE_DIR, workspace);
 
   // Validate review directory exists
@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     const phases = buildCreateTodoPipeline(workspace, reviewTimestamp, instruction);
     const operation = startOperationPipeline("create-todo", workspace, phases, undefined, {
       reviewTimestamp,
+      interactionLevel,
       ...(instruction && { instruction }),
     });
     return NextResponse.json(operation);

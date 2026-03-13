@@ -13,6 +13,7 @@ import { Textarea } from "../shared/forms/textarea";
 import { StatusText } from "../shared/feedback/status-text";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import type { OperationType } from "@/types/operation";
+import type { InteractionLevel } from "@/types/prompts";
 import {
   Play,
   ClipboardCheck,
@@ -20,6 +21,41 @@ import {
   CodeXml,
   Terminal,
 } from "lucide-react";
+
+const INTERACTION_LEVELS: { value: InteractionLevel; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "mid", label: "Mid" },
+  { value: "high", label: "High" },
+];
+
+function InteractionLevelSelector({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: InteractionLevel;
+  onChange: (level: InteractionLevel) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="flex gap-0.5">
+      {INTERACTION_LEVELS.map(({ value: level, label }) => (
+        <button
+          key={level}
+          onClick={() => onChange(level)}
+          disabled={disabled}
+          className={`rounded px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            value === level
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted text-muted-foreground hover:bg-muted/80"
+          }`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function UpdateForm({
   label,
@@ -30,21 +66,22 @@ function UpdateForm({
 }: {
   label: string;
   placeholder: string;
-  onSubmit: (instruction: string) => void;
+  onSubmit: (instruction: string, interactionLevel: InteractionLevel) => void;
   disabled: boolean;
   /** When provided, renders a SplitButton with batch dropdown items. */
-  batchItems?: (instruction: string) => SplitButtonItem[];
+  batchItems?: (instruction: string, interactionLevel: InteractionLevel) => SplitButtonItem[];
 }) {
   const [instruction, setInstruction] = useState("");
+  const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
 
   const handleSubmit = () => {
     const trimmed = instruction.trim();
     if (!trimmed) return;
-    onSubmit(trimmed);
+    onSubmit(trimmed, interactionLevel);
     setInstruction("");
   };
 
-  const items = batchItems ? batchItems(instruction) : undefined;
+  const items = batchItems ? batchItems(instruction, interactionLevel) : undefined;
 
   return (
     <div className="space-y-2">
@@ -61,7 +98,15 @@ function UpdateForm({
         disabled={disabled}
         rows={2}
       />
-      <div className="flex justify-end">
+      <div className="flex items-center justify-end gap-4">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-muted-foreground">Interaction:</span>
+          <InteractionLevelSelector
+            value={interactionLevel}
+            onChange={setInteractionLevel}
+            disabled={disabled}
+          />
+        </div>
         {items ? (
           <SplitButton
             label={label}
@@ -217,14 +262,15 @@ function RepoTodoCard({
           label="Update"
           placeholder={`Update TODOs for ${todo.repoName}...`}
           disabled={disabled}
-          onSubmit={(instruction) => {
+          onSubmit={(instruction, interactionLevel) => {
             onStartAndNavigate("update-todo", {
               workspace: workspacePath,
               instruction,
+              interactionLevel,
               repo: todo.repoName,
             });
           }}
-          batchItems={(instruction) => [
+          batchItems={(instruction, interactionLevel) => [
             {
               label: "Update \u2192 Execute \u2192 Review",
               onClick: () =>
@@ -232,6 +278,7 @@ function RepoTodoCard({
                   startWith: "update-todo",
                   mode: "execute-review",
                   workspace: workspacePath,
+                  interactionLevel,
                   ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
                 }),
             },
@@ -242,6 +289,7 @@ function RepoTodoCard({
                   startWith: "update-todo",
                   mode: "execute-pr",
                   workspace: workspacePath,
+                  interactionLevel,
                   ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
                 }),
             },
@@ -252,6 +300,7 @@ function RepoTodoCard({
                   startWith: "update-todo",
                   mode: "execute-review-pr-gated",
                   workspace: workspacePath,
+                  interactionLevel,
                   ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
                 }),
             },
@@ -262,6 +311,7 @@ function RepoTodoCard({
                   startWith: "update-todo",
                   mode: "execute-review-pr",
                   workspace: workspacePath,
+                  interactionLevel,
                   ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
                 }),
             },
@@ -339,13 +389,14 @@ export function TodoUpdater({
           label="Update"
           placeholder="Describe TODO changes to apply across all repositories..."
           disabled={isRunning}
-          onSubmit={(instruction) => {
+          onSubmit={(instruction, interactionLevel) => {
             startAndNavigate("update-todo", {
               workspace: workspacePath,
               instruction,
+              interactionLevel,
             });
           }}
-          batchItems={(instruction) => [
+          batchItems={(instruction, interactionLevel) => [
             {
               label: "Update \u2192 Execute \u2192 Review",
               onClick: () =>
@@ -353,6 +404,7 @@ export function TodoUpdater({
                   startWith: "update-todo",
                   mode: "execute-review",
                   workspace: workspacePath,
+                  interactionLevel,
                   ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
                 }),
             },
@@ -363,6 +415,7 @@ export function TodoUpdater({
                   startWith: "update-todo",
                   mode: "execute-pr",
                   workspace: workspacePath,
+                  interactionLevel,
                   ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
                 }),
             },
@@ -373,6 +426,7 @@ export function TodoUpdater({
                   startWith: "update-todo",
                   mode: "execute-review-pr-gated",
                   workspace: workspacePath,
+                  interactionLevel,
                   ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
                 }),
             },
@@ -383,6 +437,7 @@ export function TodoUpdater({
                   startWith: "update-todo",
                   mode: "execute-review-pr",
                   workspace: workspacePath,
+                  interactionLevel,
                   ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
                 }),
             },

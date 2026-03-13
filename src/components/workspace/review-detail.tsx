@@ -12,6 +12,13 @@ import { MarkdownRenderer } from "../shared/content/markdown-renderer";
 import { Textarea } from "../shared/forms/textarea";
 import { StatusText } from "../shared/feedback/status-text";
 import { useRunningOperations } from "@/hooks/use-running-operations";
+import type { InteractionLevel } from "@/types/prompts";
+
+const INTERACTION_LEVELS: { value: InteractionLevel; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "mid", label: "Mid" },
+  { value: "high", label: "High" },
+];
 
 export function ReviewDetail({
   workspaceName,
@@ -21,6 +28,7 @@ export function ReviewDetail({
   timestamp: string;
 }) {
   const [instruction, setInstruction] = useState("");
+  const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
   const { summary, files, isLoading } = useReviewDetail(
     workspaceName,
     timestamp
@@ -66,12 +74,32 @@ export function ReviewDetail({
               disabled={isRunning}
               rows={2}
             />
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end gap-4">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">Interaction:</span>
+                <div className="flex gap-0.5">
+                  {INTERACTION_LEVELS.map(({ value: level, label }) => (
+                    <button
+                      key={level}
+                      onClick={() => setInteractionLevel(level)}
+                      disabled={isRunning}
+                      className={`rounded px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                        interactionLevel === level
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <Button
                 onClick={() =>
                   startAndNavigate({
                     workspace: workspace.path,
                     reviewTimestamp: timestamp,
+                    interactionLevel,
                     ...(instruction.trim() && {
                       instruction: instruction.trim(),
                     }),
