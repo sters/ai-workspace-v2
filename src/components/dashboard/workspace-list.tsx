@@ -31,8 +31,7 @@ export function WorkspaceList() {
   if (workspaces.length === 0) {
     return (
       <StatusText>
-        No workspaces found. Create one using <code>/workspace-init</code> in
-        Claude Code.
+        No workspaces found. Use the Init operation to create one.
       </StatusText>
     );
   }
