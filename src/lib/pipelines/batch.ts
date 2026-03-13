@@ -111,7 +111,7 @@ export function buildBatchPipeline(input: {
         return false;
       }
       ctx.emitStatus(`Executing workspace: ${ws}`);
-      const subPhases = await buildExecutePipeline({ workspace: ws });
+      const subPhases = await buildExecutePipeline({ workspace: ws, repository: repo });
       return runSubPhases(ctx, subPhases);
     },
   });
@@ -129,7 +129,7 @@ export function buildBatchPipeline(input: {
       fn: async (ctx) => {
         const ws = resolveWorkspace(ctx.operationId, workspace);
         ctx.emitStatus(`Reviewing workspace: ${ws}`);
-        const subPhases = await buildReviewPipeline({ workspace: ws });
+        const subPhases = await buildReviewPipeline({ workspace: ws, repository: repo });
         return runSubPhases(ctx, subPhases);
       },
     });
@@ -190,6 +190,7 @@ export function buildBatchPipeline(input: {
         const subPhases = await buildCreatePrPipeline({
           workspace: ws,
           draft: draft ?? false,
+          repository: repo,
         });
         return runSubPhases(ctx, subPhases);
       },
