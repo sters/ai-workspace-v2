@@ -26,7 +26,7 @@ if (!isDev && !isHot && !existsSync(resolve(projectDir, ".next"))) {
   });
 }
 
-const port = process.env.PORT || "3741";
+const port = process.env.AIW_PORT || "3741";
 
 const nextArgs = isHot
   ? ["bun", "--bun", "next", "dev", "-p", port]
@@ -35,7 +35,7 @@ const nextArgs = isHot
 const child = Bun.spawn(nextArgs, {
   cwd: projectDir,
   stdio: ["inherit", "inherit", "inherit"],
-  env: { ...process.env, PORT: port },
+  env: { ...process.env, PORT: port, AIW_PORT: port },
 });
 
 process.on("SIGINT", () => child.kill());

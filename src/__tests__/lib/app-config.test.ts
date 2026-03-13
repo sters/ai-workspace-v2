@@ -186,11 +186,11 @@ describe("mergeConfig", () => {
 describe("getConfig", () => {
   const savedEnv: Record<string, string | undefined> = {};
   const envKeys = [
-    "AI_WORKSPACE_ROOT",
-    "PORT",
-    "CHAT_WS_PORT",
-    "CLAUDE_PATH",
-    "CLAUDE_USE_CLI",
+    "AIW_WORKSPACE_ROOT",
+    "AIW_PORT",
+    "AIW_CHAT_PORT",
+    "AIW_CLAUDE_PATH",
+    "AIW_CLAUDE_USE_CLI",
     "AIW_EDITOR",
     "AIW_TERMINAL",
   ];
@@ -229,8 +229,8 @@ describe("getConfig", () => {
   });
 
   it("picks up env vars", () => {
-    process.env.PORT = "5555";
-    process.env.CLAUDE_USE_CLI = "false";
+    process.env.AIW_PORT = "5555";
+    process.env.AIW_CLAUDE_USE_CLI = "false";
     const config = getConfig();
     expect(config.server.port).toBe(5555);
     expect(config.claude.useCli).toBe(false);
@@ -238,7 +238,7 @@ describe("getConfig", () => {
 
   it("_resetConfig clears cache", () => {
     const first = getConfig();
-    process.env.PORT = "6666";
+    process.env.AIW_PORT = "6666";
     _resetConfig();
     const second = getConfig();
     expect(second.server.port).toBe(6666);
