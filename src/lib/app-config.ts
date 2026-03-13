@@ -36,6 +36,51 @@ export const CONFIG_FILE_PATH = path.join(
 );
 
 // ---------------------------------------------------------------------------
+// Config file generation
+// ---------------------------------------------------------------------------
+
+/** Generate default config file content with comments. */
+export function generateDefaultConfigContent(): string {
+  const lines = [
+    "# ai-workspace configuration",
+    "# All fields are optional. Priority: env vars > config.yml > defaults.",
+    "",
+    "# workspaceRoot: /path/to/ai-workspace  # env: AI_WORKSPACE_ROOT",
+    "",
+    "# server:",
+    "#   port: 3741          # env: PORT",
+    "#   chatPort: 3742      # env: CHAT_WS_PORT",
+    "",
+    "# claude:",
+    "#   path: null           # env: CLAUDE_PATH (null = auto-detect)",
+    "#   useCli: true         # env: CLAUDE_USE_CLI",
+    "",
+    "# operations:",
+    "#   maxConcurrent: 3",
+    "#   claudeTimeoutMinutes: 20",
+    "#   functionTimeoutMinutes: 3",
+    "#   defaultInteractionLevel: mid   # low / mid / high",
+    "",
+    "# editor: code {path}              # env: AIW_EDITOR",
+    "# terminal: open -a Terminal {path} # env: AIW_TERMINAL",
+    "",
+  ];
+  return lines.join("\n");
+}
+
+/**
+ * Create the config file with commented-out defaults if it doesn't exist.
+ * Returns true if the file was created, false if it already exists.
+ */
+export function ensureConfigFile(filePath: string = CONFIG_FILE_PATH): boolean {
+  if (fs.existsSync(filePath)) return false;
+  const dir = path.dirname(filePath);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(filePath, generateDefaultConfigContent(), "utf-8");
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // YAML loading
 // ---------------------------------------------------------------------------
 

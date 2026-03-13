@@ -6,6 +6,8 @@ import {
   mergeConfig,
   getConfig,
   _resetConfig,
+  ensureConfigFile,
+  generateDefaultConfigContent,
 } from "@/lib/app-config";
 
 describe("CONFIG_DEFAULTS", () => {
@@ -263,5 +265,53 @@ describe("getConfig", () => {
   it("defaults terminal to open -a Terminal {path}", () => {
     const config = getConfig();
     expect(config.terminal).toBe("open -a Terminal {path}");
+  });
+});
+
+describe("ensureConfigFile", () => {
+  it("creates config file when it does not exist", async () => {
+    const fs = await import("node:fs");
+    const tmpDir = `/tmp/test-aiw-config-${Date.now()}`;
+    const tmpPath = `${tmpDir}/config.yml`;
+    try {
+      const created = ensureConfigFile(tmpPath);
+      expect(created).toBe(true);
+      expect(fs.existsSync(tmpPath)).toBe(true);
+      const content = fs.readFileSync(tmpPath, "utf-8");
+      expect(content).toContain("# ai-workspace configuration");
+      expect(content).toContain("# editor:");
+      expect(content).toContain("# terminal:");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("does not overwrite existing config file", async () => {
+    const fs = await import("node:fs");
+    const tmpDir = `/tmp/test-aiw-config-${Date.now()}`;
+    const tmpPath = `${tmpDir}/config.yml`;
+    fs.mkdirSync(tmpDir, { recursive: true });
+    fs.writeFileSync(tmpPath, "editor: vim {path}\n");
+    try {
+      const created = ensureConfigFile(tmpPath);
+      expect(created).toBe(false);
+      const content = fs.readFileSync(tmpPath, "utf-8");
+      expect(content).toBe("editor: vim {path}\n");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("generateDefaultConfigContent", () => {
+  it("contains all config sections as comments", () => {
+    const content = generateDefaultConfigContent();
+    expect(content).toContain("# workspaceRoot:");
+    expect(content).toContain("# server:");
+    expect(content).toContain("#   port: 3741");
+    expect(content).toContain("# claude:");
+    expect(content).toContain("# operations:");
+    expect(content).toContain("# editor:");
+    expect(content).toContain("# terminal:");
   });
 });
