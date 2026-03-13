@@ -6,6 +6,7 @@ import {
   mergeConfig,
   getConfig,
   _resetConfig,
+  _setConfigFilePath,
   ensureConfigFile,
   generateDefaultConfigContent,
 } from "@/lib/app-config";
@@ -197,6 +198,8 @@ describe("getConfig", () => {
 
   beforeEach(() => {
     _resetConfig();
+    // Point to a non-existent file so tests don't read the real user config
+    _setConfigFilePath("/tmp/nonexistent-aiw-test-config.yml");
     for (const key of envKeys) {
       savedEnv[key] = process.env[key];
       delete process.env[key];
@@ -205,6 +208,7 @@ describe("getConfig", () => {
 
   afterEach(() => {
     _resetConfig();
+    _setConfigFilePath(null);
     for (const key of envKeys) {
       if (savedEnv[key] !== undefined) {
         process.env[key] = savedEnv[key];
