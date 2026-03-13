@@ -15,10 +15,17 @@ import { Semaphore } from "./semaphore";
 // Internal types
 // ---------------------------------------------------------------------------
 
+interface ChildProcessEntry {
+  process: ClaudeProcess;
+  childLabel?: string;
+  phaseIndex?: number;
+  phaseLabel?: string;
+}
+
 interface ManagedOperation {
   operation: Operation;
   claudeProcess: ClaudeProcess | null;
-  childProcesses: Map<string, ClaudeProcess>;
+  childProcesses: Map<string, ChildProcessEntry>;
   events: OperationEvent[];
   listeners: Set<(event: OperationEvent) => void>;
   /** Pending ask resolvers for function-phase emitAsk calls, keyed by toolUseId. */
@@ -184,7 +191,12 @@ function wireChild(
   process: ClaudeProcess,
   phaseExtra?: { phaseIndex?: number; phaseLabel?: string },
 ): Promise<WireChildResult> {
-  managed.childProcesses.set(childId, process);
+  managed.childProcesses.set(childId, {
+    process,
+    childLabel,
+    phaseIndex: phaseExtra?.phaseIndex,
+    phaseLabel: phaseExtra?.phaseLabel,
+  });
   emitStatus(managed, "Initializing...", { childLabel, ...phaseExtra });
 
   return new Promise<WireChildResult>((resolve) => {
@@ -360,8 +372,8 @@ export function startOperationPipeline(
           managed.abortController.abort();
         }
         // Kill all child processes for single/group phases
-        for (const [, proc] of managed.childProcesses) {
-          proc.kill();
+        for (const [, entry] of managed.childProcesses) {
+          entry.process.kill();
         }
       }, timeoutMs);
 
@@ -649,7 +661,7 @@ export function killOperation(id: string): boolean {
   if (!managed || managed.operation.status !== "running") return false;
   managed.abortController.abort();
   if (managed.claudeProcess) managed.claudeProcess.kill();
-  for (const [, process] of managed.childProcesses) process.kill();
+  for (const [, entry] of managed.childProcesses) entry.process.kill();
   return true;
 }
 
@@ -668,12 +680,11 @@ export function submitAnswer(
     return true;
   }
   if (managed.claudeProcess?.submitAnswer(toolUseId, answers)) return true;
-  for (const [childId, process] of managed.childProcesses) {
-    if (process.submitAnswer(toolUseId, answers)) {
+  for (const [, entry] of managed.childProcesses) {
+    if (entry.process.submitAnswer(toolUseId, answers)) {
       // Emit a synthetic tool_result so findPendingAsk() in the UI
       // immediately stops showing the ask input (before the resumed
       // process sends the real tool_result).
-      const childLabel = managed.operation.children?.find((c) => c.id === childId)?.label;
       emitEvent(managed, {
         type: "output",
         operationId: managed.operation.id,
@@ -688,7 +699,9 @@ export function submitAnswer(
           },
         }),
         timestamp: new Date().toISOString(),
-        ...(childLabel && { childLabel }),
+        ...(entry.childLabel && { childLabel: entry.childLabel }),
+        ...(entry.phaseIndex !== undefined && { phaseIndex: entry.phaseIndex }),
+        ...(entry.phaseLabel && { phaseLabel: entry.phaseLabel }),
       });
       return true;
     }
