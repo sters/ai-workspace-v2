@@ -112,9 +112,12 @@ if (isBunx && resolvedGitHash) {
   await Promise.race([doCheck(), Bun.sleep(3000)]);
 }
 
-// Resolve AI_WORKSPACE_ROOT: args > env > cwd
+// Resolve AI_WORKSPACE_ROOT: args > env > config > cwd
+import { getConfig } from "../src/lib/app-config";
+const appConfig = getConfig();
+
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
-let root = args[0] || process.env.AI_WORKSPACE_ROOT || process.cwd();
+let root = args[0] || process.env.AI_WORKSPACE_ROOT || appConfig.workspaceRoot || process.cwd();
 root = resolve(root);
 
 const workspaceDir = resolve(root, "workspace");
@@ -155,8 +158,11 @@ if (missingDirs.length > 0) {
   }
 }
 
+const port = appConfig.server.port;
+const chatPort = appConfig.server.chatPort;
+
 console.log(`ai-workspace root: ${root}`);
-console.log(`Starting on http://localhost:3741`);
+console.log(`Starting on http://localhost:${port}`);
 
 const isDev = process.argv.includes("--dev");
 const isHot = process.argv.includes("--hot");
@@ -164,6 +170,8 @@ const isHot = process.argv.includes("--hot");
 const sharedEnv = {
   ...process.env,
   AI_WORKSPACE_ROOT: root,
+  PORT: String(port),
+  CHAT_WS_PORT: String(chatPort),
   ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
 };
 

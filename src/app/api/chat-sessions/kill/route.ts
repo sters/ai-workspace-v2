@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { chatSessionKillSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
+import { getConfig } from "@/lib/app-config";
 
-const CHAT_WS_PORT = process.env.CHAT_WS_PORT || "3742";
+const CHAT_WS_PORT = getConfig().server.chatPort;
 
 export async function POST(request: Request) {
   const body = await request.json();

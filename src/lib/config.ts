@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { getConfig } from "./app-config";
 
 function resolveRoot(): string {
   if (process.env.AI_WORKSPACE_ROOT) {
@@ -8,6 +9,14 @@ function resolveRoot(): string {
       console.warn(`[config] AI_WORKSPACE_ROOT="${root}" does not exist`);
     }
     return root;
+  }
+  // Check config file for workspaceRoot
+  const configRoot = getConfig().workspaceRoot;
+  if (configRoot) {
+    if (!fs.existsSync(configRoot)) {
+      console.warn(`[config] config.yml workspaceRoot="${configRoot}" does not exist`);
+    }
+    return configRoot;
   }
   // Default: assume webui/ is inside the ai-workspace root
   const fallback = path.resolve(process.cwd(), "..");
