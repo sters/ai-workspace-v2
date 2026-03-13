@@ -668,8 +668,30 @@ export function submitAnswer(
     return true;
   }
   if (managed.claudeProcess?.submitAnswer(toolUseId, answers)) return true;
-  for (const [, process] of managed.childProcesses) {
-    if (process.submitAnswer(toolUseId, answers)) return true;
+  for (const [childId, process] of managed.childProcesses) {
+    if (process.submitAnswer(toolUseId, answers)) {
+      // Emit a synthetic tool_result so findPendingAsk() in the UI
+      // immediately stops showing the ask input (before the resumed
+      // process sends the real tool_result).
+      const childLabel = managed.operation.children?.find((c) => c.id === childId)?.label;
+      emitEvent(managed, {
+        type: "output",
+        operationId: managed.operation.id,
+        data: JSON.stringify({
+          type: "user",
+          message: {
+            content: [{
+              type: "tool_result",
+              tool_use_id: toolUseId,
+              content: Object.entries(answers).map(([q, a]) => `**${q}**\n${a}`).join("\n\n"),
+            }],
+          },
+        }),
+        timestamp: new Date().toISOString(),
+        ...(childLabel && { childLabel }),
+      });
+      return true;
+    }
   }
   return false;
 }
