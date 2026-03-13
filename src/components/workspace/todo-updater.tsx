@@ -82,8 +82,8 @@ function UpdateForm({
   );
 }
 
-function openInVSCode(targetPath: string) {
-  return fetch("/api/operations/open-vscode", {
+function openInEditor(targetPath: string) {
+  return fetch("/api/operations/open-editor", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ workspace: targetPath }),
@@ -180,7 +180,7 @@ function RepoTodoCard({
                   variant="ghost-toggle"
                   className="h-6 w-6 p-0"
                   title="Open in editor"
-                  onClick={() => openInVSCode(repoFullPath)}
+                  onClick={() => openInEditor(repoFullPath)}
                 >
                   <CodeXml className="h-3.5 w-3.5" />
                 </Button>
