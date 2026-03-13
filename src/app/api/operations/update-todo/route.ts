@@ -11,11 +11,11 @@ export async function POST(request: Request) {
   if (!parsed.success) return parsed.response;
 
   const workspace = resolveWorkspaceName(parsed.data.workspace);
-  const { instruction, repo } = parsed.data;
+  const { instruction, repo, interactionLevel } = parsed.data;
 
   try {
     const phases = await buildUpdateTodoPipeline({ workspace, instruction, repo });
-    const operation = startOperationPipeline("update-todo", workspace, phases, undefined, { instruction });
+    const operation = startOperationPipeline("update-todo", workspace, phases, undefined, { instruction, interactionLevel });
     return NextResponse.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {
