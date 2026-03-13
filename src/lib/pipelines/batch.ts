@@ -64,8 +64,9 @@ export function buildBatchPipeline(input: {
   instruction?: string;
   draft?: boolean;
   interactionLevel?: InteractionLevel;
+  repo?: string;
 }): PipelinePhase[] {
-  const { mode, startWith, description, workspace, instruction, draft, interactionLevel } = input;
+  const { mode, startWith, description, workspace, instruction, draft, interactionLevel, repo } = input;
   const phases: PipelinePhase[] = [];
 
   // ------------------------------------------------------------------
@@ -87,6 +88,7 @@ export function buildBatchPipeline(input: {
         const subPhases = await buildUpdateTodoPipeline({
           workspace: ws,
           instruction: instruction || DEFAULT_UPDATE_TODO_INSTRUCTION,
+          repo,
         });
         return runSubPhases(ctx, subPhases);
       },
