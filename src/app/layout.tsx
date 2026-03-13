@@ -70,6 +70,12 @@ export default function RootLayout({
                       Claude Version
                     </Link>
                     <Link
+                      href="/utilities/aiw-settings"
+                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                    >
+                      AIW Settings
+                    </Link>
+                    <Link
                       href="/utilities/claude-settings"
                       className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
                     >

@@ -28,6 +28,12 @@ const tools = [
       "Display the currently installed Claude Code CLI version.",
   },
   {
+    href: "/utilities/aiw-settings",
+    name: "AIW Settings",
+    description:
+      "Edit ~/.config/ai-workspace/config.yml. Changes take effect immediately.",
+  },
+  {
     href: "/utilities/claude-settings",
     name: "Claude Settings",
     description:
