@@ -68,6 +68,7 @@ export const batchSchema = z.object({
   instruction: z.string().optional(),
   draft: z.coerce.boolean().optional(),
   interactionLevel: interactionLevelSchema,
+  repo: z.string().optional(),
 });
 
 export const operationAnswerSchema = z.object({
