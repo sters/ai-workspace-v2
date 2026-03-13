@@ -120,7 +120,7 @@ if (ensureConfigFile()) {
 const appConfig = getConfig();
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
-let root = args[0] || process.env.AI_WORKSPACE_ROOT || appConfig.workspaceRoot || process.cwd();
+let root = args[0] || process.env.AIW_WORKSPACE_ROOT || appConfig.workspaceRoot || process.cwd();
 root = resolve(root);
 
 const workspaceDir = resolve(root, "workspace");
@@ -172,9 +172,9 @@ const isHot = process.argv.includes("--hot");
 
 const sharedEnv = {
   ...process.env,
-  AI_WORKSPACE_ROOT: root,
-  PORT: String(port),
-  CHAT_WS_PORT: String(chatPort),
+  AIW_WORKSPACE_ROOT: root,
+  AIW_PORT: String(port),
+  AIW_CHAT_PORT: String(chatPort),
   ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
 };
 

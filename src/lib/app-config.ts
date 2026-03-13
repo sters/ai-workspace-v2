@@ -43,17 +43,17 @@ export const CONFIG_FILE_PATH = path.join(
 export function generateDefaultConfigContent(): string {
   const lines = [
     "# ai-workspace configuration",
-    "# All fields are optional. Priority: env vars > config.yml > defaults.",
+    "# All fields are optional.",
     "",
-    "# workspaceRoot: /path/to/ai-workspace  # env: AI_WORKSPACE_ROOT",
+    "# workspaceRoot: /path/to/ai-workspace",
     "",
     "# server:",
-    "#   port: 3741          # env: PORT",
-    "#   chatPort: 3742      # env: CHAT_WS_PORT",
+    "#   port: 3741",
+    "#   chatPort: 3742",
     "",
     "# claude:",
-    "#   path: null           # env: CLAUDE_PATH (null = auto-detect)",
-    "#   useCli: true         # env: CLAUDE_USE_CLI",
+    "#   path: null           # null = auto-detect",
+    "#   useCli: true",
     "",
     "# operations:",
     "#   maxConcurrent: 3",
@@ -61,8 +61,8 @@ export function generateDefaultConfigContent(): string {
     "#   functionTimeoutMinutes: 3",
     "#   defaultInteractionLevel: mid   # low / mid / high",
     "",
-    "# editor: code {path}              # env: AIW_EDITOR",
-    "# terminal: open -a Terminal {path} # env: AIW_TERMINAL",
+    "# editor: code {path}",
+    "# terminal: open -a Terminal {path}",
     "",
   ];
   return lines.join("\n");
@@ -110,13 +110,13 @@ export function loadConfigFile(
 function envOverrides(): Partial<AppConfig> {
   const result: Partial<AppConfig> = {};
 
-  if (process.env.AI_WORKSPACE_ROOT) {
-    result.workspaceRoot = process.env.AI_WORKSPACE_ROOT;
+  if (process.env.AIW_WORKSPACE_ROOT) {
+    result.workspaceRoot = process.env.AIW_WORKSPACE_ROOT;
   }
 
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : undefined;
-  const chatPort = process.env.CHAT_WS_PORT
-    ? parseInt(process.env.CHAT_WS_PORT, 10)
+  const port = process.env.AIW_PORT ? parseInt(process.env.AIW_PORT, 10) : undefined;
+  const chatPort = process.env.AIW_CHAT_PORT
+    ? parseInt(process.env.AIW_CHAT_PORT, 10)
     : undefined;
   if (port !== undefined || chatPort !== undefined) {
     result.server = {
@@ -125,16 +125,16 @@ function envOverrides(): Partial<AppConfig> {
     } as AppConfig["server"];
   }
 
-  if (process.env.CLAUDE_PATH) {
+  if (process.env.AIW_CLAUDE_PATH) {
     result.claude = {
       ...result.claude,
-      path: process.env.CLAUDE_PATH,
+      path: process.env.AIW_CLAUDE_PATH,
     } as AppConfig["claude"];
   }
-  if (process.env.CLAUDE_USE_CLI !== undefined) {
+  if (process.env.AIW_CLAUDE_USE_CLI !== undefined) {
     result.claude = {
       ...result.claude,
-      useCli: process.env.CLAUDE_USE_CLI !== "false",
+      useCli: process.env.AIW_CLAUDE_USE_CLI !== "false",
     } as AppConfig["claude"];
   }
 

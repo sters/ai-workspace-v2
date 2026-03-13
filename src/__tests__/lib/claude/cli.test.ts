@@ -18,7 +18,7 @@ const mockSpawnSync = vi.fn();
 const originalWhich = Bun.which;
 const originalSpawn = Bun.spawn;
 const originalSpawnSync = Bun.spawnSync;
-const originalClaudePath = process.env.CLAUDE_PATH;
+const originalClaudePath = process.env.AIW_CLAUDE_PATH;
 
 // Override Bun globals before importing the module
 Bun.which = mockWhich as typeof Bun.which;
@@ -41,9 +41,9 @@ afterAll(() => {
   Bun.spawn = originalSpawn;
   Bun.spawnSync = originalSpawnSync;
   if (originalClaudePath !== undefined) {
-    process.env.CLAUDE_PATH = originalClaudePath;
+    process.env.AIW_CLAUDE_PATH = originalClaudePath;
   } else {
-    delete process.env.CLAUDE_PATH;
+    delete process.env.AIW_CLAUDE_PATH;
   }
   _resetCliPath();
 });
@@ -57,7 +57,7 @@ describe("getCliPath", () => {
     _resetCliPath();
     mockWhich.mockReset();
     mockSpawnSync.mockReset();
-    delete process.env.CLAUDE_PATH;
+    delete process.env.AIW_CLAUDE_PATH;
   });
 
   it("resolves via Bun.which + realpath", () => {
@@ -133,7 +133,7 @@ describe("getCliPath", () => {
   });
 
   it("uses CLAUDE_PATH env var when set", () => {
-    process.env.CLAUDE_PATH = "/custom/path/to/claude";
+    process.env.AIW_CLAUDE_PATH = "/custom/path/to/claude";
 
     expect(getCliPath()).toBe("/custom/path/to/claude");
     // Should not call Bun.which when CLAUDE_PATH is set
@@ -263,7 +263,7 @@ describe("getClaudeEnv", () => {
 describe("spawnClaude", () => {
   beforeEach(() => {
     _resetCliPath();
-    process.env.CLAUDE_PATH = "/mock/claude";
+    process.env.AIW_CLAUDE_PATH = "/mock/claude";
     mockSpawn.mockReset();
     mockSpawn.mockReturnValue({
       stdout: new ReadableStream(),
@@ -315,7 +315,7 @@ describe("spawnClaude", () => {
 describe("spawnClaudeSync", () => {
   beforeEach(() => {
     _resetCliPath();
-    process.env.CLAUDE_PATH = "/mock/claude";
+    process.env.AIW_CLAUDE_PATH = "/mock/claude";
     mockSpawnSync.mockReset();
     mockSpawnSync.mockReturnValue({
       success: true,
@@ -361,7 +361,7 @@ describe("spawnClaudeTerminal", () => {
 
   beforeEach(() => {
     _resetCliPath();
-    process.env.CLAUDE_PATH = "/mock/claude";
+    process.env.AIW_CLAUDE_PATH = "/mock/claude";
     mockSpawnTerminal.mockReset();
     mockSpawnTerminal.mockReturnValue(mockProc);
   });
@@ -428,7 +428,7 @@ describe("runClaude", () => {
 
   beforeEach(() => {
     _resetCliPath();
-    process.env.CLAUDE_PATH = "/mock/claude";
+    process.env.AIW_CLAUDE_PATH = "/mock/claude";
     mockSpawn.mockReset();
   });
 

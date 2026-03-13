@@ -19,8 +19,8 @@ let _cliPath: string | null = null;
 
 function resolveCliPath(): string {
   // Allow explicit override via CLAUDE_PATH env var
-  if (process.env.CLAUDE_PATH) {
-    return process.env.CLAUDE_PATH;
+  if (process.env.AIW_CLAUDE_PATH) {
+    return process.env.AIW_CLAUDE_PATH;
   }
   // Check config file for claude.path
   const configPath = getConfig().claude.path;

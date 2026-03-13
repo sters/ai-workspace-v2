@@ -116,11 +116,11 @@ function runGc() {
 }
 
 // ---------------------------------------------------------------------------
-// Resolve AI_WORKSPACE_ROOT
+// Resolve workspace root
 // ---------------------------------------------------------------------------
 
 function getWorkspaceRoot(): string {
-  return process.env.AI_WORKSPACE_ROOT || process.cwd();
+  return process.env.AIW_WORKSPACE_ROOT || process.cwd();
 }
 
 // ---------------------------------------------------------------------------
