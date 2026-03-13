@@ -155,8 +155,8 @@ export function OperationPanel({
   );
 }
 
-function openInVSCode(targetPath: string) {
-  return fetch("/api/operations/open-vscode", {
+function openInEditor(targetPath: string) {
+  return fetch("/api/operations/open-editor", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ workspace: targetPath }),
@@ -240,13 +240,13 @@ function OpenVSCodeButton({
   repositories?: { alias: string; path: string }[];
 }) {
   const handleClick = useCallback(
-    () => openInVSCode(workspacePath),
+    () => openInEditor(workspacePath),
     [workspacePath]
   );
 
   const repoItems = (repositories ?? []).map((repo) => ({
     label: repo.alias || repo.path.split("/").pop() || repo.path,
-    onClick: () => openInVSCode(`${workspacePath}/${repo.path}`),
+    onClick: () => openInEditor(`${workspacePath}/${repo.path}`),
   }));
 
   const labelNode = <><CodeXml className="h-3.5 w-3.5" /> Open in editor</>;
