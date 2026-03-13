@@ -112,8 +112,11 @@ if (isBunx && resolvedGitHash) {
   await Promise.race([doCheck(), Bun.sleep(3000)]);
 }
 
-// Resolve AI_WORKSPACE_ROOT: args > env > config > cwd
-import { getConfig } from "../src/lib/app-config";
+// Ensure config file exists, then load config
+import { getConfig, ensureConfigFile, CONFIG_FILE_PATH } from "../src/lib/app-config";
+if (ensureConfigFile()) {
+  console.log(`Created config: ${CONFIG_FILE_PATH}`);
+}
 const appConfig = getConfig();
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
