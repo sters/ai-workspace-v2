@@ -104,6 +104,8 @@ function executorInstructions(todoFilePath: string, worktreePath?: string, works
    - The repository worktree is already on a feature/fix branch
    - Check repository conventions for commit message format
    - If no format specified, use clear descriptive messages starting with a verb
+   - **Do NOT rebase or amend commits** — always create new commits. Keep the commit history as-is.
+   - Unless the user explicitly instructs otherwise, never rewrite git history
 
 5. **Prefer Task Runner Commands Over Direct Tool Invocation**:
    When running build, test, lint, format, or any development commands, always prefer the project's task runner over invoking tools directly.
