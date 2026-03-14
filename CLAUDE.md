@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-Web UI dashboard for [ai-workspace](https://github.com/sters/ai-workspace), a multi-repository workspace manager for Claude Code. Provides a browser interface on `localhost:3741` to view workspace status, TODO progress, reviews, git history, and trigger operations (init, execute, review, create-pr, etc.) that run Claude Code via `Bun.spawn` + `claude -p --output-format stream-json` (with SDK fallback via `CLAUDE_USE_CLI=false`).
+Web UI dashboard for [ai-workspace](https://github.com/sters/ai-workspace), a multi-repository workspace manager for Claude Code. Provides a browser interface on `localhost:3741` to view workspace status, TODO progress, reviews, git history, and trigger operations (init, execute, review, create-pr, etc.) that run Claude Code via `Bun.spawn` + `claude -p --output-format stream-json` (with SDK fallback via `AIW_CLAUDE_USE_CLI=false`). A separate WebSocket chat server runs on port 3742 for interactive Claude sessions.
 
 ## Commands
 
@@ -37,7 +37,26 @@ bun run test:watch
 bunx vitest run src/__tests__/lib/parsers/todo.test.ts
 ```
 
-The app runs on port 3741. Set `AI_WORKSPACE_ROOT` env var to point to the ai-workspace root directory (containing `workspace/` and `repositories/`). When running via `bunx`, it can also be passed as a CLI argument or defaults to the current working directory.
+The app runs on port 3741 (Next.js) and 3742 (WebSocket chat). Set `AIW_WORKSPACE_ROOT` env var to point to the ai-workspace root directory (containing `workspace/` and `repositories/`). When running via `bunx`, it can also be passed as a CLI argument or defaults to the current working directory.
+
+## Configuration
+
+Three-tier config system (priority: env vars > config file > defaults):
+
+- **Config file**: `~/.config/ai-workspace/config.yml` (auto-created on first run)
+- **Config resolution**: `src/lib/app-config.ts` — merges defaults, YAML config, and env overrides. Cached on `globalThis` to survive Next.js module isolation.
+
+**Environment variables** (all optional, override config file values):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AIW_WORKSPACE_ROOT` | cwd | ai-workspace root directory |
+| `AIW_PORT` | 3741 | Next.js server port |
+| `AIW_CHAT_PORT` | 3742 | WebSocket chat server port |
+| `AIW_CLAUDE_PATH` | auto-detect | Custom Claude CLI path |
+| `AIW_CLAUDE_USE_CLI` | `true` | Use CLI (`true`) or legacy SDK (`false`) |
+| `AIW_EDITOR` | `code {path}` | Editor command template |
+| `AIW_TERMINAL` | `open -a Terminal {path}` | Terminal command template |
 
 ## Architecture
 
@@ -48,7 +67,8 @@ The app runs on port 3741. Set `AI_WORKSPACE_ROOT` env var to point to the ai-wo
 API routes under `src/app/api/` read workspace data directly from the filesystem (`workspace/` directory in ai-workspace root):
 
 - **`src/lib/workspace/reader.ts`** — Core functions that scan `WORKSPACE_DIR` to list workspaces, read README.md, TODO files, review artifacts, and git history. All filesystem access happens here.
-- **`src/lib/config.ts`** — Resolves `AI_WORKSPACE_ROOT` (from env or `..` fallback) and `WORKSPACE_DIR` paths.
+- **`src/lib/app-config.ts`** — Three-tier config resolution (env > `~/.config/ai-workspace/config.yml` > defaults). Exports `getConfig()` cached on `globalThis`.
+- **`src/lib/config.ts`** — Resolves `AI_WORKSPACE_ROOT` constant (from `AIW_WORKSPACE_ROOT` env, config file, or `..` fallback) and `WORKSPACE_DIR` paths.
 - **`src/lib/parsers/`** — Extract structured data from markdown files using regex:
   - `todo.ts` — TODO items use checkbox syntax: `[x]` completed, `[ ]` pending, `[!]` blocked, `[~]` in-progress.
   - `readme.ts` — Parse workspace metadata from README.md.
@@ -60,16 +80,19 @@ API routes under `src/app/api/` read workspace data directly from the filesystem
 Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes via `Bun.spawn`:
 
 - **`src/lib/claude/`** — Claude CLI/SDK execution and authentication:
-  - `index.ts` — Facade that delegates to CLI (default) or SDK (set `CLAUDE_USE_CLI=false`).
+  - `index.ts` — Facade that delegates to CLI (default) or SDK (set `AIW_CLAUDE_USE_CLI=false`).
   - `cli.ts` — Spawns `claude -p` with `--output-format stream-json` via `Bun.spawn`. Handles `AskUserQuestion` by detecting permission denials and using `--resume {session_id}` to inject answers and continue.
   - `sdk.ts` — Legacy SDK wrapper using `@anthropic-ai/claude-agent-sdk`'s `query()` function. Resolves the `claude` CLI path, auto-approves all tools via `canUseTool`.
   - `login.ts` — Claude auth status checking and login via `Bun.spawn`.
   - `version.ts` — Claude CLI version checking.
   - `mcp.ts` — MCP server discovery and status from `.mcp.json` (project) and `~/.claude.json` (user). Parses `claude mcp list` output.
   - `settings.ts` — Reads/writes Claude settings from three scopes: project (`.claude/settings.json`), local (`.claude/settings.local.json`), and user (`~/.claude/settings.json`).
-- **`src/lib/pipeline-manager.ts`** — Pipeline orchestration engine. Each operation is a sequence of `PipelinePhase`s (single child, parallel group, or TypeScript function). Function phases get a rich context (`ctx`) with helpers: `emitStatus`, `emitResult`, `emitAsk` (prompt user and await answer), `runChild`, `runChildGroup`, `setWorkspace`. Stores all state (`ManagedOperation` map, counter) on `globalThis` to survive HMR in dev. Max 3 concurrent operations; phase timeouts default to 20min (Claude) / 3min (functions).
+- **`src/lib/pipeline-manager.ts`** — Pipeline orchestration engine. Each operation is a sequence of `PipelinePhase`s (single child, parallel group, or TypeScript function). Function phases get a rich context (`ctx`) with helpers: `emitStatus`, `emitResult`, `emitAsk` (prompt user and await answer), `runChild`, `runChildGroup`, `setWorkspace`. Max 3 concurrent operations (configurable); phase timeouts default to 20min (Claude) / 3min (functions).
+- **`src/lib/semaphore.ts`** — Custom `Semaphore` class for limiting concurrent operations.
 - **`src/lib/operation-store.ts`** — File-based operation persistence. Stores operation events as JSONL files in `.operations/` directory.
-- **`src/lib/schemas.ts`** — Zod validation schemas for all operation request bodies (init, execute, review, create-pr, update-todo, create-todo, batch, mcp-auth, etc.).
+- **`src/lib/schemas.ts`** — Zod validation schemas for all HTTP request bodies (POST endpoints).
+- **`src/lib/runtime-schemas.ts`** — Zod schemas for validating untrusted runtime data: JSONL files from disk, WebSocket messages, localStorage data, SSE events, and Claude CLI stream fragments. Separate from `schemas.ts` by design.
+- **`src/lib/validate.ts`** — `parseBody()` helper for API routes. Returns discriminated union: `{success: true, data}` or `{success: false, response: NextResponse}`. Also validates workspace names and operation IDs with regex (path traversal protection).
 - **`src/lib/workspace/`** — TypeScript equivalents of shell scripts. All paths relative to `AI_WORKSPACE_ROOT`:
   - `index.ts` — Barrel export for all workspace modules.
   - `helpers.ts` — `exec()`, `repoDir()`, `sanitizeSlug()`, staleness utilities.
@@ -141,7 +164,9 @@ Uses Tailwind with a shadcn/ui-style CSS variable theme system (`hsl(var(--prima
 
 - Path alias: `@/*` maps to `./src/*` (configured in `tsconfig.json`).
 - Types live in `src/types/` — `operation.ts` (Operation, OperationEvent, OperationType, OperationPhaseInfo), `workspace.ts` (TodoItem, TodoFile, WorkspaceMeta, WorkspaceSummary, WorkspaceDetail, ReviewSession, HistoryEntry), `claude.ts` (ClaudeProcess, RunClaudeOptions, LogEntry types), `pipeline.ts` (PipelinePhase, PhaseFunctionContext), `prompts.ts` (prompt input interfaces), `pty.ts` (DataListener).
-- `bin/start.ts` is the CLI entry point. Resolves `AI_WORKSPACE_ROOT` from args/env/cwd, validates workspace directory exists, then spawns `bun run dev` or `bun run start`. Supports `--self-update` flag for bunx users. Additional entry points: `bin/chat-server.ts` (standalone chat), `bin/next-server.ts` (direct Next.js server).
+- `bin/start.ts` is the CLI entry point. Resolves workspace root from CLI args / `AIW_WORKSPACE_ROOT` env / config file / cwd, validates workspace directory exists, auto-creates `workspace/` and `repositories/` if missing, then spawns both the Next.js server and WebSocket chat server. Supports `--self-update` flag for bunx users. Additional entry points: `bin/chat-server.ts` (WebSocket chat on port 3742), `bin/next-server.ts` (Next.js on port 3741).
+- **`globalThis` pattern**: Mutable state (pipeline operations, app config cache, chat sessions) is stored on `globalThis` to survive Next.js Hot Module Reloading during development. Tests must account for this (see `test-setup.ts`).
+- **`force-dynamic`**: All API routes export `const dynamic = "force-dynamic"` since they read from the filesystem.
 - `NEXT_PUBLIC_GIT_HASH` is injected at build time by `next.config.ts` for display in the sidebar.
 - ESLint uses flat config (`eslint.config.ts`) with typescript-eslint. Unused vars must be prefixed with `_` (both args and vars).
 
