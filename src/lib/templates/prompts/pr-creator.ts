@@ -59,6 +59,12 @@ function prCreatorInstructions(worktreePath: string): string {
 
 **Your mission: Create or update a pull request based on the changes and context above.**
 
+### Git History Rules
+
+- **Do NOT rebase or amend commits** — always create new commits. Keep the commit history as-is.
+- **Do NOT force-push** — if the remote branch has new commits, pull and merge them before pushing.
+- Unless the user explicitly instructs otherwise, never rewrite git history.
+
 ### Commit Uncommitted Changes First
 
 Before pushing or creating a PR, **always check for uncommitted changes** — the user may have edited files directly.
@@ -79,6 +85,7 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 
 3. **Push and Create**:
    - Push the branch to remote: \`git push -u origin <branch>\`
+   - If the push is rejected because the remote has new commits, run \`git pull --no-rebase\` to merge, then push again. Do NOT force-push.
    - Create PR using \`gh pr create\`
    - Use \`--draft\` flag if Draft is true
 
@@ -89,7 +96,7 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 3. **Do NOT add** update history, incremental change logs, or review feedback sections
 4. **Keep everything else unchanged** — do NOT remove or rewrite user-added notes, QA results, manual annotations, or any human-added content
 5. **Update the title** if the scope of changes has significantly shifted
-6. **Push** latest changes: \`git push\`
+6. **Push** latest changes: \`git push\` — if rejected, run \`git pull --no-rebase\` to merge remote changes first. Do NOT force-push.
 7. **Update** PR using \`gh pr edit\`
 
 ### Working Directory
