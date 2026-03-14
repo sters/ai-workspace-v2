@@ -21,10 +21,7 @@ bun run dev:hot
 # Production build + start
 bun run build && bun run start
 
-# Type checking
-bunx tsc --noEmit
-
-# Lint
+# Lint (runs both tsc --noEmit AND eslint src/ — no need to run tsc separately)
 bun run lint
 
 # Run all tests
@@ -79,46 +76,21 @@ API routes under `src/app/api/` read workspace data directly from the filesystem
 
 Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes via `Bun.spawn`:
 
-- **`src/lib/claude/`** — Claude CLI/SDK execution and authentication:
-  - `index.ts` — Facade that delegates to CLI (default) or SDK (set `AIW_CLAUDE_USE_CLI=false`).
-  - `cli.ts` — Spawns `claude -p` with `--output-format stream-json` via `Bun.spawn`. Handles `AskUserQuestion` by detecting permission denials and using `--resume {session_id}` to inject answers and continue.
-  - `sdk.ts` — Legacy SDK wrapper using `@anthropic-ai/claude-agent-sdk`'s `query()` function. Resolves the `claude` CLI path, auto-approves all tools via `canUseTool`.
-  - `login.ts` — Claude auth status checking and login via `Bun.spawn`.
-  - `version.ts` — Claude CLI version checking.
-  - `mcp.ts` — MCP server discovery and status from `.mcp.json` (project) and `~/.claude.json` (user). Parses `claude mcp list` output.
-  - `settings.ts` — Reads/writes Claude settings from three scopes: project (`.claude/settings.json`), local (`.claude/settings.local.json`), and user (`~/.claude/settings.json`).
+- **`src/lib/claude/`** — Claude CLI/SDK execution and authentication. Facade in `index.ts` delegates to CLI (default) or SDK (`AIW_CLAUDE_USE_CLI=false`). CLI mode (`cli.ts`) spawns `claude -p --output-format stream-json` and handles `AskUserQuestion` via `--resume {session_id}`. Also includes auth, version, MCP server discovery, and settings management (three scopes: project/local/user).
 - **`src/lib/pipeline-manager.ts`** — Pipeline orchestration engine. Each operation is a sequence of `PipelinePhase`s (single child, parallel group, or TypeScript function). Function phases get a rich context (`ctx`) with helpers: `emitStatus`, `emitResult`, `emitAsk` (prompt user and await answer), `runChild`, `runChildGroup`, `setWorkspace`. Max 3 concurrent operations (configurable); phase timeouts default to 20min (Claude) / 3min (functions).
-- **`src/lib/semaphore.ts`** — Custom `Semaphore` class for limiting concurrent operations.
+- **`src/lib/pipelines/`** — Pipeline definitions for each operation type. Each file exports a `build*Pipeline()` function returning a sequence of phases. Shared reusable actions live in `actions/`.
 - **`src/lib/operation-store.ts`** — File-based operation persistence. Stores operation events as JSONL files in `.operations/` directory.
 - **`src/lib/schemas.ts`** — Zod validation schemas for all HTTP request bodies (POST endpoints).
 - **`src/lib/runtime-schemas.ts`** — Zod schemas for validating untrusted runtime data: JSONL files from disk, WebSocket messages, localStorage data, SSE events, and Claude CLI stream fragments. Separate from `schemas.ts` by design.
 - **`src/lib/validate.ts`** — `parseBody()` helper for API routes. Returns discriminated union: `{success: true, data}` or `{success: false, response: NextResponse}`. Also validates workspace names and operation IDs with regex (path traversal protection).
-- **`src/lib/workspace/`** — TypeScript equivalents of shell scripts. All paths relative to `AI_WORKSPACE_ROOT`:
-  - `index.ts` — Barrel export for all workspace modules.
-  - `helpers.ts` — `exec()`, `repoDir()`, `sanitizeSlug()`, staleness utilities.
-  - `setup.ts` — `setupWorkspace()`, `setupRepository()`, `detectBaseBranch()`, `parseAnalysisResultText()`.
-  - `git.ts` — `listWorkspaceRepos()`, `commitWorkspaceSnapshot()`, `deleteWorkspace()`.
-  - `templates.ts` — I/O wrappers: `writeTodoTemplate()`, `writeReportTemplates()`, `prepareReviewDir()`. Template content lives in `src/lib/templates/`.
-  - `pr.ts` — `checkExistingPR()`, `getRepoChanges()`.
-- **`src/lib/templates/`** — All template strings and prompt builders, organized by concern:
-  - `todo.ts` — TODO template strings for each task type + `selectTodoTemplate()`.
-  - `reports.ts` — Report template strings (review, verification, research, summary) + `REPORT_TEMPLATES` map.
-  - `readme.ts` — `buildReadmeContent()` for new workspace READMEs.
-  - `prompts/` — Prompt builder functions for each agent type (planner, executor, coordinator, reviewer, code-reviewer, todo-verifier, pr-creator, researcher, updater, collector, init-readme, chat). Each exports a `build*Prompt(input)` function.
-  - `index.ts` — Barrel re-export of all templates and prompts.
-- **`src/lib/pipelines/`** — Pipeline definitions for each operation type (init, execute, review, create-pr, etc.). Each file exports a `build*Pipeline()` function that returns a sequence of `PipelinePhase`s. Shared reusable actions (commit-snapshot, coordinate-todos, setup-repository, etc.) live in `actions/`.
+- **`src/lib/workspace/`** — TypeScript equivalents of shell scripts (setup, git operations, PR helpers, template I/O). All paths relative to `AI_WORKSPACE_ROOT`.
+- **`src/lib/templates/`** — All template strings and prompt builders. `prompts/` contains `build*Prompt(input)` functions for each agent type (planner, executor, reviewer, pr-creator, etc.).
 - **`src/app/api/events/route.ts`** — SSE endpoint. Clients connect with `?operationId=` to stream `OperationEvent`s in real time. Replays existing events on connection, then streams new ones.
 
 ### Client-side
 
-- **`src/hooks/use-workspaces.ts`** / **`use-workspace.ts`** — SWR hooks with auto-refresh (10s list, 5s detail) for workspace data.
-- **`src/hooks/use-operation.ts`** — Operation lifecycle hook. Persists active operation ID to localStorage (`aiw-op:{key}`) so navigating away and returning reconnects to the SSE stream. Detects `__setWorkspace:` and `__phaseUpdate:` control events from the server.
-- **`src/hooks/use-sse.ts`** — EventSource hook for streaming operation output from `/api/events`.
-- **Components**:
-  - `dashboard/` — `workspace-list.tsx` (dashboard), `workspace-card.tsx` (summary card).
-  - `workspace/` — `operation-panel.tsx`, `readme-viewer.tsx`, `todo-viewer.tsx`, `review-viewer.tsx`, `history-timeline.tsx`, `chat-terminal.tsx`.
-  - `operation/` — Operation execution UI: `claude-operation.tsx` (render-prop wrapper), `log/` (split into `index.tsx`, `display-nodes.ts`, `sections.tsx`, `entries.tsx`, `ask-input.tsx`), `next-action-suggestions.tsx`, `mcp-auth-terminal.tsx`.
-  - `shared/` — Generic UI primitives: `status-badge.tsx`, `progress-bar.tsx`, `markdown-renderer.tsx`, `monaco-editor-lazy.tsx`.
+- **`src/hooks/`** — SWR hooks with auto-refresh (`use-workspaces.ts`, `use-workspace.ts`), operation lifecycle with localStorage persistence (`use-operation.ts`), and SSE streaming (`use-sse.ts`).
+- **Components** in `src/components/`: `dashboard/` (workspace list/cards), `workspace/` (detail views), `operation/` (execution UI with log rendering and ask-input), `shared/` (generic UI primitives).
 
 ### Pages
 
@@ -130,25 +102,12 @@ Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes 
 
 ### API Routes
 
-- `GET /api/workspaces` — List all workspaces
-- `GET /api/workspaces/[name]` — Workspace detail
-- `GET /api/workspaces/[name]/readme` — Raw README
-- `GET /api/workspaces/[name]/todos` — Parsed TODO files
-- `GET /api/workspaces/[name]/reviews` — Review sessions
-- `GET /api/workspaces/[name]/reviews/[timestamp]` — Review detail
-- `GET /api/workspaces/[name]/history` — Git log
+API routes live under `src/app/api/`. Key patterns:
+- `GET /api/workspaces/[name]/{readme,todos,reviews,history}` — Read workspace state from disk
 - `POST /api/operations/{init,execute,review,create-pr,update-todo,create-todo,delete,batch,mcp-auth}` — Start operations
-- `POST /api/operations/answer` — Submit AskUserQuestion answers
-- `POST /api/operations/kill` — Kill a running operation
-- `POST /api/operations/open-vscode` — Open workspace in VS Code
-- `GET /api/operations` — List operations
+- `POST /api/operations/{answer,kill}` — Control running operations
 - `GET /api/events?operationId=` — SSE stream for operation output
-- `GET /api/claude-auth` — Claude authentication status
-- `GET /api/claude-version` — Claude CLI version
-- `GET /api/claude-settings` — Read Claude settings (all scopes)
-- `POST /api/claude-settings/add-permission` — Add tool permission
-- `GET /api/mcp-servers` — List MCP server configurations
-- `GET /api/mcp-servers/status` — MCP server connection statuses
+- `GET /api/{claude-auth,claude-version,claude-settings,mcp-servers}` — Claude CLI utilities
 
 ## Styling
 
@@ -168,11 +127,11 @@ Uses Tailwind with a shadcn/ui-style CSS variable theme system (`hsl(var(--prima
 - **`globalThis` pattern**: Mutable state (pipeline operations, app config cache, chat sessions) is stored on `globalThis` to survive Next.js Hot Module Reloading during development. Tests must account for this (see `test-setup.ts`).
 - **`force-dynamic`**: All API routes export `const dynamic = "force-dynamic"` since they read from the filesystem.
 - `NEXT_PUBLIC_GIT_HASH` is injected at build time by `next.config.ts` for display in the sidebar.
-- ESLint uses flat config (`eslint.config.ts`) with typescript-eslint. Unused vars must be prefixed with `_` (both args and vars).
+- ESLint uses flat config (`eslint.config.ts`) with typescript-eslint. Unused vars must be prefixed with `_` (both args and vars). ESLint ignores `bin/**` — entry point files there are not linted.
 
 ## Testing
 
-Tests use **Vitest** with jsdom environment, `@testing-library/react`, and `@testing-library/jest-dom` matchers. Test files live in `src/__tests__/` mirroring the `src/` structure (e.g., `src/__tests__/lib/parsers/todo.test.ts`). Vitest globals are enabled (no need to import `describe`/`it`/`expect`).
+Tests use **Vitest** with jsdom environment, `@testing-library/react`, and `@testing-library/jest-dom` matchers. Test files live in `src/__tests__/` mirroring the `src/` structure (e.g., `src/__tests__/lib/parsers/todo.test.ts`). Vitest globals are enabled (no need to import `describe`/`it`/`expect`). Note: `tsconfig.json` excludes `src/__tests__/` and `src/test-setup.ts`, so `tsc --noEmit` (via `bun run lint`) does not type-check test files — Vitest handles that separately.
 
 ## Key Dependencies
 
