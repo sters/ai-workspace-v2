@@ -16,7 +16,10 @@ import {
   buildInitAnalyzeAndReadmePrompt,
   INIT_ANALYSIS_SCHEMA,
   buildPlannerPrompt,
+  buildBestOfNFileReviewerPrompt,
+  BEST_OF_N_REVIEW_SCHEMA,
 } from "@/lib/templates";
+import { runBestOfNFiles } from "./actions/best-of-n-files";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
@@ -25,19 +28,99 @@ import { buildCoordinateTodosPhase } from "./actions/coordinate-todos";
 import { buildDiscoverConstraintsPhase } from "./actions/discover-constraints";
 import { buildReviewTodosPhase } from "./actions/review-todos";
 
-export function buildInitPipeline(description: string, interactionLevel?: InteractionLevel): PipelinePhase[] {
+interface InitBestOfNOptions {
+  bestOfN?: number;
+  bestOfNConfirm?: boolean;
+}
+
+/** Reuse the same schema structure for reviewing README candidates. */
+const INIT_REVIEW_SCHEMA = BEST_OF_N_REVIEW_SCHEMA;
+
+/** Schema for README synthesizer output. */
+const INIT_SYNTH_SCHEMA = {
+  type: "object",
+  properties: {
+    readmeContent: {
+      type: "string",
+      description: "The synthesized README content combining the best parts from multiple candidates.",
+    },
+  },
+  required: ["readmeContent"],
+  additionalProperties: false,
+} as const;
+
+/** Build a prompt for synthesizing README from multiple candidates. */
+function buildInitReadmeSynthesizerPrompt(input: {
+  candidates: { label: string; files: { name: string; content: string }[] }[];
+  baseCandidate: number;
+}): string {
+  const sections = input.candidates
+    .map((c, i) => {
+      const readme = c.files[0]?.content ?? "(no content)";
+      return `### Candidate ${i + 1}: ${c.label}\n\`\`\`markdown\n${readme}\n\`\`\``;
+    })
+    .join("\n\n---\n\n");
+
+  return `# Task: Synthesize README from Best-of-N Candidates
+
+## Base Candidate: candidate-${input.baseCandidate}
+
+## Candidates
+
+${sections}
+
+## Instructions
+
+Create a synthesized README.md that combines the best parts from all candidates. Start with candidate-${input.baseCandidate} as the base and incorporate superior sections, details, or structure from the other candidates.
+
+Output a JSON object with a single \`readmeContent\` field containing the full synthesized README.md content.
+
+Maintain the overall structure of the base candidate while integrating improvements from others.`;
+}
+
+/** Parse analysis from Claude's onResultText callback. */
+function parseAnalysis(
+  text: string | undefined,
+  description: string,
+): TaskAnalysis & { readmeContent?: string } {
+  const base = parseAnalysisResultText(text, description);
+  let readmeContent: string | undefined;
+  if (text) {
+    try {
+      const { values } = Bun.JSONL.parseChunk(text);
+      if (values.length > 0) {
+        const parsed = values[0] as Record<string, unknown>;
+        if (typeof parsed.readmeContent === "string") {
+          readmeContent = parsed.readmeContent;
+        }
+      }
+    } catch { /* use template as fallback */ }
+  }
+  return { ...base, readmeContent };
+}
+
+export function buildInitPipeline(
+  description: string,
+  interactionLevel?: InteractionLevel,
+  bestOfNOptions?: InitBestOfNOptions,
+): PipelinePhase[] {
+  const bestOfN = bestOfNOptions?.bestOfN;
+  const bestOfNConfirm = bestOfNOptions?.bestOfNConfirm;
+
   // Shared mutable state across pipeline phases
   let wsName = "";
   let wsPath = "";
   let analysis: (TaskAnalysis & { readmeContent?: string }) | null = null;
   const repoResults: SetupRepositoryResult[] = [];
+  // Whether user opted into Best-of-N (set in Phase A, checked in Phase D)
+  let useBestOfN = bestOfN != null && bestOfN >= 2;
 
   return [
     // Phase A: Claude analyzes the task and drafts README (merged analysis + README fill)
     {
       kind: "function",
       label: "Analyze & draft README",
-      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
+      timeoutMs: 60 * 60 * 1000, // 1 hour — may wait for human confirmation
       fn: async (ctx) => {
         // Build README template content to include in the prompt
         const today = new Date().toISOString().slice(0, 10);
@@ -49,24 +132,174 @@ export function buildInitPipeline(description: string, interactionLevel?: Intera
           interactionLevel,
         });
 
-        return ctx.runChild("Analyze & draft README", prompt, {
-          jsonSchema: INIT_ANALYSIS_SCHEMA,
-          onResultText: (text) => {
-            analysis = parseAnalysisResultText(text, description);
-            // Extract readmeContent from the structured output
-            if (text) {
-              try {
-                const { values } = Bun.JSONL.parseChunk(text);
-                if (values.length > 0) {
-                  const parsed = values[0] as Record<string, unknown>;
-                  if (typeof parsed.readmeContent === "string") {
-                    analysis = { ...analysis!, readmeContent: parsed.readmeContent };
-                  }
-                }
-              } catch { /* use template as fallback */ }
+        const runOnce = (label?: string) =>
+          ctx.runChild(label ?? "Analyze & draft README", prompt, {
+            jsonSchema: INIT_ANALYSIS_SCHEMA,
+            onResultText: (text) => {
+              analysis = parseAnalysis(text, description);
+            },
+          });
+
+        // Best-of-N for README
+        if (bestOfN && bestOfN >= 2) {
+          // Confirmation ask (applies to both README and TODO Best-of-N)
+          if (bestOfNConfirm) {
+            const answers = await ctx.emitAsk([{
+              question: `Best-of-N mode is enabled (${bestOfN} candidates). Use it for README creation and TODO planning?`,
+              options: [
+                { label: "Use Best-of-N", description: `Run ${bestOfN} candidates and compare results` },
+                { label: "Normal execution", description: "Run single execution without Best-of-N" },
+              ],
+            }]);
+            if (Object.values(answers)[0] !== "Use Best-of-N") {
+              useBestOfN = false;
+              ctx.emitStatus("Best-of-N skipped — running normal execution");
+              return runOnce();
             }
-          },
-        });
+          }
+
+          ctx.emitStatus(`Running ${bestOfN} README candidates in parallel`);
+          type Candidate = { label: string; analysis: TaskAnalysis & { readmeContent?: string } };
+
+          // Collect parsed analyses per candidate via onResultText callbacks
+          const candidateAnalyses = new Map<string, (TaskAnalysis & { readmeContent?: string }) | null>();
+          const children = Array.from({ length: bestOfN }, (_, i) => {
+            const label = `candidate-${i + 1}`;
+            return {
+              label: `${label}: Analyze & draft README`,
+              prompt,
+              jsonSchema: INIT_ANALYSIS_SCHEMA as Record<string, unknown>,
+              onResultText: (text: string) => {
+                candidateAnalyses.set(label, parseAnalysis(text, description));
+              },
+            };
+          });
+
+          const results = await ctx.runChildGroup(children);
+          const candidates: Candidate[] = [];
+          for (let i = 0; i < results.length; i++) {
+            const label = `candidate-${i + 1}`;
+            const candidateAnalysis = candidateAnalyses.get(label);
+            ctx.emitStatus(`[${label}] ${results[i] ? "Completed" : "Failed"}`);
+            if (results[i] && candidateAnalysis) {
+              candidates.push({ label, analysis: candidateAnalysis });
+            }
+          }
+
+          if (candidates.length === 0) {
+            ctx.emitResult("**Best-of-N README: All candidates failed.**");
+            return false;
+          }
+
+          if (candidates.length === 1) {
+            analysis = candidates[0].analysis;
+            ctx.emitStatus(`Only one candidate succeeded (${candidates[0].label}) — auto-selected`);
+            return true;
+          }
+
+          // Run AI reviewer to select or synthesize
+          ctx.emitStatus(`Running AI reviewer to compare ${candidates.length} README candidates`);
+          const reviewCandidates = candidates.map((c) => ({
+            label: c.label,
+            files: [{ name: "README.md", content: c.analysis.readmeContent ?? "(no content)" }],
+          }));
+          const reviewPrompt = buildBestOfNFileReviewerPrompt({
+            operationType: "init-readme",
+            candidates: reviewCandidates,
+          });
+
+          let reviewResultText: string | undefined;
+          const reviewOk = await ctx.runChild("Best-of-N README Reviewer", reviewPrompt, {
+            jsonSchema: INIT_REVIEW_SCHEMA as Record<string, unknown>,
+            onResultText: (text) => { reviewResultText = text; },
+          });
+
+          if (!reviewOk) {
+            analysis = candidates[0].analysis;
+            ctx.emitStatus("Reviewer failed — using first candidate");
+            return true;
+          }
+
+          let action: "select" | "synthesize" = "select";
+          let candidateNum = 1;
+          let reasoning = "";
+          try {
+            const decision = JSON.parse(reviewResultText ?? "{}");
+            action = decision.action ?? "select";
+            candidateNum = decision.candidate ?? 1;
+            reasoning = decision.reasoning ?? "";
+          } catch {
+            analysis = candidates[0].analysis;
+            ctx.emitStatus("Failed to parse reviewer result — using first candidate");
+            return true;
+          }
+
+          ctx.emitResult(`**Best-of-N README Reviewer:** ${action} — ${reasoning}`);
+
+          // When interactionLevel is "high", let user confirm or override
+          if (interactionLevel === "high") {
+            const confirmAnswers = await ctx.emitAsk([{
+              question: `Reviewer chose to ${action} (candidate-${candidateNum}). Accept?`,
+              options: [
+                { label: "Accept", description: `Accept reviewer's ${action} decision` },
+                ...candidates.map((c) => ({
+                  label: `Override: pick ${c.label}`,
+                  description: `Use ${c.label}'s README instead`,
+                })),
+              ],
+            }]);
+            const confirmAnswer = Object.values(confirmAnswers)[0];
+            if (confirmAnswer && confirmAnswer !== "Accept") {
+              const match = confirmAnswer.match(/Override: pick candidate-(\d+)/);
+              if (match) {
+                const overrideIdx = parseInt(match[1], 10) - 1;
+                const selected = candidates[overrideIdx] ?? candidates[0];
+                analysis = selected.analysis;
+                ctx.emitStatus(`Human override: applied ${selected.label}`);
+                return true;
+              }
+            }
+          }
+
+          if (action === "select") {
+            const selected = candidates[candidateNum - 1] ?? candidates[0];
+            analysis = selected.analysis;
+            ctx.emitStatus(`Reviewer selected ${selected.label}`);
+            return true;
+          }
+
+          // Synthesize: run a synthesizer child that outputs merged README content
+          ctx.emitStatus("Running synthesizer to merge README candidates");
+          const baseAnalysis = candidates[candidateNum - 1]?.analysis ?? candidates[0].analysis;
+          const synthPrompt = buildInitReadmeSynthesizerPrompt({
+            candidates: reviewCandidates,
+            baseCandidate: candidateNum,
+          });
+
+          let synthResultText: string | undefined;
+          const synthOk = await ctx.runChild("Best-of-N README Synthesizer", synthPrompt, {
+            jsonSchema: INIT_SYNTH_SCHEMA as Record<string, unknown>,
+            onResultText: (text) => { synthResultText = text; },
+          });
+
+          if (synthOk && synthResultText) {
+            try {
+              const result = JSON.parse(synthResultText);
+              analysis = { ...baseAnalysis, readmeContent: result.readmeContent };
+              ctx.emitStatus("Synthesized README applied");
+            } catch {
+              analysis = baseAnalysis;
+              ctx.emitStatus("Failed to parse synthesizer result — using base candidate");
+            }
+          } else {
+            analysis = baseAnalysis;
+            ctx.emitStatus("Synthesizer failed — using base candidate");
+          }
+          return true;
+        }
+
+        // Normal execution (no Best-of-N)
+        return runOnce();
       },
     },
     // Phase B: Read analysis result, create workspace, copy README, setup repos
@@ -166,11 +399,11 @@ export function buildInitPipeline(description: string, interactionLevel?: Intera
         })),
       }).fn(ctx),
     },
-    // Phase D: Plan TODOs for each repo (parallel)
+    // Phase D: Plan TODOs for each repo (parallel, with optional Best-of-N)
     {
       kind: "function",
       label: "Plan TODO items",
-      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
+      timeoutMs: 60 * 60 * 1000, // 1 hour — may wait for human when Best-of-N
       fn: async (ctx) => {
         const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
 
@@ -179,37 +412,68 @@ export function buildInitPipeline(description: string, interactionLevel?: Intera
           return true;
         }
 
-        const children = repoResults.map((repo) => ({
-          label: `plan-${repo.repoName}`,
-          prompt: buildPlannerPrompt({
-            workspaceName: wsName,
-            repoPath: repo.repoPath,
-            repoName: repo.repoName,
-            readmeContent,
-            worktreePath: repo.worktreePath,
-            taskType: meta.taskType,
-            interactive: interactionLevel === "high",
-          }),
-          addDirs: [wsPath],
-        }));
+        const buildPlannerChildren = (todoOutputDir?: string, addDirsOverride?: string[]) =>
+          repoResults.map((repo) => ({
+            label: `plan-${repo.repoName}`,
+            prompt: buildPlannerPrompt({
+              workspaceName: wsName,
+              repoPath: repo.repoPath,
+              repoName: repo.repoName,
+              readmeContent,
+              worktreePath: repo.worktreePath,
+              taskType: meta.taskType,
+              interactive: interactionLevel === "high",
+              todoOutputDir,
+            }),
+            addDirs: addDirsOverride ?? [wsPath],
+          }));
 
+        const cleanup = () => {
+          const templatePath = path.join(wsPath, "TODO-template.md");
+          if (existsSync(templatePath)) {
+            unlinkSync(templatePath);
+          }
+        };
+
+        // Best-of-N for TODO planning
+        if (useBestOfN && bestOfN && bestOfN >= 2) {
+          const todoFiles = repoResults.map((r) => path.join(wsPath, `TODO-${r.repoName}.md`));
+          // Include template so each candidate dir has it for the planner to read
+          const templatePath = path.join(wsPath, "TODO-template.md");
+          const filesToCapture = existsSync(templatePath)
+            ? [...todoFiles, templatePath]
+            : todoFiles;
+
+          const result = await runBestOfNFiles({
+            ctx,
+            n: bestOfN,
+            operationType: "plan-todo",
+            filesToCapture,
+            buildChildren: (candidateDir) =>
+              buildPlannerChildren(
+                candidateDir,
+                [candidateDir, ...repoResults.map((r) => r.worktreePath)],
+              ),
+            interactionLevel,
+          });
+
+          cleanup();
+          return result;
+        }
+
+        // Normal execution
+        const children = buildPlannerChildren();
         ctx.emitStatus(`Planning TODOs for ${children.length} repositories`);
         const results = await ctx.runChildGroup(children);
         const allSuccess = results.every(Boolean);
         ctx.emitStatus(
           `Planning complete: ${results.filter(Boolean).length}/${results.length} succeeded`,
         );
-
-        // Remove the template file now that planning is done
-        const templatePath = path.join(wsPath, "TODO-template.md");
-        if (existsSync(templatePath)) {
-          unlinkSync(templatePath);
-        }
-
+        cleanup();
         return allSuccess;
       },
     },
-    // Phase D: Coordinate TODOs across repos (single, skip for single repo)
+    // Phase E: Coordinate TODOs across repos (single, skip for single repo)
     // Delegates to shared action at runtime when wsName/repoResults are populated
     {
       kind: "function",
@@ -221,7 +485,7 @@ export function buildInitPipeline(description: string, interactionLevel?: Intera
         repoNames: repoResults.map((r) => r.repoName),
       }).fn(ctx),
     },
-    // Phase E: Review TODOs (parallel, per repo)
+    // Phase F: Review TODOs (parallel, per repo)
     {
       kind: "function",
       label: "Review TODOs",
@@ -235,7 +499,7 @@ export function buildInitPipeline(description: string, interactionLevel?: Intera
         })),
       }).fn(ctx),
     },
-    // Phase F: Commit workspace snapshot
+    // Phase G: Commit workspace snapshot
     {
       kind: "function",
       label: "Commit snapshot",

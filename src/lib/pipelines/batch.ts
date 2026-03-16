@@ -1,11 +1,15 @@
 import { getOperation } from "@/lib/pipeline-manager";
 import { getReviewSessions } from "@/lib/workspace/reader";
+import { listWorkspaceRepos } from "@/lib/workspace";
+import { getConfig } from "@/lib/app-config";
 import { buildInitPipeline } from "./init";
 import { buildExecutePipeline } from "./execute";
 import { buildReviewPipeline } from "./review";
 import { buildCreatePrPipeline } from "./create-pr";
 import { buildUpdateTodoPipeline } from "./update-todo";
-import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
+import { buildBestOfNPipeline } from "./best-of-n";
+import { runSubPhases } from "./actions/run-sub-phases";
+import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 
 type BatchMode =
@@ -16,39 +20,6 @@ type BatchMode =
 
 const DEFAULT_UPDATE_TODO_INSTRUCTION =
   "Update TODO item statuses to reflect current implementation progress.";
-
-/**
- * Run sub-pipeline phases within a single function phase context.
- * Handles single, group, and function phase kinds.
- */
-async function runSubPhases(
-  ctx: PhaseFunctionContext,
-  phases: PipelinePhase[],
-): Promise<boolean> {
-  for (const phase of phases) {
-    if (ctx.signal.aborted) return false;
-
-    if (phase.kind === "single") {
-      ctx.emitStatus(`Running: ${phase.label}`);
-      const ok = await ctx.runChild(phase.label, phase.prompt, {
-        cwd: phase.cwd,
-        addDirs: phase.addDirs,
-      });
-      if (!ok) return false;
-    } else if (phase.kind === "group") {
-      ctx.emitStatus(
-        `Running parallel: ${phase.children.map((c) => c.label).join(", ")}`,
-      );
-      const results = await ctx.runChildGroup(phase.children);
-      if (!results.every(Boolean)) return false;
-    } else {
-      ctx.emitStatus(`Running: ${phase.label}`);
-      const ok = await phase.fn(ctx);
-      if (!ok) return false;
-    }
-  }
-  return true;
-}
 
 /** Resolve the workspace name from the running operation. */
 function resolveWorkspace(operationId: string, fallback?: string): string {
@@ -65,8 +36,13 @@ export function buildBatchPipeline(input: {
   draft?: boolean;
   interactionLevel?: InteractionLevel;
   repo?: string;
+  bestOfN?: number;
+  bestOfNPhases?: ("execute" | "review" | "create-pr" | "update-todo")[];
 }): PipelinePhase[] {
   const { mode, startWith, description, workspace, instruction, draft, interactionLevel, repo } = input;
+  const effectiveBestOfN = input.bestOfN ?? getConfig().operations.bestOfN;
+  const bestOfNFromConfig = input.bestOfN == null;
+  const bestOfNPhases = input.bestOfNPhases ?? ["execute"];
   const phases: PipelinePhase[] = [];
 
   // ------------------------------------------------------------------
@@ -75,7 +51,10 @@ export function buildBatchPipeline(input: {
 
   if (startWith === "init") {
     // Inline all init phases — they share closures for wsName etc.
-    const initPhases = buildInitPipeline(description ?? "", interactionLevel);
+    const initPhases = buildInitPipeline(description ?? "", interactionLevel, {
+      bestOfN: effectiveBestOfN >= 2 ? effectiveBestOfN : undefined,
+      bestOfNConfirm: bestOfNFromConfig,
+    });
     phases.push(...initPhases);
   } else if (startWith === "update-todo") {
     // update-todo: single phase built upfront
@@ -89,6 +68,9 @@ export function buildBatchPipeline(input: {
           workspace: ws,
           instruction: instruction || DEFAULT_UPDATE_TODO_INSTRUCTION,
           repo,
+          bestOfN: effectiveBestOfN >= 2 && bestOfNPhases.includes("update-todo") ? effectiveBestOfN : undefined,
+          bestOfNConfirm: bestOfNFromConfig,
+          interactionLevel,
         });
         return runSubPhases(ctx, subPhases);
       },
@@ -111,6 +93,23 @@ export function buildBatchPipeline(input: {
         return false;
       }
       ctx.emitStatus(`Executing workspace: ${ws}`);
+
+      if (effectiveBestOfN >= 2 && bestOfNPhases.includes("execute")) {
+        const repos = listWorkspaceRepos(ws);
+        const bonPhases = await buildBestOfNPipeline({
+          workspace: ws,
+          n: effectiveBestOfN,
+          operationType: "execute",
+          buildCandidatePhases: (candidateRepos) =>
+            buildExecutePipeline({ workspace: ws, repos: candidateRepos }),
+          repos,
+          confirm: bestOfNFromConfig,
+          buildNormalPhases: () => buildExecutePipeline({ workspace: ws, repository: repo }),
+          interactionLevel,
+        });
+        return runSubPhases(ctx, bonPhases);
+      }
+
       const subPhases = await buildExecutePipeline({ workspace: ws, repository: repo });
       return runSubPhases(ctx, subPhases);
     },
@@ -129,6 +128,23 @@ export function buildBatchPipeline(input: {
       fn: async (ctx) => {
         const ws = resolveWorkspace(ctx.operationId, workspace);
         ctx.emitStatus(`Reviewing workspace: ${ws}`);
+
+        if (effectiveBestOfN >= 2 && bestOfNPhases.includes("review")) {
+          const repos = listWorkspaceRepos(ws);
+          const bonPhases = await buildBestOfNPipeline({
+            workspace: ws,
+            n: effectiveBestOfN,
+            operationType: "review",
+            buildCandidatePhases: (candidateRepos) =>
+              buildReviewPipeline({ workspace: ws, repos: candidateRepos }),
+            repos,
+            confirm: bestOfNFromConfig,
+            buildNormalPhases: () => buildReviewPipeline({ workspace: ws, repository: repo }),
+            interactionLevel,
+          });
+          return runSubPhases(ctx, bonPhases);
+        }
+
         const subPhases = await buildReviewPipeline({ workspace: ws, repository: repo });
         return runSubPhases(ctx, subPhases);
       },
@@ -187,6 +203,23 @@ export function buildBatchPipeline(input: {
         }
         const ws = resolveWorkspace(ctx.operationId, workspace);
         ctx.emitStatus(`Creating PR for workspace: ${ws}`);
+
+        if (effectiveBestOfN >= 2 && bestOfNPhases.includes("create-pr")) {
+          const repos = listWorkspaceRepos(ws);
+          const bonPhases = await buildBestOfNPipeline({
+            workspace: ws,
+            n: effectiveBestOfN,
+            operationType: "create-pr",
+            buildCandidatePhases: (candidateRepos) =>
+              buildCreatePrPipeline({ workspace: ws, draft: draft ?? false, repos: candidateRepos }),
+            repos,
+            confirm: bestOfNFromConfig,
+            buildNormalPhases: () => buildCreatePrPipeline({ workspace: ws, draft: draft ?? false, repository: repo }),
+            interactionLevel,
+          });
+          return runSubPhases(ctx, bonPhases);
+        }
+
         const subPhases = await buildCreatePrPipeline({
           workspace: ws,
           draft: draft ?? false,

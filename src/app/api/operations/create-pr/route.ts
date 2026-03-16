@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { listWorkspaceRepos } from "@/lib/workspace";
+import { getConfig } from "@/lib/app-config";
 import { buildCreatePrPipeline } from "@/lib/pipelines/create-pr";
+import { buildBestOfNPipeline } from "@/lib/pipelines/best-of-n";
 import { createPrSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 
@@ -23,10 +25,29 @@ export async function POST(request: Request) {
     );
   }
 
+  const bestOfN = parsed.data.bestOfN ?? getConfig().operations.bestOfN;
+  const bestOfNFromConfig = parsed.data.bestOfN == null;
+
   try {
-    const phases = await buildCreatePrPipeline({ workspace, draft: draft !== false, repository });
+    let phases;
+    if (bestOfN >= 2) {
+      phases = await buildBestOfNPipeline({
+        workspace,
+        n: bestOfN,
+        operationType: "create-pr",
+        buildCandidatePhases: (candidateRepos) =>
+          buildCreatePrPipeline({ workspace, draft: draft !== false, repos: candidateRepos }),
+        repos,
+        confirm: bestOfNFromConfig,
+        buildNormalPhases: () => buildCreatePrPipeline({ workspace, draft: draft !== false, repository }),
+        interactionLevel: parsed.data.interactionLevel,
+      });
+    } else {
+      phases = await buildCreatePrPipeline({ workspace, draft: draft !== false, repository });
+    }
     const operation = startOperationPipeline("create-pr", workspace, phases, undefined, {
       ...(draft === false && { draft: "false" }),
+      ...(bestOfN >= 2 && { bestOfN: String(bestOfN) }),
     });
     return NextResponse.json(operation);
   } catch (err) {

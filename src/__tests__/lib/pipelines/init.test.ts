@@ -21,6 +21,8 @@ vi.mock("@/lib/templates", () => ({
   buildPlannerPrompt: vi.fn(() => "planner-prompt"),
   buildCoordinatorPrompt: vi.fn(() => "coordinator-prompt"),
   buildReviewerPrompt: vi.fn(() => "reviewer-prompt"),
+  buildBestOfNFileReviewerPrompt: vi.fn(() => "reviewer-prompt"),
+  BEST_OF_N_REVIEW_SCHEMA: {},
 }));
 
 describe("buildInitPipeline", () => {
@@ -57,5 +59,34 @@ describe("buildInitPipeline", () => {
     const phases1 = buildInitPipeline("desc 1");
     const phases2 = buildInitPipeline("desc 2");
     expect(phases1).not.toBe(phases2);
+  });
+
+  describe("Best-of-N options", () => {
+    it("still returns 7 phases when bestOfN is provided", () => {
+      const phases = buildInitPipeline("desc", undefined, { bestOfN: 3 });
+      expect(phases).toHaveLength(7);
+    });
+
+    it("phase labels remain the same with bestOfN", () => {
+      const phases = buildInitPipeline("desc", undefined, { bestOfN: 3 });
+      const labels = phases.map((p) => {
+        if (p.kind === "function" || p.kind === "single") return p.label;
+        return "group";
+      });
+      expect(labels).toEqual([
+        "Analyze & draft README",
+        "Setup workspace",
+        "Discover repo constraints",
+        "Plan TODO items",
+        "Coordinate TODOs",
+        "Review TODOs",
+        "Commit snapshot",
+      ]);
+    });
+
+    it("accepts bestOfNConfirm option", () => {
+      const phases = buildInitPipeline("desc", undefined, { bestOfN: 2, bestOfNConfirm: true });
+      expect(phases).toHaveLength(7);
+    });
   });
 });

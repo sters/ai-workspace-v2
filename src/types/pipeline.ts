@@ -8,6 +8,10 @@ export interface GroupChild {
   cwd?: string;
   /** Additional directories to expose via --add-dir. */
   addDirs?: string[];
+  /** JSON Schema for structured output via --json-schema. */
+  jsonSchema?: Record<string, unknown>;
+  /** Called with the model's final text response when the child process completes. */
+  onResultText?: (text: string) => void;
 }
 
 export interface PipelinePhaseSingle {
@@ -75,6 +79,8 @@ export interface PipelineOptions {
     phase: PipelinePhase,
     success: boolean,
   ) => "continue" | "skip" | "abort";
+  /** When set, wraps the pipeline in Best-of-N mode with N parallel candidates. */
+  bestOfN?: number;
 }
 
 export interface SetupRepositoryResult extends WorkspaceRepo {

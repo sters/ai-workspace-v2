@@ -29,6 +29,8 @@ export interface PlannerInput extends RepoPromptInput {
   readmeContent: string;
   taskType: string;
   interactive?: boolean;
+  /** Override directory for TODO file output. When set, uses this absolute path instead of the default relative path. */
+  todoOutputDir?: string;
 }
 
 export interface CoordinatorInput {
@@ -121,4 +123,29 @@ export interface CreateTodoPlannerInput extends RepoPromptInput {
   reviewDir: string;
   taskType: string;
   instruction?: string;
+}
+
+export interface BestOfNReviewerInput {
+  workspaceName: string;
+  operationType: string;
+  candidates: { label: string; diff: string; resultText?: string }[];
+  readmeContent: string;
+}
+
+export interface BestOfNFileReviewerInput {
+  operationType: string;
+  candidates: { label: string; files: { name: string; content: string }[] }[];
+}
+
+export interface BestOfNFileSynthesizerInput {
+  operationType: string;
+  candidates: { label: string; files: { name: string; content: string }[] }[];
+  /** Base candidate index (1-indexed) to start from. */
+  baseCandidate: number;
+  /** Source candidates (1-indexed) to draw from. */
+  sources: number[];
+  /** Directory where synthesized files should be written. */
+  outputDir: string;
+  /** File names to synthesize. */
+  fileNames: string[];
 }

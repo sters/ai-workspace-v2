@@ -10,3 +10,4 @@ export { buildMcpAuthPipeline } from "./mcp-auth";
 export { buildClaudeLoginPipeline } from "./claude-login";
 export { buildBatchPipeline } from "./batch";
 export { buildSearchPipeline } from "./search";
+export { buildBestOfNPipeline } from "./best-of-n";

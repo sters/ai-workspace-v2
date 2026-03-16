@@ -9,6 +9,8 @@ import {
   _setConfigFilePath,
   ensureConfigFile,
   generateDefaultConfigContent,
+  migrateConfigContent,
+  migrateConfigFile,
 } from "@/lib/app-config";
 
 describe("CONFIG_DEFAULTS", () => {
@@ -290,7 +292,7 @@ describe("ensureConfigFile", () => {
     }
   });
 
-  it("does not overwrite existing config file", async () => {
+  it("migrates existing config file on ensure", async () => {
     const fs = await import("node:fs");
     const tmpDir = `/tmp/test-aiw-config-${Date.now()}`;
     const tmpPath = `${tmpDir}/config.yml`;
@@ -300,7 +302,11 @@ describe("ensureConfigFile", () => {
       const created = ensureConfigFile(tmpPath);
       expect(created).toBe(false);
       const content = fs.readFileSync(tmpPath, "utf-8");
-      expect(content).toBe("editor: vim {path}\n");
+      // User's active value is preserved
+      expect(content).toContain("editor: vim {path}");
+      // Missing keys are added as comments
+      expect(content).toContain("# terminal:");
+      expect(content).toContain("# operations:");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -317,5 +323,220 @@ describe("generateDefaultConfigContent", () => {
     expect(content).toContain("# operations:");
     expect(content).toContain("# editor:");
     expect(content).toContain("# terminal:");
+  });
+});
+
+describe("migrateConfigContent", () => {
+  it("returns unchanged content when all keys present", () => {
+    const content = generateDefaultConfigContent();
+    expect(migrateConfigContent(content)).toBe(content);
+  });
+
+  it("adds missing nested key as comment at end of section", () => {
+    const content = [
+      "operations:",
+      "  maxConcurrent: 3",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    // bestOfN and other missing ops keys should be added in the operations section
+    expect(result).toContain("#   bestOfN:");
+    expect(result).toContain("#   claudeTimeoutMinutes:");
+    // maxConcurrent should remain active
+    expect(result).toContain("  maxConcurrent: 3");
+    // The missing ops keys should appear between maxConcurrent and the blank line (or after)
+    const lines = result.split("\n");
+    const maxConcIdx = lines.findIndex((l) => l.includes("maxConcurrent: 3"));
+    const bestOfNIdx = lines.findIndex((l) => l.includes("bestOfN:"));
+    expect(bestOfNIdx).toBeGreaterThan(maxConcIdx);
+  });
+
+  it("comments out unknown active top-level key", () => {
+    const content = [
+      "unknownSetting: value",
+      "editor: code {path}",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    expect(result).toContain("# unknownSetting: value");
+    // Known key preserved as active
+    expect(result).toContain("editor: code {path}");
+  });
+
+  it("comments out unknown active nested key", () => {
+    const content = [
+      "operations:",
+      "  maxConcurrent: 3",
+      "  oldSetting: true",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    expect(result).toContain("#   oldSetting: true");
+    expect(result).toContain("  maxConcurrent: 3");
+  });
+
+  it("preserves active known keys unchanged", () => {
+    const content = [
+      "editor: vim {path}",
+      "terminal: open -a iTerm {path}",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    expect(result).toContain("editor: vim {path}");
+    expect(result).toContain("terminal: open -a iTerm {path}");
+  });
+
+  it("preserves commented known keys unchanged", () => {
+    const content = [
+      "# editor: code {path}",
+      "# terminal: open -a Terminal {path}",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    expect(result).toContain("# editor: code {path}");
+    expect(result).toContain("# terminal: open -a Terminal {path}");
+  });
+
+  it("adds missing section with all its keys", () => {
+    const content = [
+      "editor: code {path}",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    // operations section should be added
+    expect(result).toContain("# operations:");
+    expect(result).toContain("#   maxConcurrent:");
+    expect(result).toContain("#   bestOfN:");
+    // server and claude sections too
+    expect(result).toContain("# server:");
+    expect(result).toContain("#   port:");
+    expect(result).toContain("# claude:");
+    expect(result).toContain("#   useCli:");
+  });
+
+  it("handles both commenting out and adding in same migration", () => {
+    const content = [
+      "operations:",
+      "  maxConcurrent: 3",
+      "  deprecatedKey: old",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    // Unknown key commented out
+    expect(result).toContain("#   deprecatedKey: old");
+    // Missing keys added
+    expect(result).toContain("#   bestOfN:");
+    expect(result).toContain("#   claudeTimeoutMinutes:");
+    // Active known key preserved
+    expect(result).toContain("  maxConcurrent: 3");
+  });
+
+  it("comments out children of unknown section header", () => {
+    const content = [
+      "oldSection:",
+      "  oldChild: value",
+      "  anotherChild: 42",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    expect(result).toContain("# oldSection:");
+    expect(result).toContain("#   oldChild: value");
+    expect(result).toContain("#   anotherChild: 42");
+  });
+
+  it("preserves user comments and blank lines", () => {
+    const content = [
+      "# ai-workspace configuration",
+      "# My custom note",
+      "",
+      "editor: vim {path}",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    expect(result).toContain("# ai-workspace configuration");
+    expect(result).toContain("# My custom note");
+    expect(result).toContain("editor: vim {path}");
+  });
+
+  it("handles fully active config file", () => {
+    const content = [
+      "workspaceRoot: /my/workspace",
+      "",
+      "server:",
+      "  port: 3741",
+      "  chatPort: 3742",
+      "",
+      "claude:",
+      "  path: null",
+      "  useCli: true",
+      "",
+      "operations:",
+      "  maxConcurrent: 3",
+      "  claudeTimeoutMinutes: 20",
+      "  functionTimeoutMinutes: 3",
+      "  defaultInteractionLevel: mid",
+      "  bestOfN: 0",
+      "",
+      "editor: code {path}",
+      "terminal: open -a Terminal {path}",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    // All keys present — no changes
+    expect(result).toBe(content);
+  });
+
+  it("adds missing keys to partially filled section", () => {
+    const content = [
+      "server:",
+      "  port: 9999",
+      "",
+      "editor: code {path}",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    // chatPort should be added to server section
+    expect(result).toContain("#   chatPort:");
+    // port stays active
+    expect(result).toContain("  port: 9999");
+    // chatPort should be in the server section (before editor)
+    const lines = result.split("\n");
+    const chatPortIdx = lines.findIndex((l) => l.includes("chatPort:"));
+    const editorIdx = lines.findIndex((l) => l.includes("editor:"));
+    expect(chatPortIdx).toBeLessThan(editorIdx);
+  });
+});
+
+describe("migrateConfigFile", () => {
+  it("returns false when no changes needed", async () => {
+    const fs = await import("node:fs");
+    const tmpDir = `/tmp/test-aiw-migrate-${Date.now()}`;
+    const tmpPath = `${tmpDir}/config.yml`;
+    fs.mkdirSync(tmpDir, { recursive: true });
+    fs.writeFileSync(tmpPath, generateDefaultConfigContent());
+    try {
+      const changed = migrateConfigFile(tmpPath);
+      expect(changed).toBe(false);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("writes migrated content and returns true when changes needed", async () => {
+    const fs = await import("node:fs");
+    const tmpDir = `/tmp/test-aiw-migrate-${Date.now()}`;
+    const tmpPath = `${tmpDir}/config.yml`;
+    fs.mkdirSync(tmpDir, { recursive: true });
+    fs.writeFileSync(tmpPath, "editor: vim {path}\n");
+    try {
+      const changed = migrateConfigFile(tmpPath);
+      expect(changed).toBe(true);
+      const content = fs.readFileSync(tmpPath, "utf-8");
+      expect(content).toContain("editor: vim {path}");
+      expect(content).toContain("# terminal:");
+      expect(content).toContain("# operations:");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 });

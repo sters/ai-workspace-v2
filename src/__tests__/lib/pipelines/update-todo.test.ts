@@ -79,6 +79,56 @@ describe("buildUpdateTodoPipeline", () => {
     });
   });
 
+  describe("Best-of-N mode", () => {
+    beforeEach(() => {
+      mockListWorkspaceRepos.mockReturnValue([
+        {
+          repoName: "my-repo",
+          repoPath: "/repos/my-repo",
+          worktreePath: "/repos/my-repo/worktrees/test-ws",
+        } as ReturnType<typeof listWorkspaceRepos>[number],
+      ]);
+    });
+
+    it("returns a function phase when bestOfN >= 2", async () => {
+      const phases = await buildUpdateTodoPipeline({
+        workspace: "test-ws",
+        instruction: "add tests",
+        bestOfN: 3,
+      });
+      expect(phases).toHaveLength(1);
+      expect(phases[0].kind).toBe("function");
+    });
+
+    it("returns a single phase when bestOfN is undefined", async () => {
+      const phases = await buildUpdateTodoPipeline({
+        workspace: "test-ws",
+        instruction: "add tests",
+      });
+      expect(phases[0].kind).toBe("single");
+    });
+
+    it("returns a single phase when bestOfN < 2", async () => {
+      const phases = await buildUpdateTodoPipeline({
+        workspace: "test-ws",
+        instruction: "add tests",
+        bestOfN: 1,
+      });
+      expect(phases[0].kind).toBe("single");
+    });
+
+    it("function phase label includes Best-of-N", async () => {
+      const phases = await buildUpdateTodoPipeline({
+        workspace: "test-ws",
+        instruction: "add tests",
+        bestOfN: 2,
+      });
+      const phase = phases[0];
+      if (phase.kind !== "function") throw new Error("expected function");
+      expect(phase.label).toBe("Update TODOs (Best-of-N)");
+    });
+  });
+
   describe("multiple repos", () => {
     beforeEach(() => {
       mockListWorkspaceRepos.mockReturnValue([

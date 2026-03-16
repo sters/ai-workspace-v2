@@ -16,16 +16,19 @@ import {
   buildCollectorPrompt,
 } from "@/lib/templates";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
+import type { WorkspaceRepo } from "@/types/workspace";
 import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
 
 export async function buildReviewPipeline(input: {
   workspace: string;
   repository?: string;
+  /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
+  repos?: WorkspaceRepo[];
 }): Promise<PipelinePhase[]> {
   const { workspace, repository } = input;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const allRepos = listWorkspaceRepos(workspace);
+  const allRepos = input.repos ?? listWorkspaceRepos(workspace);
   const repos = repository
     ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
     : allRepos;
