@@ -7,9 +7,14 @@ import type { PlannerInput } from "@/types/prompts";
 
 export function buildPlannerPrompt(input: PlannerInput): string {
   const isResearch = input.taskType === "research";
+  const todoDir = input.todoOutputDir ?? `workspace/${input.workspaceName}`;
   const instructions = isResearch
-    ? researchPlannerInstructions(input.worktreePath)
-    : plannerInstructions(input.worktreePath);
+    ? researchPlannerInstructions(input.worktreePath, todoDir)
+    : plannerInstructions(input.worktreePath, todoDir);
+
+  const templatePath = input.todoOutputDir
+    ? `${input.todoOutputDir}/TODO-template.md`
+    : `workspace/${input.workspaceName}/TODO-template.md`;
 
   return `# Task: Plan TODO items for ${input.repoName}
 
@@ -25,7 +30,7 @@ ${input.readmeContent}
 
 ## TODO Template
 
-Read the TODO template file at: workspace/${input.workspaceName}/TODO-template.md
+Read the TODO template file at: ${templatePath}
 Use it as the base structure for the TODO file. Replace \`{{REPOSITORY_NAME}}\` with the actual repository name.
 
 ## Instructions
@@ -34,7 +39,7 @@ ${instructions}
 `;
 }
 
-function plannerInstructions(worktreePath: string): string {
+function plannerInstructions(worktreePath: string, todoDir: string): string {
   return `You are a specialized agent for creating TODO items. Your role is to understand the workspace objectives, assess how much repository analysis is needed, and create actionable TODO items that guide the executor.
 
 **Your mission is simple and unwavering: Create a TODO file that tells the executor what to do.**
@@ -71,7 +76,7 @@ function plannerInstructions(worktreePath: string): string {
 
 ### Output
 
-Write the TODO file to: workspace/{workspace-name}/TODO-{repository-name}.md
+Write the TODO file to: ${todoDir}/TODO-{repository-name}.md
 
 ### Working Directory
 
@@ -115,7 +120,7 @@ If Mode is "interactive", pause at two checkpoints:
 `;
 }
 
-function researchPlannerInstructions(worktreePath: string): string {
+function researchPlannerInstructions(worktreePath: string, todoDir: string): string {
   return `You are a specialized agent for creating TODO items for a **research/investigation task**. Your role is to outline what needs to be investigated — NOT to perform the investigation itself.
 
 **CRITICAL: Do NOT analyze source code, read implementation files, or investigate the codebase. The executor will do that. Your job is only to create a TODO list of what to look into.**
@@ -144,7 +149,7 @@ function researchPlannerInstructions(worktreePath: string): string {
 
 ### Output
 
-Write the TODO file to: workspace/{workspace-name}/TODO-{repository-name}.md
+Write the TODO file to: ${todoDir}/TODO-{repository-name}.md
 
 ### Working Directory
 

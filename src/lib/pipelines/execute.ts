@@ -24,11 +24,13 @@ export async function buildExecutePipeline(input: {
   workspace: string;
   batchSize?: number;
   repository?: string;
+  /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
+  repos?: WorkspaceRepo[];
 }): Promise<PipelinePhase[]> {
   const { workspace, batchSize = DEFAULT_BATCH_SIZE, repository } = input;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const allRepos = listWorkspaceRepos(workspace);
+  const allRepos = input.repos ?? listWorkspaceRepos(workspace);
   const repos = repository
     ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
     : allRepos;

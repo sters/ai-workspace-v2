@@ -4,6 +4,11 @@ import type { PhaseFunctionContext, PipelinePhase, GroupChild } from "@/types/pi
 vi.mock("@/lib/pipeline-manager", () => ({
   getOperation: vi.fn(),
 }));
+vi.mock("@/lib/app-config", () => ({
+  getConfig: vi.fn(() => ({
+    operations: { bestOfN: 0, defaultInteractionLevel: "mid" },
+  })),
+}));
 vi.mock("@/lib/workspace/reader", () => ({
   getReviewSessions: vi.fn(() => []),
 }));

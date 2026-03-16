@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   const parsed = parseBody(batchSchema, body);
   if (!parsed.success) return parsed.response;
 
-  const { mode, startWith, description, instruction, draft, interactionLevel, repo } = parsed.data;
+  const { mode, startWith, description, instruction, draft, interactionLevel, repo, bestOfN, bestOfNPhases } = parsed.data;
   let workspace = parsed.data.workspace;
 
   if (startWith === "init") {
@@ -48,6 +48,8 @@ export async function POST(request: Request) {
       draft,
       interactionLevel,
       repo,
+      bestOfN,
+      bestOfNPhases,
     });
     const operation = startOperationPipeline(
       "batch",
@@ -62,6 +64,8 @@ export async function POST(request: Request) {
         ...(instruction && { instruction }),
         ...(draft != null && { draft: String(draft) }),
         ...(repo && { repo }),
+        ...(bestOfN != null && bestOfN >= 2 && { bestOfN: String(bestOfN) }),
+        ...(bestOfNPhases && { bestOfNPhases: bestOfNPhases.join(",") }),
       },
     );
     return NextResponse.json(operation);

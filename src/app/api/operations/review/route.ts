@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { listWorkspaceRepos } from "@/lib/workspace";
+import { getConfig } from "@/lib/app-config";
 import { buildReviewPipeline } from "@/lib/pipelines/review";
+import { buildBestOfNPipeline } from "@/lib/pipelines/best-of-n";
 import { reviewSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 
@@ -21,9 +23,29 @@ export async function POST(request: Request) {
     );
   }
 
+  const bestOfN = parsed.data.bestOfN ?? getConfig().operations.bestOfN;
+  const bestOfNFromConfig = parsed.data.bestOfN == null;
+
   try {
-    const phases = await buildReviewPipeline({ workspace, repository: parsed.data.repository });
-    const operation = startOperationPipeline("review", workspace, phases);
+    let phases;
+    if (bestOfN >= 2) {
+      phases = await buildBestOfNPipeline({
+        workspace,
+        n: bestOfN,
+        operationType: "review",
+        buildCandidatePhases: (candidateRepos) =>
+          buildReviewPipeline({ workspace, repos: candidateRepos }),
+        repos,
+        confirm: bestOfNFromConfig,
+        buildNormalPhases: () => buildReviewPipeline({ workspace, repository: parsed.data.repository }),
+        interactionLevel: parsed.data.interactionLevel,
+      });
+    } else {
+      phases = await buildReviewPipeline({ workspace, repository: parsed.data.repository });
+    }
+    const operation = startOperationPipeline("review", workspace, phases, undefined,
+      bestOfN >= 2 ? { bestOfN: String(bestOfN) } : undefined,
+    );
     return NextResponse.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {

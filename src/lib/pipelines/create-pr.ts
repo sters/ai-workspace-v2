@@ -11,16 +11,19 @@ import {
 import { WORKSPACE_DIR } from "@/lib/config";
 import { buildPRCreatorPrompt } from "@/lib/templates";
 import type { PipelinePhase } from "@/types/pipeline";
+import type { WorkspaceRepo } from "@/types/workspace";
 
 export async function buildCreatePrPipeline(input: {
   workspace: string;
   draft: boolean;
   repository?: string;
+  /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
+  repos?: WorkspaceRepo[];
 }): Promise<PipelinePhase[]> {
   const { workspace, draft, repository } = input;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const allRepos = listWorkspaceRepos(workspace);
+  const allRepos = input.repos ?? listWorkspaceRepos(workspace);
   const repos = repository
     ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
     : allRepos;

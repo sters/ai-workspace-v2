@@ -23,6 +23,7 @@ export const CONFIG_DEFAULTS: AppConfig = {
     claudeTimeoutMinutes: 20,
     functionTimeoutMinutes: 3,
     defaultInteractionLevel: "mid",
+    bestOfN: 0,
   },
   editor: "code {path}",
   terminal: "open -a Terminal {path}",
@@ -60,6 +61,7 @@ export function generateDefaultConfigContent(): string {
     "#   claudeTimeoutMinutes: 20",
     "#   functionTimeoutMinutes: 3",
     "#   defaultInteractionLevel: mid   # low / mid / high",
+    "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates",
     "",
     "# editor: code {path}",
     "# terminal: open -a Terminal {path}",
@@ -73,10 +75,289 @@ export function generateDefaultConfigContent(): string {
  * Returns true if the file was created, false if it already exists.
  */
 export function ensureConfigFile(filePath: string = CONFIG_FILE_PATH): boolean {
-  if (fs.existsSync(filePath)) return false;
+  if (fs.existsSync(filePath)) {
+    migrateConfigFile(filePath);
+    return false;
+  }
   const dir = path.dirname(filePath);
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(filePath, generateDefaultConfigContent(), "utf-8");
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Config migration
+// ---------------------------------------------------------------------------
+
+const SECTION_NAMES = new Set(["server", "claude", "operations"]);
+
+interface ConfigKeyDef {
+  key: string;
+  /** null = top-level key or section header */
+  section: string | null;
+  /** Default commented-out line to add when missing */
+  defaultLine: string;
+}
+
+/** Registry of all known config keys, in canonical order. */
+export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
+  { key: "workspaceRoot", section: null, defaultLine: "# workspaceRoot: /path/to/ai-workspace" },
+  { key: "server", section: null, defaultLine: "# server:" },
+  { key: "port", section: "server", defaultLine: "#   port: 3741" },
+  { key: "chatPort", section: "server", defaultLine: "#   chatPort: 3742" },
+  { key: "claude", section: null, defaultLine: "# claude:" },
+  { key: "path", section: "claude", defaultLine: "#   path: null           # null = auto-detect" },
+  { key: "useCli", section: "claude", defaultLine: "#   useCli: true" },
+  { key: "operations", section: null, defaultLine: "# operations:" },
+  { key: "maxConcurrent", section: "operations", defaultLine: "#   maxConcurrent: 3" },
+  { key: "claudeTimeoutMinutes", section: "operations", defaultLine: "#   claudeTimeoutMinutes: 20" },
+  { key: "functionTimeoutMinutes", section: "operations", defaultLine: "#   functionTimeoutMinutes: 3" },
+  { key: "defaultInteractionLevel", section: "operations", defaultLine: "#   defaultInteractionLevel: mid   # low / mid / high" },
+  { key: "bestOfN", section: "operations", defaultLine: "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates" },
+  { key: "editor", section: null, defaultLine: "# editor: code {path}" },
+  { key: "terminal", section: null, defaultLine: "# terminal: open -a Terminal {path}" },
+];
+
+interface ParsedLine {
+  type: "top-key" | "nested-key" | "other";
+  key?: string;
+  commented: boolean;
+}
+
+function parseConfigLine(line: string): ParsedLine {
+  const trimmed = line.trimStart();
+  if (!trimmed || !trimmed.includes(":")) {
+    return { type: "other", commented: false };
+  }
+
+  const isCommented = line.startsWith("#");
+  // Remove '#' and at most one space after it (the comment marker space)
+  const effective = isCommented ? line.replace(/^#\s?/, "") : line;
+
+  // Nested key: starts with 2+ spaces then word then colon
+  const nestedMatch = effective.match(/^(\s{2,})(\w+)\s*:/);
+  if (nestedMatch) {
+    return { type: "nested-key", key: nestedMatch[2], commented: isCommented };
+  }
+
+  // Top-level key: starts with word char at column 0
+  const topMatch = effective.match(/^(\w+)\s*:/);
+  if (topMatch) {
+    return { type: "top-key", key: topMatch[1], commented: isCommented };
+  }
+
+  return { type: "other", commented: false };
+}
+
+/**
+ * Find the last line index that belongs to a section (header or nested key).
+ * Returns -1 if the section is not found.
+ */
+function findSectionEnd(lines: string[], sectionName: string): number {
+  let inSection = false;
+  let lastSectionLine = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const parsed = parseConfigLine(lines[i]);
+    if (parsed.type === "top-key" && parsed.key === sectionName) {
+      inSection = true;
+      lastSectionLine = i;
+    } else if (inSection) {
+      if (parsed.type === "nested-key") {
+        lastSectionLine = i;
+      } else if (parsed.type === "top-key") {
+        break; // New top-level key = section ended
+      }
+    }
+  }
+
+  return lastSectionLine;
+}
+
+/**
+ * Migrate config file content: comment out unknown active keys, add missing
+ * known keys as commented-out entries.
+ *
+ * Pure function — no I/O.
+ */
+export function migrateConfigContent(content: string): string {
+  let lines = content.split("\n");
+
+  // --- Phase 1: Comment out unknown active keys ---
+  lines = commentOutUnknownKeys(lines);
+
+  // --- Phase 2: Add missing entries ---
+  lines = addMissingEntries(lines);
+
+  return lines.join("\n");
+}
+
+function commentOutUnknownKeys(lines: string[]): string[] {
+  let currentSection: string | null = null;
+  let sectionCommentedOut = false;
+
+  return lines.map((line) => {
+    const parsed = parseConfigLine(line);
+
+    if (parsed.type === "top-key") {
+      sectionCommentedOut = false;
+      if (SECTION_NAMES.has(parsed.key!)) {
+        currentSection = parsed.key!;
+      } else {
+        currentSection = null;
+      }
+      if (!parsed.commented) {
+        const isKnown = KNOWN_CONFIG_KEYS.some(
+          (k) => k.section === null && k.key === parsed.key!,
+        );
+        if (!isKnown) {
+          // If this is a section-like header (key with no inline value), mark children
+          if (/^\w+\s*:\s*$/.test(line)) {
+            sectionCommentedOut = true;
+          }
+          return `# ${line}`;
+        }
+      }
+    } else if (parsed.type === "nested-key") {
+      if (!parsed.commented) {
+        if (sectionCommentedOut) {
+          return `# ${line}`;
+        }
+        if (currentSection) {
+          const isKnown = KNOWN_CONFIG_KEYS.some(
+            (k) => k.section === currentSection && k.key === parsed.key!,
+          );
+          if (!isKnown) return `# ${line}`;
+        }
+      }
+    }
+
+    // Track section from commented headers too
+    if (parsed.type === "top-key" && parsed.commented) {
+      if (SECTION_NAMES.has(parsed.key!)) {
+        currentSection = parsed.key!;
+      } else {
+        currentSection = null;
+      }
+    }
+
+    return line;
+  });
+}
+
+function addMissingEntries(lines: string[]): string[] {
+  // Scan for what exists (both active and commented)
+  let currentSection: string | null = null;
+  const found = new Set<string>();
+
+  for (const line of lines) {
+    const parsed = parseConfigLine(line);
+    if (parsed.type === "top-key") {
+      found.add(parsed.key!);
+      if (SECTION_NAMES.has(parsed.key!)) {
+        currentSection = parsed.key!;
+      } else {
+        currentSection = null;
+      }
+    } else if (parsed.type === "nested-key" && currentSection) {
+      found.add(`${currentSection}.${parsed.key!}`);
+    }
+  }
+
+  // Determine what's missing
+  const missing = KNOWN_CONFIG_KEYS.filter((def) => {
+    const id = def.section ? `${def.section}.${def.key}` : def.key;
+    return !found.has(id);
+  });
+
+  if (missing.length === 0) return lines;
+
+  const result = [...lines];
+
+  // Missing sections (section header itself is missing)
+  const missingSectionHeaders = new Set(
+    missing
+      .filter((m) => m.section === null && SECTION_NAMES.has(m.key))
+      .map((m) => m.key),
+  );
+
+  // Missing nested entries in EXISTING sections
+  const missingInExistingSection = missing.filter(
+    (m) => m.section !== null && !missingSectionHeaders.has(m.section) && found.has(m.section),
+  );
+
+  // Missing top-level scalar entries
+  const missingTopLevel = missing.filter(
+    (m) => m.section === null && !SECTION_NAMES.has(m.key),
+  );
+
+  // Insert missing nested entries at end of their existing sections
+  // Group by section
+  const sectionInsertions = new Map<string, string[]>();
+  for (const m of missingInExistingSection) {
+    if (!sectionInsertions.has(m.section!)) {
+      sectionInsertions.set(m.section!, []);
+    }
+    sectionInsertions.get(m.section!)!.push(m.defaultLine);
+  }
+
+  // Find insertion points and apply bottom-to-top
+  const insertionPoints: { afterLine: number; linesToInsert: string[] }[] = [];
+  for (const [section, insertLines] of sectionInsertions) {
+    const endLine = findSectionEnd(result, section);
+    if (endLine >= 0) {
+      insertionPoints.push({ afterLine: endLine, linesToInsert: insertLines });
+    }
+  }
+
+  insertionPoints.sort((a, b) => b.afterLine - a.afterLine);
+  for (const { afterLine, linesToInsert } of insertionPoints) {
+    result.splice(afterLine + 1, 0, ...linesToInsert);
+  }
+
+  // Append missing sections and top-level entries at end
+  const appendLines: string[] = [];
+
+  // Missing sections (header + all children)
+  for (const sectionKey of missingSectionHeaders) {
+    const header = KNOWN_CONFIG_KEYS.find(
+      (k) => k.key === sectionKey && k.section === null,
+    );
+    if (header) {
+      appendLines.push("");
+      appendLines.push(header.defaultLine);
+      const children = missing.filter((m) => m.section === sectionKey);
+      for (const child of children) {
+        appendLines.push(child.defaultLine);
+      }
+    }
+  }
+
+  // Missing top-level scalars
+  for (const m of missingTopLevel) {
+    appendLines.push(m.defaultLine);
+  }
+
+  if (appendLines.length > 0) {
+    // Remove trailing empty lines before appending
+    while (result.length > 0 && result[result.length - 1] === "") {
+      result.pop();
+    }
+    result.push(...appendLines);
+    result.push(""); // trailing newline
+  }
+
+  return result;
+}
+
+/**
+ * Migrate a config file on disk. Returns true if changes were made.
+ */
+export function migrateConfigFile(filePath: string): boolean {
+  const content = fs.readFileSync(filePath, "utf-8");
+  const migrated = migrateConfigContent(content);
+  if (migrated === content) return false;
+  fs.writeFileSync(filePath, migrated, "utf-8");
   return true;
 }
 
@@ -200,6 +481,11 @@ export function mergeConfig(
         env.operations?.defaultInteractionLevel,
         file.operations?.defaultInteractionLevel,
         defaults.operations.defaultInteractionLevel,
+      ),
+      bestOfN: pick(
+        env.operations?.bestOfN,
+        file.operations?.bestOfN,
+        defaults.operations.bestOfN,
       ),
     },
     editor: pick(env.editor, file.editor, defaults.editor),

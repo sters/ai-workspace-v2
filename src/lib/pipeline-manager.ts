@@ -496,11 +496,14 @@ export function startOperationPipeline(
                   const cid = `${id}-phase-${i}-fn-${childCounter++}`;
                   operation.children!.push({ id: cid, label: child.label, status: "running" });
                   const claudeOpts: RunClaudeOptions | undefined =
-                    (child.cwd || child.addDirs)
-                      ? { cwd: child.cwd, addDirs: child.addDirs }
+                    (child.cwd || child.addDirs || child.jsonSchema)
+                      ? { cwd: child.cwd, addDirs: child.addDirs, jsonSchema: child.jsonSchema }
                       : undefined;
                   const proc = runClaude(cid, child.prompt, claudeOpts);
                   const result = await wireChild(managed, cid, child.label, proc, phaseExtra);
+                  if (result.resultText && child.onResultText) {
+                    child.onResultText(result.resultText);
+                  }
                   return result.success;
                 });
               });
@@ -543,11 +546,14 @@ export function startOperationPipeline(
             const childId = `${id}-phase-${i}-child-${j}`;
             operation.children!.push({ id: childId, label: child.label, status: "running" });
             const claudeOpts: RunClaudeOptions | undefined =
-              (child.cwd || child.addDirs)
-                ? { cwd: child.cwd, addDirs: child.addDirs }
+              (child.cwd || child.addDirs || child.jsonSchema)
+                ? { cwd: child.cwd, addDirs: child.addDirs, jsonSchema: child.jsonSchema }
                 : undefined;
             const process = runClaude(childId, child.prompt, claudeOpts);
             const result = await wireChild(managed, childId, child.label, process, phaseExtra);
+            if (result.resultText && child.onResultText) {
+              child.onResultText(result.resultText);
+            }
             return result.success;
           });
         });
