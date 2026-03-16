@@ -35,7 +35,7 @@ export function createSubWorktrees(
 
   for (let i = 0; i < n; i++) {
     const label = `candidate-${i + 1}`;
-    const bonDir = `.bon-${i + 1}`;
+    const bonDir = path.join("tmp", `bon-${i + 1}`);
     const repoPaths = new Map<string, string>();
     const branchNames = new Map<string, string>();
     const candidateRepos: WorkspaceRepo[] = [];
@@ -201,8 +201,8 @@ export function cleanupSubWorktrees(
       }
     }
 
-    // Remove the .bon-N directory from workspace
-    const bonDir = path.join(wsPath, `.bon-${sub.index + 1}`);
+    // Remove the tmp/bon-N directory from workspace
+    const bonDir = path.join(wsPath, "tmp", `bon-${sub.index + 1}`);
     if (existsSync(bonDir)) {
       try {
         rmSync(bonDir, { recursive: true, force: true });

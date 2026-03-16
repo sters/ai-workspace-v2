@@ -24,8 +24,7 @@ export function listWorkspaceRepos(workspaceName: string): WorkspaceRepo[] {
     if (depth > 4) return;
     const entries = readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
-      if (entry.name === "artifacts" || entry.name === "tmp" || entry.name === ".git"
-          || entry.name.startsWith(".bon-")) continue;
+      if (entry.name === "artifacts" || entry.name === "tmp" || entry.name === ".git") continue;
       const fullPath = path.join(dir, entry.name);
       if (!entry.isDirectory()) continue;
 

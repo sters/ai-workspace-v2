@@ -119,9 +119,9 @@ describe("best-of-n-worktree", () => {
 
       const result = createSubWorktrees("my-ws", repos, 2, vi.fn());
 
-      // Candidate repos should point to .bon-N directories, not the original
-      expect(result[0].repos[0].worktreePath).toContain(".bon-1");
-      expect(result[1].repos[0].worktreePath).toContain(".bon-2");
+      // Candidate repos should point to tmp/bon-N directories, not the original
+      expect(result[0].repos[0].worktreePath).toContain("tmp/bon-1");
+      expect(result[1].repos[0].worktreePath).toContain("tmp/bon-2");
     });
   });
 
@@ -194,7 +194,7 @@ describe("best-of-n-worktree", () => {
       const sub = {
         index: 0,
         label: "candidate-1",
-        repoPaths: new Map([["github.com/org/repo", "/tmp/test-workspace/my-ws/.bon-1/github.com/org/repo"]]),
+        repoPaths: new Map([["github.com/org/repo", "/tmp/test-workspace/my-ws/tmp/bon-1/github.com/org/repo"]]),
         branchNames: new Map([["github.com/org/repo", "main-bon-1"]]),
         repos: repos,
       };
