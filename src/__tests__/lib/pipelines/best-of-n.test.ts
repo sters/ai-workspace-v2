@@ -37,11 +37,11 @@ function makeSubWorktrees(repos: WorkspaceRepo[], n: number): SubWorktree[] {
   return Array.from({ length: n }, (_, i) => ({
     index: i,
     label: `candidate-${i + 1}`,
-    repoPaths: new Map(repos.map((r) => [r.repoPath, `/tmp/test-workspace/ws/.bon-${i + 1}/${r.repoPath}`])),
+    repoPaths: new Map(repos.map((r) => [r.repoPath, `/tmp/test-workspace/ws/tmp/bon-${i + 1}/${r.repoPath}`])),
     branchNames: new Map(repos.map((r) => [r.repoPath, `main-bon-${i + 1}`])),
     repos: repos.map((r) => ({
       ...r,
-      worktreePath: `/tmp/test-workspace/ws/.bon-${i + 1}/${r.repoPath}`,
+      worktreePath: `/tmp/test-workspace/ws/tmp/bon-${i + 1}/${r.repoPath}`,
     })),
   }));
 }
