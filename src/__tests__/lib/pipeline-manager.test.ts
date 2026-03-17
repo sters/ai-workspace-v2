@@ -77,6 +77,7 @@ describe("pipeline-manager GC", () => {
       events: [],
       listeners: new Set(),
       pendingAsks: new Map(),
+      hasPendingAsk: false,
       abortController: new AbortController(),
       completedAt: Date.now() - 31 * 60 * 1000, // 31 minutes ago
     });
@@ -100,6 +101,7 @@ describe("pipeline-manager GC", () => {
       events: [],
       listeners: new Set(),
       pendingAsks: new Map(),
+      hasPendingAsk: false,
       abortController: new AbortController(),
       completedAt: Date.now() - 31 * 60 * 1000,
     });

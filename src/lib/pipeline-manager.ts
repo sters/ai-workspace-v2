@@ -31,6 +31,8 @@ interface ManagedOperation {
   listeners: Set<(event: OperationEvent) => void>;
   /** Pending ask resolvers for function-phase emitAsk calls, keyed by toolUseId. */
   pendingAsks: Map<string, (answers: Record<string, string>) => void>;
+  /** True when the operation is waiting for user input (AskUserQuestion). */
+  hasPendingAsk: boolean;
   /** Abort controller for cancelling function-phase work (e.g. PTY processes). */
   abortController: AbortController;
   /** Timestamp (ms) when the operation completed. Used for GC. */
@@ -95,6 +97,24 @@ function emitEvent(managed: ManagedOperation, event: OperationEvent) {
   if (managed.events.length > 5000) {
     managed.events = managed.events.slice(-3000);
   }
+
+  // Detect AskUserQuestion events to track pending ask state
+  if (event.type === "output" && event.data.includes('"AskUserQuestion"')) {
+    try {
+      const parsed = JSON.parse(event.data);
+      if (parsed.type === "assistant" && Array.isArray(parsed.message?.content)) {
+        for (const block of parsed.message.content) {
+          if (block.type === "tool_use" && block.name === "AskUserQuestion") {
+            managed.hasPendingAsk = true;
+            break;
+          }
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+
   for (const listener of managed.listeners) {
     listener(event);
   }
@@ -330,6 +350,7 @@ export function startOperationPipeline(
     events: [],
     listeners: new Set(),
     pendingAsks: new Map(),
+    hasPendingAsk: false,
     abortController: new AbortController(),
   };
 
@@ -623,10 +644,11 @@ export function getOperations(): Operation[] {
   return Array.from(operations.values()).map((m) => m.operation);
 }
 
-function toSummary(op: Operation, events?: OperationEvent[]): OperationListItem {
+function toSummary(managed: ManagedOperation): OperationListItem {
+  const op = managed.operation;
   const currentPhase = op.phases?.find((p) => p.status === "running");
-  const resultSummary = op.status !== "running" && events
-    ? extractLastResult(events)
+  const resultSummary = op.status !== "running" && managed.events.length > 0
+    ? extractLastResult(managed.events)
     : undefined;
   return {
     id: op.id,
@@ -638,12 +660,13 @@ function toSummary(op: Operation, events?: OperationEvent[]): OperationListItem 
     ...(currentPhase && { currentPhase }),
     ...(op.inputs && { inputs: op.inputs }),
     ...(resultSummary && { resultSummary }),
+    ...(managed.hasPendingAsk && { hasPendingAsk: true }),
   };
 }
 
 export function getOperationSummaries(): OperationListItem[] {
   gcCompletedOperations();
-  return Array.from(operations.values()).map((m) => toSummary(m.operation, m.events));
+  return Array.from(operations.values()).map((m) => toSummary(m));
 }
 
 export function getOperation(id: string): Operation | undefined {
@@ -693,12 +716,17 @@ export function submitAnswer(
   const pendingResolver = managed.pendingAsks.get(toolUseId);
   if (pendingResolver) {
     managed.pendingAsks.delete(toolUseId);
+    managed.hasPendingAsk = false;
     pendingResolver(answers);
     return true;
   }
-  if (managed.claudeProcess?.submitAnswer(toolUseId, answers)) return true;
+  if (managed.claudeProcess?.submitAnswer(toolUseId, answers)) {
+    managed.hasPendingAsk = false;
+    return true;
+  }
   for (const [, entry] of managed.childProcesses) {
     if (entry.process.submitAnswer(toolUseId, answers)) {
+      managed.hasPendingAsk = false;
       // Emit a synthetic tool_result so findPendingAsk() in the UI
       // immediately stops showing the ask input (before the resumed
       // process sends the real tool_result).

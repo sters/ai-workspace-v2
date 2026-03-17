@@ -58,6 +58,8 @@ export interface OperationListItem {
   inputs?: Record<string, string>;
   /** Last result text from the operation (populated for completed/failed operations). */
   resultSummary?: { content: string; cost?: string; duration?: string };
+  /** True when the operation is waiting for user input (AskUserQuestion). */
+  hasPendingAsk?: boolean;
 }
 
 export interface OperationEvent {

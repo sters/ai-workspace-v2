@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { Loader2, MessageCircleQuestion } from "lucide-react";
 import type { WorkspaceSummary } from "@/types/workspace";
 import { cardVariants } from "../shared/containers/card";
 import { ProgressBar } from "../shared/feedback/progress-bar";
@@ -19,10 +19,12 @@ function formatShortDate(dateStr: string): string {
 export function WorkspaceCard({
   workspace,
   isRunning,
+  isAsking,
   children,
 }: {
   workspace: WorkspaceSummary;
   isRunning?: boolean;
+  isAsking?: boolean;
   children?: React.ReactNode;
 }) {
   const { name, meta, overallProgress, totalCompleted, totalItems, lastModified } =
@@ -32,14 +34,16 @@ export function WorkspaceCard({
     <Link
       href={`/workspace/${encodeURIComponent(name)}`}
       className={cardVariants("default", `block transition-colors hover:bg-accent/50${
-        isRunning ? " border-primary/50" : ""
+        isAsking ? " border-orange-400/50" : isRunning ? " border-primary/50" : ""
       }`)}
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-2">
-          {isRunning && (
+          {isAsking ? (
+            <MessageCircleQuestion className="h-4 w-4 shrink-0 animate-pulse text-orange-500" />
+          ) : isRunning ? (
             <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
-          )}
+          ) : null}
           <h3 className="truncate font-semibold">{meta.title}</h3>
           <span className="shrink-0 text-sm text-muted-foreground">{name}</span>
         </div>

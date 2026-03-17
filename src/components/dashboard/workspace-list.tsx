@@ -7,7 +7,12 @@ import { StatusText } from "../shared/feedback/status-text";
 
 export function WorkspaceList() {
   const { workspaces, isLoading, error } = useWorkspaces();
-  const { runningWorkspaces } = useRunningOperations();
+  const { runningWorkspaces, operations } = useRunningOperations();
+
+  // Build set of workspaces that have a pending ask
+  const askingWorkspaces = new Set(
+    operations.filter((op) => op.hasPendingAsk).map((op) => op.workspace),
+  );
 
   if (isLoading) {
     return (
@@ -43,6 +48,7 @@ export function WorkspaceList() {
           key={ws.name}
           workspace={ws}
           isRunning={runningWorkspaces.has(ws.name)}
+          isAsking={askingWorkspaces.has(ws.name)}
         />
       ))}
     </div>

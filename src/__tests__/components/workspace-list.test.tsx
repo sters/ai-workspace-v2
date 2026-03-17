@@ -27,7 +27,7 @@ vi.mock("@/hooks/use-workspaces", () => ({
   useWorkspaces: () => mockUseWorkspaces(),
 }));
 
-const mockUseRunningOperations = vi.fn<() => { runningWorkspaces: Set<string> }>();
+const mockUseRunningOperations = vi.fn<() => { runningWorkspaces: Set<string>; operations: { hasPendingAsk?: boolean; workspace: string }[] }>();
 vi.mock("@/hooks/use-running-operations", () => ({
   useRunningOperations: () => mockUseRunningOperations(),
 }));
@@ -58,6 +58,7 @@ describe("WorkspaceList", () => {
   beforeEach(() => {
     mockUseRunningOperations.mockReturnValue({
       runningWorkspaces: new Set<string>(),
+      operations: [],
     });
   });
 
