@@ -194,6 +194,17 @@ const chatServer = Bun.spawn(["bun", "--bun", "run", "bin/chat-server.ts"], {
 });
 
 function killAll() {
+  // Start draining stdin immediately to catch terminal escape sequence
+  // responses that arrive after child processes are killed. If we wait until
+  // after the processes exit, the responses may land in the shell's input
+  // buffer instead.
+  if (process.stdin.isTTY) {
+    try {
+      process.stdin.setRawMode(true);
+      process.stdin.on("data", () => {}); // discard all incoming data
+      process.stdin.resume();
+    } catch {}
+  }
   nextServer.kill();
   chatServer.kill();
 }
@@ -205,20 +216,14 @@ process.on("SIGTERM", killAll);
 const nextExitCode = await nextServer.exited;
 chatServer.kill();
 
-// Next.js dev server queries terminal capabilities (background color, cursor
-// position, device attributes). When the process is killed, the terminal's
-// responses arrive on stdin with no process to consume them, so the shell
-// displays them as garbage text. Drain any pending responses before exiting.
+// The SIGINT handler already started draining stdin in raw mode to catch
+// terminal escape sequence responses. Wait a bit for any remaining responses
+// to arrive, then restore stdin to normal mode before exiting.
 if (process.stdin.isTTY) {
   try {
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-    process.stdin.once("readable", () => {
-      // discard whatever is buffered
-      while (process.stdin.read() !== null) {}
-    });
-    await Bun.sleep(100);
+    await Bun.sleep(200);
     process.stdin.pause();
+    process.stdin.removeAllListeners("data");
     process.stdin.setRawMode(false);
   } catch {
     // setRawMode can fail if stdin fd is already closed (e.g. bunx environment)
