@@ -1,4 +1,4 @@
-import { unlinkSync, existsSync } from "node:fs";
+import { unlinkSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import {
@@ -11,6 +11,8 @@ import {
 import type { TaskAnalysis } from "@/types/workspace";
 import { setupRepository } from "./actions/setup-repository";
 import type { SetupRepositoryResult } from "@/types/pipeline";
+import { extractPrUrls, resolvePrBranch } from "@/lib/workspace/pr-url";
+import type { PrBranchInfo } from "@/lib/workspace/pr-url";
 import {
   buildReadmeContent,
   buildInitAnalyzeAndReadmePrompt,
@@ -338,15 +340,35 @@ export function buildInitPipeline(
         }
 
         // Write template files for agents to reference
-        await writeTodoTemplate(wsPath, analysis.taskType);
+        if (analysis.taskType !== "review") {
+          await writeTodoTemplate(wsPath, analysis.taskType);
+        }
         await writeReportTemplates(wsPath);
+
+        // Detect PR URLs from description and README content for branch resolution
+        const prUrlMap = new Map<string, PrBranchInfo>();
+        const allText = [description, analysis.readmeContent ?? ""].join("\n");
+        const prUrls = extractPrUrls(allText);
+        for (const prUrl of prUrls) {
+          try {
+            ctx.emitStatus(`Resolving PR branch info: ${prUrl.url}`);
+            const prInfo = resolvePrBranch(prUrl);
+            prUrlMap.set(prUrl.repoPath, prInfo);
+            ctx.emitStatus(`PR #${prUrl.prNumber}: ${prInfo.headBranch} → ${prInfo.baseBranch}${prInfo.isFork ? " (fork)" : ""}`);
+          } catch (err) {
+            ctx.emitStatus(`Warning: Failed to resolve PR ${prUrl.url}: ${err}`);
+          }
+        }
 
         if (analysis.repositories.length > 0) {
           for (const repoPath of analysis.repositories) {
             if (ctx.signal.aborted) return false;
             ctx.emitStatus(`Setting up repository: ${repoPath}`);
+            const prInfo = prUrlMap.get(repoPath);
             try {
-              const repoResult = setupRepository(wsName, repoPath, undefined, ctx.emitStatus);
+              const repoResult = prInfo
+                ? setupRepository(wsName, repoPath, prInfo.baseBranch, ctx.emitStatus, prInfo.headBranch)
+                : setupRepository(wsName, repoPath, undefined, ctx.emitStatus);
               repoResults.push(repoResult);
             } catch (err) {
               ctx.emitResult(`Failed to setup repository ${repoPath}: ${err}`);
@@ -372,6 +394,26 @@ export function buildInitPipeline(
             } catch (err) {
               ctx.emitStatus(`Warning: Failed to setup ${metaRepo.path}: ${err}`);
             }
+          }
+        }
+
+        // Update README base branch info from resolved PR data
+        if (prUrlMap.size > 0) {
+          const readmePath = path.join(wsPath, "README.md");
+          if (existsSync(readmePath)) {
+            let readmeText = readFileSync(readmePath, "utf-8");
+            for (const [_repoPath, prInfo] of prUrlMap) {
+              // Update (base: `main`) → (base: `actual-branch`) for matching repos
+              const repoName = _repoPath.split("/").pop() ?? "";
+              if (repoName) {
+                const bt = "`";
+                const basePattern = new RegExp(
+                  "(\\*\\*" + repoName + "\\*\\*:.*?\\(base:\\s*" + bt + ")([^" + bt + "]+)(" + bt + "\\))",
+                );
+                readmeText = readmeText.replace(basePattern, "$1" + prInfo.baseBranch + "$3");
+              }
+            }
+            writeFileSync(readmePath, readmeText, "utf-8");
           }
         }
 
@@ -405,6 +447,11 @@ export function buildInitPipeline(
       label: "Plan TODO items",
       timeoutMs: 60 * 60 * 1000, // 1 hour — may wait for human when Best-of-N
       fn: async (ctx) => {
+        if (analysis?.taskType === "review") {
+          ctx.emitStatus("Review workspace — skipping TODO planning");
+          return true;
+        }
+
         const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
 
         if (repoResults.length === 0) {
@@ -479,25 +526,37 @@ export function buildInitPipeline(
       kind: "function",
       label: "Coordinate TODOs",
       timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
-      fn: (ctx) => buildCoordinateTodosPhase({
-        workspace: wsName,
-        wsPath,
-        repoNames: repoResults.map((r) => r.repoName),
-      }).fn(ctx),
+      fn: (ctx) => {
+        if (analysis?.taskType === "review") {
+          ctx.emitStatus("Review workspace — skipping TODO coordination");
+          return Promise.resolve(true);
+        }
+        return buildCoordinateTodosPhase({
+          workspace: wsName,
+          wsPath,
+          repoNames: repoResults.map((r) => r.repoName),
+        }).fn(ctx);
+      },
     },
     // Phase F: Review TODOs (parallel, per repo)
     {
       kind: "function",
       label: "Review TODOs",
       timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
-      fn: (ctx) => buildReviewTodosPhase({
-        workspace: wsName,
-        wsPath,
-        repos: repoResults.map((r) => ({
-          repoName: r.repoName,
-          worktreePath: r.worktreePath,
-        })),
-      }).fn(ctx),
+      fn: (ctx) => {
+        if (analysis?.taskType === "review") {
+          ctx.emitStatus("Review workspace — skipping TODO review");
+          return Promise.resolve(true);
+        }
+        return buildReviewTodosPhase({
+          workspace: wsName,
+          wsPath,
+          repos: repoResults.map((r) => ({
+            repoName: r.repoName,
+            worktreePath: r.worktreePath,
+          })),
+        }).fn(ctx);
+      },
     },
     // Phase G: Commit workspace snapshot
     {

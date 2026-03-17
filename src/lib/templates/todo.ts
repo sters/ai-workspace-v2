@@ -164,6 +164,8 @@ export function selectTodoTemplate(taskType: string): string {
       return TODO_BUGFIX_TEMPLATE;
     case "research":
       return TODO_RESEARCH_TEMPLATE;
+    case "review":
+      return TODO_DEFAULT_TEMPLATE; // unused — review skips TODO planning
     default:
       return TODO_DEFAULT_TEMPLATE;
   }

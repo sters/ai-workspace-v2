@@ -14,6 +14,7 @@ export function setupRepository(
   repositoryPathArg: string,
   baseBranchOverride: string | undefined,
   emitStatus: (message: string) => void,
+  checkoutBranch?: string,
 ): SetupRepositoryResult {
   // Parse alias syntax (e.g. github.com/org/repo:dev)
   let actualRepoPath = repositoryPathArg;
@@ -56,90 +57,113 @@ export function setupRepository(
   const baseBranch = baseBranchOverride ?? detectBaseBranch(repoAbsPath);
   emitStatus(`Base branch: ${baseBranch}`);
 
-  // Extract task info from workspace name for branch naming
-  const parts = workspaceName.split("-");
-  const taskType = parts[0];
-  const dateMatch = workspaceName.match(/(\d{8})$/);
-  const date = dateMatch?.[1] ?? new Date().toISOString().slice(0, 10).replace(/-/g, "");
-
-  // Detect ticket ID
-  let ticketId = "";
-  let description = "";
-  if (parts.length > 1 && /^[A-Z]+[-]?\d+$/i.test(parts[1])) {
-    ticketId = parts[1];
-    description = workspaceName
-      .replace(new RegExp(`^${taskType}-${ticketId}-`), "")
-      .replace(new RegExp(`-${date}$`), "");
-  } else {
-    description = workspaceName
-      .replace(new RegExp(`^${taskType}-`), "")
-      .replace(new RegExp(`-${date}$`), "");
-  }
-
-  // Build branch name
-  let branchName: string;
-  if (ticketId) {
-    branchName = repoAlias
-      ? `${taskType}/${ticketId}-${description}-${repoAlias}`
-      : `${taskType}/${ticketId}-${description}`;
-  } else {
-    branchName = repoAlias
-      ? `${taskType}/${description}-${repoAlias}`
-      : `${taskType}/${description}-${date}`;
-  }
-
   // Create worktree — use absolute path so git -C doesn't resolve it
   // relative to the repository directory
   const worktreePath = path.resolve(path.join(wsPath, repoPathInput));
   mkdirSync(path.dirname(worktreePath), { recursive: true });
 
-  // If the branch already exists, resolve the conflict
-  try {
-    exec(`git -C "${repoAbsPath}" rev-parse --verify "${branchName}"`);
-    emitStatus(`Branch ${branchName} already exists, resolving...`);
-    try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+  let branchName: string;
 
-    const worktreeList = exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
-    const isInUse = worktreeList
-      .split("\n")
-      .some((line) => line === `branch refs/heads/${branchName}`);
+  if (checkoutBranch) {
+    // --- Checkout existing remote branch (PR-based setup) ---
+    branchName = checkoutBranch;
 
-    if (isInUse) {
-      const origName = branchName;
-      let suffix = 2;
-      while (true) {
-        const candidate = `${branchName}-${suffix}`;
-        try {
-          exec(`git -C "${repoAbsPath}" rev-parse --verify "${candidate}"`);
-          suffix++;
-        } catch {
-          branchName = candidate;
-          break;
-        }
-      }
-      emitStatus(`Branch ${origName} in use by another worktree, using ${branchName} instead.`);
-    } else {
-      emitStatus(`Branch is stale, deleting and recreating.`);
-      exec(`git -C "${repoAbsPath}" branch -D "${branchName}"`);
+    // If the target directory already exists, remove it
+    if (existsSync(worktreePath)) {
+      emitStatus(`Target directory already exists, removing: ${repoPathInput}`);
+      rmSync(worktreePath, { recursive: true, force: true });
+      try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
     }
-  } catch {
-    // Branch doesn't exist — good
-  }
 
-  // If the target directory already exists (e.g. from a previous failed attempt),
-  // remove it before creating the worktree
-  if (existsSync(worktreePath)) {
-    emitStatus(`Target directory already exists, removing: ${repoPathInput}`);
-    rmSync(worktreePath, { recursive: true, force: true });
-    try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
-  }
+    emitStatus(`Creating worktree: checking out existing branch ${checkoutBranch}`);
+    exec(
+      `git -C "${repoAbsPath}" worktree add "${worktreePath}" "origin/${checkoutBranch}"`,
+    );
+    exec(
+      `git -C "${worktreePath}" checkout -B "${checkoutBranch}" --track "origin/${checkoutBranch}"`,
+    );
+  } else {
+    // --- Create new branch (default behavior) ---
 
-  emitStatus(`Creating worktree: branch ${branchName} from origin/${baseBranch}`);
-  const worktreeOutput = exec(
-    `git -C "${repoAbsPath}" worktree add -b "${branchName}" "${worktreePath}" "origin/${baseBranch}"`,
-  );
-  if (worktreeOutput) {
-    emitStatus(`git worktree add: ${worktreeOutput}`);
+    // Extract task info from workspace name for branch naming
+    const parts = workspaceName.split("-");
+    const taskType = parts[0];
+    const dateMatch = workspaceName.match(/(\d{8})$/);
+    const date = dateMatch?.[1] ?? new Date().toISOString().slice(0, 10).replace(/-/g, "");
+
+    // Detect ticket ID
+    let ticketId = "";
+    let description = "";
+    if (parts.length > 1 && /^[A-Z]+[-]?\d+$/i.test(parts[1])) {
+      ticketId = parts[1];
+      description = workspaceName
+        .replace(new RegExp(`^${taskType}-${ticketId}-`), "")
+        .replace(new RegExp(`-${date}$`), "");
+    } else {
+      description = workspaceName
+        .replace(new RegExp(`^${taskType}-`), "")
+        .replace(new RegExp(`-${date}$`), "");
+    }
+
+    // Build branch name
+    if (ticketId) {
+      branchName = repoAlias
+        ? `${taskType}/${ticketId}-${description}-${repoAlias}`
+        : `${taskType}/${ticketId}-${description}`;
+    } else {
+      branchName = repoAlias
+        ? `${taskType}/${description}-${repoAlias}`
+        : `${taskType}/${description}-${date}`;
+    }
+
+    // If the branch already exists, resolve the conflict
+    try {
+      exec(`git -C "${repoAbsPath}" rev-parse --verify "${branchName}"`);
+      emitStatus(`Branch ${branchName} already exists, resolving...`);
+      try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+
+      const worktreeList = exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
+      const isInUse = worktreeList
+        .split("\n")
+        .some((line) => line === `branch refs/heads/${branchName}`);
+
+      if (isInUse) {
+        const origName = branchName;
+        let suffix = 2;
+        while (true) {
+          const candidate = `${branchName}-${suffix}`;
+          try {
+            exec(`git -C "${repoAbsPath}" rev-parse --verify "${candidate}"`);
+            suffix++;
+          } catch {
+            branchName = candidate;
+            break;
+          }
+        }
+        emitStatus(`Branch ${origName} in use by another worktree, using ${branchName} instead.`);
+      } else {
+        emitStatus(`Branch is stale, deleting and recreating.`);
+        exec(`git -C "${repoAbsPath}" branch -D "${branchName}"`);
+      }
+    } catch {
+      // Branch doesn't exist — good
+    }
+
+    // If the target directory already exists (e.g. from a previous failed attempt),
+    // remove it before creating the worktree
+    if (existsSync(worktreePath)) {
+      emitStatus(`Target directory already exists, removing: ${repoPathInput}`);
+      rmSync(worktreePath, { recursive: true, force: true });
+      try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+    }
+
+    emitStatus(`Creating worktree: branch ${branchName} from origin/${baseBranch}`);
+    const worktreeOutput = exec(
+      `git -C "${repoAbsPath}" worktree add -b "${branchName}" "${worktreePath}" "origin/${baseBranch}"`,
+    );
+    if (worktreeOutput) {
+      emitStatus(`git worktree add: ${worktreeOutput}`);
+    }
   }
 
   // Verify the worktree was actually created
