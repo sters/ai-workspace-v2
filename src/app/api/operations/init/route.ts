@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
-import { getConfig } from "@/lib/app-config";
+import { getOperationConfig } from "@/lib/app-config";
 import { buildInitPipeline } from "@/lib/pipelines/init";
 import { initSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return parsed.response;
   const { description, interactionLevel } = parsed.data;
 
-  const bestOfN = parsed.data.bestOfN ?? getConfig().operations.bestOfN;
+  const bestOfN = parsed.data.bestOfN ?? getOperationConfig("init").bestOfN;
   const bestOfNFromConfig = parsed.data.bestOfN == null;
 
   try {

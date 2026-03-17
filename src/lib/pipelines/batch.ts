@@ -1,7 +1,7 @@
 import { getOperation } from "@/lib/pipeline-manager";
 import { getReviewSessions } from "@/lib/workspace/reader";
 import { listWorkspaceRepos } from "@/lib/workspace";
-import { getConfig } from "@/lib/app-config";
+import { getOperationConfig } from "@/lib/app-config";
 import { buildInitPipeline } from "./init";
 import { buildExecutePipeline } from "./execute";
 import { buildReviewPipeline } from "./review";
@@ -40,9 +40,11 @@ export function buildBatchPipeline(input: {
   bestOfNPhases?: ("execute" | "review" | "create-pr" | "update-todo")[];
 }): PipelinePhase[] {
   const { mode, startWith, description, workspace, instruction, draft, interactionLevel, repo } = input;
-  const effectiveBestOfN = input.bestOfN ?? getConfig().operations.bestOfN;
   const bestOfNFromConfig = input.bestOfN == null;
   const bestOfNPhases = input.bestOfNPhases ?? ["execute"];
+  /** Resolve effective bestOfN for a given operation type (explicit input > per-type config > global). */
+  const resolveBestOfN = (type: "execute" | "review" | "create-pr" | "update-todo" | "init"): number =>
+    input.bestOfN ?? getOperationConfig(type).bestOfN;
   const phases: PipelinePhase[] = [];
 
   // ------------------------------------------------------------------
@@ -51,8 +53,9 @@ export function buildBatchPipeline(input: {
 
   if (startWith === "init") {
     // Inline all init phases — they share closures for wsName etc.
+    const initBon = resolveBestOfN("init");
     const initPhases = buildInitPipeline(description ?? "", interactionLevel, {
-      bestOfN: effectiveBestOfN >= 2 ? effectiveBestOfN : undefined,
+      bestOfN: initBon >= 2 ? initBon : undefined,
       bestOfNConfirm: bestOfNFromConfig,
     });
     phases.push(...initPhases);
@@ -68,7 +71,7 @@ export function buildBatchPipeline(input: {
           workspace: ws,
           instruction: instruction || DEFAULT_UPDATE_TODO_INSTRUCTION,
           repo,
-          bestOfN: effectiveBestOfN >= 2 && bestOfNPhases.includes("update-todo") ? effectiveBestOfN : undefined,
+          bestOfN: resolveBestOfN("update-todo") >= 2 && bestOfNPhases.includes("update-todo") ? resolveBestOfN("update-todo") : undefined,
           bestOfNConfirm: bestOfNFromConfig,
           interactionLevel,
         });
@@ -94,11 +97,12 @@ export function buildBatchPipeline(input: {
       }
       ctx.emitStatus(`Executing workspace: ${ws}`);
 
-      if (effectiveBestOfN >= 2 && bestOfNPhases.includes("execute")) {
+      const execBon = resolveBestOfN("execute");
+      if (execBon >= 2 && bestOfNPhases.includes("execute")) {
         const repos = listWorkspaceRepos(ws);
         const bonPhases = await buildBestOfNPipeline({
           workspace: ws,
-          n: effectiveBestOfN,
+          n: execBon,
           operationType: "execute",
           buildCandidatePhases: (candidateRepos) =>
             buildExecutePipeline({ workspace: ws, repos: candidateRepos }),
@@ -129,11 +133,12 @@ export function buildBatchPipeline(input: {
         const ws = resolveWorkspace(ctx.operationId, workspace);
         ctx.emitStatus(`Reviewing workspace: ${ws}`);
 
-        if (effectiveBestOfN >= 2 && bestOfNPhases.includes("review")) {
+        const revBon = resolveBestOfN("review");
+        if (revBon >= 2 && bestOfNPhases.includes("review")) {
           const repos = listWorkspaceRepos(ws);
           const bonPhases = await buildBestOfNPipeline({
             workspace: ws,
-            n: effectiveBestOfN,
+            n: revBon,
             operationType: "review",
             buildCandidatePhases: (candidateRepos) =>
               buildReviewPipeline({ workspace: ws, repos: candidateRepos }),
@@ -204,11 +209,12 @@ export function buildBatchPipeline(input: {
         const ws = resolveWorkspace(ctx.operationId, workspace);
         ctx.emitStatus(`Creating PR for workspace: ${ws}`);
 
-        if (effectiveBestOfN >= 2 && bestOfNPhases.includes("create-pr")) {
+        const prBon = resolveBestOfN("create-pr");
+        if (prBon >= 2 && bestOfNPhases.includes("create-pr")) {
           const repos = listWorkspaceRepos(ws);
           const bonPhases = await buildBestOfNPipeline({
             workspace: ws,
-            n: effectiveBestOfN,
+            n: prBon,
             operationType: "create-pr",
             buildCandidatePhases: (candidateRepos) =>
               buildCreatePrPipeline({ workspace: ws, draft: draft ?? false, repos: candidateRepos }),

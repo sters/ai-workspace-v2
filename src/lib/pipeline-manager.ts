@@ -10,7 +10,7 @@ import { runClaude } from "./claude";
 import type { ClaudeProcess, RunClaudeOptions } from "@/types/claude";
 import { extractLastResult } from "./parsers/stream";
 import { Semaphore } from "./semaphore";
-import { getConfig } from "./app-config";
+import { getConfig, getOperationConfig } from "./app-config";
 
 // ---------------------------------------------------------------------------
 // Internal types
@@ -58,6 +58,15 @@ export class ConcurrencyLimitError extends Error {
 export const DEFAULT_CLAUDE_TIMEOUT_MS = getConfig().operations.claudeTimeoutMinutes * 60 * 1000;
 /** Default timeout for function phases. */
 export const DEFAULT_FUNCTION_TIMEOUT_MS = getConfig().operations.functionTimeoutMinutes * 60 * 1000;
+
+/** Get timeout defaults for a specific operation type (respects per-type overrides). */
+export function getTimeoutDefaults(type: OperationType): { claudeMs: number; functionMs: number } {
+  const cfg = getOperationConfig(type);
+  return {
+    claudeMs: cfg.claudeTimeoutMinutes * 60 * 1000,
+    functionMs: cfg.functionTimeoutMinutes * 60 * 1000,
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Global store (survives HMR in dev mode)
@@ -349,10 +358,11 @@ export function startOperationPipeline(
       const phaseExtra = { phaseIndex: i, phaseLabel };
       let phaseSuccess: boolean;
 
-      // Determine timeout for this phase
+      // Determine timeout for this phase (per-type overrides > global defaults)
+      const timeouts = getTimeoutDefaults(type);
       const defaultTimeout = phase.kind === "function"
-        ? DEFAULT_FUNCTION_TIMEOUT_MS
-        : DEFAULT_CLAUDE_TIMEOUT_MS;
+        ? timeouts.functionMs
+        : timeouts.claudeMs;
       const timeoutMs = phase.timeoutMs ?? defaultTimeout;
 
       // Store timeout and start time on the phase info before emitting the update

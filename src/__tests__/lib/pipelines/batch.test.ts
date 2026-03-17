@@ -6,7 +6,13 @@ vi.mock("@/lib/pipeline-manager", () => ({
 }));
 vi.mock("@/lib/app-config", () => ({
   getConfig: vi.fn(() => ({
-    operations: { bestOfN: 0, defaultInteractionLevel: "mid" },
+    operations: { bestOfN: 0, defaultInteractionLevel: "mid", typeOverrides: {} },
+  })),
+  getOperationConfig: vi.fn(() => ({
+    bestOfN: 0,
+    claudeTimeoutMinutes: 20,
+    functionTimeoutMinutes: 3,
+    defaultInteractionLevel: "mid",
   })),
 }));
 vi.mock("@/lib/workspace/reader", () => ({
