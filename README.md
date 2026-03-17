@@ -4,6 +4,8 @@ Web UI dashboard for a multi-repository workspace manager and task executer for 
 
 Provides a browser interface on `localhost:3741` to view workspace status, TODO progress, reviews, git history, and trigger operations (init, execute, review, create-pr, etc.) that run Claude Code via `Bun.spawn` + `claude -p --output-format stream-json`. A separate WebSocket chat server runs on port 3742 for interactive Claude sessions.
 
+**This tool is under development through real usecases. The latest version breaks easily.**
+
 ## Quick Start
 
 ```bash

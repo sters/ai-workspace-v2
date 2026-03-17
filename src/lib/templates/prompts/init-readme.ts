@@ -43,7 +43,7 @@ export const INIT_ANALYSIS_SCHEMA: Record<string, unknown> = {
   properties: {
     taskType: {
       type: "string",
-      enum: ["feature", "bugfix", "research"],
+      enum: ["feature", "bugfix", "research", "review"],
     },
     slug: {
       type: "string",
@@ -85,6 +85,7 @@ Analyze the task description above. Your final text response will be constrained
 - **taskType**: classify based on the **end goal**, not the process:
   - **"bugfix"**: the goal is to fix a bug, resolve an error, or correct wrong behavior. This includes tasks that require investigation/diagnosis as a step toward fixing. "Investigate and fix X" → bugfix.
   - **"feature"**: the goal is to add new functionality, improve existing behavior, refactor, update configs, or make any code change that isn't a bug fix. Default to this if unclear.
+  - **"review"**: the goal is to review an existing PR. The description must contain a GitHub PR URL. Use this when the user asks to review, check, or analyze a specific PR.
   - **"research"**: the goal is **only** to gather information or understand something, with no intent to change code. Pure investigation with no fix/implementation planned. Only use this when the task explicitly asks for research/analysis/documentation without code changes.
 - **slug**: concise English directory name for the workspace. Do NOT include the ticket ID in the slug.
 - **ticketId**: extract Jira IDs (XX-123), GitHub issue refs (#123 or org/repo#123), Linear IDs, etc. Empty string if none.
@@ -117,5 +118,18 @@ ${buildInteractionGuidance(input.interactionLevel)}
 - Keep the template structure, just fill in the placeholder sections
 - The README should give clear context for agents that will work on this task later
 - Your final text response must be the JSON with all fields including readmeContent
+- **If the description contains a GitHub PR URL** (e.g., https://github.com/org/repo/pull/123):
+  - Extract the repository from the URL and include it in the \`repositories\` array
+  - Include the PR URL in the "Related Resources" section of the README
+  - Do NOT omit the PR URL from the README body — the system uses it to resolve branch info automatically
+  - **If taskType is "review"** (PR review workspace):
+    - **Requirements must describe what the PR is trying to achieve** (the PR's goals and acceptance criteria), NOT what the reviewer should do. A later verification phase checks whether these requirements are satisfied by the code changes. For example:
+      - GOOD: "SupportRequest table is correctly defined with proper keys and indexes"
+      - GOOD: "gRPC endpoint returns proper error codes for invalid input"
+      - BAD: "Review all 24 changed files for correctness"
+      - BAD: "Check domain model design and consistency"
+    - Use the PR description, linked tickets, and commit messages to extract the PR's original intent and acceptance criteria
+    - Review scope / what to check can go in the Context section instead
+  - **If the PR is just a reference** for new implementation work, treat it as a normal feature/bugfix task — Requirements should describe the new work to be done, and the PR is just a reference resource
 `;
 }

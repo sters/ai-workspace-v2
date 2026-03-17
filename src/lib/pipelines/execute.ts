@@ -36,6 +36,10 @@ export async function buildExecutePipeline(input: {
     : allRepos;
   const wsPath = path.join(WORKSPACE_DIR, workspace);
 
+  if (meta.taskType === "review") {
+    return []; // Review workspaces skip execute entirely
+  }
+
   const isResearch = meta.taskType === "research";
 
   if (isResearch) {
