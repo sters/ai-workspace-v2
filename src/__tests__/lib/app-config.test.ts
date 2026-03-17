@@ -5,6 +5,8 @@ import {
   loadConfigFile,
   mergeConfig,
   getConfig,
+  getOperationConfig,
+  normalizeRawConfig,
   _resetConfig,
   _setConfigFilePath,
   ensureConfigFile,
@@ -24,6 +26,7 @@ describe("CONFIG_DEFAULTS", () => {
     expect(CONFIG_DEFAULTS.operations.claudeTimeoutMinutes).toBe(20);
     expect(CONFIG_DEFAULTS.operations.functionTimeoutMinutes).toBe(3);
     expect(CONFIG_DEFAULTS.operations.defaultInteractionLevel).toBe("mid");
+    expect(CONFIG_DEFAULTS.operations.typeOverrides).toEqual({});
     expect(CONFIG_DEFAULTS.editor).toBe("code {path}");
     expect(CONFIG_DEFAULTS.terminal).toBe("open -a Terminal {path}");
   });
@@ -69,6 +72,95 @@ describe("loadConfigFile", () => {
     } finally {
       fs.unlinkSync(tmpPath);
     }
+  });
+
+  it("extracts per-operation-type overrides from YAML", async () => {
+    const tmpPath = `/tmp/test-ai-workspace-config-overrides-${Date.now()}.yml`;
+    const fs = await import("node:fs");
+    const yaml = [
+      "operations:",
+      "  bestOfN: 3",
+      "  review:",
+      "    bestOfN: 0",
+      "  execute:",
+      "    claudeTimeoutMinutes: 30",
+      "",
+    ].join("\n");
+    fs.writeFileSync(tmpPath, yaml);
+    try {
+      const result = loadConfigFile(tmpPath);
+      expect(result).not.toBeNull();
+      expect(result!.operations?.bestOfN).toBe(3);
+      expect(result!.operations?.typeOverrides?.review).toEqual({ bestOfN: 0 });
+      expect(result!.operations?.typeOverrides?.execute).toEqual({ claudeTimeoutMinutes: 30 });
+    } finally {
+      fs.unlinkSync(tmpPath);
+    }
+  });
+});
+
+describe("normalizeRawConfig", () => {
+  it("extracts operation type keys into typeOverrides", () => {
+    const raw = {
+      operations: {
+        bestOfN: 3,
+        maxConcurrent: 5,
+        review: { bestOfN: 0 },
+        execute: { claudeTimeoutMinutes: 30, bestOfN: 5 },
+      },
+    };
+    const result = normalizeRawConfig(raw);
+    expect(result.operations?.bestOfN).toBe(3);
+    expect(result.operations?.maxConcurrent).toBe(5);
+    expect(result.operations?.typeOverrides).toEqual({
+      review: { bestOfN: 0 },
+      execute: { claudeTimeoutMinutes: 30, bestOfN: 5 },
+    });
+    // Original operation type keys should be removed from operations root
+    expect((result.operations as Record<string, unknown>).review).toBeUndefined();
+    expect((result.operations as Record<string, unknown>).execute).toBeUndefined();
+  });
+
+  it("handles hyphenated operation type names", () => {
+    const raw = {
+      operations: {
+        bestOfN: 2,
+        "create-pr": { bestOfN: 0 },
+        "update-todo": { claudeTimeoutMinutes: 10 },
+      },
+    };
+    const result = normalizeRawConfig(raw);
+    expect(result.operations?.typeOverrides?.["create-pr"]).toEqual({ bestOfN: 0 });
+    expect(result.operations?.typeOverrides?.["update-todo"]).toEqual({ claudeTimeoutMinutes: 10 });
+  });
+
+  it("returns config unchanged when no operations section", () => {
+    const raw = { editor: "vim {path}" };
+    const result = normalizeRawConfig(raw);
+    expect(result.editor).toBe("vim {path}");
+    expect(result.operations).toBeUndefined();
+  });
+
+  it("returns config unchanged when no type overrides present", () => {
+    const raw = {
+      operations: { bestOfN: 3, maxConcurrent: 2 },
+    };
+    const result = normalizeRawConfig(raw);
+    expect(result.operations?.bestOfN).toBe(3);
+    expect(result.operations?.typeOverrides).toBeUndefined();
+  });
+
+  it("ignores non-operation-type object keys", () => {
+    const raw = {
+      operations: {
+        bestOfN: 3,
+        notAnOpType: { bestOfN: 0 },
+      },
+    };
+    const result = normalizeRawConfig(raw);
+    // notAnOpType is not an operation type, should remain as-is
+    expect((result.operations as Record<string, unknown>).notAnOpType).toEqual({ bestOfN: 0 });
+    expect(result.operations?.typeOverrides).toBeUndefined();
   });
 });
 
@@ -184,6 +276,27 @@ describe("mergeConfig", () => {
     const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, env);
     expect(result.terminal).toBe("warp {path}");
   });
+
+  it("merges typeOverrides from file config", () => {
+    const fileConfig: Partial<AppConfig> = {
+      operations: {
+        bestOfN: 3,
+        typeOverrides: {
+          review: { bestOfN: 0 },
+          execute: { claudeTimeoutMinutes: 30 },
+        },
+      } as AppConfig["operations"],
+    };
+    const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, {});
+    expect(result.operations.bestOfN).toBe(3);
+    expect(result.operations.typeOverrides.review).toEqual({ bestOfN: 0 });
+    expect(result.operations.typeOverrides.execute).toEqual({ claudeTimeoutMinutes: 30 });
+  });
+
+  it("defaults typeOverrides to empty when not in file", () => {
+    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
+    expect(result.operations.typeOverrides).toEqual({});
+  });
 });
 
 describe("getConfig", () => {
@@ -274,6 +387,83 @@ describe("getConfig", () => {
   });
 });
 
+describe("getOperationConfig", () => {
+  const savedEnv: Record<string, string | undefined> = {};
+  const envKeys = [
+    "AIW_WORKSPACE_ROOT",
+    "AIW_PORT",
+    "AIW_CHAT_PORT",
+    "AIW_CLAUDE_PATH",
+    "AIW_CLAUDE_USE_CLI",
+    "AIW_EDITOR",
+    "AIW_TERMINAL",
+  ];
+
+  beforeEach(() => {
+    _resetConfig();
+    _setConfigFilePath("/tmp/nonexistent-aiw-test-config.yml");
+    for (const key of envKeys) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterEach(() => {
+    _resetConfig();
+    _setConfigFilePath(null);
+    for (const key of envKeys) {
+      if (savedEnv[key] !== undefined) {
+        process.env[key] = savedEnv[key];
+      } else {
+        delete process.env[key];
+      }
+    }
+  });
+
+  it("returns global defaults when no per-type overrides", () => {
+    const result = getOperationConfig("execute");
+    expect(result.bestOfN).toBe(0);
+    expect(result.claudeTimeoutMinutes).toBe(20);
+    expect(result.functionTimeoutMinutes).toBe(3);
+    expect(result.defaultInteractionLevel).toBe("mid");
+  });
+
+  it("returns per-type overrides from config file", async () => {
+    const fs = await import("node:fs");
+    const tmpPath = `/tmp/test-aiw-opconfig-${Date.now()}.yml`;
+    const yaml = [
+      "operations:",
+      "  bestOfN: 3",
+      "  review:",
+      "    bestOfN: 0",
+      "  execute:",
+      "    claudeTimeoutMinutes: 30",
+      "    bestOfN: 5",
+      "",
+    ].join("\n");
+    fs.writeFileSync(tmpPath, yaml);
+    _setConfigFilePath(tmpPath);
+    try {
+      // Review: bestOfN overridden to 0, others inherit global
+      const reviewCfg = getOperationConfig("review");
+      expect(reviewCfg.bestOfN).toBe(0);
+      expect(reviewCfg.claudeTimeoutMinutes).toBe(20); // global default
+
+      // Execute: both bestOfN and claudeTimeoutMinutes overridden
+      const execCfg = getOperationConfig("execute");
+      expect(execCfg.bestOfN).toBe(5);
+      expect(execCfg.claudeTimeoutMinutes).toBe(30);
+
+      // Init: no per-type override, uses global bestOfN=3
+      const initCfg = getOperationConfig("init");
+      expect(initCfg.bestOfN).toBe(3);
+      expect(initCfg.claudeTimeoutMinutes).toBe(20);
+    } finally {
+      fs.unlinkSync(tmpPath);
+    }
+  });
+});
+
 describe("ensureConfigFile", () => {
   it("creates config file when it does not exist", async () => {
     const fs = await import("node:fs");
@@ -323,6 +513,16 @@ describe("generateDefaultConfigContent", () => {
     expect(content).toContain("# operations:");
     expect(content).toContain("# editor:");
     expect(content).toContain("# terminal:");
+  });
+
+  it("contains per-operation-type override reference", () => {
+    const content = generateDefaultConfigContent();
+    expect(content).toContain("Per-operation-type overrides");
+    expect(content).toContain("#   # <operation-type>:");
+    expect(content).toContain("#   #   claudeTimeoutMinutes:");
+    expect(content).toContain("#   #   functionTimeoutMinutes:");
+    expect(content).toContain("#   #   defaultInteractionLevel:");
+    expect(content).toContain("#   #   bestOfN:");
   });
 });
 
@@ -476,6 +676,12 @@ describe("migrateConfigContent", () => {
       "  functionTimeoutMinutes: 3",
       "  defaultInteractionLevel: mid",
       "  bestOfN: 0",
+      "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
+      "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
+      "#   #   claudeTimeoutMinutes: 20",
+      "#   #   functionTimeoutMinutes: 3",
+      "#   #   defaultInteractionLevel: mid",
+      "#   #   bestOfN: 0",
       "",
       "editor: code {path}",
       "terminal: open -a Terminal {path}",
@@ -504,6 +710,95 @@ describe("migrateConfigContent", () => {
     const chatPortIdx = lines.findIndex((l) => l.includes("chatPort:"));
     const editorIdx = lines.findIndex((l) => l.includes("editor:"));
     expect(chatPortIdx).toBeLessThan(editorIdx);
+  });
+
+  it("preserves per-operation-type override sections", () => {
+    const content = [
+      "operations:",
+      "  bestOfN: 3",
+      "  review:",
+      "    bestOfN: 0",
+      "  execute:",
+      "    claudeTimeoutMinutes: 30",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    // Per-type override sections should be preserved
+    expect(result).toContain("  review:");
+    expect(result).toContain("    bestOfN: 0");
+    expect(result).toContain("  execute:");
+    expect(result).toContain("    claudeTimeoutMinutes: 30");
+    // Global settings still present
+    expect(result).toContain("  bestOfN: 3");
+  });
+
+  it("comments out unknown keys inside per-type override sections", () => {
+    const content = [
+      "operations:",
+      "  bestOfN: 3",
+      "  review:",
+      "    bestOfN: 0",
+      "    unknownSetting: true",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    // Valid key preserved
+    expect(result).toContain("    bestOfN: 0");
+    // Unknown key commented out
+    expect(result).toContain("#     unknownSetting: true");
+  });
+
+  it("preserves config with per-type overrides and all keys present", () => {
+    const content = [
+      "workspaceRoot: /my/workspace",
+      "",
+      "server:",
+      "  port: 3741",
+      "  chatPort: 3742",
+      "",
+      "claude:",
+      "  path: null",
+      "  useCli: true",
+      "",
+      "operations:",
+      "  maxConcurrent: 3",
+      "  claudeTimeoutMinutes: 20",
+      "  functionTimeoutMinutes: 3",
+      "  defaultInteractionLevel: mid",
+      "  bestOfN: 3",
+      "  review:",
+      "    bestOfN: 0",
+      "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
+      "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
+      "#   #   claudeTimeoutMinutes: 20",
+      "#   #   functionTimeoutMinutes: 3",
+      "#   #   defaultInteractionLevel: mid",
+      "#   #   bestOfN: 0",
+      "",
+      "editor: code {path}",
+      "terminal: open -a Terminal {path}",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    // All keys present including per-type overrides — no changes
+    expect(result).toBe(content);
+  });
+
+  it("preserves hyphenated operation type names in overrides", () => {
+    const content = [
+      "operations:",
+      "  bestOfN: 3",
+      "  create-pr:",
+      "    bestOfN: 0",
+      "  update-todo:",
+      "    claudeTimeoutMinutes: 10",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(content);
+    expect(result).toContain("  create-pr:");
+    expect(result).toContain("    bestOfN: 0");
+    expect(result).toContain("  update-todo:");
+    expect(result).toContain("    claudeTimeoutMinutes: 10");
   });
 });
 

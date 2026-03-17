@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { listWorkspaceRepos } from "@/lib/workspace";
-import { getConfig } from "@/lib/app-config";
+import { getOperationConfig } from "@/lib/app-config";
 import { buildExecutePipeline } from "@/lib/pipelines/execute";
 import { buildBestOfNPipeline } from "@/lib/pipelines/best-of-n";
 import { executeSchema } from "@/lib/schemas";
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const bestOfN = parsed.data.bestOfN ?? getConfig().operations.bestOfN;
+  const bestOfN = parsed.data.bestOfN ?? getOperationConfig("execute").bestOfN;
   const bestOfNFromConfig = parsed.data.bestOfN == null;
 
   try {

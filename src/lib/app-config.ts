@@ -2,7 +2,8 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { parse as parseYaml } from "yaml";
-import type { AppConfig } from "@/types/config";
+import type { AppConfig, OperationTypeSettings } from "@/types/config";
+import type { OperationType } from "@/types/operation";
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -24,6 +25,7 @@ export const CONFIG_DEFAULTS: AppConfig = {
     functionTimeoutMinutes: 3,
     defaultInteractionLevel: "mid",
     bestOfN: 0,
+    typeOverrides: {},
   },
   editor: "code {path}",
   terminal: "open -a Terminal {path}",
@@ -35,6 +37,35 @@ export const CONFIG_FILE_PATH = path.join(
   "ai-workspace",
   "config.yml",
 );
+
+// ---------------------------------------------------------------------------
+// Operation type names (for config validation and migration)
+// ---------------------------------------------------------------------------
+
+/** All valid OperationType values. Used by migration to recognize sub-sections. */
+export const OPERATION_TYPE_NAMES: ReadonlySet<string> = new Set<OperationType>([
+  "init",
+  "execute",
+  "review",
+  "create-pr",
+  "update-todo",
+  "create-todo",
+  "delete",
+  "workspace-prune",
+  "operation-prune",
+  "mcp-auth",
+  "claude-login",
+  "batch",
+  "search",
+]);
+
+/** Setting keys that can be overridden per operation type. */
+const OVERRIDABLE_SETTINGS_KEYS = new Set<keyof OperationTypeSettings>([
+  "claudeTimeoutMinutes",
+  "functionTimeoutMinutes",
+  "defaultInteractionLevel",
+  "bestOfN",
+]);
 
 // ---------------------------------------------------------------------------
 // Config file generation
@@ -62,6 +93,12 @@ export function generateDefaultConfigContent(): string {
     "#   functionTimeoutMinutes: 3",
     "#   defaultInteractionLevel: mid   # low / mid / high",
     "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates",
+    "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
+    "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
+    "#   #   claudeTimeoutMinutes: 20",
+    "#   #   functionTimeoutMinutes: 3",
+    "#   #   defaultInteractionLevel: mid",
+    "#   #   bestOfN: 0",
     "",
     "# editor: code {path}",
     "# terminal: open -a Terminal {path}",
@@ -121,6 +158,8 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
 interface ParsedLine {
   type: "top-key" | "nested-key" | "other";
   key?: string;
+  /** Indentation level (number of leading spaces) for nested keys. */
+  indent?: number;
   commented: boolean;
 }
 
@@ -135,13 +174,13 @@ function parseConfigLine(line: string): ParsedLine {
   const effective = isCommented ? line.replace(/^#\s?/, "") : line;
 
   // Nested key: starts with 2+ spaces then word then colon
-  const nestedMatch = effective.match(/^(\s{2,})(\w+)\s*:/);
+  const nestedMatch = effective.match(/^(\s{2,})([\w-]+)\s*:/);
   if (nestedMatch) {
-    return { type: "nested-key", key: nestedMatch[2], commented: isCommented };
+    return { type: "nested-key", key: nestedMatch[2], indent: nestedMatch[1].length, commented: isCommented };
   }
 
   // Top-level key: starts with word char at column 0
-  const topMatch = effective.match(/^(\w+)\s*:/);
+  const topMatch = effective.match(/^([\w-]+)\s*:/);
   if (topMatch) {
     return { type: "top-key", key: topMatch[1], commented: isCommented };
   }
@@ -189,18 +228,76 @@ export function migrateConfigContent(content: string): string {
   // --- Phase 2: Add missing entries ---
   lines = addMissingEntries(lines);
 
+  // --- Phase 3: Add per-type override hint if operations section exists ---
+  lines = addTypeOverrideHint(lines);
+
   return lines.join("\n");
+}
+
+/** Per-type override hint comment marker (used to detect if hint is already present). */
+const TYPE_OVERRIDE_HINT_MARKER = "Per-operation-type overrides";
+
+const TYPE_OVERRIDE_HINT_LINES = [
+  "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
+  "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
+  "#   #   claudeTimeoutMinutes: 20",
+  "#   #   functionTimeoutMinutes: 3",
+  "#   #   defaultInteractionLevel: mid",
+  "#   #   bestOfN: 0",
+];
+
+/**
+ * If the operations section exists but has no (or outdated) per-type override
+ * hint comment, insert/replace it at the end of the section.
+ */
+function addTypeOverrideHint(lines: string[]): string[] {
+  // Check if the operations section exists
+  const hasOperations = lines.some((line) => {
+    const parsed = parseConfigLine(line);
+    return parsed.type === "top-key" && parsed.key === "operations";
+  });
+  if (!hasOperations) return lines;
+
+  const result = [...lines];
+
+  // Find and remove any existing hint block (marker line + consecutive `#   #` lines after it)
+  const markerIdx = result.findIndex((line) => line.includes(TYPE_OVERRIDE_HINT_MARKER));
+  if (markerIdx >= 0) {
+    let end = markerIdx + 1;
+    while (end < result.length && result[end].startsWith("#   #")) {
+      end++;
+    }
+    // Check if the existing block already matches the desired content
+    const existing = result.slice(markerIdx, end);
+    if (
+      existing.length === TYPE_OVERRIDE_HINT_LINES.length &&
+      existing.every((line, i) => line === TYPE_OVERRIDE_HINT_LINES[i])
+    ) {
+      return lines; // Already up to date
+    }
+    result.splice(markerIdx, end - markerIdx);
+  }
+
+  // Find the end of the operations section and insert the hint
+  const endLine = findSectionEnd(result, "operations");
+  if (endLine < 0) return lines;
+
+  result.splice(endLine + 1, 0, ...TYPE_OVERRIDE_HINT_LINES);
+  return result;
 }
 
 function commentOutUnknownKeys(lines: string[]): string[] {
   let currentSection: string | null = null;
   let sectionCommentedOut = false;
+  // Track operation-type sub-section within "operations" (e.g., "review", "execute")
+  let opsSubSection: string | null = null;
 
   return lines.map((line) => {
     const parsed = parseConfigLine(line);
 
     if (parsed.type === "top-key") {
       sectionCommentedOut = false;
+      opsSubSection = null;
       if (SECTION_NAMES.has(parsed.key!)) {
         currentSection = parsed.key!;
       } else {
@@ -212,7 +309,7 @@ function commentOutUnknownKeys(lines: string[]): string[] {
         );
         if (!isKnown) {
           // If this is a section-like header (key with no inline value), mark children
-          if (/^\w+\s*:\s*$/.test(line)) {
+          if (/^[\w-]+\s*:\s*$/.test(line)) {
             sectionCommentedOut = true;
           }
           return `# ${line}`;
@@ -223,17 +320,51 @@ function commentOutUnknownKeys(lines: string[]): string[] {
         if (sectionCommentedOut) {
           return `# ${line}`;
         }
-        if (currentSection) {
+        if (currentSection === "operations") {
+          // Check for operation-type sub-section headers (2-space indent)
+          if (parsed.indent === 2 && OPERATION_TYPE_NAMES.has(parsed.key!)) {
+            opsSubSection = parsed.key!;
+            return line; // Valid sub-section header
+          }
+          // Check for keys inside an operation-type sub-section (4+ space indent)
+          if (opsSubSection && parsed.indent != null && parsed.indent >= 4) {
+            if (OVERRIDABLE_SETTINGS_KEYS.has(parsed.key! as keyof OperationTypeSettings)) {
+              return line; // Valid overridable setting
+            }
+            return `# ${line}`; // Unknown key inside sub-section
+          }
+          // Regular operations nested key (2-space indent, not a sub-section)
+          if (parsed.indent === 2) {
+            opsSubSection = null; // Left the sub-section
+          }
+          const isKnown = KNOWN_CONFIG_KEYS.some(
+            (k) => k.section === "operations" && k.key === parsed.key!,
+          );
+          if (!isKnown && !OPERATION_TYPE_NAMES.has(parsed.key!)) {
+            return `# ${line}`;
+          }
+        } else if (currentSection) {
           const isKnown = KNOWN_CONFIG_KEYS.some(
             (k) => k.section === currentSection && k.key === parsed.key!,
           );
           if (!isKnown) return `# ${line}`;
+        }
+      } else {
+        // Track sub-section from commented lines too
+        if (currentSection === "operations" && parsed.indent === 2) {
+          if (OPERATION_TYPE_NAMES.has(parsed.key!)) {
+            opsSubSection = parsed.key!;
+          } else if (!OVERRIDABLE_SETTINGS_KEYS.has(parsed.key! as keyof OperationTypeSettings)
+            && !KNOWN_CONFIG_KEYS.some((k) => k.section === "operations" && k.key === parsed.key!)) {
+            opsSubSection = null;
+          }
         }
       }
     }
 
     // Track section from commented headers too
     if (parsed.type === "top-key" && parsed.commented) {
+      opsSubSection = null;
       if (SECTION_NAMES.has(parsed.key!)) {
         currentSection = parsed.key!;
       } else {
@@ -260,7 +391,10 @@ function addMissingEntries(lines: string[]): string[] {
         currentSection = null;
       }
     } else if (parsed.type === "nested-key" && currentSection) {
-      found.add(`${currentSection}.${parsed.key!}`);
+      // Only track direct children (indent 2), not sub-section children (indent 4+)
+      if (parsed.indent === 2) {
+        found.add(`${currentSection}.${parsed.key!}`);
+      }
     }
   }
 
@@ -366,6 +500,45 @@ export function migrateConfigFile(filePath: string): boolean {
 // ---------------------------------------------------------------------------
 
 /**
+ * Normalize a raw YAML-parsed config object: extract per-operation-type
+ * override objects from `operations` into `operations.typeOverrides`.
+ *
+ * In the YAML file, users write:
+ * ```yaml
+ * operations:
+ *   bestOfN: 3
+ *   review:
+ *     bestOfN: 0
+ * ```
+ *
+ * The YAML parser produces `{ operations: { bestOfN: 3, review: { bestOfN: 0 } } }`.
+ * This function moves the `review` object into `operations.typeOverrides.review`.
+ */
+export function normalizeRawConfig(raw: Record<string, unknown>): Partial<AppConfig> {
+  const result = { ...raw } as Record<string, unknown>;
+
+  if (result.operations && typeof result.operations === "object") {
+    const ops = { ...result.operations as Record<string, unknown> };
+    const typeOverrides: Record<string, Partial<OperationTypeSettings>> = {};
+
+    for (const key of Object.keys(ops)) {
+      if (OPERATION_TYPE_NAMES.has(key) && ops[key] && typeof ops[key] === "object") {
+        typeOverrides[key] = ops[key] as Partial<OperationTypeSettings>;
+        delete ops[key];
+      }
+    }
+
+    if (Object.keys(typeOverrides).length > 0) {
+      ops.typeOverrides = typeOverrides;
+    }
+
+    result.operations = ops;
+  }
+
+  return result as Partial<AppConfig>;
+}
+
+/**
  * Load and parse a YAML config file. Returns a partial config object or null
  * if the file doesn't exist or fails to parse.
  */
@@ -377,7 +550,7 @@ export function loadConfigFile(
     const raw = fs.readFileSync(filePath, "utf-8");
     const parsed = parseYaml(raw);
     if (!parsed || typeof parsed !== "object") return null;
-    return parsed as Partial<AppConfig>;
+    return normalizeRawConfig(parsed as Record<string, unknown>);
   } catch (err) {
     console.warn(`[app-config] Failed to load config from ${filePath}:`, err);
     return null;
@@ -451,6 +624,28 @@ export function mergeConfig(
     return def;
   }
 
+  // Merge typeOverrides from file config (env doesn't support per-type overrides)
+  const fileTypeOverrides = file.operations?.typeOverrides ?? {};
+  const defaultTypeOverrides = defaults.operations.typeOverrides ?? {};
+  const mergedTypeOverrides: AppConfig["operations"]["typeOverrides"] = {};
+
+  // Collect all operation type keys from both defaults and file
+  const allTypeKeys = new Set([
+    ...Object.keys(defaultTypeOverrides),
+    ...Object.keys(fileTypeOverrides),
+  ]);
+
+  for (const typeKey of allTypeKeys) {
+    const defOverride = defaultTypeOverrides[typeKey as OperationType];
+    const fileOverride = fileTypeOverrides[typeKey as OperationType];
+    if (fileOverride || defOverride) {
+      mergedTypeOverrides[typeKey as OperationType] = {
+        ...defOverride,
+        ...fileOverride,
+      };
+    }
+  }
+
   return {
     workspaceRoot: pick(env.workspaceRoot, file.workspaceRoot, defaults.workspaceRoot),
     server: {
@@ -487,9 +682,29 @@ export function mergeConfig(
         file.operations?.bestOfN,
         defaults.operations.bestOfN,
       ),
+      typeOverrides: mergedTypeOverrides,
     },
     editor: pick(env.editor, file.editor, defaults.editor),
     terminal: pick(env.terminal, file.terminal, defaults.terminal),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Per-operation-type config resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Get resolved settings for a specific operation type.
+ * Per-type overrides take precedence over the global defaults.
+ */
+export function getOperationConfig(type: OperationType): OperationTypeSettings {
+  const cfg = getConfig();
+  const overrides = cfg.operations.typeOverrides?.[type];
+  return {
+    claudeTimeoutMinutes: overrides?.claudeTimeoutMinutes ?? cfg.operations.claudeTimeoutMinutes,
+    functionTimeoutMinutes: overrides?.functionTimeoutMinutes ?? cfg.operations.functionTimeoutMinutes,
+    defaultInteractionLevel: overrides?.defaultInteractionLevel ?? cfg.operations.defaultInteractionLevel,
+    bestOfN: overrides?.bestOfN ?? cfg.operations.bestOfN,
   };
 }
 

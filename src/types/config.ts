@@ -1,3 +1,14 @@
+import type { OperationType } from "./operation";
+
+/** Settings that can be overridden per operation type. */
+export interface OperationTypeSettings {
+  claudeTimeoutMinutes: number;
+  functionTimeoutMinutes: number;
+  defaultInteractionLevel: "low" | "mid" | "high";
+  /** Best-of-N parallel execution count. 0 = disabled, 2-5 = parallel count. */
+  bestOfN: number;
+}
+
 export interface AppConfig {
   workspaceRoot: string | null;
 
@@ -11,13 +22,10 @@ export interface AppConfig {
     useCli: boolean;
   };
 
-  operations: {
+  operations: OperationTypeSettings & {
     maxConcurrent: number;
-    claudeTimeoutMinutes: number;
-    functionTimeoutMinutes: number;
-    defaultInteractionLevel: "low" | "mid" | "high";
-    /** Best-of-N parallel execution count. 0 = disabled, 2-5 = parallel count. */
-    bestOfN: number;
+    /** Per-operation-type setting overrides. Keys are OperationType values. */
+    typeOverrides: Partial<Record<OperationType, Partial<OperationTypeSettings>>>;
   };
 
   /** Editor launch command. Use `{path}` as placeholder for the target path. */
