@@ -80,10 +80,50 @@ export function OperationCard({
     return operation.status;
   }, [events, operation.status]);
 
+  // Detect pending ask from SSE events (lightweight check on raw events)
+  const liveHasPendingAsk = useMemo(() => {
+    if (liveStatus !== "running") return false;
+    // Track ask tool_use IDs and answered tool_result IDs
+    const askIds = new Set<string>();
+    const answeredIds = new Set<string>();
+    for (const ev of events) {
+      if (ev.type !== "output") continue;
+      if (ev.data.includes('"AskUserQuestion"')) {
+        try {
+          const parsed = JSON.parse(ev.data);
+          if (parsed.type === "assistant" && Array.isArray(parsed.message?.content)) {
+            for (const block of parsed.message.content) {
+              if (block.type === "tool_use" && block.name === "AskUserQuestion") {
+                askIds.add(block.id);
+              }
+            }
+          }
+        } catch { /* ignore */ }
+      }
+      if (ev.data.includes('"tool_result"')) {
+        try {
+          const parsed = JSON.parse(ev.data);
+          if (parsed.type === "user" && Array.isArray(parsed.message?.content)) {
+            for (const block of parsed.message.content) {
+              if (block.type === "tool_result" && block.tool_use_id) {
+                answeredIds.add(block.tool_use_id);
+              }
+            }
+          }
+        } catch { /* ignore */ }
+      }
+    }
+    for (const id of askIds) {
+      if (!answeredIds.has(id)) return true;
+    }
+    return false;
+  }, [events, liveStatus]);
+
   const effectiveOperation = {
     ...operation,
     status: liveStatus,
     ...(livePhases && { currentPhase: livePhases.find((p) => p.status === "running") }),
+    hasPendingAsk: liveHasPendingAsk || operation.hasPendingAsk,
   };
   const effectiveIsRunning = liveStatus === "running" && (connected || isRunning);
 

@@ -50,12 +50,15 @@ function SearchExcerpts({ excerpts }: { excerpts: string[] }) {
 
 function useWorkspaceMap() {
   const { workspaces } = useWorkspaces();
-  const { runningWorkspaces } = useRunningOperations();
+  const { runningWorkspaces, operations } = useRunningOperations();
   const wsMap = new Map<string, WorkspaceSummary>();
   for (const ws of workspaces) {
     wsMap.set(ws.name, ws);
   }
-  return { wsMap, runningWorkspaces };
+  const askingWorkspaces = new Set(
+    operations.filter((op) => op.hasPendingAsk).map((op) => op.workspace),
+  );
+  return { wsMap, runningWorkspaces, askingWorkspaces };
 }
 
 export function QuickSearchResults({
@@ -67,7 +70,7 @@ export function QuickSearchResults({
   isLoading: boolean;
   error: string | null;
 }) {
-  const { wsMap, runningWorkspaces } = useWorkspaceMap();
+  const { wsMap, runningWorkspaces, askingWorkspaces } = useWorkspaceMap();
 
   if (isLoading) {
     return (
@@ -106,6 +109,7 @@ export function QuickSearchResults({
             key={result.workspaceName}
             workspace={ws}
             isRunning={runningWorkspaces.has(result.workspaceName)}
+            isAsking={askingWorkspaces.has(result.workspaceName)}
           >
             <SearchMatchLines matches={result.matches} />
           </WorkspaceCard>
@@ -122,7 +126,7 @@ export function DeepSearchResults({
   data: DeepSearchResponse | null;
   error: string | null;
 }) {
-  const { wsMap, runningWorkspaces } = useWorkspaceMap();
+  const { wsMap, runningWorkspaces, askingWorkspaces } = useWorkspaceMap();
 
   if (error) {
     return <StatusText variant="error">{error}</StatusText>;
@@ -151,6 +155,7 @@ export function DeepSearchResults({
             key={result.workspaceName}
             workspace={ws}
             isRunning={runningWorkspaces.has(result.workspaceName)}
+            isAsking={askingWorkspaces.has(result.workspaceName)}
           >
             <SearchExcerpts excerpts={result.excerpts} />
           </WorkspaceCard>
