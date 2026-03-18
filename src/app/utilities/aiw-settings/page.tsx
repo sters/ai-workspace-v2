@@ -7,14 +7,13 @@ import { Button } from "@/components/shared/buttons/button";
 import { Card } from "@/components/shared/containers/card";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { PageHeader } from "@/components/shared/feedback/page-header";
+import { fetcher } from "@/lib/api-client";
 
 type ConfigData = {
   filePath: string;
   exists: boolean;
   content: string | null;
 };
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function AiwSettingsPage() {
   const { data, error, isLoading, mutate } = useSWR<ConfigData>(

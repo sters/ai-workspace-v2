@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef } from "react";
 import { Button } from "@/components/shared/buttons/button";
+import { Input } from "@/components/shared/forms/input";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { MarkdownRenderer } from "@/components/shared/content/markdown-renderer";
 import { parseStreamEvent } from "@/lib/parsers/stream";
@@ -105,14 +106,14 @@ export function QuickAsk({ workspaceName }: { workspaceName: string }) {
   return (
     <div className="space-y-3">
       <div className="flex gap-2">
-        <input
+        <Input
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isRunning}
           placeholder="Ask a question about this workspace..."
-          className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+          className="flex-1"
         />
         <Button
           onClick={handleAsk}

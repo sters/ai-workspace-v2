@@ -1,12 +1,7 @@
 import useSWR from "swr";
 import type { WorkspaceSummary, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";
-
-const fetcher = async (url: string) => {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`${r.status}`);
-  return r.json();
-};
+import { fetcher } from "@/lib/api-client";
 
 export function useWorkspace(name: string) {
   const { data, error, isLoading, mutate } = useSWR<WorkspaceSummary>(

@@ -1,12 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
-interface SubagentOutputState {
-  content: string;
-  loading: boolean;
-  error: boolean;
-}
+import type { SubagentOutputState } from "@/types/hooks";
 
 /**
  * Stream sub-agent output file content via SSE.

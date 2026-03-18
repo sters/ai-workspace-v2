@@ -6,6 +6,7 @@ import { MonacoEditorLazy } from "@/components/shared/content/monaco-editor-lazy
 import { Button } from "@/components/shared/buttons/button";
 import { Card } from "@/components/shared/containers/card";
 import { StatusText } from "@/components/shared/feedback/status-text";
+import { fetcher } from "@/lib/api-client";
 import type { editor } from "monaco-editor";
 
 type SettingsEntry = {
@@ -15,8 +16,6 @@ type SettingsEntry = {
   content: string | null;
   error: string | null;
 };
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export function SettingsEditor({ scope }: { scope: "project" | "local" | "user" }) {
   const { data, error, isLoading, mutate } = useSWR<{

@@ -9,17 +9,8 @@ import { Card } from "@/components/shared/containers/card";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { ResultBox } from "@/components/shared/feedback/result-box";
 import { useSSE } from "@/hooks/use-sse";
-import type { OperationListItem, OperationType, OperationPhaseInfo } from "@/types/operation";
-
-interface OperationCardProps {
-  operation: OperationListItem;
-  /** Called when user starts a new operation from next-action suggestions. */
-  onStartOperation: (type: OperationType, body: Record<string, string>) => Promise<void>;
-  /** Called when user clicks Cancel on a running operation. */
-  onCancel: (operationId: string) => void;
-  /** Whether this card should be expanded by default. */
-  defaultExpanded?: boolean;
-}
+import type { OperationPhaseInfo } from "@/types/operation";
+import type { OperationCardProps } from "@/types/components";
 
 export function OperationCard({
   operation,

@@ -26,3 +26,5 @@ export interface DeepSearchResponse {
   query: string;
   results: DeepSearchResult[];
 }
+
+export type SearchMode = "quick" | "deep" | null;

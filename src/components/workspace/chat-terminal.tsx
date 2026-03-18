@@ -4,24 +4,12 @@ import { useRef, useEffect, useState, useCallback } from "react";
 import { useTerminal } from "@/hooks/use-terminal";
 import { Button } from "../shared/buttons/button";
 import { StatusText } from "../shared/feedback/status-text";
+import type { SessionState, ServerMessage } from "@/types/chat";
 
 const CHAT_WS_URL =
   typeof window !== "undefined"
     ? `ws://${window.location.hostname}:${process.env.NEXT_PUBLIC_CHAT_WS_PORT || "3742"}/ws`
     : "";
-
-type SessionState = "idle" | "connecting" | "resuming" | "running" | "exited";
-
-interface ServerMessage {
-  type: "output" | "started" | "exited" | "error" | "resumed" | "replay_done";
-  data?: string;
-  sessionId?: string;
-  code?: number;
-  message?: string;
-  exited?: boolean;
-  exitCode?: number;
-  bufferedChunks?: number;
-}
 
 // ---------------------------------------------------------------------------
 // localStorage helpers

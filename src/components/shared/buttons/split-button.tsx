@@ -2,13 +2,9 @@
 
 import { type ReactNode, useState, useRef, useEffect } from "react";
 import { useAsyncCallback } from "@/hooks/use-async-callback";
+import type { SplitButtonItem, SplitButtonVariant } from "@/types/components";
 
-export interface SplitButtonItem {
-  label: string;
-  onClick: () => void | Promise<unknown>;
-}
-
-const splitVariants = {
+const splitVariants: Record<SplitButtonVariant, { main: string; dropdown: string }> = {
   primary: {
     main: "inline-flex items-center gap-1.5 rounded-l-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50",
     dropdown:
@@ -25,8 +21,6 @@ const splitVariants = {
       "rounded-r-md border border-l-0 bg-background px-1.5 py-1.5 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-50",
   },
 };
-
-export type SplitButtonVariant = keyof typeof splitVariants;
 
 export function SplitButton({
   label,

@@ -6,8 +6,7 @@ import useSWR from "swr";
 import { OperationCard } from "@/components/workspace/operation-card";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import type { OperationListItem, OperationType } from "@/types/operation";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+import { fetcher, killOperation } from "@/lib/api-client";
 
 const VALID_AUTO_ACTIONS = new Set<string>([
   "execute",
@@ -127,11 +126,7 @@ export default function OperationsPage({
 
   const handleCancel = useCallback(
     async (operationId: string) => {
-      await fetch("/api/operations/kill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operationId }),
-      });
+      await killOperation(operationId);
       mutate();
     },
     [mutate]

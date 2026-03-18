@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import type { TodoFile } from "@/types/workspace";
 import { TodoItemRow } from "./todo-item";
 import { SectionBlock } from "./todo-viewer";
 import { Card } from "../shared/containers/card";
 import { ProgressBar } from "../shared/feedback/progress-bar";
-import { SplitButton, type SplitButtonItem } from "../shared/buttons/split-button";
+import { SplitButton } from "../shared/buttons/split-button";
+import type { SplitButtonItem } from "@/types/components";
 import { Button } from "../shared/buttons/button";
 import { Textarea } from "../shared/forms/textarea";
+import { InteractionLevelSelector } from "../shared/forms/interaction-level-selector";
 import { StatusText } from "../shared/feedback/status-text";
 import { useRunningOperations } from "@/hooks/use-running-operations";
+import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
+import { openInEditor, openInTerminal } from "@/lib/api-actions";
 import type { OperationType } from "@/types/operation";
 import type { InteractionLevel } from "@/types/prompts";
 import {
@@ -21,41 +24,6 @@ import {
   CodeXml,
   Terminal,
 } from "lucide-react";
-
-const INTERACTION_LEVELS: { value: InteractionLevel; label: string }[] = [
-  { value: "low", label: "Low" },
-  { value: "mid", label: "Mid" },
-  { value: "high", label: "High" },
-];
-
-function InteractionLevelSelector({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: InteractionLevel;
-  onChange: (level: InteractionLevel) => void;
-  disabled: boolean;
-}) {
-  return (
-    <div className="flex gap-0.5">
-      {INTERACTION_LEVELS.map(({ value: level, label }) => (
-        <button
-          key={level}
-          onClick={() => onChange(level)}
-          disabled={disabled}
-          className={`rounded px-2 py-1 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-            value === level
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground hover:bg-muted/80"
-          }`}
-        >
-          {label}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 function UpdateForm({
   label,
@@ -125,32 +93,6 @@ function UpdateForm({
       </div>
     </div>
   );
-}
-
-function openInEditor(targetPath: string) {
-  return fetch("/api/operations/open-editor", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ workspace: targetPath }),
-  }).then(async (res) => {
-    if (!res.ok) {
-      const data = await res.json();
-      console.error("Failed to open editor:", data.error);
-    }
-  });
-}
-
-function openInTerminal(targetPath: string) {
-  return fetch("/api/operations/open-terminal", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ workspace: targetPath }),
-  }).then(async (res) => {
-    if (!res.ok) {
-      const data = await res.json();
-      console.error("Failed to open terminal:", data.error);
-    }
-  });
 }
 
 function RepoTodoCard({
@@ -357,28 +299,9 @@ export function TodoUpdater({
   workspaceName: string;
   repositories?: { alias: string; path: string }[];
 }) {
-  const router = useRouter();
   const { isWorkspaceTypeRunning } = useRunningOperations();
   const isRunning = isWorkspaceTypeRunning(workspaceName, "update-todo");
-
-  const startAndNavigate = useCallback(
-    async (type: OperationType, body: Record<string, string>) => {
-      const res = await fetch(`/api/operations/${type}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        console.error("Failed to start operation:", await res.text());
-        return;
-      }
-      const op = await res.json();
-      router.push(
-        `/workspace/${encodeURIComponent(workspaceName)}/operations?operationId=${encodeURIComponent(op.id)}`
-      );
-    },
-    [router, workspaceName]
-  );
+  const startAndNavigate = useStartAndNavigate(workspaceName);
 
   if (todos.length === 0) {
     return <StatusText>No TODO files found.</StatusText>;

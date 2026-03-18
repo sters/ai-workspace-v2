@@ -1,2 +1,3 @@
-export { Button, buttonVariants, type ButtonVariant } from "./button";
-export { SplitButton, type SplitButtonItem, type SplitButtonVariant } from "./split-button";
+export { Button, buttonVariants } from "./button";
+export { SplitButton } from "./split-button";
+export type { ButtonVariant, SplitButtonItem, SplitButtonVariant } from "@/types/components";
