@@ -5,11 +5,10 @@
 import type { Subprocess } from "bun";
 import type { ClaudeProcess, RunClaudeOptions, SpawnClaudeOptions, SpawnClaudeTerminalOptions, StreamEvent } from "@/types/claude";
 import type { TerminalSubprocess } from "@/types/pty";
-import { AI_WORKSPACE_ROOT } from "../config";
+import { AI_WORKSPACE_ROOT, getConfig } from "../config";
 import type { OperationEvent } from "@/types/operation";
 import { spawnTerminal } from "../pty";
 import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
-import { getConfig } from "../app-config";
 
 // ---------------------------------------------------------------------------
 // CLI path resolution (moved from cli-path.ts)

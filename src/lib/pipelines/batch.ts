@@ -1,7 +1,7 @@
 import { getOperation } from "@/lib/pipeline-manager";
 import { getReviewSessions } from "@/lib/workspace/reader";
 import { listWorkspaceRepos } from "@/lib/workspace";
-import { getOperationConfig } from "@/lib/app-config";
+import { getOperationConfig } from "@/lib/config";
 import { buildInitPipeline } from "./init";
 import { buildExecutePipeline } from "./execute";
 import { buildReviewPipeline } from "./review";

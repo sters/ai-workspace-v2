@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
-import { resolveWorkspaceName } from "@/lib/config";
-import { getOperationConfig } from "@/lib/app-config";
+import { resolveWorkspaceName, getOperationConfig } from "@/lib/config";
 import { buildUpdateTodoPipeline } from "@/lib/pipelines/update-todo";
 import { updateTodoSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";

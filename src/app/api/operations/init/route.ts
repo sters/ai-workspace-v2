@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
-import { getOperationConfig } from "@/lib/app-config";
+import { getOperationConfig } from "@/lib/config";
 import { buildInitPipeline } from "@/lib/pipelines/init";
 import { initSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";

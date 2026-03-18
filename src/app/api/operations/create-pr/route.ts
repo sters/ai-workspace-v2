@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { resolveWorkspaceName } from "@/lib/config";
+import { resolveWorkspaceName, getOperationConfig } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { listWorkspaceRepos } from "@/lib/workspace";
-import { getOperationConfig } from "@/lib/app-config";
 import { buildCreatePrPipeline } from "@/lib/pipelines/create-pr";
 import { buildBestOfNPipeline } from "@/lib/pipelines/best-of-n";
 import { createPrSchema } from "@/lib/schemas";

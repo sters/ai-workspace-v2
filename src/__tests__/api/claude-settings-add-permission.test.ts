@@ -34,6 +34,7 @@ vi.mock("node:os", async () => {
 
 vi.mock("@/lib/config", () => ({
   AI_WORKSPACE_ROOT: "/workspace-root",
+  getConfig: () => ({ operations: { defaultInteractionLevel: "mid" } }),
 }));
 
 async function callPOST(body: Record<string, unknown>) {

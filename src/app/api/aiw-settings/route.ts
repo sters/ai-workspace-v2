@@ -5,7 +5,7 @@ import { parse as parseYaml } from "yaml";
 import {
   CONFIG_FILE_PATH,
   _resetConfig,
-} from "@/lib/app-config";
+} from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 

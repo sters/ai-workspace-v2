@@ -1,5 +1,5 @@
 import z from "zod";
-import { getConfig } from "./app-config";
+import { getConfig } from "./config";
 
 export const interactionLevelSchema = z.enum(["low", "mid", "high"]).default(getConfig().operations.defaultInteractionLevel);
 
