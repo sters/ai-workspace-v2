@@ -18,6 +18,15 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_GIT_HASH: getGitHash(),
   },
+  async redirects() {
+    return [
+      {
+        source: "/utilities/claude-settings",
+        destination: "/utilities/claude-settings/project",
+        permanent: false,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
