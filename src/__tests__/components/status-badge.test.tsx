@@ -67,4 +67,49 @@ describe("StatusBadge", () => {
     const el = screen.getByText("test");
     expect(el.className).toContain("ml-2");
   });
+
+  it("uses pill shape by default", () => {
+    render(<StatusBadge label="test" />);
+    const el = screen.getByText("test");
+    expect(el.className).toContain("rounded-full");
+    expect(el.className).toContain("px-2.5");
+  });
+
+  it("uses square shape when specified", () => {
+    render(<StatusBadge label="project" shape="square" />);
+    const el = screen.getByText("project");
+    expect(el.className).toContain("px-1.5");
+    expect(el.className).not.toContain("rounded-full");
+  });
+
+  it("renders title attribute when provided", () => {
+    render(<StatusBadge label="Error" title="Connection timed out" />);
+    const el = screen.getByText("Error");
+    expect(el).toHaveAttribute("title", "Connection timed out");
+  });
+
+  it("applies scope variant (user)", () => {
+    render(<StatusBadge label="user" shape="square" />);
+    const el = screen.getByText("user");
+    expect(el.className).toContain("bg-purple-100");
+  });
+
+  it("applies connected variant", () => {
+    render(<StatusBadge label="Connected" variant="connected" shape="square" />);
+    const el = screen.getByText("Connected");
+    expect(el.className).toContain("bg-emerald-100");
+  });
+
+  it("applies muted variant", () => {
+    render(<StatusBadge label="not found" variant="muted" shape="square" />);
+    const el = screen.getByText("not found");
+    expect(el.className).toContain("bg-muted");
+  });
+
+  it("applies op-running variant for operation status", () => {
+    render(<StatusBadge label="running" variant="op-running" />);
+    const el = screen.getByText("running");
+    expect(el.className).toContain("bg-blue-100");
+    expect(el.className).toContain("text-blue-700");
+  });
 });
