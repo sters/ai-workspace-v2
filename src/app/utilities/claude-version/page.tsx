@@ -2,9 +2,8 @@
 
 import useSWR from "swr";
 import { Card } from "@/components/shared/containers/card";
-import { Callout } from "@/components/shared/containers/callout";
+import { FetchStatus } from "@/components/shared/feedback/fetch-status";
 import { PageHeader } from "@/components/shared/feedback/page-header";
-import { StatusText } from "@/components/shared/feedback/status-text";
 import { fetcher } from "@/lib/api-client";
 
 export default function ClaudeVersionPage() {
@@ -20,24 +19,16 @@ export default function ClaudeVersionPage() {
         description="The currently installed Claude Code CLI version."
         onRefresh={() => mutate()}
       />
-
-      {isLoading && <StatusText>Loading...</StatusText>}
-      {error && (
-        <StatusText variant="error">
-          Failed to fetch Claude version.
-        </StatusText>
-      )}
-
+      <FetchStatus
+        isLoading={isLoading}
+        error={error}
+        apiError={data?.error}
+        errorText="Failed to fetch Claude version."
+      />
       {data && !data.error && (
         <Card>
           <code className="text-sm">{data.version}</code>
         </Card>
-      )}
-
-      {data?.error && (
-        <Callout variant="error">
-          <StatusText variant="error">{data.error}</StatusText>
-        </Callout>
       )}
     </div>
   );

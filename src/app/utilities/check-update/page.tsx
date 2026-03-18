@@ -3,8 +3,8 @@
 import useSWR from "swr";
 import { Card } from "@/components/shared/containers/card";
 import { Callout } from "@/components/shared/containers/callout";
+import { FetchStatus } from "@/components/shared/feedback/fetch-status";
 import { PageHeader } from "@/components/shared/feedback/page-header";
-import { StatusText } from "@/components/shared/feedback/status-text";
 import { fetcher } from "@/lib/api-client";
 import type { UpdateCheckResult } from "@/lib/update";
 
@@ -28,18 +28,13 @@ export default function CheckUpdatePage() {
         onRefresh={() => mutate()}
       />
 
-      {isLoading && <StatusText>Checking...</StatusText>}
-      {error && (
-        <StatusText variant="error">
-          Failed to check for updates.
-        </StatusText>
-      )}
-
-      {data?.error && (
-        <Callout variant="error">
-          <StatusText variant="error">{data.error}</StatusText>
-        </Callout>
-      )}
+      <FetchStatus
+        isLoading={isLoading}
+        error={error}
+        apiError={data?.error}
+        loadingText="Checking..."
+        errorText="Failed to check for updates."
+      />
 
       {data && !data.error && data.devMode && (
         <Callout variant="info">
