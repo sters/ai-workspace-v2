@@ -1,0 +1,143 @@
+import type { PhaseFunctionContext } from "@/types/pipeline";
+import type { RunClaudeOptions } from "@/types/claude";
+import type { ManagedOperation } from "./types";
+import { emitEvent, emitStatus } from "./events";
+import { wireChild } from "./wire-child";
+import { runClaude } from "@/lib/claude";
+import { Semaphore } from "@/lib/semaphore";
+
+export function buildPhaseFunctionContext(
+  managed: ManagedOperation,
+  operationId: string,
+  phaseIndex: number,
+  phaseExtra: { phaseIndex: number; phaseLabel: string },
+): PhaseFunctionContext {
+  const operation = managed.operation;
+  let childCounter = 0;
+
+  return {
+    operationId,
+    emitStatus: (msg) => emitStatus(managed, msg, phaseExtra),
+    emitResult: (msg) => {
+      emitEvent(managed, {
+        type: "output",
+        operationId: managed.operation.id,
+        data: JSON.stringify({ type: "result", subtype: "success", result: msg }),
+        timestamp: new Date().toISOString(),
+        ...phaseExtra,
+      });
+    },
+    setWorkspace: (ws) => {
+      managed.operation.workspace = ws;
+      emitStatus(managed, `__setWorkspace:${ws}`, phaseExtra);
+    },
+    emitAsk: (questions, askOptions) => {
+      const toolUseId = `fn-ask-${operationId}-${phaseIndex}-${childCounter++}`;
+      // Emit an ask event that the UI will render
+      emitEvent(managed, {
+        type: "output",
+        operationId: managed.operation.id,
+        data: JSON.stringify({
+          type: "assistant",
+          message: {
+            content: [{
+              type: "tool_use",
+              id: toolUseId,
+              name: "AskUserQuestion",
+              input: {
+                questions: questions.map((q) => ({
+                  question: q.question,
+                  options: q.options,
+                  multiSelect: q.multiSelect ?? false,
+                })),
+                allowFreeText: askOptions?.allowFreeText ?? false,
+              },
+            }],
+          },
+        }),
+        timestamp: new Date().toISOString(),
+        ...phaseExtra,
+      });
+      // Return a promise that resolves when the user answers
+      // or rejects when the operation is cancelled
+      return new Promise<Record<string, string>>((resolve, reject) => {
+        const signal = managed.abortController.signal;
+        if (signal.aborted) {
+          managed.pendingAsks.delete(toolUseId);
+          reject(new DOMException("Operation cancelled", "AbortError"));
+          return;
+        }
+        const onAbort = () => {
+          managed.pendingAsks.delete(toolUseId);
+          reject(new DOMException("Operation cancelled", "AbortError"));
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+        managed.pendingAsks.set(toolUseId, (answers) => {
+          signal.removeEventListener("abort", onAbort);
+          // Emit a tool_result event so findPendingAsk marks it answered
+          emitEvent(managed, {
+            type: "output",
+            operationId: managed.operation.id,
+            data: JSON.stringify({
+              type: "user",
+              message: {
+                content: [{
+                  type: "tool_result",
+                  tool_use_id: toolUseId,
+                  content: Object.values(answers).join(", "),
+                }],
+              },
+            }),
+            timestamp: new Date().toISOString(),
+            ...phaseExtra,
+          });
+          resolve(answers);
+        });
+      });
+    },
+    runChild: async (label, prompt, childOptions) => {
+      const cid = `${operationId}-phase-${phaseIndex}-fn-${childCounter++}`;
+      operation.children!.push({ id: cid, label, status: "running" });
+      const claudeOpts: RunClaudeOptions | undefined =
+        (childOptions?.jsonSchema || childOptions?.cwd || childOptions?.addDirs)
+          ? { jsonSchema: childOptions.jsonSchema, cwd: childOptions.cwd, addDirs: childOptions.addDirs }
+          : undefined;
+      const proc = runClaude(cid, prompt, claudeOpts);
+      const result = await wireChild(managed, cid, label, proc, phaseExtra);
+      if (result.resultText && childOptions?.onResultText) {
+        childOptions.onResultText(result.resultText);
+      }
+      return result.success;
+    },
+    emitTerminal: (data) => {
+      emitEvent(managed, {
+        type: "terminal",
+        operationId: managed.operation.id,
+        data,
+        timestamp: new Date().toISOString(),
+        ...phaseExtra,
+      });
+    },
+    signal: managed.abortController.signal,
+    runChildGroup: (children) => {
+      const sem = new Semaphore(5);
+      const promises = children.map(async (child) => {
+        return sem.run(async () => {
+          const cid = `${operationId}-phase-${phaseIndex}-fn-${childCounter++}`;
+          operation.children!.push({ id: cid, label: child.label, status: "running" });
+          const claudeOpts: RunClaudeOptions | undefined =
+            (child.cwd || child.addDirs || child.jsonSchema)
+              ? { cwd: child.cwd, addDirs: child.addDirs, jsonSchema: child.jsonSchema }
+              : undefined;
+          const proc = runClaude(cid, child.prompt, claudeOpts);
+          const result = await wireChild(managed, cid, child.label, proc, phaseExtra);
+          if (result.resultText && child.onResultText) {
+            child.onResultText(result.resultText);
+          }
+          return result.success;
+        });
+      });
+      return Promise.all(promises);
+    },
+  };
+}
