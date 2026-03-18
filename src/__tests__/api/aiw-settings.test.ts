@@ -21,7 +21,7 @@ vi.mock("node:fs", () => ({
 
 const mockResetConfig = vi.fn();
 
-vi.mock("@/lib/app-config", () => ({
+vi.mock("@/lib/config", () => ({
   CONFIG_FILE_PATH: "/mock-home/.config/ai-workspace/config.yml",
   _resetConfig: () => mockResetConfig(),
 }));

@@ -4,7 +4,7 @@
 import { runClaude as runCLI } from "./cli";
 import { runClaude as runSDK } from "./sdk";
 import type { RunClaudeOptions } from "@/types/claude";
-import { getConfig } from "../app-config";
+import { getConfig } from "../config";
 
 const USE_CLI = getConfig().claude.useCli;
 

@@ -13,7 +13,7 @@ import {
   generateDefaultConfigContent,
   migrateConfigContent,
   migrateConfigFile,
-} from "@/lib/app-config";
+} from "@/lib/config";
 
 describe("CONFIG_DEFAULTS", () => {
   it("has expected default values", () => {

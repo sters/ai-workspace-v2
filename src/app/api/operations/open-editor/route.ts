@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { workspaceSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
-import { getConfig } from "@/lib/app-config";
+import { getConfig } from "@/lib/config";
 
 export async function POST(request: Request) {
   const body = await request.json();

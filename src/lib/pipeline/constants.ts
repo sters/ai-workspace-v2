@@ -1,4 +1,4 @@
-import { getConfig, getOperationConfig } from "@/lib/app-config";
+import { getConfig, getOperationConfig } from "@/lib/config";
 import type { OperationType } from "@/types/operation";
 
 export const MAX_CONCURRENT_OPERATIONS = getConfig().operations.maxConcurrent;

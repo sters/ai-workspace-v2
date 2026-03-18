@@ -113,7 +113,7 @@ if (isBunx && resolvedGitHash) {
 }
 
 // Ensure config file exists, then load config
-import { getConfig, ensureConfigFile, CONFIG_FILE_PATH } from "../src/lib/app-config";
+import { getConfig, ensureConfigFile, CONFIG_FILE_PATH } from "../src/lib/config";
 if (ensureConfigFile()) {
   console.log(`Created config: ${CONFIG_FILE_PATH}`);
 }

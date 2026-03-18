@@ -4,7 +4,9 @@ import type { PhaseFunctionContext, PipelinePhase, GroupChild } from "@/types/pi
 vi.mock("@/lib/pipeline-manager", () => ({
   getOperation: vi.fn(),
 }));
-vi.mock("@/lib/app-config", () => ({
+vi.mock("@/lib/config", () => ({
+  AI_WORKSPACE_ROOT: "/mock/workspace-root",
+  WORKSPACE_DIR: "/mock/workspace-root/workspace",
   getConfig: vi.fn(() => ({
     operations: { bestOfN: 0, defaultInteractionLevel: "mid", typeOverrides: {} },
   })),

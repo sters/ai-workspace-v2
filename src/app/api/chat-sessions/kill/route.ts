@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { chatSessionKillSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
-import { getConfig } from "@/lib/app-config";
+import { getConfig } from "@/lib/config";
 
 const CHAT_WS_PORT = getConfig().server.chatPort;
 

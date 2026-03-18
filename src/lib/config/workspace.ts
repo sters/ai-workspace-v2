@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { getConfig } from "./app-config";
+import { getConfig } from "./resolver";
 
 function resolveRoot(): string {
   if (process.env.AIW_WORKSPACE_ROOT) {
