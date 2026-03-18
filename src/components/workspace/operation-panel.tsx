@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback } from "react";
 import Link from "next/link";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";
+import { RepositoryActionButton } from "./repository-action-button";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { openInEditor, openInTerminal } from "@/lib/api-actions";
-import type { OperationType } from "@/types/operation";
 import {
   Play,
   ClipboardCheck,
@@ -96,19 +95,31 @@ export function OperationPanel({
         >
           <ClipboardCheck className="h-3.5 w-3.5" /> Review
         </Button>
-        <CreatePRButton
-          workspacePath={workspacePath}
-          repositories={repositories}
+        <RepositoryActionButton
+          label={<><GitPullRequest className="h-3.5 w-3.5" /> Create PR</>}
+          onClick={() =>
+            startAndNavigate("create-pr", { workspace: workspacePath })
+          }
           disabled={isWorkspaceTypeRunning(workspaceName, "create-pr")}
-          onStartAndNavigate={startAndNavigate}
-        />
-        <OpenVSCodeButton
-          workspacePath={workspacePath}
           repositories={repositories}
+          onRepoClick={(repo) =>
+            startAndNavigate("create-pr", {
+              workspace: workspacePath,
+              repository: repo.path,
+            })
+          }
         />
-        <OpenTerminalButton
-          workspacePath={workspacePath}
+        <RepositoryActionButton
+          label={<><CodeXml className="h-3.5 w-3.5" /> Open in editor</>}
+          onClick={() => openInEditor(workspacePath)}
           repositories={repositories}
+          onRepoClick={(repo) => openInEditor(`${workspacePath}/${repo.path}`)}
+        />
+        <RepositoryActionButton
+          label={<><Terminal className="h-3.5 w-3.5" /> Open in terminal</>}
+          onClick={() => openInTerminal(workspacePath)}
+          repositories={repositories}
+          onRepoClick={(repo) => openInTerminal(`${workspacePath}/${repo.path}`)}
         />
         <Button
           variant="destructive"
@@ -134,138 +145,5 @@ export function OperationPanel({
         </p>
       )}
     </div>
-  );
-}
-
-function CreatePRButton({
-  workspacePath,
-  repositories,
-  disabled,
-  onStartAndNavigate,
-}: {
-  workspacePath: string;
-  repositories?: { alias: string; path: string }[];
-  disabled: boolean;
-  onStartAndNavigate: (type: OperationType, body: Record<string, string>) => Promise<void>;
-}) {
-  const handleClick = useCallback(
-    () => onStartAndNavigate("create-pr", { workspace: workspacePath }),
-    [onStartAndNavigate, workspacePath]
-  );
-
-  const repoItems = (repositories ?? []).map((repo) => ({
-    label: repo.alias || repo.path.split("/").pop() || repo.path,
-    onClick: () =>
-      onStartAndNavigate("create-pr", {
-        workspace: workspacePath,
-        repository: repo.path,
-      }),
-  }));
-
-  const labelNode = <><GitPullRequest className="h-3.5 w-3.5" /> Create PR</>;
-
-  if (repoItems.length === 0) {
-    return (
-      <Button
-        variant="secondary"
-        className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
-        onClick={handleClick}
-        disabled={disabled}
-      >
-        {labelNode}
-      </Button>
-    );
-  }
-
-  return (
-    <SplitButton
-      label={labelNode}
-      onClick={handleClick}
-      variant="secondary"
-      disabled={disabled}
-      items={repoItems}
-    />
-  );
-}
-
-function OpenVSCodeButton({
-  workspacePath,
-  repositories,
-}: {
-  workspacePath: string;
-  repositories?: { alias: string; path: string }[];
-}) {
-  const handleClick = useCallback(
-    () => openInEditor(workspacePath),
-    [workspacePath]
-  );
-
-  const repoItems = (repositories ?? []).map((repo) => ({
-    label: repo.alias || repo.path.split("/").pop() || repo.path,
-    onClick: () => openInEditor(`${workspacePath}/${repo.path}`),
-  }));
-
-  const labelNode = <><CodeXml className="h-3.5 w-3.5" /> Open in editor</>;
-
-  if (repoItems.length === 0) {
-    return (
-      <Button
-        variant="secondary"
-        className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
-        onClick={handleClick}
-      >
-        {labelNode}
-      </Button>
-    );
-  }
-
-  return (
-    <SplitButton
-      label={labelNode}
-      onClick={handleClick}
-      variant="secondary"
-      items={repoItems}
-    />
-  );
-}
-
-function OpenTerminalButton({
-  workspacePath,
-  repositories,
-}: {
-  workspacePath: string;
-  repositories?: { alias: string; path: string }[];
-}) {
-  const handleClick = useCallback(
-    () => openInTerminal(workspacePath),
-    [workspacePath]
-  );
-
-  const repoItems = (repositories ?? []).map((repo) => ({
-    label: repo.alias || repo.path.split("/").pop() || repo.path,
-    onClick: () => openInTerminal(`${workspacePath}/${repo.path}`),
-  }));
-
-  const labelNode = <><Terminal className="h-3.5 w-3.5" /> Open in terminal</>;
-
-  if (repoItems.length === 0) {
-    return (
-      <Button
-        variant="secondary"
-        className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
-        onClick={handleClick}
-      >
-        {labelNode}
-      </Button>
-    );
-  }
-
-  return (
-    <SplitButton
-      label={labelNode}
-      onClick={handleClick}
-      variant="secondary"
-      items={repoItems}
-    />
   );
 }
