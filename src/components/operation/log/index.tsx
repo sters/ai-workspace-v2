@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useMemo, useState } from "react";
-import type { OperationPhaseInfo } from "@/types/operation";
 import type { OperationLogProps } from "@/types/components";
 import { parseStreamEvent, enrichPermissionDenials } from "@/lib/parsers/stream";
+import { parsePhaseUpdatesFromEntries } from "@/lib/parse-phase-updates";
 import type { LogEntry } from "@/types/claude";
 import { buildDisplayNodes, groupByChildLabel, groupByPhase, findPendingAsk } from "./display-nodes";
 import { ChildGroupSection, SubAgentSection, PhaseGroupSection } from "./sections";
@@ -71,33 +71,10 @@ export function OperationLog({
   }, [events]);
 
   // Derive live phase statuses from __phaseUpdate events in the stream
-  const livePhases = useMemo(() => {
-    const phaseMap = new Map<number, OperationPhaseInfo>();
-
-    for (const entry of entries) {
-      if (entry.kind === "system" && entry.content.startsWith("__phaseUpdate:")) {
-        try {
-          const data = JSON.parse(entry.content.slice("__phaseUpdate:".length));
-          const idx = data.phaseIndex as number;
-          const existing = phaseMap.get(idx);
-          if (existing) {
-            existing.status = data.phaseStatus;
-          } else {
-            phaseMap.set(idx, {
-              index: idx,
-              label: data.phaseLabel ?? `Phase ${idx + 1}`,
-              status: data.phaseStatus,
-            });
-          }
-        } catch {
-          // ignore parse errors
-        }
-      }
-    }
-
-    if (phaseMap.size === 0) return undefined;
-    return Array.from(phaseMap.values()).sort((a, b) => a.index - b.index);
-  }, [entries]);
+  const livePhases = useMemo(
+    () => parsePhaseUpdatesFromEntries(entries),
+    [entries],
+  );
 
   // Auto-switch to the latest running phase (unless user manually selected a tab)
   useEffect(() => {

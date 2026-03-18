@@ -7,6 +7,7 @@ import { UpdateForm } from "./update-form";
 import { RepoTodoCard } from "./repo-todo-card";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
+import { buildBatchItems } from "@/lib/batch-modes";
 
 function findRepoPath(
   repoName: string,
@@ -55,52 +56,17 @@ export function TodoUpdater({
               interactionLevel,
             });
           }}
-          batchItems={(instruction, interactionLevel) => [
-            {
-              label: "Update \u2192 Execute \u2192 Review",
-              onClick: () =>
-                startAndNavigate("batch", {
-                  startWith: "update-todo",
-                  mode: "execute-review",
-                  workspace: workspacePath,
-                  interactionLevel,
-                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-                }),
-            },
-            {
-              label: "Update \u2192 Execute \u2192 PR",
-              onClick: () =>
-                startAndNavigate("batch", {
-                  startWith: "update-todo",
-                  mode: "execute-pr",
-                  workspace: workspacePath,
-                  interactionLevel,
-                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-                }),
-            },
-            {
-              label: "Update \u2192 Execute \u2192 Review \u2192 PR (gated)",
-              onClick: () =>
-                startAndNavigate("batch", {
-                  startWith: "update-todo",
-                  mode: "execute-review-pr-gated",
-                  workspace: workspacePath,
-                  interactionLevel,
-                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-                }),
-            },
-            {
-              label: "Update \u2192 Execute \u2192 Review \u2192 PR",
-              onClick: () =>
-                startAndNavigate("batch", {
-                  startWith: "update-todo",
-                  mode: "execute-review-pr",
-                  workspace: workspacePath,
-                  interactionLevel,
-                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-                }),
-            },
-          ]}
+          batchItems={(instruction, interactionLevel) =>
+            buildBatchItems(
+              "update-todo",
+              {
+                workspace: workspacePath,
+                interactionLevel,
+                ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+              },
+              (body) => startAndNavigate("batch", body),
+            )
+          }
         />
       </Card>
 

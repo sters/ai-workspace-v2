@@ -7,6 +7,7 @@ import { OperationCard } from "@/components/workspace/operation-card";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import { fetcher, killOperation } from "@/lib/api-client";
+import { extractBatchParams } from "@/lib/batch-modes";
 
 const VALID_AUTO_ACTIONS = new Set<string>([
   "execute",
@@ -80,10 +81,7 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
 
     const body: Record<string, string> = { workspace: workspaceName };
     if (action === "batch") {
-      for (const key of ["startWith", "mode", "instruction", "draft"]) {
-        const val = searchParams.get(key);
-        if (val) body[key] = val;
-      }
+      Object.assign(body, extractBatchParams(searchParams));
     }
 
     // Clear search params

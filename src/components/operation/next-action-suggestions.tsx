@@ -8,31 +8,7 @@ import type { NextAction } from "@/types/components";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button, buttonVariants } from "../shared/buttons/button";
 import { Callout } from "../shared/containers/callout";
-
-function executeBatchItems(workspace: string): NextAction["batchItems"] {
-  return [
-    {
-      label: "Execute \u2192 Review",
-      type: "batch",
-      body: { startWith: "execute", mode: "execute-review", workspace },
-    },
-    {
-      label: "Execute \u2192 PR",
-      type: "batch",
-      body: { startWith: "execute", mode: "execute-pr", workspace },
-    },
-    {
-      label: "Execute \u2192 Review \u2192 PR (gated)",
-      type: "batch",
-      body: { startWith: "execute", mode: "execute-review-pr-gated", workspace },
-    },
-    {
-      label: "Execute \u2192 Review \u2192 PR",
-      type: "batch",
-      body: { startWith: "execute", mode: "execute-review-pr", workspace },
-    },
-  ];
-}
+import { buildNextActionBatchItems } from "@/lib/batch-modes";
 
 function getNextActions(
   completedType: OperationType,
@@ -46,7 +22,7 @@ function getNextActions(
           type: "execute",
           body: { workspace },
           primary: true,
-          batchItems: executeBatchItems(workspace),
+          batchItems: buildNextActionBatchItems("execute", workspace),
         },
       ];
     case "execute":
@@ -76,7 +52,7 @@ function getNextActions(
           label: "Execute",
           type: "execute",
           body: { workspace },
-          batchItems: executeBatchItems(workspace),
+          batchItems: buildNextActionBatchItems("execute", workspace),
         },
       ];
     case "update-todo":
@@ -87,7 +63,7 @@ function getNextActions(
           type: "execute",
           body: { workspace },
           primary: true,
-          batchItems: executeBatchItems(workspace),
+          batchItems: buildNextActionBatchItems("execute", workspace),
         },
       ];
     case "create-pr":

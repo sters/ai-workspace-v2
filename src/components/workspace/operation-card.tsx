@@ -9,7 +9,7 @@ import { Card } from "@/components/shared/containers/card";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { ResultBox } from "@/components/shared/feedback/result-box";
 import { useSSE } from "@/hooks/use-sse";
-import type { OperationPhaseInfo } from "@/types/operation";
+import { parsePhaseUpdatesFromEvents } from "@/lib/parse-phase-updates";
 import type { OperationCardProps } from "@/types/components";
 
 export function OperationCard({
@@ -29,31 +29,10 @@ export function OperationCard({
   const { events, connected } = useSSE(sseOperationId);
 
   // Derive live phases from SSE events
-  const livePhases = useMemo(() => {
-    const phaseMap = new Map<number, OperationPhaseInfo>();
-    for (const event of events) {
-      if (event.type === "status" && event.data.startsWith("__phaseUpdate:")) {
-        try {
-          const data = JSON.parse(event.data.slice("__phaseUpdate:".length));
-          const idx = data.phaseIndex as number;
-          const existing = phaseMap.get(idx);
-          if (existing) {
-            existing.status = data.phaseStatus;
-          } else {
-            phaseMap.set(idx, {
-              index: idx,
-              label: data.phaseLabel ?? `Phase ${idx + 1}`,
-              status: data.phaseStatus,
-            });
-          }
-        } catch {
-          // ignore
-        }
-      }
-    }
-    if (phaseMap.size === 0) return undefined;
-    return Array.from(phaseMap.values()).sort((a, b) => a.index - b.index);
-  }, [events]);
+  const livePhases = useMemo(
+    () => parsePhaseUpdatesFromEvents(events),
+    [events],
+  );
 
   // Detect live status from SSE (complete event)
   const liveStatus = useMemo(() => {

@@ -1,10 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
 import useSWR from "swr";
-import { MonacoEditorLazy } from "@/components/shared/content/monaco-editor-lazy";
-import { Button } from "@/components/shared/buttons/button";
-import { Card } from "@/components/shared/containers/card";
+import { ConfigEditor } from "@/components/utilities/config-editor";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { fetcher } from "@/lib/api-client";
@@ -38,90 +35,17 @@ export default function AiwSettingsPage() {
       {error && (
         <StatusText variant="error">Failed to load settings.</StatusText>
       )}
-      {data && <ConfigEditor data={data} onSaved={() => mutate()} />}
-    </div>
-  );
-}
-
-function ConfigEditor({
-  data,
-  onSaved,
-}: {
-  data: ConfigData;
-  onSaved: () => void;
-}) {
-  const [value, setValue] = useState(data.content ?? "");
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-
-  useEffect(() => {
-    setValue(data.content ?? "");
-  }, [data.content]);
-
-  const handleSave = useCallback(async () => {
-    setSaveError(null);
-    setSaveSuccess(false);
-    setSaving(true);
-    try {
-      const res = await fetch("/api/aiw-settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: value }),
-      });
-      const result = await res.json();
-      if (!res.ok) {
-        setSaveError(result.error ?? "Failed to save");
-        return;
-      }
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-      onSaved();
-    } catch (err) {
-      setSaveError(String(err));
-    } finally {
-      setSaving(false);
-    }
-  }, [value, onSaved]);
-
-  return (
-    <Card>
-      <div className="mb-3 flex items-center gap-2">
-        <code className="text-xs text-muted-foreground">{data.filePath}</code>
-        {!data.exists && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-            not found (will be created on save)
-          </span>
-        )}
-      </div>
-
-      <div className="h-[32rem] rounded-md border">
-        <MonacoEditorLazy
+      {data && (
+        <ConfigEditor
+          filePath={data.filePath}
+          exists={data.exists}
+          content={data.content}
           language="yaml"
-          value={value}
-          onChange={(v) => setValue(v ?? "")}
-          options={{
-            renderLineHighlight: "none",
-            folding: true,
-            tabSize: 2,
-          }}
+          saveEndpoint="/api/aiw-settings"
+          onSaved={() => mutate()}
+          notFoundLabel="not found (will be created on save)"
         />
-      </div>
-
-      {saveError && (
-        <p className="mt-1 text-xs text-destructive">{saveError}</p>
       )}
-
-      <div className="mt-2 flex items-center gap-2">
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving..." : "Save"}
-        </Button>
-        {saveSuccess && (
-          <span className="text-xs text-green-500">
-            Saved. Config reloaded.
-          </span>
-        )}
-      </div>
-    </Card>
+    </div>
   );
 }

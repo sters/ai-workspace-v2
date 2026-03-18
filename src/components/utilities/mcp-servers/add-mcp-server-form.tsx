@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/shared/buttons/button";
 import { Input } from "@/components/shared/forms/input";
 import { Card } from "@/components/shared/containers/card";
+import { addMcpServer } from "@/lib/api-client";
 
 export function AddMcpServerForm({ onAdded }: { onAdded: () => void }) {
   const [name, setName] = useState("");
@@ -21,23 +22,18 @@ export function AddMcpServerForm({ onAdded }: { onAdded: () => void }) {
     setSubmitting(true);
     setResult(null);
     try {
-      const res = await fetch("/api/mcp-servers/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          transport,
-          scope,
-          url: url.trim(),
-        }),
+      const res = await addMcpServer({
+        name: name.trim(),
+        transport,
+        scope,
+        url: url.trim(),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setResult({ type: "error", message: data.error || "Failed to add" });
+        setResult({ type: "error", message: res.error });
       } else {
         setResult({
           type: "success",
-          message: data.output || `Added ${name.trim()}`,
+          message: res.data.output || `Added ${name.trim()}`,
         });
         setName("");
         setUrl("");

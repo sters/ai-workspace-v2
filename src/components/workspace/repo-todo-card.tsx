@@ -9,6 +9,7 @@ import { Card } from "../shared/containers/card";
 import { ProgressBar } from "../shared/feedback/progress-bar";
 import { Button } from "../shared/buttons/button";
 import { openInEditor, openInTerminal } from "@/lib/api-actions";
+import { buildBatchItems } from "@/lib/batch-modes";
 import {
   Play,
   ClipboardCheck,
@@ -34,6 +35,11 @@ export function RepoTodoCard({
   const repoFullPath = repoPath
     ? `${workspacePath}/${repoPath}`
     : undefined;
+
+  const baseBody = {
+    workspace: workspacePath,
+    repo: todo.repoName,
+  };
 
   return (
     <Card>
@@ -128,62 +134,24 @@ export function RepoTodoCard({
           disabled={disabled}
           onSubmit={(instruction, interactionLevel) => {
             onStartAndNavigate("update-todo", {
+              ...baseBody,
               workspace: workspacePath,
               instruction,
               interactionLevel,
-              repo: todo.repoName,
             });
           }}
-          batchItems={(instruction, interactionLevel) => [
-            {
-              label: "Update \u2192 Execute \u2192 Review",
-              onClick: () =>
-                onStartAndNavigate("batch", {
-                  startWith: "update-todo",
-                  mode: "execute-review",
-                  workspace: workspacePath,
-                  interactionLevel,
-                  repo: todo.repoName,
-                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-                }),
-            },
-            {
-              label: "Update \u2192 Execute \u2192 PR",
-              onClick: () =>
-                onStartAndNavigate("batch", {
-                  startWith: "update-todo",
-                  mode: "execute-pr",
-                  workspace: workspacePath,
-                  interactionLevel,
-                  repo: todo.repoName,
-                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-                }),
-            },
-            {
-              label: "Update \u2192 Execute \u2192 Review \u2192 PR (gated)",
-              onClick: () =>
-                onStartAndNavigate("batch", {
-                  startWith: "update-todo",
-                  mode: "execute-review-pr-gated",
-                  workspace: workspacePath,
-                  interactionLevel,
-                  repo: todo.repoName,
-                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-                }),
-            },
-            {
-              label: "Update \u2192 Execute \u2192 Review \u2192 PR",
-              onClick: () =>
-                onStartAndNavigate("batch", {
-                  startWith: "update-todo",
-                  mode: "execute-review-pr",
-                  workspace: workspacePath,
-                  interactionLevel,
-                  repo: todo.repoName,
-                  ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-                }),
-            },
-          ]}
+          batchItems={(instruction, interactionLevel) =>
+            buildBatchItems(
+              "update-todo",
+              {
+                ...baseBody,
+                workspace: workspacePath,
+                interactionLevel,
+                ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+              },
+              (body) => onStartAndNavigate("batch", body),
+            )
+          }
         />
       </div>
 

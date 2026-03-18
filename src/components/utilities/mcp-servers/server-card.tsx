@@ -7,6 +7,7 @@ import { Button } from "@/components/shared/buttons/button";
 import { Card } from "@/components/shared/containers/card";
 import { ScopeBadge } from "./scope-badge";
 import { ConnectionBadge } from "./connection-badge";
+import { removeMcpServer } from "@/lib/api-client";
 import type { McpServerEntry, McpConnectionStatus } from "@/types/claude";
 
 export function ServerCard({
@@ -22,13 +23,9 @@ export function ServerCard({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const handleRemove = useCallback(async () => {
-    const res = await fetch("/api/mcp-servers/remove", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: server.name, scope: server.scope }),
-    });
+    const result = await removeMcpServer({ name: server.name, scope: server.scope });
     setConfirmingDelete(false);
-    if (res.ok) onSaved();
+    if (result.ok) onSaved();
   }, [server.name, server.scope, onSaved]);
 
   // MCP auth operation — single click login

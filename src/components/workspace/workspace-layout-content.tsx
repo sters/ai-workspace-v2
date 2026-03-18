@@ -9,6 +9,7 @@ import { ProgressBar } from "@/components/shared/feedback/progress-bar";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
 import { OperationPanel } from "@/components/workspace/operation-panel";
 import { cn } from "@/lib/utils";
+import { extractBatchParams } from "@/lib/batch-modes";
 
 const TABS = [
   { label: "Overview", segment: "", href: "" },
@@ -46,10 +47,7 @@ export function WorkspaceLayoutContent({
     } else if (action && VALID_AUTO_ACTIONS.has(action) && !isOnOperations) {
       const params = new URLSearchParams({ action });
       if (action === "batch") {
-        for (const key of ["startWith", "mode", "instruction", "draft"]) {
-          const val = searchParams.get(key);
-          if (val) params.set(key, val);
-        }
+        Object.entries(extractBatchParams(searchParams)).forEach(([k, v]) => params.set(k, v));
       }
       router.replace(`/workspace/${name}/operations?${params.toString()}`, { scroll: false });
     }
