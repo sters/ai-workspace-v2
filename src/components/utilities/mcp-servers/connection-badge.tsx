@@ -1,6 +1,13 @@
 "use client";
 
+import { StatusBadge } from "@/components/shared/feedback/status-badge";
 import type { McpConnectionStatus } from "@/types/claude";
+
+const statusMap: Record<string, { label: string; variant: string }> = {
+  ok: { label: "Connected", variant: "connected" },
+  needs_auth: { label: "Needs auth", variant: "needs-auth" },
+  error: { label: "Error", variant: "error" },
+};
 
 export function ConnectionBadge({
   connectionStatus,
@@ -10,33 +17,20 @@ export function ConnectionBadge({
   if (!connectionStatus) return null;
 
   const { status, statusText } = connectionStatus;
-  if (status === "ok") {
+  const mapped = statusMap[status];
+
+  if (mapped) {
     return (
-      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-medium text-emerald-800">
-        Connected
-      </span>
+      <StatusBadge
+        label={mapped.label}
+        variant={mapped.variant}
+        shape="square"
+        title={status === "error" ? statusText : undefined}
+      />
     );
   }
-  if (status === "needs_auth") {
-    return (
-      <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-800">
-        Needs auth
-      </span>
-    );
-  }
-  if (status === "error") {
-    return (
-      <span
-        className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-800"
-        title={statusText}
-      >
-        Error
-      </span>
-    );
-  }
+
   return (
-    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
-      {statusText}
-    </span>
+    <StatusBadge label={statusText} variant="unknown" shape="square" />
   );
 }

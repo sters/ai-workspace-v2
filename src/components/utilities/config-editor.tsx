@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { MonacoEditorLazy } from "@/components/shared/content/monaco-editor-lazy";
 import { Button } from "@/components/shared/buttons/button";
 import { Card } from "@/components/shared/containers/card";
+import { StatusBadge } from "@/components/shared/feedback/status-badge";
 import { postJson } from "@/lib/api-client";
 
 export function ConfigEditor({
@@ -86,9 +87,11 @@ export function ConfigEditor({
       <div className="mb-3 flex items-center gap-2">
         <code className="text-xs text-muted-foreground">{filePath}</code>
         {!exists && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-            {notFoundLabel ?? "not found"}
-          </span>
+          <StatusBadge
+            label={notFoundLabel ?? "not found"}
+            variant="muted"
+            shape="square"
+          />
         )}
       </div>
 

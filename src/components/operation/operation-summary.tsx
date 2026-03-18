@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { OperationListItem, OperationPhaseInfo } from "@/types/operation";
-import { statusBadgeColors } from "@/lib/status-styles";
+import { StatusBadge } from "@/components/shared/feedback/status-badge";
 
 export function formatRemaining(ms: number): string {
   if (ms <= 0) return "expired";
@@ -77,13 +77,10 @@ export function OperationSummary({
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
         <span className="font-semibold">{operation.type}</span>
-        <span
-          className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-            statusBadgeColors[displayStatus] ?? statusBadgeColors.failed
-          }`}
-        >
-          {displayStatus}
-        </span>
+        <StatusBadge
+          label={displayStatus}
+          variant={`op-${displayStatus}`}
+        />
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
         Started {new Date(operation.startedAt).toLocaleString()}
