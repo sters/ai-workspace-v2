@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { Button } from "@/components/shared/buttons/button";
 import { Input } from "@/components/shared/forms/input";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { MarkdownRenderer } from "@/components/shared/content/markdown-renderer";
+import { useStreamingFetch } from "@/hooks/use-streaming-fetch";
 import { parseStreamEvent } from "@/lib/parsers/stream";
+import { useState } from "react";
 import type { OperationEvent } from "@/types/operation";
 
 function extractAnswer(events: OperationEvent[]): string | null {
@@ -20,75 +22,18 @@ function extractAnswer(events: OperationEvent[]): string | null {
 
 export function QuickAsk({ workspaceName }: { workspaceName: string }) {
   const [question, setQuestion] = useState("");
-  const [events, setEvents] = useState<OperationEvent[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const { events, isRunning, error, run, cancel, reset } = useStreamingFetch();
 
   const handleAsk = useCallback(async () => {
     const q = question.trim();
     if (!q) return;
-
-    setEvents([]);
-    setError(null);
-    setIsRunning(true);
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    try {
-      const res = await fetch("/api/operations/quick-ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workspace: workspaceName, question: q }),
-        signal: controller.signal,
-      });
-
-      if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`);
-
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("No response body");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const event: OperationEvent = JSON.parse(line.slice(6));
-            setEvents((prev) => [...prev, event]);
-          } catch {
-            // ignore
-          }
-        }
-      }
-    } catch (err) {
-      if ((err as Error).name !== "AbortError") {
-        setError(err instanceof Error ? err.message : "Failed");
-      }
-    } finally {
-      setIsRunning(false);
-      abortRef.current = null;
-    }
-  }, [question, workspaceName]);
-
-  const handleCancel = useCallback(() => {
-    abortRef.current?.abort();
-  }, []);
+    await run("/api/operations/quick-ask", { workspace: workspaceName, question: q });
+  }, [question, workspaceName, run]);
 
   const handleClear = useCallback(() => {
     setQuestion("");
-    setEvents([]);
-    setError(null);
-  }, []);
+    reset();
+  }, [reset]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -124,7 +69,7 @@ export function QuickAsk({ workspaceName }: { workspaceName: string }) {
         {(isRunning || hasResult) && (
           <Button
             variant="outline"
-            onClick={isRunning ? handleCancel : handleClear}
+            onClick={isRunning ? cancel : handleClear}
           >
             {isRunning ? "Cancel" : "Clear"}
           </Button>

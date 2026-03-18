@@ -7,6 +7,7 @@ import { RepositoryActionButton } from "./repository-action-button";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { openInEditor, openInTerminal } from "@/lib/api-actions";
+import { buildBatchItems } from "@/lib/batch-modes";
 import {
   Play,
   ClipboardCheck,
@@ -46,44 +47,9 @@ export function OperationPanel({
             startAndNavigate("execute", { workspace: workspacePath })
           }
           disabled={isWorkspaceTypeRunning(workspaceName, "execute")}
-          items={[
-            {
-              label: "Execute \u2192 Review",
-              onClick: () =>
-                startAndNavigate("batch", {
-                  startWith: "execute",
-                  mode: "execute-review",
-                  workspace: workspacePath,
-                }),
-            },
-            {
-              label: "Execute \u2192 PR",
-              onClick: () =>
-                startAndNavigate("batch", {
-                  startWith: "execute",
-                  mode: "execute-pr",
-                  workspace: workspacePath,
-                }),
-            },
-            {
-              label: "Execute \u2192 Review \u2192 PR (gated)",
-              onClick: () =>
-                startAndNavigate("batch", {
-                  startWith: "execute",
-                  mode: "execute-review-pr-gated",
-                  workspace: workspacePath,
-                }),
-            },
-            {
-              label: "Execute \u2192 Review \u2192 PR",
-              onClick: () =>
-                startAndNavigate("batch", {
-                  startWith: "execute",
-                  mode: "execute-review-pr",
-                  workspace: workspacePath,
-                }),
-            },
-          ]}
+          items={buildBatchItems("execute", { workspace: workspacePath }, (body) =>
+            startAndNavigate("batch", body)
+          )}
         />
         <Button
           variant="secondary"

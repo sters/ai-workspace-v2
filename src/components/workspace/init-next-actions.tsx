@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import { buttonVariants } from "@/components/shared/buttons/button";
 import { Callout } from "@/components/shared/containers/callout";
+import { buildBatchItems } from "@/lib/batch-modes";
 
 export function InitNextActions({ workspace }: { workspace: string }) {
   const router = useRouter();
@@ -19,36 +20,11 @@ export function InitNextActions({ workspace }: { workspace: string }) {
           onClick={() =>
             router.push(`/workspace/${wsEncoded}?action=execute`)
           }
-          items={[
-            {
-              label: "Execute \u2192 Review",
-              onClick: () =>
-                router.push(
-                  `/workspace/${wsEncoded}?action=batch&startWith=execute&mode=execute-review`,
-                ),
-            },
-            {
-              label: "Execute \u2192 PR",
-              onClick: () =>
-                router.push(
-                  `/workspace/${wsEncoded}?action=batch&startWith=execute&mode=execute-pr`,
-                ),
-            },
-            {
-              label: "Execute \u2192 Review \u2192 PR (gated)",
-              onClick: () =>
-                router.push(
-                  `/workspace/${wsEncoded}?action=batch&startWith=execute&mode=execute-review-pr-gated`,
-                ),
-            },
-            {
-              label: "Execute \u2192 Review \u2192 PR",
-              onClick: () =>
-                router.push(
-                  `/workspace/${wsEncoded}?action=batch&startWith=execute&mode=execute-review-pr`,
-                ),
-            },
-          ]}
+          items={buildBatchItems("execute", {}, ({ startWith, mode }) =>
+            router.push(
+              `/workspace/${wsEncoded}?action=batch&startWith=${startWith}&mode=${mode}`,
+            )
+          )}
         />
         <Link
           href={`/workspace/${wsEncoded}`}

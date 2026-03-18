@@ -5,6 +5,7 @@ import { ClaudeOperation } from "@/components/operation/claude-operation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { InitNextActions } from "@/components/workspace/init-next-actions";
+import { buildBatchItems } from "@/lib/batch-modes";
 import type { InteractionLevel } from "@/types/prompts";
 
 export default function NewWorkspacePage() {
@@ -75,56 +76,14 @@ export default function NewWorkspacePage() {
                   start("init", { description: description.trim(), interactionLevel });
                 }}
                 disabled={!description.trim()}
-                items={[
-                  {
-                    label: "Init \u2192 Execute \u2192 Review",
-                    onClick: () => {
-                      if (!description.trim()) return;
-                      start("batch", {
-                        startWith: "init",
-                        mode: "execute-review",
-                        description: description.trim(),
-                        interactionLevel,
-                      });
-                    },
+                items={buildBatchItems(
+                  "init",
+                  { description: description.trim(), interactionLevel },
+                  (body) => {
+                    if (!description.trim()) return;
+                    start("batch", body);
                   },
-                  {
-                    label: "Init \u2192 Execute \u2192 PR",
-                    onClick: () => {
-                      if (!description.trim()) return;
-                      start("batch", {
-                        startWith: "init",
-                        mode: "execute-pr",
-                        description: description.trim(),
-                        interactionLevel,
-                      });
-                    },
-                  },
-                  {
-                    label: "Init \u2192 Execute \u2192 Review \u2192 PR (gated)",
-                    onClick: () => {
-                      if (!description.trim()) return;
-                      start("batch", {
-                        startWith: "init",
-                        mode: "execute-review-pr-gated",
-                        description: description.trim(),
-                        interactionLevel,
-                      });
-                    },
-                  },
-                  {
-                    label: "Init \u2192 Execute \u2192 Review \u2192 PR",
-                    onClick: () => {
-                      if (!description.trim()) return;
-                      start("batch", {
-                        startWith: "init",
-                        mode: "execute-review-pr",
-                        description: description.trim(),
-                        interactionLevel,
-                      });
-                    },
-                  },
-                ]}
+                )}
               />
             )}
             {status === "completed" && workspace && (

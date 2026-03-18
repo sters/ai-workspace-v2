@@ -25,9 +25,24 @@ export async function postJson<T = unknown>(
 
 /** Kill a running operation by ID. */
 export async function killOperation(operationId: string): Promise<void> {
-  await fetch("/api/operations/kill", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ operationId }),
-  });
+  await postJson("/api/operations/kill", { operationId });
+}
+
+/** Kill a chat session by ID. */
+export async function killChatSession(sessionId: string): Promise<void> {
+  await postJson("/api/chat-sessions/kill", { sessionId });
+}
+
+/** Add an MCP server. */
+export async function addMcpServer(
+  body: { name: string; transport: string; scope: string; url: string },
+): Promise<{ ok: true; data: { output?: string } } | { ok: false; error: string }> {
+  return postJson("/api/mcp-servers/add", body);
+}
+
+/** Remove an MCP server. */
+export async function removeMcpServer(
+  body: { name: string; scope: string },
+): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
+  return postJson("/api/mcp-servers/remove", body);
 }
