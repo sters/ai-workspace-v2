@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { AppSidebar } from "@/components/shared/app-sidebar";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,97 +16,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen bg-background font-sans antialiased">
         <div className="flex min-h-screen">
-          {/* Sidebar */}
-          <aside className="w-56 shrink-0 border-r bg-card">
-            <div className="sticky top-0 flex h-screen flex-col">
-              <div className="border-b p-4">
-                <Link href="/" className="text-lg font-bold">
-                  ai-workspace
-                </Link>
-              </div>
-              <nav className="flex-1 p-2">
-                <Link
-                  href="/"
-                  className="block rounded-md px-3 py-2 text-sm hover:bg-accent"
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  href="/new"
-                  className="block rounded-md px-3 py-2 text-sm hover:bg-accent"
-                >
-                  New Workspace
-                </Link>
-                <div>
-                  <Link
-                    href="/utilities"
-                    className="block rounded-md px-3 py-2 text-sm hover:bg-accent"
-                  >
-                    Utilities
-                  </Link>
-                  <div className="ml-3 border-l pl-2">
-                    <Link
-                      href="/utilities/workspace-prune"
-                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      Workspace Prune
-                    </Link>
-                    <Link
-                      href="/utilities/operation-prune"
-                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      Operation Log Prune
-                    </Link>
-                    <Link
-                      href="/utilities/mcp-servers"
-                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      MCP Servers
-                    </Link>
-                    <Link
-                      href="/utilities/claude-version"
-                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      Claude Version
-                    </Link>
-                    <Link
-                      href="/utilities/aiw-settings"
-                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      AIW Settings
-                    </Link>
-                    <Link
-                      href="/utilities/claude-settings"
-                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      Claude Settings
-                    </Link>
-                    <Link
-                      href="/utilities/claude-auth"
-                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      Claude Auth
-                    </Link>
-                    <Link
-                      href="/utilities/running"
-                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      Running Operations
-                    </Link>
-                    <Link
-                      href="/utilities/check-update"
-                      className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                    >
-                      Check Update
-                    </Link>
-                  </div>
-                </div>
-              </nav>
-              <div className="border-t p-3 text-xs text-muted-foreground">
-                {process.env.NEXT_PUBLIC_GIT_HASH ?? "dev"}
-              </div>
-            </div>
-          </aside>
+          <AppSidebar />
 
           {/* Main */}
           <main className="flex-1 overflow-auto">
