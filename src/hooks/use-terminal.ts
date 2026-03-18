@@ -2,6 +2,7 @@
 
 import "@xterm/xterm/css/xterm.css";
 import { useRef, useEffect, useCallback } from "react";
+import type { UseTerminalOptions, UseTerminalReturn } from "@/types/hooks";
 
 export const TERMINAL_THEME = {
   background: "#1a1b26",
@@ -25,19 +26,6 @@ export const TERMINAL_THEME = {
   brightCyan: "#7dcfff",
   brightWhite: "#c0caf5",
 } as const;
-
-export interface UseTerminalOptions {
-  readonly?: boolean;
-  webLinks?: boolean;
-}
-
-export interface UseTerminalReturn {
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  termRef: React.MutableRefObject<any | null>;
-  init: () => Promise<void>;
-  dispose: () => void;
-}
 
 export function useTerminal(options?: UseTerminalOptions): UseTerminalReturn {
   const containerRef = useRef<HTMLDivElement>(null);

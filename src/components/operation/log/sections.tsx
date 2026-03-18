@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { parseStreamEvent } from "@/lib/parsers/stream";
+import { statusTextColors, statusIcons } from "@/lib/status-styles";
 import type { LogEntry } from "@/types/claude";
 import { useSubagentOutput } from "@/hooks/use-subagent-output";
 import type { DisplayNode } from "@/types/claude";
@@ -73,17 +74,8 @@ export function ChildGroupSection({
     }
   }
 
-  const statusColor = {
-    running: "text-blue-500",
-    completed: "text-green-600",
-    failed: "text-red-500",
-  }[group.status];
-
-  const statusIcon = {
-    running: "\u25CF",
-    completed: "\u2713",
-    failed: "\u2717",
-  }[group.status];
+  const statusColor = statusTextColors[group.status];
+  const statusIcon = statusIcons[group.status];
 
   return (
     <div className="rounded-md border border-teal-200 dark:border-teal-800">
@@ -157,19 +149,8 @@ export function SubAgentSection({
     return buildDisplayNodes(entries);
   }, [output.content]);
 
-  const statusColor = {
-    running: "text-blue-500",
-    completed: "text-green-600",
-    failed: "text-red-500",
-    stopped: "text-yellow-600",
-  }[group.status];
-
-  const statusIcon = {
-    running: "\u25CF",
-    completed: "\u2713",
-    failed: "\u2717",
-    stopped: "\u25A0",
-  }[group.status];
+  const statusColor = statusTextColors[group.status];
+  const statusIcon = statusIcons[group.status];
 
   return (
     <div className="rounded-md border border-indigo-200 dark:border-indigo-800">

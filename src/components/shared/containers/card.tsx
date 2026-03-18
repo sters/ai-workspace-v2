@@ -1,13 +1,12 @@
 import { type ComponentProps } from "react";
 import { cn } from "@/lib/utils";
+import type { CardVariant } from "@/types/components";
 
-const cardStyles = {
+const cardStyles: Record<CardVariant, string> = {
   default: "rounded-lg border p-4",
   flush: "rounded-lg border",
   dashed: "rounded-lg border border-dashed p-4",
 };
-
-export type CardVariant = keyof typeof cardStyles;
 
 export function cardVariants(
   variant: CardVariant = "default",

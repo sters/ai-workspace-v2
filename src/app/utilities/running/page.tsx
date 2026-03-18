@@ -10,8 +10,7 @@ import { Button, buttonVariants } from "@/components/shared/buttons/button";
 import { Card } from "@/components/shared/containers/card";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+import { fetcher, killOperation } from "@/lib/api-client";
 
 const UTILITY_TYPE_PATHS: Partial<Record<OperationType, string>> = {
   "workspace-prune": "/utilities/workspace-prune",
@@ -44,11 +43,7 @@ export default function RunningPage() {
   const now = useNow(running.length > 0 || activeChats.length > 0 ? 1000 : 0);
   const kill = useCallback(
     async (operationId: string) => {
-      await fetch("/api/operations/kill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operationId }),
-      });
+      await killOperation(operationId);
       mutate();
     },
     [mutate]

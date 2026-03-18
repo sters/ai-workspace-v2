@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import { useSSE } from "./use-sse";
 import { operationListItemSchema } from "@/lib/runtime-schemas";
+import { killOperation } from "@/lib/api-client";
 
 const STORAGE_PREFIX = "aiw-op:";
 
@@ -139,11 +140,7 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
   const cancel = useCallback(async () => {
     if (!operation) return;
     try {
-      await fetch("/api/operations/kill", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operationId: operation.id }),
-      });
+      await killOperation(operation.id);
     } catch (err) {
       console.warn("[use-operation] kill failed:", err);
     }

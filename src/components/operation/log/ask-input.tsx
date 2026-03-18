@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import type { AskQuestion } from "@/types/claude";
 import { Button } from "../../shared/buttons/button";
+import { Input } from "../../shared/forms/input";
 import { Callout } from "../../shared/containers/callout";
 import { MarkdownRenderer } from "../../shared/content/markdown-renderer";
 
@@ -180,7 +181,7 @@ export function AskInput({
                   </div>
                 ))}
               {allowFreeText && (
-                <input
+                <Input
                   type="text"
                   value={ft}
                   onChange={(e) => setFreeText(q.question, e.target.value, !!q.multiSelect)}
@@ -192,7 +193,7 @@ export function AskInput({
                   }}
                   placeholder={hasOptions ? "Or type a response..." : "Type a response..."}
                   disabled={submitting}
-                  className="w-full rounded-md border bg-background px-3 py-1.5 text-sm disabled:opacity-50"
+                  className="w-full"
                   autoFocus={qi === 0 && !hasOptions}
                 />
               )}

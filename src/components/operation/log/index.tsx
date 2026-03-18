@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useMemo, useState } from "react";
-import type { OperationEvent, OperationPhaseInfo } from "@/types/operation";
+import type { OperationPhaseInfo } from "@/types/operation";
+import type { OperationLogProps } from "@/types/components";
 import { parseStreamEvent, enrichPermissionDenials } from "@/lib/parsers/stream";
 import type { LogEntry } from "@/types/claude";
 import { buildDisplayNodes, groupByChildLabel, groupByPhase, findPendingAsk } from "./display-nodes";
@@ -9,12 +10,7 @@ import { ChildGroupSection, SubAgentSection, PhaseGroupSection } from "./section
 import { EntryRow } from "./entries";
 import { AskInput } from "./ask-input";
 import { Button } from "../../shared/buttons/button";
-
-interface OperationLogProps {
-  operationId: string;
-  events: OperationEvent[];
-  isRunning: boolean;
-}
+import { statusTextColors, statusIcons } from "@/lib/status-styles";
 
 export function OperationLog({
   operationId,
@@ -206,21 +202,6 @@ function PhaseTabBar({
   activeTab: number | "all";
   onTabClick: (tab: number | "all") => void;
 }) {
-  const statusIcon: Record<OperationPhaseInfo["status"], string> = {
-    pending: "\u25CB",    // ○
-    running: "\u25CF",    // ●
-    completed: "\u2713",  // ✓
-    failed: "\u2717",     // ✗
-    skipped: "\u2014",    // —
-  };
-
-  const statusColor: Record<OperationPhaseInfo["status"], string> = {
-    pending: "text-muted-foreground",
-    running: "text-blue-500",
-    completed: "text-green-600",
-    failed: "text-red-500",
-    skipped: "text-muted-foreground/50",
-  };
 
   return (
     <div className="flex flex-col gap-0.5 rounded-lg border bg-muted/30 p-1.5">
@@ -246,8 +227,8 @@ function PhaseTabBar({
               : "hover:bg-background/50"
           }`}
         >
-          <span className={`shrink-0 ${statusColor[phase.status]} ${phase.status === "running" ? "animate-pulse" : ""}`}>
-            {statusIcon[phase.status]}
+          <span className={`shrink-0 ${statusTextColors[phase.status]} ${phase.status === "running" ? "animate-pulse" : ""}`}>
+            {statusIcons[phase.status]}
           </span>
           <span>Phase {phase.index + 1}: {phase.label}</span>
         </Button>

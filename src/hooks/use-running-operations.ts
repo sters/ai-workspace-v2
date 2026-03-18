@@ -1,7 +1,6 @@
 import useSWR from "swr";
 import type { OperationListItem, OperationType } from "@/types/operation";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
+import { fetcher } from "@/lib/api-client";
 
 /**
  * Expand a batch operation into the individual operation types it encompasses,

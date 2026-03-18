@@ -4,20 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import type { OperationType } from "@/types/operation";
+import type { NextAction } from "@/types/components";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button, buttonVariants } from "../shared/buttons/button";
 import { Callout } from "../shared/containers/callout";
-
-interface NextAction {
-  label: string;
-  type: OperationType;
-  body: Record<string, string>;
-  primary?: boolean;
-  /** Batch dropdown items for this action. */
-  batchItems?: { label: string; type: OperationType; body: Record<string, string> }[];
-  /** When set, renders as a link navigating to this sub-path (e.g. "/review") instead of triggering an operation. */
-  linkSubPath?: string;
-}
 
 function executeBatchItems(workspace: string): NextAction["batchItems"] {
   return [

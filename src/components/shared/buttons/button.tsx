@@ -3,8 +3,9 @@
 import { type ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 import { useAsyncCallback } from "@/hooks/use-async-callback";
+import type { ButtonVariant } from "@/types/components";
 
-const variants = {
+const variants: Record<ButtonVariant, string> = {
   primary:
     "rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50",
   secondary:
@@ -22,8 +23,6 @@ const variants = {
   "ghost-toggle":
     "text-muted-foreground hover:text-foreground disabled:opacity-50",
 };
-
-export type ButtonVariant = keyof typeof variants;
 
 export function buttonVariants(variant: ButtonVariant = "primary", className?: string) {
   return cn(variants[variant], className);

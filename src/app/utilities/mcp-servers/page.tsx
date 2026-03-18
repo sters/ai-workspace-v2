@@ -5,12 +5,12 @@ import useSWR from "swr";
 import { useOperation } from "@/hooks/use-operation";
 import { McpAuthTerminal } from "@/components/operation/mcp-auth-terminal";
 import { Button } from "@/components/shared/buttons/button";
+import { Input } from "@/components/shared/forms/input";
 import { Card } from "@/components/shared/containers/card";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
+import { fetcher } from "@/lib/api-client";
 import type { McpServerEntry, McpConnectionStatus } from "@/types/claude";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function ScopeBadge({ scope }: { scope: McpServerEntry["scope"] }) {
   const styles = {
@@ -151,24 +151,24 @@ function AddMcpServerForm({ onAdded }: { onAdded: () => void }) {
           <label className="mb-1 block text-xs text-muted-foreground">
             Name
           </label>
-          <input
+          <Input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="server-name"
-            className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+            className="h-8 w-full"
           />
         </div>
         <div className="min-w-0 flex-1">
           <label className="mb-1 block text-xs text-muted-foreground">
             URL / Command
           </label>
-          <input
+          <Input
             type="text"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://mcp.example.com/sse"
-            className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+            className="h-8 w-full"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !submitting) handleSubmit();
             }}

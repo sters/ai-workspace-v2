@@ -4,13 +4,12 @@ import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import { Button } from "@/components/shared/buttons/button";
+import { Input } from "@/components/shared/forms/input";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { QuickSearchResults, DeepSearchResults } from "./quick-search-results";
 import { useOperation } from "@/hooks/use-operation";
 import { parseStreamEvent } from "@/lib/parsers/stream";
-import type { QuickSearchResponse, DeepSearchResponse, DeepSearchResult } from "@/types/search";
-
-type SearchMode = "quick" | "deep" | null;
+import type { QuickSearchResponse, DeepSearchResponse, DeepSearchResult, SearchMode } from "@/types/search";
 
 function updateURL(q: string | null, mode: SearchMode) {
   const url = new URL(window.location.href);
@@ -167,14 +166,14 @@ export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange
   return (
     <div className="mb-4 space-y-3">
       <div className="flex gap-2">
-        <input
+        <Input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={isRunning}
           placeholder="Search workspaces..."
-          className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+          className="flex-1"
         />
         <SplitButton
           label="Quick Search"

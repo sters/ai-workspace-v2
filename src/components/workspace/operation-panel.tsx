@@ -2,10 +2,11 @@
 
 import { useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";
 import { useRunningOperations } from "@/hooks/use-running-operations";
+import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
+import { openInEditor, openInTerminal } from "@/lib/api-actions";
 import type { OperationType } from "@/types/operation";
 import {
   Play,
@@ -26,9 +27,9 @@ export function OperationPanel({
   /** Repository metadata from workspace README for "Open in editor" dropdown. */
   repositories?: { alias: string; path: string }[];
 }) {
-  const router = useRouter();
   const { operations, isWorkspaceRunning, isWorkspaceTypeRunning } = useRunningOperations();
   const isRunning = isWorkspaceRunning(workspaceName);
+  const startAndNavigate = useStartAndNavigate(workspaceName);
 
   // Find the running operation for this workspace to link to
   const runningOp = isRunning
@@ -36,25 +37,6 @@ export function OperationPanel({
         (op) => op.status === "running" && op.workspace === workspaceName
       )
     : undefined;
-
-  const startAndNavigate = useCallback(
-    async (type: OperationType, body: Record<string, string>) => {
-      const res = await fetch(`/api/operations/${type}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        console.error("Failed to start operation:", await res.text());
-        return;
-      }
-      const op = await res.json();
-      router.push(
-        `/workspace/${encodeURIComponent(workspaceName)}/operations?operationId=${encodeURIComponent(op.id)}`
-      );
-    },
-    [router, workspaceName]
-  );
 
   return (
     <div className="space-y-2">
@@ -153,32 +135,6 @@ export function OperationPanel({
       )}
     </div>
   );
-}
-
-function openInEditor(targetPath: string) {
-  return fetch("/api/operations/open-editor", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ workspace: targetPath }),
-  }).then(async (res) => {
-    if (!res.ok) {
-      const data = await res.json();
-      console.error("Failed to open editor:", data.error);
-    }
-  });
-}
-
-function openInTerminal(targetPath: string) {
-  return fetch("/api/operations/open-terminal", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ workspace: targetPath }),
-  }).then(async (res) => {
-    if (!res.ok) {
-      const data = await res.json();
-      console.error("Failed to open terminal:", data.error);
-    }
-  });
 }
 
 function CreatePRButton({

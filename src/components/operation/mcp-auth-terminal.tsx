@@ -1,15 +1,9 @@
 "use client";
 
 import { useRef, useEffect, useState, useMemo } from "react";
-import type { OperationEvent } from "@/types/operation";
+import type { McpAuthTerminalProps } from "@/types/components";
 import { useTerminal } from "@/hooks/use-terminal";
 import { Button } from "../shared/buttons/button";
-
-interface McpAuthTerminalProps {
-  events: OperationEvent[];
-  isRunning: boolean;
-  operationStatus?: "running" | "completed" | "failed";
-}
 
 export function McpAuthTerminal({
   events,

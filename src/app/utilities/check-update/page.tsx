@@ -5,14 +5,13 @@ import { Card } from "@/components/shared/containers/card";
 import { Callout } from "@/components/shared/containers/callout";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
+import { fetcher } from "@/lib/api-client";
 import type { UpdateCheckResult } from "@/lib/update";
 
 type CheckUpdateResponse = UpdateCheckResult & {
   devMode?: boolean;
   error?: string;
 };
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function CheckUpdatePage() {
   const { data, error, isLoading, mutate } = useSWR<CheckUpdateResponse>(
