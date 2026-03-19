@@ -1,12 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { ClaudeOperation } from "@/components/operation/claude-operation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import { PageHeader } from "@/components/shared/feedback/page-header";
-import { InitNextActions } from "@/components/workspace/init-next-actions";
 import { buildBatchItems } from "@/lib/batch-modes";
 import type { InteractionLevel } from "@/types/prompts";
+
+/** Navigate to workspace operations page once workspace name is determined (Phase B). */
+function AutoNavigateToWorkspace({ workspace, storageKey }: { workspace: string; storageKey: string }) {
+  const router = useRouter();
+  useEffect(() => {
+    // Clear init localStorage so returning to /new shows a fresh form
+    localStorage.removeItem(`aiw-op:${storageKey}`);
+    const wsEncoded = encodeURIComponent(workspace);
+    router.push(`/workspace/${wsEncoded}/operations`);
+  }, [router, workspace, storageKey]);
+  return null;
+}
 
 export default function NewWorkspacePage() {
   const [description, setDescription] = useState("");
@@ -86,8 +98,8 @@ export default function NewWorkspacePage() {
                 )}
               />
             )}
-            {status === "completed" && workspace && (
-              <InitNextActions workspace={workspace} />
+            {workspace && (
+              <AutoNavigateToWorkspace workspace={workspace} storageKey="init" />
             )}
           </div>
           );

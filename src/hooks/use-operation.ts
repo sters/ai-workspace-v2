@@ -88,27 +88,31 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
     }
   }, [sseError, storageKey, operation]);
 
-  // ---------- Status events → detect __setWorkspace ----------
+  // ---------- Scan all events for __setWorkspace and complete ----------
+  // Events may arrive in batches (via requestAnimationFrame in useSSE),
+  // so we must scan all events rather than only checking the last one.
   useEffect(() => {
-    const last = events[events.length - 1];
-    if (last?.type === "status" && last.data.startsWith("__setWorkspace:")) {
-      const ws = last.data.slice("__setWorkspace:".length);
-      setOperation((prev) => (prev ? { ...prev, workspace: ws } : null));
+    // Detect __setWorkspace (use last occurrence)
+    let ws: string | undefined;
+    for (const event of events) {
+      if (event.type === "status" && event.data.startsWith("__setWorkspace:")) {
+        ws = event.data.slice("__setWorkspace:".length);
+      }
     }
-  }, [events]);
+    if (ws) {
+      setOperation((prev) => {
+        if (!prev || prev.workspace === ws) return prev;
+        return { ...prev, workspace: ws };
+      });
+    }
 
-  // ---------- Complete event → update status ----------
-  // Only react to the pipeline-level complete (no childLabel).
-  // Child process completes are tagged with childLabel and don't end the operation.
-  useEffect(() => {
-    const last = events[events.length - 1];
-    if (
-      last?.type === "complete" &&
-      !last.childLabel &&
-      operation?.status === "running"
-    ) {
+    // Detect pipeline-level complete (no childLabel)
+    const completeEvent = events.findLast(
+      (e) => e.type === "complete" && !e.childLabel
+    );
+    if (completeEvent && operation?.status === "running") {
       try {
-        const d = JSON.parse(last.data);
+        const d = JSON.parse(completeEvent.data);
         setOperation((prev) =>
           prev
             ? {
