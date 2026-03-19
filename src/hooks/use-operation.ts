@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import { useSSE } from "./use-sse";
 import { operationListItemSchema } from "@/lib/runtime-schemas";
-import { killOperation } from "@/lib/api-client";
+import { killOperation } from "@/lib/api";
 
 const STORAGE_PREFIX = "aiw-op:";
 

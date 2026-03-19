@@ -5,16 +5,17 @@ import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { createTodoSchema } from "@/lib/schemas";
-import { parseBody } from "@/lib/validate";
+import { parseBody, applyOperationDefaults } from "@/lib/validate";
 import { buildCreateTodoPipeline } from "@/lib/pipelines/create-todo";
 
 export async function POST(request: Request) {
   const body = await request.json();
   const parsed = parseBody(createTodoSchema, body);
   if (!parsed.success) return parsed.response;
+  const data = applyOperationDefaults(parsed.data);
 
-  const workspace = resolveWorkspaceName(parsed.data.workspace);
-  const { reviewTimestamp, instruction, interactionLevel } = parsed.data;
+  const workspace = resolveWorkspaceName(data.workspace);
+  const { reviewTimestamp, instruction, interactionLevel } = data;
   const wsPath = path.join(WORKSPACE_DIR, workspace);
 
   // Validate review directory exists

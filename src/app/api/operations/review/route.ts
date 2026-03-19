@@ -5,14 +5,15 @@ import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildReviewPipeline } from "@/lib/pipelines/review";
 import { buildBestOfNPipeline } from "@/lib/pipelines/best-of-n";
 import { reviewSchema } from "@/lib/schemas";
-import { parseBody } from "@/lib/validate";
+import { parseBody, applyOperationDefaults } from "@/lib/validate";
 
 export async function POST(request: Request) {
   const body = await request.json();
   const parsed = parseBody(reviewSchema, body);
   if (!parsed.success) return parsed.response;
+  const data = applyOperationDefaults(parsed.data);
 
-  const workspace = resolveWorkspaceName(parsed.data.workspace);
+  const workspace = resolveWorkspaceName(data.workspace);
   const repos = listWorkspaceRepos(workspace);
 
   if (repos.length === 0) {
@@ -22,8 +23,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const bestOfN = parsed.data.bestOfN ?? getOperationConfig("review").bestOfN;
-  const bestOfNFromConfig = parsed.data.bestOfN == null;
+  const bestOfN = data.bestOfN ?? getOperationConfig("review").bestOfN;
+  const bestOfNFromConfig = data.bestOfN == null;
 
   try {
     let phases;
@@ -36,11 +37,11 @@ export async function POST(request: Request) {
           buildReviewPipeline({ workspace, repos: candidateRepos }),
         repos,
         confirm: bestOfNFromConfig,
-        buildNormalPhases: () => buildReviewPipeline({ workspace, repository: parsed.data.repository }),
-        interactionLevel: parsed.data.interactionLevel,
+        buildNormalPhases: () => buildReviewPipeline({ workspace, repository: data.repository }),
+        interactionLevel: data.interactionLevel,
       });
     } else {
-      phases = await buildReviewPipeline({ workspace, repository: parsed.data.repository });
+      phases = await buildReviewPipeline({ workspace, repository: data.repository });
     }
     const operation = startOperationPipeline("review", workspace, phases, undefined,
       bestOfN >= 2 ? { bestOfN: String(bestOfN) } : undefined,

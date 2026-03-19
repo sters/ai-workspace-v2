@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import { ConfigEditor } from "@/components/utilities/config-editor";
 import { StatusText } from "@/components/shared/feedback/status-text";
-import { fetcher } from "@/lib/api-client";
+import { fetcher } from "@/lib/api";
 
 type SettingsEntry = {
   scope: string;

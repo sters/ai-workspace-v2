@@ -1,7 +1,7 @@
 import useSWR from "swr";
 import type { WorkspaceSummary } from "@/types/workspace";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";
-import { fetcher } from "@/lib/api-client";
+import { fetcher } from "@/lib/api";
 
 export function useWorkspaces() {
   const { data, error, isLoading, mutate } = useSWR<WorkspaceSummary[]>(

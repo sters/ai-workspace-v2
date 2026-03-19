@@ -3,18 +3,19 @@ import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-ma
 import { resolveWorkspaceName, getOperationConfig } from "@/lib/config";
 import { buildUpdateTodoPipeline } from "@/lib/pipelines/update-todo";
 import { updateTodoSchema } from "@/lib/schemas";
-import { parseBody } from "@/lib/validate";
+import { parseBody, applyOperationDefaults } from "@/lib/validate";
 
 export async function POST(request: Request) {
   const body = await request.json();
   const parsed = parseBody(updateTodoSchema, body);
   if (!parsed.success) return parsed.response;
+  const data = applyOperationDefaults(parsed.data);
 
-  const workspace = resolveWorkspaceName(parsed.data.workspace);
-  const { instruction, repo, interactionLevel } = parsed.data;
+  const workspace = resolveWorkspaceName(data.workspace);
+  const { instruction, repo, interactionLevel } = data;
 
-  const bestOfN = parsed.data.bestOfN ?? getOperationConfig("update-todo").bestOfN;
-  const bestOfNFromConfig = parsed.data.bestOfN == null;
+  const bestOfN = data.bestOfN ?? getOperationConfig("update-todo").bestOfN;
+  const bestOfNFromConfig = data.bestOfN == null;
 
   try {
     const phases = await buildUpdateTodoPipeline({

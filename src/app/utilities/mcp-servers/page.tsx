@@ -7,7 +7,7 @@ import { ServerCard } from "@/components/utilities/mcp-servers/server-card";
 import { Card } from "@/components/shared/containers/card";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
-import { fetcher } from "@/lib/api-client";
+import { fetcher } from "@/lib/api";
 import type { McpServerEntry, McpConnectionStatus } from "@/types/claude";
 
 export default function McpServersPage() {
