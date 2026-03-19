@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PushToggle } from "./push-toggle";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/" },
@@ -56,8 +57,11 @@ export function AppSidebar() {
             </div>
           </div>
         </nav>
-        <div className="border-t p-3 text-xs text-muted-foreground">
-          {process.env.NEXT_PUBLIC_GIT_HASH ?? "dev"}
+        <div className="border-t p-3">
+          <PushToggle />
+          <div className="mt-2 text-xs text-muted-foreground">
+            {process.env.NEXT_PUBLIC_GIT_HASH ?? "dev"}
+          </div>
         </div>
       </div>
     </aside>
