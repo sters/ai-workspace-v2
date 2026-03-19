@@ -6,7 +6,7 @@ import useSWR from "swr";
 import { OperationCard } from "@/components/workspace/operation-card";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import type { OperationListItem, OperationType } from "@/types/operation";
-import { fetcher, killOperation } from "@/lib/api-client";
+import { fetcher, killOperation } from "@/lib/api";
 import { extractBatchParams } from "@/lib/batch-modes";
 
 const VALID_AUTO_ACTIONS = new Set<string>([

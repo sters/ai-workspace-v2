@@ -7,7 +7,7 @@ import { Button } from "@/components/shared/buttons/button";
 import { Card } from "@/components/shared/containers/card";
 import { ScopeBadge } from "./scope-badge";
 import { ConnectionBadge } from "./connection-badge";
-import { removeMcpServer } from "@/lib/api-client";
+import { removeMcpServer } from "@/lib/api";
 import type { McpServerEntry, McpConnectionStatus } from "@/types/claude";
 
 export function ServerCard({

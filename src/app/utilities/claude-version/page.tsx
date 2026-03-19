@@ -4,7 +4,7 @@ import useSWR from "swr";
 import { Card } from "@/components/shared/containers/card";
 import { FetchStatus } from "@/components/shared/feedback/fetch-status";
 import { PageHeader } from "@/components/shared/feedback/page-header";
-import { fetcher } from "@/lib/api-client";
+import { fetcher } from "@/lib/api";
 
 export default function ClaudeVersionPage() {
   const { data, error, isLoading, mutate } = useSWR<{

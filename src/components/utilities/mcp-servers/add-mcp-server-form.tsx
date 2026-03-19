@@ -4,12 +4,12 @@ import { useState } from "react";
 import { Button } from "@/components/shared/buttons/button";
 import { Input } from "@/components/shared/forms/input";
 import { Card } from "@/components/shared/containers/card";
-import { addMcpServer } from "@/lib/api-client";
+import { addMcpServer } from "@/lib/api";
 
 export function AddMcpServerForm({ onAdded }: { onAdded: () => void }) {
   const [name, setName] = useState("");
-  const [transport, setTransport] = useState("sse");
-  const [scope, setScope] = useState("project");
+  const [transport, setTransport] = useState<"stdio" | "sse" | "http">("sse");
+  const [scope, setScope] = useState<"project" | "local">("project");
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<{
     type: "success" | "error";
@@ -61,7 +61,7 @@ export function AddMcpServerForm({ onAdded }: { onAdded: () => void }) {
           </label>
           <select
             value={scope}
-            onChange={(e) => setScope(e.target.value)}
+            onChange={(e) => setScope(e.target.value as "project" | "local")}
             className="h-8 rounded-md border bg-background px-2 text-sm"
           >
             <option value="project">project</option>
@@ -74,7 +74,7 @@ export function AddMcpServerForm({ onAdded }: { onAdded: () => void }) {
           </label>
           <select
             value={transport}
-            onChange={(e) => setTransport(e.target.value)}
+            onChange={(e) => setTransport(e.target.value as "stdio" | "sse" | "http")}
             className="h-8 rounded-md border bg-background px-2 text-sm"
           >
             <option value="stdio">stdio</option>

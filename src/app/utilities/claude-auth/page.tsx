@@ -7,7 +7,7 @@ import { Card } from "@/components/shared/containers/card";
 import { FetchStatus } from "@/components/shared/feedback/fetch-status";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
-import { fetcher } from "@/lib/api-client";
+import { fetcher } from "@/lib/api";
 
 type AuthStatus = {
   loggedIn: boolean;

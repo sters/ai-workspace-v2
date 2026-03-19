@@ -8,7 +8,7 @@ import { UpdateForm } from "./update-form";
 import { Card } from "../shared/containers/card";
 import { ProgressBar } from "../shared/feedback/progress-bar";
 import { Button } from "../shared/buttons/button";
-import { openInEditor, openInTerminal } from "@/lib/api-actions";
+import { openInEditor, openInTerminal } from "@/lib/api";
 import { buildBatchItems } from "@/lib/batch-modes";
 import {
   Play,

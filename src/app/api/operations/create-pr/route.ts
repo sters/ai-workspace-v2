@@ -5,16 +5,17 @@ import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildCreatePrPipeline } from "@/lib/pipelines/create-pr";
 import { buildBestOfNPipeline } from "@/lib/pipelines/best-of-n";
 import { createPrSchema } from "@/lib/schemas";
-import { parseBody } from "@/lib/validate";
+import { parseBody, applyOperationDefaults } from "@/lib/validate";
 
 export async function POST(request: Request) {
   const body = await request.json();
   const parsed = parseBody(createPrSchema, body);
   if (!parsed.success) return parsed.response;
+  const data = applyOperationDefaults(parsed.data);
 
-  const workspace = resolveWorkspaceName(parsed.data.workspace);
-  const draft = parsed.data.draft;
-  const repository = parsed.data.repository;
+  const workspace = resolveWorkspaceName(data.workspace);
+  const draft = data.draft;
+  const repository = data.repository;
   const repos = listWorkspaceRepos(workspace);
 
   if (repos.length === 0) {
@@ -24,8 +25,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const bestOfN = parsed.data.bestOfN ?? getOperationConfig("create-pr").bestOfN;
-  const bestOfNFromConfig = parsed.data.bestOfN == null;
+  const bestOfN = data.bestOfN ?? getOperationConfig("create-pr").bestOfN;
+  const bestOfNFromConfig = data.bestOfN == null;
 
   try {
     let phases;
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
         repos,
         confirm: bestOfNFromConfig,
         buildNormalPhases: () => buildCreatePrPipeline({ workspace, draft: draft !== false, repository }),
-        interactionLevel: parsed.data.interactionLevel,
+        interactionLevel: data.interactionLevel,
       });
     } else {
       phases = await buildCreatePrPipeline({ workspace, draft: draft !== false, repository });

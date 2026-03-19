@@ -4,7 +4,7 @@ import useSWR from "swr";
 import { ConfigEditor } from "@/components/utilities/config-editor";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { PageHeader } from "@/components/shared/feedback/page-header";
-import { fetcher } from "@/lib/api-client";
+import { fetcher } from "@/lib/api";
 
 type ConfigData = {
   filePath: string;

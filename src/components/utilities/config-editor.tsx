@@ -5,7 +5,7 @@ import { MonacoEditorLazy } from "@/components/shared/content/monaco-editor-lazy
 import { Button } from "@/components/shared/buttons/button";
 import { Card } from "@/components/shared/containers/card";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
-import { postJson } from "@/lib/api-client";
+import { postJson } from "@/lib/api";
 
 export function ConfigEditor({
   filePath,

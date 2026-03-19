@@ -1,11 +1,11 @@
 import z from "zod";
-import { getConfig } from "./config";
 
-export const interactionLevelSchema = z.enum(["low", "mid", "high"]).default(getConfig().operations.defaultInteractionLevel);
+/** Interaction level enum — shared between client and server. */
+export const interactionLevelEnum = z.enum(["low", "mid", "high"]);
 
 export const initSchema = z.object({
   description: z.string().min(1, "description is required"),
-  interactionLevel: interactionLevelSchema,
+  interactionLevel: interactionLevelEnum.optional(),
   bestOfN: z.coerce.number().min(0).max(5).optional(),
 });
 
@@ -16,14 +16,14 @@ export const workspaceSchema = z.object({
 export const executeSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   repository: z.string().optional(),
-  interactionLevel: interactionLevelSchema,
+  interactionLevel: interactionLevelEnum.optional(),
   bestOfN: z.coerce.number().min(0).max(5).optional(),
 });
 
 export const reviewSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   repository: z.string().optional(),
-  interactionLevel: interactionLevelSchema,
+  interactionLevel: interactionLevelEnum.optional(),
   bestOfN: z.coerce.number().min(0).max(5).optional(),
 });
 
@@ -31,7 +31,7 @@ export const createPrSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   draft: z.coerce.boolean().optional(),
   repository: z.string().optional(),
-  interactionLevel: interactionLevelSchema,
+  interactionLevel: interactionLevelEnum.optional(),
   bestOfN: z.coerce.number().min(0).max(5).optional(),
 });
 
@@ -39,7 +39,7 @@ export const updateTodoSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   instruction: z.string().min(1, "instruction is required"),
   repo: z.string().optional(),
-  interactionLevel: interactionLevelSchema,
+  interactionLevel: interactionLevelEnum.optional(),
   bestOfN: z.coerce.number().min(0).max(5).optional(),
 });
 
@@ -47,7 +47,7 @@ export const createTodoSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   reviewTimestamp: z.string().min(1, "reviewTimestamp is required"),
   instruction: z.string().optional(),
-  interactionLevel: interactionLevelSchema,
+  interactionLevel: interactionLevelEnum.optional(),
 });
 
 export const deleteSchema = workspaceSchema;
@@ -75,7 +75,7 @@ export const batchSchema = z.object({
   workspace: z.string().optional(),
   instruction: z.string().optional(),
   draft: z.coerce.boolean().optional(),
-  interactionLevel: interactionLevelSchema,
+  interactionLevel: interactionLevelEnum.optional(),
   repo: z.string().optional(),
   bestOfN: z.coerce.number().min(0).max(5).optional(),
   bestOfNPhases: z.array(z.enum(["execute", "review", "create-pr", "update-todo"])).optional(),

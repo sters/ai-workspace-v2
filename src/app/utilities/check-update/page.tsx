@@ -5,7 +5,7 @@ import { Card } from "@/components/shared/containers/card";
 import { Callout } from "@/components/shared/containers/callout";
 import { FetchStatus } from "@/components/shared/feedback/fetch-status";
 import { PageHeader } from "@/components/shared/feedback/page-header";
-import { fetcher } from "@/lib/api-client";
+import { fetcher } from "@/lib/api";
 import type { UpdateCheckResult } from "@/lib/update";
 
 type CheckUpdateResponse = UpdateCheckResult & {

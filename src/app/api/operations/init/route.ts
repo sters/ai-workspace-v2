@@ -3,16 +3,17 @@ import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-ma
 import { getOperationConfig } from "@/lib/config";
 import { buildInitPipeline } from "@/lib/pipelines/init";
 import { initSchema } from "@/lib/schemas";
-import { parseBody } from "@/lib/validate";
+import { parseBody, applyOperationDefaults } from "@/lib/validate";
 
 export async function POST(request: Request) {
   const body = await request.json();
   const parsed = parseBody(initSchema, body);
   if (!parsed.success) return parsed.response;
-  const { description, interactionLevel } = parsed.data;
+  const data = applyOperationDefaults(parsed.data);
+  const { description, interactionLevel } = data;
 
-  const bestOfN = parsed.data.bestOfN ?? getOperationConfig("init").bestOfN;
-  const bestOfNFromConfig = parsed.data.bestOfN == null;
+  const bestOfN = data.bestOfN ?? getOperationConfig("init").bestOfN;
+  const bestOfNFromConfig = data.bestOfN == null;
 
   try {
     const phases = buildInitPipeline(description, interactionLevel, {

@@ -4,15 +4,16 @@ import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-ma
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildBatchPipeline } from "@/lib/pipelines/batch";
 import { batchSchema } from "@/lib/schemas";
-import { parseBody } from "@/lib/validate";
+import { parseBody, applyOperationDefaults } from "@/lib/validate";
 
 export async function POST(request: Request) {
   const body = await request.json();
   const parsed = parseBody(batchSchema, body);
   if (!parsed.success) return parsed.response;
+  const data = applyOperationDefaults(parsed.data);
 
-  const { mode, startWith, description, instruction, draft, interactionLevel, repo, bestOfN, bestOfNPhases } = parsed.data;
-  let workspace = parsed.data.workspace;
+  const { mode, startWith, description, instruction, draft, interactionLevel, repo, bestOfN, bestOfNPhases } = data;
+  let workspace = data.workspace;
 
   if (startWith === "init") {
     if (!description || !description.trim()) {

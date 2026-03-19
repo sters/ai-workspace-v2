@@ -6,7 +6,7 @@ import { Button } from "../shared/buttons/button";
 import { RepositoryActionButton } from "./repository-action-button";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
-import { openInEditor, openInTerminal } from "@/lib/api-actions";
+import { openInEditor, openInTerminal } from "@/lib/api";
 import { buildBatchItems } from "@/lib/batch-modes";
 import {
   Play,

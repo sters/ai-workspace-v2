@@ -1,6 +1,6 @@
 import useSWR from "swr";
 import type { OperationListItem, OperationType } from "@/types/operation";
-import { fetcher } from "@/lib/api-client";
+import { fetcher } from "@/lib/api";
 
 /**
  * Expand a batch operation into the individual operation types it encompasses,

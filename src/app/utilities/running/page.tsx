@@ -10,7 +10,7 @@ import { Button, buttonVariants } from "@/components/shared/buttons/button";
 import { Card } from "@/components/shared/containers/card";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
-import { fetcher, killOperation, killChatSession } from "@/lib/api-client";
+import { fetcher, killOperation, killChatSession } from "@/lib/api";
 
 const UTILITY_TYPE_PATHS: Partial<Record<OperationType, string>> = {
   "workspace-prune": "/utilities/workspace-prune",
