@@ -40,7 +40,13 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
       if (!raw) return;
       const result = operationListItemSchema.safeParse(JSON.parse(raw));
       if (result.success) {
-        setOperation(result.data as OperationListItem);
+        const op = result.data as OperationListItem;
+        // Auto-clear completed/failed operations on navigation
+        if (op.status === "completed" || op.status === "failed") {
+          localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
+          return;
+        }
+        setOperation(op);
       }
     } catch (err) {
       console.warn("[use-operation] localStorage restore failed:", err);
