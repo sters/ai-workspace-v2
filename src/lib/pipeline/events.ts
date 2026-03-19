@@ -1,5 +1,6 @@
 import type { OperationEvent } from "@/types/operation";
 import type { ManagedOperation } from "./types";
+import { sendAskNotification } from "@/lib/web-push";
 
 export function emitEvent(managed: ManagedOperation, event: OperationEvent) {
   managed.events.push(event);
@@ -15,6 +16,7 @@ export function emitEvent(managed: ManagedOperation, event: OperationEvent) {
         for (const block of parsed.message.content) {
           if (block.type === "tool_use" && block.name === "AskUserQuestion") {
             managed.hasPendingAsk = true;
+            sendAskNotification(managed.operation.id, managed.operation.workspace ?? undefined);
             break;
           }
         }
