@@ -89,4 +89,25 @@ describe("buildAutonomousGatePrompt", () => {
     });
     expect(prompt).toContain("(no TODO files)");
   });
+
+  it("instructs to evaluate all severity levels including warnings and suggestions", () => {
+    const prompt = buildAutonomousGatePrompt(baseInput);
+    expect(prompt).toContain("warnings");
+    expect(prompt).toContain("suggestions");
+    expect(prompt).toContain("every severity level");
+  });
+
+  it("defaults to fixing actionable issues", () => {
+    const prompt = buildAutonomousGatePrompt(baseInput);
+    expect(prompt).toContain("Default to fixing");
+    expect(prompt).toContain("Err on the side of addressing issues");
+  });
+
+  it("lists concrete examples of fixable issues including struct layouts", () => {
+    const prompt = buildAutonomousGatePrompt(baseInput);
+    expect(prompt).toContain("Typos");
+    expect(prompt).toContain("stale references");
+    expect(prompt).toContain("struct/type layouts");
+    expect(prompt).toContain("suboptimal data structures");
+  });
 });

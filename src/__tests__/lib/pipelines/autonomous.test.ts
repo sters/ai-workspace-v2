@@ -46,9 +46,10 @@ import { buildExecutePipeline } from "@/lib/pipelines/execute";
 import { buildReviewPipeline } from "@/lib/pipelines/review";
 import { buildCreatePrPipeline } from "@/lib/pipelines/create-pr";
 import { getOperation } from "@/lib/pipeline-manager";
-import { getReviewSessions } from "@/lib/workspace/reader";
+import { getReviewSessions, getReviewDetail } from "@/lib/workspace/reader";
 
 const mockGetOperation = vi.mocked(getOperation);
+const mockGetReviewDetail = vi.mocked(getReviewDetail);
 const mockBuildInit = vi.mocked(buildInitPipeline);
 const mockBuildUpdateTodo = vi.mocked(buildUpdateTodoPipeline);
 const mockBuildExecute = vi.mocked(buildExecutePipeline);
@@ -180,6 +181,49 @@ describe("buildAutonomousPipeline", () => {
       expect(result).toBe(false);
       expect(ctx.emitStatus).toHaveBeenCalledWith(
         expect.stringContaining("No workspace found"),
+      );
+    });
+
+    it("calls AI gate even when critical=0 but warnings exist", async () => {
+      mockGetReviewSessions.mockResolvedValue([{
+        timestamp: "2024-01-01",
+        critical: 0,
+        major: 0,
+        minor: 2,
+        total: 2,
+      }]);
+      mockGetReviewDetail.mockResolvedValue({
+        summary: "2 warnings found",
+        files: [{ name: "REVIEW-repo.md", content: "Warning: typo found" }],
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const cycleFn = phases[0];
+      if (cycleFn.kind !== "function") return;
+
+      const runChildCalls: string[] = [];
+      const ctx = createMockCtx({
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          runChildCalls.push(label);
+          if (opts?.onResultText && label === "Autonomous Gate") {
+            opts.onResultText(JSON.stringify({
+              shouldLoop: true,
+              reason: "Typo should be fixed",
+              fixableIssues: ["Fix executer -> executor typo"],
+            }));
+          }
+          return true;
+        }),
+      });
+
+      await cycleFn.fn(ctx);
+
+      expect(runChildCalls).toContain("Autonomous Gate");
+      expect(ctx.emitResult).toHaveBeenCalledWith(
+        expect.stringContaining("Loop"),
       );
     });
 
