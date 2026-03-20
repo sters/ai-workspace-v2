@@ -62,12 +62,32 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 2,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE workspace_suggestions (
+          id                  TEXT PRIMARY KEY,
+          source_workspace    TEXT NOT NULL,
+          source_operation_id TEXT NOT NULL,
+          title               TEXT NOT NULL,
+          description         TEXT NOT NULL,
+          dismissed           INTEGER NOT NULL DEFAULT 0,
+          created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE INDEX idx_ws_sug_dismissed ON workspace_suggestions(dismissed);
+        CREATE INDEX idx_ws_sug_source ON workspace_suggestions(source_workspace);
+      `);
+    },
+  },
 ];
 
 /**
  * Run all pending migrations in order.
  * Each migration runs inside a transaction.
  */
+const LATEST_VERSION = migrations[migrations.length - 1].version;
+
 export function runMigrations(db: Database): void {
   // Check if schema_migrations table exists
   const tableExists = db
@@ -81,6 +101,9 @@ export function runMigrations(db: Database): void {
       .get() as { v: number | null } | null;
     currentVersion = row?.v ?? 0;
   }
+
+  // Fast path: already up-to-date (avoids re-checking on every getDb() call)
+  if (currentVersion >= LATEST_VERSION) return;
 
   for (const migration of migrations) {
     if (migration.version <= currentVersion) continue;

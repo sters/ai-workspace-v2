@@ -32,4 +32,6 @@ export {
   BEST_OF_N_REVIEW_SCHEMA,
   buildAutonomousGatePrompt,
   AUTONOMOUS_GATE_SCHEMA,
+  buildWorkspaceSuggesterPrompt,
+  WORKSPACE_SUGGESTION_SCHEMA,
 } from "./prompts";

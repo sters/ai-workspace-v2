@@ -38,6 +38,9 @@ vi.mock("@/lib/pipelines/create-pr", () => ({
 vi.mock("@/lib/pipelines/update-todo", () => ({
   buildUpdateTodoPipeline: vi.fn(async () => []),
 }));
+vi.mock("@/lib/suggest-workspace", () => ({
+  triggerWorkspaceSuggestion: vi.fn(),
+}));
 
 import { buildAutonomousPipeline } from "@/lib/pipelines/autonomous";
 import { buildInitPipeline } from "@/lib/pipelines/init";

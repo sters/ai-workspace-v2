@@ -15,6 +15,7 @@ import {
   buildReadmeVerifierPrompt,
   buildCollectorPrompt,
 } from "@/lib/templates";
+import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
 import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
@@ -141,7 +142,11 @@ export async function buildReviewPipeline(input: {
           readmeVerifyFiles: [...actualReadmeVerifyFiles].map((f) => path.join(reviewDir, f)),
         });
 
-        return ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir] });
+        const ok = await ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir] });
+        if (ok) {
+          triggerWorkspaceSuggestion(workspace, ctx.operationId, "review");
+        }
+        return ok;
       },
     },
   ];

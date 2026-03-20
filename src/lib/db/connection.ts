@@ -22,7 +22,11 @@ const globalStore = globalThis as unknown as {
  * Stored on globalThis to survive Next.js module isolation / HMR.
  */
 export function getDb(): Database {
-  if (globalStore.__aiwDb) return globalStore.__aiwDb;
+  if (globalStore.__aiwDb) {
+    // Run pending migrations even on cached instances (handles HMR adding new migrations)
+    runMigrations(globalStore.__aiwDb);
+    return globalStore.__aiwDb;
+  }
 
   const dbPath = globalStore.__aiwDbPath ?? DEFAULT_DB_PATH;
 

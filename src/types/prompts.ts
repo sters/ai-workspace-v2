@@ -147,6 +147,12 @@ export interface AutonomousGateInput {
   maxLoops: number;
 }
 
+export interface WorkspaceSuggesterInput {
+  workspaceName: string;
+  readmeContent: string;
+  operationOutput: string;
+}
+
 export interface BestOfNFileSynthesizerInput {
   operationType: string;
   candidates: { label: string; files: { name: string; content: string }[] }[];

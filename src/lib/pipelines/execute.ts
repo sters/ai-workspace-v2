@@ -15,6 +15,7 @@ import {
   buildResearcherPrompt,
 } from "@/lib/templates";
 import { writeReportTemplates } from "@/lib/workspace";
+import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
 
@@ -74,14 +75,19 @@ export async function buildExecutePipeline(input: {
       kind: "function",
       label: "Execute",
       timeoutMs,
-      fn: (ctx: PhaseFunctionContext) =>
-        executeRepoLanes(ctx, {
+      fn: async (ctx: PhaseFunctionContext) => {
+        const result = await executeRepoLanes(ctx, {
           workspace,
           readmeContent,
           repos,
           wsPath,
           batchSize,
-        }),
+        });
+        if (result) {
+          triggerWorkspaceSuggestion(workspace, ctx.operationId, "execute");
+        }
+        return result;
+      },
     },
   ];
 }
