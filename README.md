@@ -1,6 +1,6 @@
 # ai-workspace-v2
 
-Web UI dashboard for a multi-repository workspace manager and task executor for Claude Code.
+Web UI dashboard for [ai-workspace](https://github.com/sters/ai-workspace), a multi-repository workspace manager and task executor for Claude Code.
 
 Provides a browser interface on `localhost:3741` to view workspace status, TODO progress, reviews, git history, and trigger operations (init, execute, review, create-pr, autonomous, etc.) that run Claude Code via `Bun.spawn` + `claude -p --output-format stream-json`. A separate WebSocket chat server runs on port 3742 for interactive Claude sessions.
 
@@ -94,7 +94,7 @@ Three-tier config system (priority: env vars > config file > defaults):
 - `GET /api/workspaces/[name]/{readme,todos,reviews,history}` — Read workspace state from disk
 - `POST /api/operations/{init,execute,review,create-pr,update-todo,create-todo,delete}` — Start operations
 - `POST /api/operations/{autonomous,batch,search,quick-ask}` — Advanced operations
-- `POST /api/operations/{claude-login,mcp-auth,workspace-prune,operation-prune}` — Maintenance operations
+- `POST /api/operations/{claude-login,mcp-auth,workspace-prune,operation-prune,clear}` — Maintenance operations
 - `POST /api/operations/{answer,kill}` — Control running operations
 - `POST /api/operations/{open-editor,open-terminal}` — Open local tools
 - `GET /api/events?operationId=` — SSE stream for operation output
@@ -136,16 +136,9 @@ bun run build && bun run start
 
 # Lint (runs tsc --noEmit + eslint)
 bun run lint
-
-# Run all tests
-bun run test
-
-# Run tests in watch mode
-bun run test:watch
-
-# Run a single test file
-bunx vitest run src/__tests__/lib/parsers/todo.test.ts
 ```
+
+See [Testing](#testing) for test commands.
 
 ## Testing
 
