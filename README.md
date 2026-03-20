@@ -66,6 +66,8 @@ Three-tier config system (priority: env vars > config file > defaults):
 - **Claude Code execution**: Operations spawn Claude Code processes via `Bun.spawn` with `claude -p --output-format stream-json`. The pipeline manager (`src/lib/pipeline-manager.ts`) orchestrates multi-phase pipelines with configurable concurrency and timeouts. Legacy SDK fallback is available via `AIW_CLAUDE_USE_CLI=false`.
 - **Autonomous mode**: The autonomous pipeline (`src/lib/pipelines/autonomous.ts`) runs an Execute → Review → Gate loop. An AI-powered gate evaluates review results and decides whether to loop (fix issues) or stop.
 - **Batch operations**: The batch pipeline (`src/lib/pipelines/batch.ts`) runs multiple operations in sequence or with best-of-n evaluation.
+- **Best-of-N evaluation**: The best-of-n pipeline (`src/lib/pipelines/best-of-n.ts`) runs N candidate executions in parallel using sub-worktrees, then uses an AI reviewer to select or synthesize the best result. Used by batch operations for higher-quality outputs.
+- **Quick ask**: The quick-ask pipeline (`src/lib/templates/prompts/quick-ask.ts`, `src/app/api/operations/quick-ask/route.ts`) provides a one-shot Q&A interface for asking questions about a workspace. It reads workspace context (README, TODOs) and answers concisely without running multi-phase operations.
 - **Parsers** (`src/lib/parsers/`): Extract structured data from markdown — TODO items, README metadata, review summaries, and stream-json log entries.
 - **Web Push** (`src/lib/web-push/`): Browser push notifications for `AskUserQuestion` events when Claude needs user input.
 
