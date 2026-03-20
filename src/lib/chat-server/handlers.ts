@@ -8,7 +8,7 @@ export function send(ws: { send(data: string): void }, msg: ServerMessage) {
   ws.send(JSON.stringify(msg));
 }
 import { trimBuffer } from "./buffer";
-import { getStore, nextSessionId } from "./store";
+import { getStore, nextSessionId, persistSessionCreated, persistSessionExited, persistSessionDeleted } from "./store";
 import { runGc } from "./gc";
 
 function getWorkspaceRoot(): string {
@@ -28,6 +28,7 @@ export function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" 
       existing.proc.kill();
     }
     store.__chatSessions!.delete(wsData.sessionId);
+    persistSessionDeleted(wsData.sessionId);
   }
 
   // Run GC opportunistically
@@ -69,6 +70,7 @@ export function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" 
     startedAt: Date.now(),
   };
   store.__chatSessions!.set(sessionId, session);
+  persistSessionCreated(session);
 
   // Forward PTY output to buffer (raw bytes) + active WebSocket (decoded text)
   const outputListener: DataListener = (data, rawData) => {
@@ -85,6 +87,7 @@ export function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" 
     session.exited = true;
     session.exitCode = code;
     session.exitedAt = Date.now();
+    persistSessionExited(sessionId, code);
     if (session.activeWs) {
       send(session.activeWs, { type: "exited", code });
     }
@@ -167,6 +170,7 @@ export function handleKill(ws: Ws): void {
   // Explicit kill: remove session entirely
   if (session) {
     store.__chatSessions!.delete(session.id);
+    persistSessionDeleted(session.id);
   }
 }
 

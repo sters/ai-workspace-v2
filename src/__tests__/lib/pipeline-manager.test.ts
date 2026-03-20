@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Tests for pipeline-manager GC and concurrency logic.
  * We test the exported functions directly by manipulating the global store.

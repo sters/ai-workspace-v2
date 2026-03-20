@@ -5,6 +5,7 @@ import { emitEvent, emitStatus } from "./events";
 import { wireChild } from "./wire-child";
 import { runClaude } from "@/lib/claude";
 import { Semaphore } from "@/lib/semaphore";
+import { updateOperationWorkspace } from "@/lib/db";
 
 export function buildPhaseFunctionContext(
   managed: ManagedOperation,
@@ -29,6 +30,7 @@ export function buildPhaseFunctionContext(
     },
     setWorkspace: (ws) => {
       managed.operation.workspace = ws;
+      updateOperationWorkspace(managed.operation.id, ws);
       emitStatus(managed, `__setWorkspace:${ws}`, phaseExtra);
     },
     emitAsk: (questions, askOptions) => {

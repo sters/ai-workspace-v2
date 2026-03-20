@@ -1,5 +1,4 @@
-import fs from "node:fs";
-import { listAllOperationLogsWithAge } from "@/lib/operation-store";
+import { listAllOperationLogsWithAge, deleteStoredOperation } from "@/lib/operation-store";
 import type { PipelinePhase } from "@/types/pipeline";
 
 export function buildOperationPrunePipeline(days: number): PipelinePhase[] {
@@ -63,7 +62,7 @@ export function buildOperationPrunePipeline(days: number): PipelinePhase[] {
         for (const log of stale) {
           if (ctx.signal.aborted) break;
           try {
-            fs.unlinkSync(log.filePath);
+            deleteStoredOperation(log.operationId, log.workspace);
             deleted++;
             ctx.emitStatus(`  Deleted: ${log.workspace}/${log.type} (${log.operationId})`);
           } catch (err) {
