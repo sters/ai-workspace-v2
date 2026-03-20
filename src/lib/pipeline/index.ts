@@ -16,3 +16,4 @@ export {
 } from "./queries";
 export { killOperation, submitAnswer } from "./controls";
 export { _gc } from "./gc";
+export { resumeStaleOperations } from "./resume";

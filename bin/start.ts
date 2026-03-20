@@ -161,6 +161,13 @@ if (missingDirs.length > 0) {
   }
 }
 
+// Set env before DB init so OPERATIONS_DIR resolves correctly for JSONL migration
+process.env.AIW_WORKSPACE_ROOT = root;
+
+// Initialize SQLite database (runs migrations + JSONL auto-migration on first startup)
+import { getDb } from "../src/lib/db";
+getDb();
+
 const port = appConfig.server.port;
 const chatPort = appConfig.server.chatPort;
 

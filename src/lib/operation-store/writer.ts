@@ -1,13 +1,16 @@
-import fs from "node:fs";
 import type { Operation, OperationEvent } from "@/types/operation";
-import type { StoredHeader, StoredEvent } from "./types";
-import { validateId, validateWorkspace, workspaceDir, operationFilePath } from "./constants";
+import { extractLastResult } from "../parsers/stream";
+import {
+  updateOperationStatus,
+  updateOperationMeta,
+} from "../db";
+import { validateId, validateWorkspace } from "./constants";
 
 /**
- * Write an operation log to disk as JSONL.
- * Stored at `.operations/{workspace}/{operationId}.jsonl`.
- * Line 1: header with operation metadata.
- * Lines 2..N: individual events.
+ * Persist a completed operation to SQLite.
+ *
+ * Events are already flushed incrementally by the event buffer,
+ * so this only updates the operation row (status, completedAt, resultSummary).
  */
 export function writeOperationLog(
   operation: Operation,
@@ -16,16 +19,18 @@ export function writeOperationLog(
   if (!validateId(operation.id)) return;
   if (!validateWorkspace(operation.workspace)) return;
 
-  const dir = workspaceDir(operation.workspace);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  updateOperationStatus(
+    operation.id,
+    operation.status,
+    operation.completedAt,
+  );
 
-  const lines: string[] = [];
-  lines.push(JSON.stringify({ _type: "header", operation } satisfies StoredHeader));
-  for (const event of events) {
-    lines.push(JSON.stringify({ _type: "event", ...event } satisfies StoredEvent));
+  const resultSummary = extractLastResult(events);
+  if (resultSummary || operation.children || operation.phases) {
+    updateOperationMeta(operation.id, {
+      children: operation.children,
+      phases: operation.phases,
+      resultSummary,
+    });
   }
-
-  fs.writeFileSync(operationFilePath(operation.workspace, operation.id), lines.join("\n") + "\n");
 }

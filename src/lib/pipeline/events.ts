@@ -1,12 +1,16 @@
 import type { OperationEvent } from "@/types/operation";
 import type { ManagedOperation } from "./types";
 import { sendAskNotification } from "@/lib/web-push";
+import { bufferEvent, stopAutoFlush } from "@/lib/db";
 
 export function emitEvent(managed: ManagedOperation, event: OperationEvent) {
   managed.events.push(event);
   if (managed.events.length > 5000) {
     managed.events = managed.events.slice(-3000);
   }
+
+  // Buffer event for periodic SQLite flush
+  bufferEvent(managed.operation.id, event);
 
   // Detect AskUserQuestion events to track pending ask state
   if (event.type === "output" && event.data.includes('"AskUserQuestion"')) {
@@ -61,13 +65,17 @@ export function markComplete(managed: ManagedOperation, success: boolean) {
     timestamp: new Date().toISOString(),
   });
 
-  // Persist to disk, then release events from memory
+  // Stop auto-flush and do final flush of buffered events
+  stopAutoFlush(managed.operation.id);
+
+  // Persist operation metadata (status, completedAt, resultSummary) to SQLite.
+  // Events are already flushed above, so writeOperationLog only updates the operation row.
   const eventsSnapshot = managed.events.slice();
   const operationSnapshot = { ...managed.operation };
   import("../operation-store")
     .then(({ writeOperationLog }) => {
       writeOperationLog(operationSnapshot, eventsSnapshot);
-      // Events are now on disk — free them from memory
+      // Events are now in SQLite — free them from memory
       managed.events.length = 0;
     })
     .catch((err) => console.warn("[pipeline-manager] Failed to persist operation log:", err));

@@ -7,6 +7,7 @@ import { emitStatus, markComplete } from "./events";
 import { gcCompletedOperations } from "./gc";
 import { getPhaseLabel, emitPhaseUpdate } from "./phase-helpers";
 import { runFunctionPhase, runSinglePhase, runGroupPhase } from "./phase-runners";
+import { insertOperation, startAutoFlush } from "@/lib/db";
 
 export function startOperationPipeline(
   type: OperationType,
@@ -63,6 +64,10 @@ export function startOperationPipeline(
     hasPendingAsk: false,
     abortController: new AbortController(),
   };
+
+  // Persist to SQLite first — if this fails, no memory orphan
+  insertOperation(operation);
+  startAutoFlush(id);
 
   operations.set(id, managed);
   emitStatus(managed, `Starting pipeline with ${phases.length} phases`);

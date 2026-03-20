@@ -1,5 +1,10 @@
 import webPush from "web-push";
 import { getVapidDetails } from "./vapid";
+import {
+  addPushSubscription,
+  removePushSubscription,
+  getAllPushSubscriptions,
+} from "@/lib/db/push";
 
 interface PushSubscriptionData {
   endpoint: string;
@@ -9,28 +14,17 @@ interface PushSubscriptionData {
   };
 }
 
-declare global {
-  var __pushSubscriptions: Map<string, PushSubscriptionData> | undefined;
-}
-
-function getSubscriptions(): Map<string, PushSubscriptionData> {
-  if (!globalThis.__pushSubscriptions) {
-    globalThis.__pushSubscriptions = new Map();
-  }
-  return globalThis.__pushSubscriptions;
-}
-
 export function addSubscription(subscription: PushSubscriptionData): void {
-  getSubscriptions().set(subscription.endpoint, subscription);
+  addPushSubscription(subscription);
 }
 
 export function removeSubscription(endpoint: string): boolean {
-  return getSubscriptions().delete(endpoint);
+  return removePushSubscription(endpoint);
 }
 
 export function sendAskNotification(operationId: string, workspace?: string): void {
-  const subs = getSubscriptions();
-  if (subs.size === 0) return;
+  const subs = getAllPushSubscriptions();
+  if (subs.length === 0) return;
 
   const vapid = getVapidDetails();
   const payload = JSON.stringify({
@@ -42,7 +36,7 @@ export function sendAskNotification(operationId: string, workspace?: string): vo
     url: workspace ? `/workspace/${workspace}` : "/",
   });
 
-  for (const [endpoint, sub] of subs) {
+  for (const sub of subs) {
     webPush
       .sendNotification(sub, payload, {
         vapidDetails: vapid,
@@ -50,7 +44,7 @@ export function sendAskNotification(operationId: string, workspace?: string): vo
       })
       .catch((err) => {
         if (err.statusCode === 404 || err.statusCode === 410) {
-          subs.delete(endpoint);
+          removePushSubscription(sub.endpoint);
         }
       });
   }
