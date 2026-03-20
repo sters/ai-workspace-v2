@@ -1,12 +1,17 @@
-import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
+import type { PipelinePhase, PhaseFunctionContext, RunChildOptions } from "@/types/pipeline";
+
+/** Options merged into every child call within runSubPhases. */
+export type SubPhaseOptions = Pick<RunChildOptions, "skipAskUserQuestion">;
 
 /**
  * Run sub-pipeline phases within a single function phase context.
  * Handles single, group, and function phase kinds.
+ * When `extra` is provided, its fields are merged into every runChild/runChildGroup call.
  */
 export async function runSubPhases(
   ctx: PhaseFunctionContext,
   phases: PipelinePhase[],
+  extra?: SubPhaseOptions,
 ): Promise<boolean> {
   for (const phase of phases) {
     if (ctx.signal.aborted) return false;
@@ -16,13 +21,17 @@ export async function runSubPhases(
       const ok = await ctx.runChild(phase.label, phase.prompt, {
         cwd: phase.cwd,
         addDirs: phase.addDirs,
+        ...extra,
       });
       if (!ok) return false;
     } else if (phase.kind === "group") {
       ctx.emitStatus(
         `Running parallel: ${phase.children.map((c) => c.label).join(", ")}`,
       );
-      const results = await ctx.runChildGroup(phase.children);
+      const children = extra
+        ? phase.children.map((c) => ({ ...c, ...extra }))
+        : phase.children;
+      const results = await ctx.runChildGroup(children);
       if (!results.every(Boolean)) return false;
     } else {
       ctx.emitStatus(`Running: ${phase.label}`);

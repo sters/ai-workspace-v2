@@ -307,9 +307,10 @@ export function runClaude(
             // Detect CLI's auto-error response to AskUserQuestion in -p mode.
             // The CLI can't show interactive UI, so it auto-responds with
             // tool_result { is_error: true, content: "Answer questions?" }.
-            // We suppress this event (so findPendingAsk() keeps the ask pending
-            // for the UI) and kill the process so the model doesn't continue
-            // without the user's answer. submitAnswer() will resume via --resume.
+            // When skipAskUserQuestion is set, let the auto-error flow through
+            // so Claude continues without waiting for user input.
+            // Otherwise, suppress the event and kill the process so the UI
+            // can present the question to the user.
             if (pendingAskToolUseId && parsed.type === "user" && parsed.message?.content) {
               const blocks = Array.isArray(parsed.message.content)
                 ? parsed.message.content
@@ -319,10 +320,15 @@ export function runClaude(
                 return r.success && r.data.tool_use_id === pendingAskToolUseId && r.data.is_error;
               });
               if (isAskAutoError) {
-                log(operationId, "suppressing CLI auto-error for AskUserQuestion, killing process");
-                askKilled = true;
-                proc.kill();
-                break; // Stop processing this chunk; outer loop checks askKilled
+                if (options?.skipAskUserQuestion) {
+                  log(operationId, "skipAskUserQuestion: letting CLI auto-error flow through, continuing");
+                  pendingAskToolUseId = null; // Clear so we don't wait for answer
+                } else {
+                  log(operationId, "suppressing CLI auto-error for AskUserQuestion, killing process");
+                  askKilled = true;
+                  proc.kill();
+                  break; // Stop processing this chunk; outer loop checks askKilled
+                }
               }
             }
 
