@@ -75,10 +75,29 @@ Three-tier config system (priority: env vars > config file > defaults):
 ### Pages
 
 - `/` — Dashboard listing all workspaces
-- `/workspace/[name]` — Workspace detail with tabs: Overview, TODOs, Reviews, History, Operations
-- `/workspace/[name]/chat` — Chat interface for workspace
+- `/new` — Create a new workspace
+- `/workspace/[name]` — Workspace detail (overview)
 - `/workspace/[name]/todo` — TODO management
-- `/utilities` — Utility hub: claude-auth, claude-version, claude-settings, mcp-servers, running operations, workspace-prune
+- `/workspace/[name]/review` — Review session list
+- `/workspace/[name]/review/[timestamp]` — Review session detail
+- `/workspace/[name]/history` — Git history
+- `/workspace/[name]/operations` — Operation log
+- `/workspace/[name]/chat/interactive` — Interactive chat (WebSocket-based)
+- `/workspace/[name]/chat/quick` — Quick one-shot chat
+- `/utilities` — Utility hub
+- `/utilities/aiw-settings` — AI Workspace configuration
+- `/utilities/claude-auth` — Claude authentication
+- `/utilities/claude-version` — Claude CLI version info
+- `/utilities/claude-settings/{project,local,user}` — Claude settings by scope
+- `/utilities/mcp-servers` — MCP server management
+- `/utilities/running` — Running operations
+- `/utilities/operation-prune` — Prune old operations
+- `/utilities/workspace-prune` — Prune old workspaces
+- `/utilities/check-update` — Check for updates
+
+## Web Push Notifications
+
+Supports browser push notifications for operation events (e.g., when an `AskUserQuestion` event requires user input). Uses the Web Push protocol with VAPID keys auto-generated on first run. Subscribe/unsubscribe via the UI; notifications are delivered even when the browser tab is in the background.
 
 ## Claude Settings and MCP Servers
 
@@ -142,5 +161,9 @@ bunx vitest run <file> # Single file
 - **TypeScript** (strict mode)
 - **Tailwind CSS 3** with shadcn/ui-style theme
 - **SWR** for data fetching
+- **Zod** for request/response validation
+- **Web Push** for browser notifications
+- **xterm.js** for terminal emulation (MCP auth, interactive sessions)
+- **Monaco Editor** for code editing
 - **Vitest** + **@testing-library/react** for testing
 - **Claude Code CLI** (`claude -p --output-format stream-json`) for headless execution (legacy SDK fallback via `AIW_CLAUDE_USE_CLI=false`)
