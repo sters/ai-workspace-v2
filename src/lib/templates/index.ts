@@ -30,4 +30,6 @@ export {
   buildBestOfNFileReviewerPrompt,
   buildBestOfNFileSynthesizerPrompt,
   BEST_OF_N_REVIEW_SCHEMA,
+  buildAutonomousGatePrompt,
+  AUTONOMOUS_GATE_SCHEMA,
 } from "./prompts";

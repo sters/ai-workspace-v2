@@ -11,6 +11,7 @@ export type OperationType =
   | "mcp-auth"
   | "claude-login"
   | "batch"
+  | "autonomous"
   | "search";
 
 export type OperationStatus = "running" | "completed" | "failed";

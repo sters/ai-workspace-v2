@@ -8,7 +8,7 @@ import type { NextAction } from "@/types/components";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button, buttonVariants } from "../shared/buttons/button";
 import { Callout } from "../shared/containers/callout";
-import { buildNextActionBatchItems } from "@/lib/batch-modes";
+import { buildNextActionBatchItems, buildNextActionAutonomousItems } from "@/lib/batch-modes";
 
 function getNextActions(
   completedType: OperationType,
@@ -22,7 +22,10 @@ function getNextActions(
           type: "execute",
           body: { workspace },
           primary: true,
-          batchItems: buildNextActionBatchItems("execute", workspace),
+          batchItems: [
+            ...buildNextActionBatchItems("execute", workspace),
+            ...buildNextActionAutonomousItems("execute", workspace),
+          ],
         },
       ];
     case "execute":
@@ -68,6 +71,7 @@ function getNextActions(
       ];
     case "create-pr":
     case "batch":
+    case "autonomous":
       // Terminal operations
       return [];
     default:
@@ -81,6 +85,7 @@ const OPERATIONS_TAB_ACTIONS = new Set<OperationType>([
   "review",
   "create-pr",
   "batch",
+  "autonomous",
 ]);
 
 export function NextActionSuggestions({
@@ -115,8 +120,8 @@ export function NextActionSuggestions({
       // pathname may be /workspace/[name] or /workspace/[name]/todo etc.
       const basePath = pathname.split("/").slice(0, 3).join("/");
       const params = new URLSearchParams({ action: action.type });
-      // For batch actions, include extra params in the URL
-      if (action.type === "batch") {
+      // For batch/autonomous actions, include extra params in the URL
+      if (action.type === "batch" || action.type === "autonomous") {
         for (const [key, val] of Object.entries(action.body)) {
           if (key !== "workspace") params.set(key, val);
         }

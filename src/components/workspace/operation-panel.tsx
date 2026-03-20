@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";
@@ -7,7 +8,8 @@ import { RepositoryActionButton } from "./repository-action-button";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { openInEditor, openInTerminal } from "@/lib/api";
-import { buildBatchItems } from "@/lib/batch-modes";
+import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
+import type { InteractionLevel } from "@/types/prompts";
 import {
   Play,
   ClipboardCheck,
@@ -16,6 +18,12 @@ import {
   Terminal,
   Trash2,
 } from "lucide-react";
+
+const INTERACTION_LEVELS: { value: InteractionLevel; label: string }[] = [
+  { value: "low", label: "Low" },
+  { value: "mid", label: "Mid" },
+  { value: "high", label: "High" },
+];
 
 export function OperationPanel({
   workspaceName,
@@ -30,6 +38,14 @@ export function OperationPanel({
   const { operations, isWorkspaceRunning, isWorkspaceTypeRunning } = useRunningOperations();
   const isRunning = isWorkspaceRunning(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
+  const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
+
+  /** Build body with workspace path and current interaction level. */
+  const body = (extra?: Record<string, string>) => ({
+    workspace: workspacePath,
+    interactionLevel,
+    ...extra,
+  });
 
   // Find the running operation for this workspace to link to
   const runningOp = isRunning
@@ -39,40 +55,54 @@ export function OperationPanel({
     : undefined;
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {/* Interaction Level selector */}
+      <div className="flex items-center gap-1">
+        <span className="text-xs text-muted-foreground mr-1">Interaction:</span>
+        {INTERACTION_LEVELS.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setInteractionLevel(value)}
+            className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
+              interactionLevel === value
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <SplitButton
           label={<><Play className="h-3.5 w-3.5" /> Execute</>}
-          onClick={() =>
-            startAndNavigate("execute", { workspace: workspacePath })
-          }
+          onClick={() => startAndNavigate("execute", body())}
           disabled={isWorkspaceTypeRunning(workspaceName, "execute")}
-          items={buildBatchItems("execute", { workspace: workspacePath }, (body) =>
-            startAndNavigate("batch", body)
-          )}
+          items={[
+            ...buildBatchItems("execute", body(), (b) =>
+              startAndNavigate("batch", b)
+            ),
+            ...buildAutonomousItems("execute", body(), (b) =>
+              startAndNavigate("autonomous", b)
+            ),
+          ]}
         />
         <Button
           variant="secondary"
           className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
-          onClick={() =>
-            startAndNavigate("review", { workspace: workspacePath })
-          }
+          onClick={() => startAndNavigate("review", body())}
           disabled={isWorkspaceTypeRunning(workspaceName, "review")}
         >
           <ClipboardCheck className="h-3.5 w-3.5" /> Review
         </Button>
         <RepositoryActionButton
           label={<><GitPullRequest className="h-3.5 w-3.5" /> Create PR</>}
-          onClick={() =>
-            startAndNavigate("create-pr", { workspace: workspacePath })
-          }
+          onClick={() => startAndNavigate("create-pr", body())}
           disabled={isWorkspaceTypeRunning(workspaceName, "create-pr")}
           repositories={repositories}
           onRepoClick={(repo) =>
-            startAndNavigate("create-pr", {
-              workspace: workspacePath,
-              repository: repo.path,
-            })
+            startAndNavigate("create-pr", body({ repository: repo.path }))
           }
         />
         <RepositoryActionButton

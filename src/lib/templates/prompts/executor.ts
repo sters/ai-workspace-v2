@@ -99,6 +99,10 @@ function executorInstructions(todoFilePath: string, worktreePath?: string, works
    - Small, focused commits after completing logical units of work
    - Run tests and linter after changes
    - Follow existing code style and commit message patterns
+   - Before implementing, review 2-3 files in the same directory to understand naming conventions, error handling, import style, and comment style
+   - Match existing patterns: if the codebase uses camelCase, use camelCase; if it uses specific error patterns, follow them
+   - If TODO items include \`Pattern:\` sub-items, follow those style observations
+   - When adding new files, follow the structure and conventions of similar existing files
 
 4. **Git Workflow**:
    - The repository worktree is already on a feature/fix branch

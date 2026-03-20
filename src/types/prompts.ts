@@ -137,6 +137,16 @@ export interface BestOfNFileReviewerInput {
   candidates: { label: string; files: { name: string; content: string }[] }[];
 }
 
+export interface AutonomousGateInput {
+  workspaceName: string;
+  reviewSummary: string;
+  reviewFiles: { name: string; content: string }[];
+  todoFiles: { repoName: string; content: string }[];
+  readmeContent: string;
+  loopIteration: number;
+  maxLoops: number;
+}
+
 export interface BestOfNFileSynthesizerInput {
   operationType: string;
   candidates: { label: string; files: { name: string; content: string }[] }[];
