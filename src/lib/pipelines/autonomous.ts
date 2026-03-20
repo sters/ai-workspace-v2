@@ -89,6 +89,7 @@ async function runAutonomousGate(
   const ok = await ctx.runChild("Autonomous Gate", prompt, {
     jsonSchema: AUTONOMOUS_GATE_SCHEMA,
     onResultText: (text) => { resultText = text; },
+    skipAskUserQuestion: true,
   });
 
   if (!ok || !resultText) {
@@ -124,6 +125,7 @@ export function buildAutonomousPipeline(input: {
   const { startWith, description, workspace, instruction, draft, interactionLevel, repo } = input;
   const maxLoops = input.maxLoops ?? DEFAULT_MAX_LOOPS;
   const phases: PipelinePhase[] = [];
+  const skip = { skipAskUserQuestion: true } as const;
 
   // ------------------------------------------------------------------
   // Leading phases: init, update-todo, or skip straight to execute
@@ -145,7 +147,7 @@ export function buildAutonomousPipeline(input: {
           repo,
           interactionLevel,
         });
-        return runSubPhases(ctx, subPhases);
+        return runSubPhases(ctx, subPhases, skip);
       },
     });
   }
@@ -174,13 +176,13 @@ export function buildAutonomousPipeline(input: {
         ctx.emitStatus(`Autonomous cycle ${loopCount}/${maxLoops}: Executing workspace: ${ws}`);
 
         const execPhases = await buildExecutePipeline({ workspace: ws, repository: repo });
-        const execOk = await runSubPhases(ctx, execPhases);
+        const execOk = await runSubPhases(ctx, execPhases, skip);
         if (!execOk) return false;
 
         // Review
         ctx.emitStatus(`Autonomous cycle ${loopCount}/${maxLoops}: Reviewing workspace: ${ws}`);
         const reviewPhases = await buildReviewPipeline({ workspace: ws, repository: repo });
-        const reviewOk = await runSubPhases(ctx, reviewPhases);
+        const reviewOk = await runSubPhases(ctx, reviewPhases, skip);
         if (!reviewOk) return false;
 
         // AI Gate
@@ -209,7 +211,7 @@ export function buildAutonomousPipeline(input: {
           repo,
           interactionLevel,
         });
-        const updateOk = await runSubPhases(ctx, updatePhases);
+        const updateOk = await runSubPhases(ctx, updatePhases, skip);
         if (!updateOk) return false;
       }
 
@@ -221,7 +223,7 @@ export function buildAutonomousPipeline(input: {
         draft: draft ?? false,
         repository: repo,
       });
-      return runSubPhases(ctx, prPhases);
+      return runSubPhases(ctx, prPhases, skip);
     },
   });
 

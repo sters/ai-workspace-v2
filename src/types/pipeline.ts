@@ -12,6 +12,8 @@ export interface GroupChild {
   jsonSchema?: Record<string, unknown>;
   /** Called with the model's final text response when the child process completes. */
   onResultText?: (text: string) => void;
+  /** When true, skip AskUserQuestion instead of waiting for user input. */
+  skipAskUserQuestion?: boolean;
 }
 
 export interface PipelinePhaseSingle {
@@ -40,6 +42,8 @@ export interface RunChildOptions {
   cwd?: string;
   /** Additional directories to expose via --add-dir. */
   addDirs?: string[];
+  /** When true, skip AskUserQuestion instead of waiting for user input. */
+  skipAskUserQuestion?: boolean;
 }
 
 export interface PhaseFunctionContext {

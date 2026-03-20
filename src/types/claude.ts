@@ -17,6 +17,8 @@ export interface RunClaudeOptions {
   cwd?: string;
   /** Additional directories to expose via --add-dir. */
   addDirs?: string[];
+  /** When true, let the CLI auto-error response to AskUserQuestion flow through instead of killing the process and waiting for user input. Claude will see the error and continue without the user's answer. */
+  skipAskUserQuestion?: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
