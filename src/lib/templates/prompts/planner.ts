@@ -66,6 +66,8 @@ function plannerInstructions(worktreePath: string, todoDir: string): string {
    Decide based on the task's nature:
    - **Documentation / config / simple tasks** (e.g., "write README", "update CI config", "add license"): Repository documentation alone is sufficient. Do NOT explore source code — create TODOs from the task description and docs.
    - **Implementation / refactoring / bugfix tasks** (e.g., "refactor auth module", "fix race condition", "add API endpoint"): Explore source code as needed — find reference implementations, understand existing patterns, check affected modules, and assess impact. Use your judgment on how broadly to explore.
+     - Analyze existing code style: naming conventions, error handling patterns, file organization, and import style
+     - Include \`Pattern:\` sub-items in TODO items with specific style observations (e.g., "Pattern: uses camelCase for variables, PascalCase for types")
 
 5. **Create TODO Items**:
    - Break down objectives into logical, actionable steps

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ClaudeOperation } from "@/components/operation/claude-operation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import { PageHeader } from "@/components/shared/feedback/page-header";
-import { buildBatchItems } from "@/lib/batch-modes";
+import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
 import type { InteractionLevel } from "@/types/prompts";
 
 /** Navigate to workspace operations page once workspace name is determined (Phase B). */
@@ -67,7 +67,7 @@ export default function NewWorkspacePage() {
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
                     }`}
                   >
-                    {level === "low" ? "Low — Autonomous" : level === "mid" ? "Mid — Balanced" : "High — Collaborative"}
+                    {level === "low" ? "Low" : level === "mid" ? "Mid" : "High"}
                   </button>
                 ))}
               </div>
@@ -88,14 +88,24 @@ export default function NewWorkspacePage() {
                   start("init", { description: description.trim(), interactionLevel });
                 }}
                 disabled={!description.trim()}
-                items={buildBatchItems(
-                  "init",
-                  { description: description.trim(), interactionLevel },
-                  (body) => {
-                    if (!description.trim()) return;
-                    start("batch", body);
-                  },
-                )}
+                items={[
+                  ...buildBatchItems(
+                    "init",
+                    { description: description.trim(), interactionLevel },
+                    (body) => {
+                      if (!description.trim()) return;
+                      start("batch", body);
+                    },
+                  ),
+                  ...buildAutonomousItems(
+                    "init",
+                    { description: description.trim(), interactionLevel },
+                    (body) => {
+                      if (!description.trim()) return;
+                      start("autonomous", body);
+                    },
+                  ),
+                ]}
               />
             )}
             {workspace && (

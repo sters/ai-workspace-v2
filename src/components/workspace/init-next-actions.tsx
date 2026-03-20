@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import { buttonVariants } from "@/components/shared/buttons/button";
 import { Callout } from "@/components/shared/containers/callout";
-import { buildBatchItems } from "@/lib/batch-modes";
+import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
 
 export function InitNextActions({ workspace }: { workspace: string }) {
   const router = useRouter();
@@ -20,11 +20,18 @@ export function InitNextActions({ workspace }: { workspace: string }) {
           onClick={() =>
             router.push(`/workspace/${wsEncoded}?action=execute`)
           }
-          items={buildBatchItems("execute", {}, ({ startWith, mode }) =>
-            router.push(
-              `/workspace/${wsEncoded}?action=batch&startWith=${startWith}&mode=${mode}`,
-            )
-          )}
+          items={[
+            ...buildBatchItems("execute", {}, ({ startWith, mode }) =>
+              router.push(
+                `/workspace/${wsEncoded}?action=batch&startWith=${startWith}&mode=${mode}`,
+              )
+            ),
+            ...buildAutonomousItems("execute", {}, ({ startWith }) =>
+              router.push(
+                `/workspace/${wsEncoded}?action=autonomous&startWith=${startWith}`,
+              )
+            ),
+          ]}
         />
         <Link
           href={`/workspace/${wsEncoded}`}

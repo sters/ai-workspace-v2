@@ -54,6 +54,7 @@ export const OPERATION_TYPE_NAMES: ReadonlySet<string> = new Set<OperationType>(
   "mcp-auth",
   "claude-login",
   "batch",
+  "autonomous",
   "search",
 ]);
 
