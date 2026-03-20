@@ -7,7 +7,7 @@ import { OperationCard } from "@/components/workspace/operation-card";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import { fetcher, killOperation } from "@/lib/api";
-import { extractBatchParams } from "@/lib/batch-modes";
+import { extractBatchParams, extractAutonomousParams } from "@/lib/batch-modes";
 
 const VALID_AUTO_ACTIONS = new Set<string>([
   "execute",
@@ -15,6 +15,7 @@ const VALID_AUTO_ACTIONS = new Set<string>([
   "create-pr",
   "create-todo",
   "batch",
+  "autonomous",
 ]);
 
 export function OperationsList({ workspaceName }: { workspaceName: string }) {
@@ -82,6 +83,8 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
     const body: Record<string, string> = { workspace: workspaceName };
     if (action === "batch") {
       Object.assign(body, extractBatchParams(searchParams));
+    } else if (action === "autonomous") {
+      Object.assign(body, extractAutonomousParams(searchParams));
     }
 
     // Clear search params

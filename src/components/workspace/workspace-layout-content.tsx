@@ -9,7 +9,7 @@ import { ProgressBar } from "@/components/shared/feedback/progress-bar";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
 import { OperationPanel } from "@/components/workspace/operation-panel";
 import { cn } from "@/lib/utils";
-import { extractBatchParams } from "@/lib/batch-modes";
+import { extractBatchParams, extractAutonomousParams } from "@/lib/batch-modes";
 
 const TABS = [
   { label: "Overview", segment: "", href: "" },
@@ -20,7 +20,7 @@ const TABS = [
   { label: "Chat", segment: "chat", href: "chat/quick" },
 ] as const;
 
-const VALID_AUTO_ACTIONS = new Set<string>(["execute", "review", "create-pr", "create-todo", "batch"]);
+const VALID_AUTO_ACTIONS = new Set<string>(["execute", "review", "create-pr", "create-todo", "batch", "autonomous"]);
 
 export function WorkspaceLayoutContent({
   params,
@@ -48,6 +48,8 @@ export function WorkspaceLayoutContent({
       const params = new URLSearchParams({ action });
       if (action === "batch") {
         Object.entries(extractBatchParams(searchParams)).forEach(([k, v]) => params.set(k, v));
+      } else if (action === "autonomous") {
+        Object.entries(extractAutonomousParams(searchParams)).forEach(([k, v]) => params.set(k, v));
       }
       router.replace(`/workspace/${name}/operations?${params.toString()}`, { scroll: false });
     }

@@ -21,3 +21,4 @@ export {
   buildBestOfNFileSynthesizerPrompt,
   BEST_OF_N_REVIEW_SCHEMA,
 } from "./best-of-n-reviewer";
+export { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "./autonomous-gate";
