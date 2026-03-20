@@ -8,6 +8,8 @@ Provides a browser interface on `localhost:3741` to view workspace status, TODO 
 
 ## Quick Start
 
+> **Prerequisite:** [Bun](https://bun.sh/) runtime is required.
+
 ```bash
 # Run from the ai-workspace root directory
 bunx github:sters/ai-workspace-v2
@@ -67,7 +69,7 @@ Three-tier config system (priority: env vars > config file > defaults):
 - **Autonomous mode**: The autonomous pipeline (`src/lib/pipelines/autonomous.ts`) runs an Execute → Review → Gate loop. An AI-powered gate evaluates review results and decides whether to loop (fix issues) or stop.
 - **Batch operations**: The batch pipeline (`src/lib/pipelines/batch.ts`) runs multiple operations in sequence or with best-of-n evaluation.
 - **Best-of-N evaluation**: The best-of-n pipeline (`src/lib/pipelines/best-of-n.ts`) runs N candidate executions in parallel using sub-worktrees, then uses an AI reviewer to select or synthesize the best result. Used by batch operations for higher-quality outputs.
-- **Quick ask**: The quick-ask pipeline (`src/lib/templates/prompts/quick-ask.ts`, `src/app/api/operations/quick-ask/route.ts`) provides a one-shot Q&A interface for asking questions about a workspace. It reads workspace context (README, TODOs) and answers concisely without running multi-phase operations.
+- **Quick ask**: The quick-ask pipeline (`src/lib/templates/prompts/quick-ask.ts`, `src/app/api/operations/quick-ask/route.ts`, page at `/workspace/[name]/chat/quick`) provides a one-shot Q&A interface for asking questions about a workspace. It reads workspace context (README, TODOs) and answers concisely without running multi-phase operations. The best-of-n pipeline (`src/lib/pipelines/best-of-n.ts`) uses quick-ask for evaluation.
 - **Parsers** (`src/lib/parsers/`): Extract structured data from markdown — TODO items, README metadata, review summaries, and stream-json log entries.
 - **Web Push** (`src/lib/web-push/`): Browser push notifications for `AskUserQuestion` events when Claude needs user input.
 
@@ -88,11 +90,14 @@ Three-tier config system (priority: env vars > config file > defaults):
 - `/workspace/[name]/review` — Review reports
 - `/workspace/[name]/history` — Git history
 - `/workspace/[name]/operations` — Operation logs
-- `/workspace/[name]/chat` — Interactive chat interface
+- `/workspace/[name]/chat/interactive` — Interactive chat (terminal-based Claude session)
+- `/workspace/[name]/chat/quick` — Quick ask (one-shot Q&A about the workspace)
 - `/utilities` — Utility hub: aiw-settings, check-update, claude-auth, claude-version, claude-settings (project/local/user), mcp-servers, running operations, operation-prune, workspace-prune
 
 ### API Routes
 
+- `GET /api/workspaces` — List all workspaces
+- `GET /api/workspaces/[name]` — Workspace detail
 - `GET /api/workspaces/[name]/{readme,todos,reviews,history}` — Read workspace state from disk
 - `POST /api/operations/{init,execute,review,create-pr,update-todo,create-todo,delete}` — Start operations
 - `POST /api/operations/{autonomous,batch,search,quick-ask}` — Advanced operations
@@ -101,6 +106,12 @@ Three-tier config system (priority: env vars > config file > defaults):
 - `POST /api/operations/{open-editor,open-terminal}` — Open local tools
 - `GET /api/events?operationId=` — SSE stream for operation output
 - `GET /api/{claude-auth,claude-version,claude-settings,mcp-servers,aiw-settings}` — Configuration endpoints
+- `POST /api/claude-settings/add-permission` — Add Claude permission
+- `POST /api/mcp-servers/{add,remove}` — Add/remove MCP servers
+- `GET /api/mcp-servers/status` — MCP server status
+- `POST /api/chat-sessions/kill` — Kill chat session
+- `POST /api/push/{subscribe,unsubscribe}` — Push notification subscribe/unsubscribe
+- `GET /api/push/vapid-public-key` — VAPID public key for web push
 - `GET /api/{search,chat-sessions,check-update,push,subagent-output}` — Utility endpoints
 
 ## Claude Settings and MCP Servers
