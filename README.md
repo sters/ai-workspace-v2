@@ -1,8 +1,8 @@
 # ai-workspace-v2
 
-Web UI dashboard for a multi-repository workspace manager and task executer for Claude Code.
+Web UI dashboard for a multi-repository workspace manager and task executor for Claude Code.
 
-Provides a browser interface on `localhost:3741` to view workspace status, TODO progress, reviews, git history, and trigger operations (init, execute, review, create-pr, etc.) that run Claude Code via `Bun.spawn` + `claude -p --output-format stream-json`. A separate WebSocket chat server runs on port 3742 for interactive Claude sessions.
+Provides a browser interface on `localhost:3741` to view workspace status, TODO progress, reviews, git history, and trigger operations (init, execute, review, create-pr, autonomous, etc.) that run Claude Code via `Bun.spawn` + `claude -p --output-format stream-json`. A separate WebSocket chat server runs on port 3742 for interactive Claude sessions.
 
 **This tool is under development through real usecases. The latest version breaks easily.**
 
@@ -63,22 +63,43 @@ Three-tier config system (priority: env vars > config file > defaults):
 ### Server-side
 
 - **Workspace state**: API routes under `src/app/api/` read workspace data directly from the filesystem (`workspace/` directory in `AIW_WORKSPACE_ROOT`). Core reading logic is in `src/lib/workspace/reader.ts`.
-- **Claude Code execution**: Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes via `Bun.spawn` with `claude -p --output-format stream-json`. The pipeline manager (`src/lib/pipeline-manager.ts`) orchestrates multi-phase pipelines. Legacy SDK fallback is available via `AIW_CLAUDE_USE_CLI=false`.
+- **Claude Code execution**: Operations spawn Claude Code processes via `Bun.spawn` with `claude -p --output-format stream-json`. The pipeline manager (`src/lib/pipeline-manager.ts`) orchestrates multi-phase pipelines with configurable concurrency and timeouts. Legacy SDK fallback is available via `AIW_CLAUDE_USE_CLI=false`.
+- **Autonomous mode**: The autonomous pipeline (`src/lib/pipelines/autonomous.ts`) runs an Execute → Review → Gate loop. An AI-powered gate evaluates review results and decides whether to loop (fix issues) or stop.
+- **Batch operations**: The batch pipeline (`src/lib/pipelines/batch.ts`) runs multiple operations in sequence or with best-of-n evaluation.
 - **Parsers** (`src/lib/parsers/`): Extract structured data from markdown — TODO items, README metadata, review summaries, and stream-json log entries.
+- **Web Push** (`src/lib/web-push/`): Browser push notifications for `AskUserQuestion` events when Claude needs user input.
 
 ### Client-side
 
 - **SWR hooks** (`src/hooks/`): Auto-refreshing data fetching (10s for workspace list, 5s for detail).
 - **SSE streaming** (`use-sse.ts`): Real-time operation output via `/api/events?operationId=`.
 - **Operation persistence** (`use-operation.ts`): Active operation ID is stored in localStorage so navigating away and returning reconnects to the stream.
+- **Monaco editor**: Integrated code editor for viewing and editing Claude settings and MCP server configs.
+- **Xterm.js**: Terminal emulator for interactive chat sessions.
 
 ### Pages
 
 - `/` — Dashboard listing all workspaces
-- `/workspace/[name]` — Workspace detail with tabs: Overview, TODOs, Reviews, History, Operations
-- `/workspace/[name]/chat` — Chat interface for workspace
+- `/new` — Create a new workspace (init operation)
+- `/workspace/[name]` — Workspace detail (overview)
 - `/workspace/[name]/todo` — TODO management
-- `/utilities` — Utility hub: claude-auth, claude-version, claude-settings, mcp-servers, running operations, workspace-prune
+- `/workspace/[name]/review` — Review reports
+- `/workspace/[name]/history` — Git history
+- `/workspace/[name]/operations` — Operation logs
+- `/workspace/[name]/chat` — Interactive chat interface
+- `/utilities` — Utility hub: aiw-settings, check-update, claude-auth, claude-version, claude-settings (project/local/user), mcp-servers, running operations, operation-prune, workspace-prune
+
+### API Routes
+
+- `GET /api/workspaces/[name]/{readme,todos,reviews,history}` — Read workspace state from disk
+- `POST /api/operations/{init,execute,review,create-pr,update-todo,create-todo,delete}` — Start operations
+- `POST /api/operations/{autonomous,batch,search,quick-ask}` — Advanced operations
+- `POST /api/operations/{claude-login,mcp-auth,workspace-prune,operation-prune}` — Maintenance operations
+- `POST /api/operations/{answer,kill}` — Control running operations
+- `POST /api/operations/{open-editor,open-terminal}` — Open local tools
+- `GET /api/events?operationId=` — SSE stream for operation output
+- `GET /api/{claude-auth,claude-version,claude-settings,mcp-servers,aiw-settings}` — Configuration endpoints
+- `GET /api/{search,chat-sessions,check-update,push,subagent-output}` — Utility endpoints
 
 ## Claude Settings and MCP Servers
 
@@ -142,5 +163,9 @@ bunx vitest run <file> # Single file
 - **TypeScript** (strict mode)
 - **Tailwind CSS 3** with shadcn/ui-style theme
 - **SWR** for data fetching
+- **Monaco Editor** for config editing
+- **Xterm.js** for terminal emulation
+- **Zod** for request/response validation
 - **Vitest** + **@testing-library/react** for testing
+- **Web Push** for browser notifications
 - **Claude Code CLI** (`claude -p --output-format stream-json`) for headless execution (legacy SDK fallback via `AIW_CLAUDE_USE_CLI=false`)
