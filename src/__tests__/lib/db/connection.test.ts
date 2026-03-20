@@ -69,11 +69,19 @@ describe("db/connection", () => {
     expect(row).not.toBeNull();
   });
 
+  it("creates workspace_suggestions table", () => {
+    const db = getDb();
+    const row = db
+      .query("SELECT name FROM sqlite_master WHERE type='table' AND name='workspace_suggestions'")
+      .get();
+    expect(row).not.toBeNull();
+  });
+
   it("records migration version", () => {
     const db = getDb();
     const row = db
       .query("SELECT MAX(version) as v FROM schema_migrations")
       .get() as { v: number };
-    expect(row.v).toBe(1);
+    expect(row.v).toBe(2);
   });
 });

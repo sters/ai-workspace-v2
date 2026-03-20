@@ -31,3 +31,6 @@ export { addPushSubscription, removePushSubscription, getAllPushSubscriptions, _
 
 // Chat sessions
 export { upsertChatSession, markChatSessionExited, getChatSession, deleteChatSession, markAllSessionsExited, _resetChatStatements } from "./chat-sessions";
+
+// Workspace suggestions
+export { insertSuggestion, listActiveSuggestions, dismissSuggestion, getSuggestion, _resetSuggestionStatements } from "./suggestions";

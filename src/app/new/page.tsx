@@ -1,27 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { ClaudeOperation } from "@/components/operation/claude-operation";
-import { SplitButton } from "@/components/shared/buttons/split-button";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { InitOperation, InitSplitButton } from "@/components/operation/init-operation";
 import { PageHeader } from "@/components/shared/feedback/page-header";
-import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
 import type { InteractionLevel } from "@/types/prompts";
 
-/** Navigate to workspace operations page once workspace name is determined (Phase B). */
-function AutoNavigateToWorkspace({ workspace, storageKey }: { workspace: string; storageKey: string }) {
-  const router = useRouter();
-  useEffect(() => {
-    // Clear init localStorage so returning to /new shows a fresh form
-    localStorage.removeItem(`aiw-op:${storageKey}`);
-    const wsEncoded = encodeURIComponent(workspace);
-    router.push(`/workspace/${wsEncoded}/operations`);
-  }, [router, workspace, storageKey]);
-  return null;
-}
-
 export default function NewWorkspacePage() {
-  const [description, setDescription] = useState("");
+  const searchParams = useSearchParams();
+  const [description, setDescription] = useState(searchParams.get("description") ?? "");
   const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
 
   return (
@@ -31,10 +18,8 @@ export default function NewWorkspacePage() {
         description="Describe the task, ticket, or feature. Claude will determine the task type, repositories, and workspace name automatically."
       />
 
-      <ClaudeOperation storageKey="init">
-        {({ start, isRunning, workspace, status }) => {
-          const started = isRunning || status === "completed" || status === "failed";
-          return (
+      <InitOperation>
+        {({ start, started }) => (
           <div className="w-full space-y-4">
             <div>
               <label className="mb-1 block text-xs font-medium">
@@ -80,41 +65,16 @@ export default function NewWorkspacePage() {
               </p>
             </div>
 
-            {!isRunning && status !== "completed" && (
-              <SplitButton
-                label="Initialize"
-                onClick={() => {
-                  if (!description.trim()) return;
-                  start("init", { description: description.trim(), interactionLevel });
-                }}
-                disabled={!description.trim()}
-                items={[
-                  ...buildBatchItems(
-                    "init",
-                    { description: description.trim(), interactionLevel },
-                    (body) => {
-                      if (!description.trim()) return;
-                      start("batch", body);
-                    },
-                  ),
-                  ...buildAutonomousItems(
-                    "init",
-                    { description: description.trim(), interactionLevel },
-                    (body) => {
-                      if (!description.trim()) return;
-                      start("autonomous", body);
-                    },
-                  ),
-                ]}
+            {!started && (
+              <InitSplitButton
+                description={description}
+                interactionLevel={interactionLevel}
+                start={start}
               />
             )}
-            {workspace && (
-              <AutoNavigateToWorkspace workspace={workspace} storageKey="init" />
-            )}
           </div>
-          );
-        }}
-      </ClaudeOperation>
+        )}
+      </InitOperation>
     </div>
   );
 }

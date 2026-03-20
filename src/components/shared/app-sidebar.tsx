@@ -1,11 +1,6 @@
 import Link from "next/link";
 import { PushToggle } from "./push-toggle";
 
-const NAV_ITEMS = [
-  { label: "Dashboard", href: "/" },
-  { label: "New Workspace", href: "/new" },
-];
-
 const UTILITY_ITEMS = [
   { label: "Workspace Prune", href: "/utilities/workspace-prune" },
   { label: "Operation Log Prune", href: "/utilities/operation-prune" },
@@ -28,15 +23,28 @@ export function AppSidebar() {
           </Link>
         </div>
         <nav className="flex-1 p-2">
-          {NAV_ITEMS.map((item) => (
+          <Link
+            href="/"
+            className="block rounded-md px-3 py-2 text-sm hover:bg-accent"
+          >
+            Dashboard
+          </Link>
+          <div>
             <Link
-              key={item.href}
-              href={item.href}
+              href="/new"
               className="block rounded-md px-3 py-2 text-sm hover:bg-accent"
             >
-              {item.label}
+              New Workspace
             </Link>
-          ))}
+            <div className="ml-3 border-l pl-2">
+              <Link
+                href="/suggestions"
+                className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                Suggestions
+              </Link>
+            </div>
+          </div>
           <div>
             <Link
               href="/utilities"

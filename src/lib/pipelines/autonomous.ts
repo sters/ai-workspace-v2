@@ -1,5 +1,6 @@
 import { getOperation } from "@/lib/pipeline-manager";
 import { getReviewSessions, getReviewDetail, getTodos, getReadme } from "@/lib/workspace/reader";
+import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { buildInitPipeline } from "./init";
 import { buildExecutePipeline } from "./execute";
 import { buildReviewPipeline } from "./review";
@@ -193,6 +194,7 @@ export function buildAutonomousPipeline(input: {
         );
 
         if (!gateResult.shouldLoop) {
+          triggerWorkspaceSuggestion(ws, ctx.operationId, "autonomous-gate");
           break;
         }
 
