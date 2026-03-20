@@ -47,11 +47,8 @@ async function runAutonomousGate(
   }
 
   const latest = sessions[0];
-  if (latest.critical === 0) {
-    return { shouldLoop: false, reason: "No critical issues in review", fixableIssues: [] };
-  }
 
-  // Get review detail
+  // Always let AI evaluate — even warnings/suggestions may be worth fixing
   const reviewDetail = await getReviewDetail(workspace, latest.timestamp);
   if (!reviewDetail) {
     return { shouldLoop: false, reason: "Could not read review details", fixableIssues: [] };
