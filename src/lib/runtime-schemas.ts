@@ -15,7 +15,12 @@ import z from "zod";
 // Operation store (JSONL files in .operations/)
 // ---------------------------------------------------------------------------
 
-/** Loose operation schema — validates key fields without duplicating the full Operation type. */
+/**
+ * Loose operation schema — validates key fields without duplicating the full Operation type.
+ * NOTE: `type` remains z.string() intentionally. This schema is used for JSONL migration
+ * of potentially old data that may contain operation types that have since been renamed
+ * or removed. Tightening to z.enum() would reject valid historical records.
+ */
 const operationLoose = z.object({
   id: z.string(),
   type: z.string(),
@@ -150,6 +155,13 @@ export const operationListItemSchema = z.object({
   status: z.enum(["running", "completed", "failed"]),
   startedAt: z.string(),
   completedAt: z.string().optional(),
+  currentPhase: z.object({
+    index: z.number(),
+    label: z.string(),
+    status: z.enum(["pending", "running", "completed", "failed", "skipped"]),
+    timeoutMs: z.number().optional(),
+    startedAt: z.string().optional(),
+  }).optional(),
   inputs: z.record(z.string()).optional(),
   resultSummary: z.object({
     content: z.string(),

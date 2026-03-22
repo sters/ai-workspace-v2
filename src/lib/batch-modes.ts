@@ -25,7 +25,7 @@ const BATCH_MODES: BatchModeDefinition[] = [
   { mode: "execute-review-pr", suffix: "Execute \u2192 Review \u2192 PR" },
 ];
 
-const START_LABELS: Record<string, string> = {
+const START_LABELS: Readonly<Record<string, string>> = {
   init: "Init",
   execute: "Execute",
   "update-todo": "Update",
@@ -86,14 +86,8 @@ export function buildNextActionBatchItems(
 // Autonomous helpers
 // ---------------------------------------------------------------------------
 
-const AUTONOMOUS_START_LABELS: Record<string, string> = {
-  init: "Init",
-  execute: "Execute",
-  "update-todo": "Update",
-};
-
 function getAutonomousLabel(startWith: string): string {
-  const prefix = AUTONOMOUS_START_LABELS[startWith];
+  const prefix = START_LABELS[startWith];
   const suffix = "Autonomous (Loop)";
   return prefix && startWith !== "execute"
     ? `${prefix} \u2192 ${suffix}`

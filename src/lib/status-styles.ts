@@ -3,7 +3,9 @@
  *
  * Text colors for inline status indicators (icons, labels).
  */
-export const statusTextColors: Record<string, string> = {
+export type StatusKey = "pending" | "running" | "completed" | "failed" | "stopped" | "skipped";
+
+export const statusTextColors: Record<StatusKey, string> = {
   pending: "text-muted-foreground",
   running: "text-blue-500",
   completed: "text-green-600",
@@ -13,7 +15,7 @@ export const statusTextColors: Record<string, string> = {
 };
 
 /** Unicode status icons. */
-export const statusIcons: Record<string, string> = {
+export const statusIcons: Record<StatusKey, string> = {
   pending: "\u25CB",   // ○
   running: "\u25CF",   // ●
   completed: "\u2713", // ✓

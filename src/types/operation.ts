@@ -39,6 +39,8 @@ export interface Operation {
   status: OperationStatus;
   startedAt: string;
   completedAt?: string;
+  // TODO: Make required (`children: OperationChild[]`) once db/operations.ts
+  // and db/migrate-jsonl.ts always provide a default `[]`.
   children?: OperationChild[];
   phases?: OperationPhaseInfo[];
   /** User-provided inputs when the operation was started (e.g. instruction, description). */
@@ -94,6 +96,6 @@ export interface OperationContext {
   /** The workspace name (may be updated dynamically during the operation). */
   workspace?: string;
   /** The operation status. */
-  status?: string;
+  status?: OperationStatus;
 }
 
