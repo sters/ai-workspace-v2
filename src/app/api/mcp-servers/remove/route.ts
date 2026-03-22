@@ -28,5 +28,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ success: true, output: stdout || stderr });
+  return NextResponse.json({ ok: true, output: stdout || stderr });
 }

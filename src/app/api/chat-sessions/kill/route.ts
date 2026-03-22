@@ -5,16 +5,16 @@ import { getConfig } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
-const CHAT_WS_PORT = getConfig().server.chatPort;
-
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const parsed = parseBody(chatSessionKillSchema, body);
   if (!parsed.success) return parsed.response;
   const { sessionId } = parsed.data;
 
+  const chatPort = getConfig().server.chatPort;
+
   try {
-    const res = await fetch(`http://localhost:${CHAT_WS_PORT}/sessions/kill`, {
+    const res = await fetch(`http://localhost:${chatPort}/sessions/kill`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sessionId }),

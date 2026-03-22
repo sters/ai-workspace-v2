@@ -148,3 +148,22 @@ export const suggestionDismissSchema = z.object({
 export const suggestionAcceptSchema = z.object({
   id: z.string().min(1, "id is required"),
 });
+
+export const aiwSettingsSchema = z.object({
+  content: z.string({
+    required_error: "content is required",
+    invalid_type_error: "content is required",
+  }),
+});
+
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({
+    p256dh: z.string(),
+    auth: z.string(),
+  }),
+});
+
+export const pushUnsubscribeSchema = z.object({
+  endpoint: z.string().url(),
+});

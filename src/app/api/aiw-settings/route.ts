@@ -1,22 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
-import z from "zod";
 import { parse as parseYaml } from "yaml";
 import {
   CONFIG_FILE_PATH,
   _resetConfig,
 } from "@/lib/config";
+import { aiwSettingsSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
-
-const aiwSettingsSchema = z.object({
-  content: z.string({
-    required_error: "content is required",
-    invalid_type_error: "content is required",
-  }),
-});
 
 export async function GET() {
   try {
