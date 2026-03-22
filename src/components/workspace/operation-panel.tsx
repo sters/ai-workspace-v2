@@ -5,6 +5,7 @@ import Link from "next/link";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";
 import { RepositoryActionButton } from "./repository-action-button";
+import { InteractionLevelSelector } from "../shared/forms/interaction-level-selector";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { openInEditor, openInTerminal } from "@/lib/api";
@@ -18,12 +19,6 @@ import {
   Terminal,
   Trash2,
 } from "lucide-react";
-
-const INTERACTION_LEVELS: { value: InteractionLevel; label: string }[] = [
-  { value: "low", label: "Low" },
-  { value: "mid", label: "Mid" },
-  { value: "high", label: "High" },
-];
 
 export function OperationPanel({
   workspaceName,
@@ -59,19 +54,11 @@ export function OperationPanel({
       {/* Interaction Level selector */}
       <div className="flex items-center gap-1">
         <span className="text-xs text-muted-foreground mr-1">Interaction:</span>
-        {INTERACTION_LEVELS.map(({ value, label }) => (
-          <button
-            key={value}
-            onClick={() => setInteractionLevel(value)}
-            className={`rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-              interactionLevel === value
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+        <InteractionLevelSelector
+          value={interactionLevel}
+          onChange={setInteractionLevel}
+          disabled={false}
+        />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

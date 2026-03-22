@@ -7,16 +7,8 @@ import { OperationCard } from "@/components/workspace/operation-card";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import { fetcher, killOperation } from "@/lib/api";
+import { VALID_AUTO_ACTIONS } from "@/lib/constants";
 import { extractBatchParams, extractAutonomousParams } from "@/lib/batch-modes";
-
-const VALID_AUTO_ACTIONS = new Set<string>([
-  "execute",
-  "review",
-  "create-pr",
-  "create-todo",
-  "batch",
-  "autonomous",
-]);
 
 export function OperationsList({ workspaceName }: { workspaceName: string }) {
   const searchParams = useSearchParams();

@@ -8,7 +8,11 @@ export type ApiResult<T = unknown> =
   | { ok: false; error: string };
 
 /** SWR-compatible fetcher that returns parsed JSON. */
-export const fetcher = (url: string) => fetch(url).then((r) => r.json());
+export const fetcher = (url: string) =>
+  fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  });
 
 /** POST JSON to an endpoint and return the parsed response. */
 export async function postJson<TResponse = unknown, TBody extends object = Record<string, unknown>>(

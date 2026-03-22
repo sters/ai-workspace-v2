@@ -102,7 +102,6 @@ export function EntryRow({ entry }: { entry: LogEntry }) {
         <PermissionDenialRow
           toolName={entry.toolName}
           summary={entry.summary}
-          permissionString={entry.permissionString}
         />
       );
     case "raw":
@@ -181,7 +180,6 @@ function PermissionDenialRow({
 }: {
   toolName: string;
   summary: string;
-  permissionString: string;
 }) {
   return (
     <Callout variant="warning" className="rounded-md">

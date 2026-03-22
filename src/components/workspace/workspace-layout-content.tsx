@@ -9,6 +9,7 @@ import { ProgressBar } from "@/components/shared/feedback/progress-bar";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
 import { OperationPanel } from "@/components/workspace/operation-panel";
 import { cn } from "@/lib/utils";
+import { VALID_AUTO_ACTIONS } from "@/lib/constants";
 import { extractBatchParams, extractAutonomousParams } from "@/lib/batch-modes";
 
 const TABS = [
@@ -19,8 +20,6 @@ const TABS = [
   { label: "Operations", segment: "operations", href: "operations" },
   { label: "Chat", segment: "chat", href: "chat/quick" },
 ] as const;
-
-const VALID_AUTO_ACTIONS = new Set<string>(["execute", "review", "create-pr", "create-todo", "batch", "autonomous"]);
 
 export function WorkspaceLayoutContent({
   params,

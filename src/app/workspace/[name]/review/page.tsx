@@ -17,7 +17,7 @@ export default function WorkspaceReviewPage({
   useEffect(() => {
     if (reviews.length > 0) {
       router.replace(
-        `/workspace/${name}/review/${reviews[0].timestamp}`
+        `/workspace/${encodeURIComponent(name)}/review/${reviews[0].timestamp}`
       );
     }
   }, [reviews, router, name]);

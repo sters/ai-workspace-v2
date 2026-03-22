@@ -7,6 +7,7 @@ import { useSuggestions } from "@/hooks/use-suggestions";
 import { postJson } from "@/lib/api";
 import { INIT_STORAGE_KEY, InitSplitButton } from "@/components/operation/init-operation";
 import { PageHeader } from "@/components/shared/feedback/page-header";
+import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import { X } from "lucide-react";
 import type { InteractionLevel } from "@/types/prompts";
 import type { OperationType } from "@/types/operation";
@@ -45,22 +46,11 @@ export default function SuggestionsPage() {
           <label className="mb-1 block text-xs font-medium">
             Interaction Level
           </label>
-          <div className="flex gap-1">
-            {(["low", "mid", "high"] as const).map((level) => (
-              <button
-                key={level}
-                onClick={() => setInteractionLevel(level)}
-                disabled={starting}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                  interactionLevel === level
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-              >
-                {level === "low" ? "Low" : level === "mid" ? "Mid" : "High"}
-              </button>
-            ))}
-          </div>
+          <InteractionLevelSelector
+            value={interactionLevel}
+            onChange={setInteractionLevel}
+            disabled={starting}
+          />
         </div>
 
         {isLoading && (
@@ -93,6 +83,7 @@ export default function SuggestionsPage() {
                   onClick={() => handleDismiss(s.id)}
                   className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
                   title="Dismiss"
+                  aria-label="Dismiss suggestion"
                 >
                   <X className="h-4 w-4" />
                 </button>

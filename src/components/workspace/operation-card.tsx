@@ -108,6 +108,7 @@ export function OperationCard({
           variant="ghost-toggle"
           onClick={() => setExpanded(!expanded)}
           className="shrink-0"
+          aria-label={expanded ? "Collapse operation" : "Expand operation"}
         >
           {expanded ? "\u25BC" : "\u25B6"}
         </Button>

@@ -83,6 +83,12 @@ export function ChildGroupSection({
         role="button"
         tabIndex={0}
         onClick={() => setExpanded(!expanded)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
         className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs cursor-pointer hover:bg-accent/50"
       >
         <span className="text-muted-foreground">
@@ -133,7 +139,6 @@ export function SubAgentSection({
 
   const output = useSubagentOutput(
     group.outputFile,
-    group.status === "running",
     expanded && !hasChildren && hasOutputFile
   );
 
@@ -159,6 +164,12 @@ export function SubAgentSection({
         role={isExpandable ? "button" : undefined}
         tabIndex={isExpandable ? 0 : undefined}
         onClick={isExpandable ? () => setExpanded(!expanded) : undefined}
+        onKeyDown={isExpandable ? (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded(!expanded);
+          }
+        } : undefined}
         className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs${
           isExpandable ? " cursor-pointer hover:bg-accent/50" : ""
         }`}
