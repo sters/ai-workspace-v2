@@ -41,7 +41,7 @@ export function Button({
   const [wrappedOnClick, pending] = useAsyncCallback(onClick);
   return (
     <button
-      className={cn(variants[variant], className)}
+      className={cn("inline-flex items-center gap-1", variants[variant], className)}
       onClick={wrappedOnClick}
       disabled={disabled || pending}
       {...props}
