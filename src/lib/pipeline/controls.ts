@@ -5,8 +5,12 @@ export function killOperation(id: string): boolean {
   const managed = operations.get(id);
   if (!managed || managed.operation.status !== "running") return false;
   managed.abortController.abort();
+  // kill() sends SIGTERM. The ClaudeProcess.kill() in cli.ts already
+  // includes its own SIGKILL fallback for the internal subprocess.
   if (managed.claudeProcess) managed.claudeProcess.kill();
-  for (const [, entry] of managed.childProcesses) entry.process.kill();
+  for (const [, entry] of managed.childProcesses) {
+    entry.process.kill(); // SIGTERM (with SIGKILL fallback inside ClaudeProcess.kill)
+  }
   return true;
 }
 
