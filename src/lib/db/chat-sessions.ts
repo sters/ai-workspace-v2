@@ -14,8 +14,9 @@ let _markAllExited: Statement | null = null;
 function stmts(db: Database) {
   if (!_upsert) {
     _upsert = db.prepare(`
-      INSERT OR REPLACE INTO chat_sessions (id, workspace_id, started_at)
+      INSERT INTO chat_sessions (id, workspace_id, started_at)
       VALUES ($id, $workspace_id, $started_at)
+      ON CONFLICT(id) DO UPDATE SET workspace_id = excluded.workspace_id, started_at = excluded.started_at
     `);
   }
   if (!_markExited) {

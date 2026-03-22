@@ -1,4 +1,4 @@
-import { getStore } from "./store";
+import { getStore, persistSessionDeleted } from "./store";
 
 export function handleHealthCheck(): Response {
   return new Response("ok");
@@ -23,6 +23,7 @@ export async function handleSessionKill(req: Request): Promise<Response> {
   }
   session.proc.kill();
   store.__chatSessions!.delete(sessionId);
+  persistSessionDeleted(sessionId);
   return new Response(JSON.stringify({ ok: true }), {
     headers: { "Content-Type": "application/json" },
   });

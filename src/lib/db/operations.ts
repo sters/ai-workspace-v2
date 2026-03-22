@@ -17,6 +17,7 @@ let _listByWorkspace: Statement | null = null;
 let _listByStatus: Statement | null = null;
 let _deleteById: Statement | null = null;
 let _deleteByWorkspace: Statement | null = null;
+let _listWithAge: Statement | null = null;
 
 function stmts(db: Database) {
   if (!_insert) {
@@ -66,6 +67,11 @@ function stmts(db: Database) {
   if (!_deleteByWorkspace) {
     _deleteByWorkspace = db.prepare("DELETE FROM operations WHERE workspace = ?");
   }
+  if (!_listWithAge) {
+    _listWithAge = db.prepare(
+      "SELECT id, type, workspace, started_at FROM operations ORDER BY started_at ASC",
+    );
+  }
   return {
     insert: _insert,
     updateStatus: _updateStatus,
@@ -77,6 +83,7 @@ function stmts(db: Database) {
     listByStatus: _listByStatus,
     deleteById: _deleteById,
     deleteByWorkspace: _deleteByWorkspace,
+    listWithAge: _listWithAge,
   };
 }
 
@@ -92,6 +99,7 @@ export function _resetStatements(): void {
   _listByStatus = null;
   _deleteById = null;
   _deleteByWorkspace = null;
+  _listWithAge = null;
 }
 
 _onDbReset(_resetStatements);
@@ -237,10 +245,9 @@ export function listRunningOperations(): Operation[] {
 
 export function listOperationsWithAge(staleDays: number): OperationLogAgeInfo[] {
   const db = getDb();
+  const s = stmts(db);
   const now = Date.now();
-  const rows = db
-    .query("SELECT id, type, workspace, started_at FROM operations ORDER BY started_at ASC")
-    .all() as Array<{ id: string; type: string; workspace: string; started_at: string }>;
+  const rows = s.listWithAge.all() as Array<{ id: string; type: string; workspace: string; started_at: string }>;
 
   return rows.map((row) => {
     const startedAtMs = new Date(row.started_at).getTime();

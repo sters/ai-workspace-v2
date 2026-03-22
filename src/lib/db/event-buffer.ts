@@ -3,18 +3,23 @@ import { appendEvents } from "./events";
 
 const FLUSH_INTERVAL_MS = 500;
 const FLUSH_THRESHOLD = 50;
+const MAX_BUFFER_SIZE = 10000;
+const MAX_CONSECUTIVE_FAILURES = 5;
 
 interface BufferEntry {
   events: OperationEvent[];
   timer: ReturnType<typeof setTimeout> | null;
+  consecutiveFailures: number;
 }
 
-const buffers = new Map<string, BufferEntry>();
+const globalStore = globalThis as unknown as { __aiwEventBuffers?: Map<string, BufferEntry> };
+if (!globalStore.__aiwEventBuffers) globalStore.__aiwEventBuffers = new Map();
+const buffers = globalStore.__aiwEventBuffers;
 
 function getOrCreateBuffer(operationId: string): BufferEntry {
   let entry = buffers.get(operationId);
   if (!entry) {
-    entry = { events: [], timer: null };
+    entry = { events: [], timer: null, consecutiveFailures: 0 };
     buffers.set(operationId, entry);
   }
   return entry;
@@ -27,6 +32,12 @@ function getOrCreateBuffer(operationId: string): BufferEntry {
 export function bufferEvent(operationId: string, event: OperationEvent): void {
   const entry = getOrCreateBuffer(operationId);
   entry.events.push(event);
+
+  if (entry.events.length > MAX_BUFFER_SIZE) {
+    const dropped = entry.events.length - MAX_BUFFER_SIZE;
+    entry.events.splice(0, dropped);
+    console.warn(`[event-buffer] Buffer for ${operationId} exceeded ${MAX_BUFFER_SIZE}, dropped ${dropped} oldest event(s)`);
+  }
 
   if (entry.events.length >= FLUSH_THRESHOLD) {
     flushEvents(operationId);
@@ -43,10 +54,17 @@ export function flushEvents(operationId: string): void {
   const eventsToFlush = entry.events.splice(0);
   try {
     appendEvents(eventsToFlush);
+    entry.consecutiveFailures = 0;
   } catch (err) {
-    console.warn(`[event-buffer] Failed to flush events for ${operationId}:`, err);
-    // Put events back at the front so they aren't lost
-    entry.events.unshift(...eventsToFlush);
+    entry.consecutiveFailures++;
+    if (entry.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+      console.error(`[event-buffer] ${MAX_CONSECUTIVE_FAILURES} consecutive flush failures for ${operationId}, dropping ${eventsToFlush.length} event(s):`, err);
+      entry.consecutiveFailures = 0;
+    } else {
+      console.warn(`[event-buffer] Failed to flush events for ${operationId} (attempt ${entry.consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}):`, err);
+      // Put events back at the front so they aren't lost
+      entry.events.unshift(...eventsToFlush);
+    }
   }
 }
 
