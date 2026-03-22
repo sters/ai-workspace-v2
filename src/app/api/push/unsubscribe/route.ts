@@ -1,20 +1,15 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { removeSubscription } from "@/lib/web-push";
+import { pushUnsubscribeSchema } from "@/lib/schemas";
+import { parseBody } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
-const unsubscribeSchema = z.object({
-  endpoint: z.string().url(),
-});
-
 export async function POST(request: Request) {
-  const body = await request.json().catch(() => null);
-  const result = unsubscribeSchema.safeParse(body);
-  if (!result.success) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  }
+  const body = await request.json().catch(() => ({}));
+  const parsed = parseBody(pushUnsubscribeSchema, body);
+  if (!parsed.success) return parsed.response;
 
-  removeSubscription(result.data.endpoint);
+  removeSubscription(parsed.data.endpoint);
   return NextResponse.json({ ok: true });
 }

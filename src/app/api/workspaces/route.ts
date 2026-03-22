@@ -4,6 +4,10 @@ import { listWorkspaces } from "@/lib/workspace/reader";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const workspaces = await listWorkspaces();
-  return NextResponse.json(workspaces);
+  try {
+    const workspaces = await listWorkspaces();
+    return NextResponse.json(workspaces);
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }

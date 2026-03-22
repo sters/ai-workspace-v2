@@ -6,13 +6,17 @@ import { parseBody } from "@/lib/validate";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const settings = await readAllSettings();
-  return NextResponse.json({ settings });
+  try {
+    const settings = await readAllSettings();
+    return NextResponse.json({ settings });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const parsed = parseBody(claudeSettingsWriteSchema, body);
     if (!parsed.success) return parsed.response;
     const { scope, content } = parsed.data;

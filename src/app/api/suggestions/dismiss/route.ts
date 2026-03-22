@@ -6,7 +6,7 @@ import { parseBody } from "@/lib/validate";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const body = await req.json();
+  const body = await req.json().catch(() => ({}));
   const parsed = parseBody(suggestionDismissSchema, body);
   if (!parsed.success) return parsed.response;
 

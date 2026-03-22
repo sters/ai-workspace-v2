@@ -4,11 +4,13 @@ import { getConfig } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
-const CHAT_WS_PORT = getConfig().server.chatPort;
-
 export async function GET() {
   try {
-    const res = await fetch(`http://localhost:${CHAT_WS_PORT}/sessions`);
+    const chatPort = getConfig().server.chatPort;
+    const res = await fetch(`http://localhost:${chatPort}/sessions`);
+    if (!res.ok) {
+      return NextResponse.json([]);
+    }
     const sessions: ChatSessionInfo[] = await res.json();
     return NextResponse.json(sessions);
   } catch {

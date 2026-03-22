@@ -8,14 +8,14 @@ import { parseBody } from "@/lib/validate";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
-  const parsed = parseBody(addPermissionSchema, body);
-  if (!parsed.success) return parsed.response;
-  const { permission } = parsed.data;
-
-  const filePath = getSettingsFilePath("local");
-
   try {
+    const body = await request.json().catch(() => ({}));
+    const parsed = parseBody(addPermissionSchema, body);
+    if (!parsed.success) return parsed.response;
+    const { permission } = parsed.data;
+
+    const filePath = getSettingsFilePath("local");
+
     // Read existing settings or start fresh
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let settings: any;

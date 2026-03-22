@@ -13,6 +13,6 @@ export async function POST() {
     if (err instanceof ConcurrencyLimitError) {
       return NextResponse.json({ error: err.message }, { status: 429 });
     }
-    throw err;
+    return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
