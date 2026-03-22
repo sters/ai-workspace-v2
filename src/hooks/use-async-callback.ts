@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 
 /**
  * Wraps an event handler that may return a Promise.
@@ -11,6 +11,14 @@ export function useAsyncCallback<Args extends unknown[]>(
 ): [(...args: Args) => void, boolean] {
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const wrapped = useCallback(
     (...args: Args) => {
@@ -23,7 +31,9 @@ export function useAsyncCallback<Args extends unknown[]>(
           .catch(() => {})
           .finally(() => {
             pendingRef.current = false;
-            setPending(false);
+            if (isMountedRef.current) {
+              setPending(false);
+            }
           });
       }
     },

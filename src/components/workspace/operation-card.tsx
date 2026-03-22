@@ -89,12 +89,12 @@ export function OperationCard({
     return false;
   }, [events, liveStatus]);
 
-  const effectiveOperation = {
+  const effectiveOperation = useMemo(() => ({
     ...operation,
     status: liveStatus,
     ...(livePhases && { currentPhase: livePhases.find((p) => p.status === "running") }),
     hasPendingAsk: liveHasPendingAsk || operation.hasPendingAsk,
-  };
+  }), [operation, liveStatus, livePhases, liveHasPendingAsk]);
   const effectiveIsRunning = liveStatus === "running" && (connected || isRunning);
 
   // Use resultSummary from the operation list item (no SSE needed for results)

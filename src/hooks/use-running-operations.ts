@@ -1,3 +1,5 @@
+"use client";
+
 import useSWR from "swr";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import { fetcher } from "@/lib/api";

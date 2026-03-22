@@ -65,6 +65,7 @@ export function useChatSession(
 
   // Refs for websocket (survive re-renders)
   const wsRef = useRef<WebSocket | null>(null);
+  const onDataDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
   // Generation counter: incremented before each async session init.
@@ -76,6 +77,10 @@ export function useChatSession(
     if (resumeTimeoutRef.current) {
       clearTimeout(resumeTimeoutRef.current);
       resumeTimeoutRef.current = null;
+    }
+    if (onDataDisposableRef.current) {
+      onDataDisposableRef.current.dispose();
+      onDataDisposableRef.current = null;
     }
     if (wsRef.current) {
       wsRef.current.close();
@@ -209,7 +214,10 @@ export function useChatSession(
       };
 
       // Forward terminal input to WebSocket
-      term.onData((data: string) => {
+      if (onDataDisposableRef.current) {
+        onDataDisposableRef.current.dispose();
+      }
+      onDataDisposableRef.current = term.onData((data: string) => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(JSON.stringify({ type: "input", data }));
         }
@@ -310,7 +318,10 @@ export function useChatSession(
     };
 
     // Forward terminal input to WebSocket
-    term.onData((data: string) => {
+    if (onDataDisposableRef.current) {
+      onDataDisposableRef.current.dispose();
+    }
+    onDataDisposableRef.current = term.onData((data: string) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: "input", data }));
       }

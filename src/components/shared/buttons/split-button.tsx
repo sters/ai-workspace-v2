@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState, useRef, useEffect } from "react";
+import { type ReactNode, useState, useRef, useEffect, useCallback } from "react";
 import { useAsyncCallback } from "@/hooks/use-async-callback";
 import type { SplitButtonItem, SplitButtonVariant } from "@/types/components";
 
@@ -41,6 +41,7 @@ export function SplitButton({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const menuItemsRef = useRef<(HTMLButtonElement | null)[]>([]);
   const [wrappedOnClick, mainPending] = useAsyncCallback(onClick);
   const [itemPending, setItemPending] = useState(false);
 
@@ -56,6 +57,24 @@ export function SplitButton({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
+
+  const handleMenuKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    const menuItems = menuItemsRef.current.filter(Boolean) as HTMLButtonElement[];
+    const currentIndex = menuItems.indexOf(e.target as HTMLButtonElement);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = currentIndex < menuItems.length - 1 ? currentIndex + 1 : 0;
+      menuItems[next]?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prev = currentIndex > 0 ? currentIndex - 1 : menuItems.length - 1;
+      menuItems[prev]?.focus();
+    }
+  }, []);
 
   const mainClass = className ?? splitVariants[variant].main;
   const dropClass = dropdownClassName ?? splitVariants[variant].dropdown;
@@ -74,6 +93,8 @@ export function SplitButton({
         disabled={disabled || pending}
         className={dropClass}
         aria-label="More options"
+        aria-expanded={open}
+        aria-haspopup="menu"
       >
         <svg
           className="h-3.5 w-3.5"
@@ -90,10 +111,16 @@ export function SplitButton({
         </svg>
       </button>
       {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 min-w-[240px] rounded-md border bg-background py-1 shadow-md">
-          {items.map((item) => (
+        <div
+          role="menu"
+          className="absolute left-0 top-full z-50 mt-1 min-w-[240px] rounded-md border bg-background py-1 shadow-md"
+          onKeyDown={handleMenuKeyDown}
+        >
+          {items.map((item, index) => (
             <button
               key={item.label}
+              ref={(el) => { menuItemsRef.current[index] = el; }}
+              role="menuitem"
               onClick={() => {
                 setOpen(false);
                 const result = item.onClick();

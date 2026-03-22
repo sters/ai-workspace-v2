@@ -10,6 +10,7 @@ import type { BeforeMount } from "@monaco-editor/react";
 
 const DIFF_THEME = "unified-diff-theme";
 const DIFF_LANG = "unified-diff";
+let themeRegistered = false;
 
 const handleBeforeMount: BeforeMount = (monaco) => {
   if (!monaco.languages.getLanguages().some((l: { id: string }) => l.id === DIFF_LANG)) {
@@ -29,17 +30,20 @@ const handleBeforeMount: BeforeMount = (monaco) => {
     });
   }
 
-  monaco.editor.defineTheme(DIFF_THEME, {
-    base: "vs-dark",
-    inherit: true,
-    rules: [
-      { token: "diff-added", foreground: "4EC969" },
-      { token: "diff-removed", foreground: "F85149" },
-      { token: "diff-hunk", foreground: "79C0FF" },
-      { token: "diff-meta", foreground: "8B949E", fontStyle: "bold" },
-    ],
-    colors: {},
-  });
+  if (!themeRegistered) {
+    themeRegistered = true;
+    monaco.editor.defineTheme(DIFF_THEME, {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        { token: "diff-added", foreground: "4EC969" },
+        { token: "diff-removed", foreground: "F85149" },
+        { token: "diff-hunk", foreground: "79C0FF" },
+        { token: "diff-meta", foreground: "8B949E", fontStyle: "bold" },
+      ],
+      colors: {},
+    });
+  }
 };
 
 function CommitDiff({
@@ -54,8 +58,10 @@ function CommitDiff({
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
     fetch(
-      `/api/workspaces/${encodeURIComponent(workspaceName)}/history/${encodeURIComponent(hash)}`
+      `/api/workspaces/${encodeURIComponent(workspaceName)}/history/${encodeURIComponent(hash)}`,
+      { signal: controller.signal }
     )
       .then((r) => {
         if (!r.ok) throw new Error("fetch failed");
@@ -65,10 +71,12 @@ function CommitDiff({
         setDiff(data.diff);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((err) => {
+        if ((err as Error).name === "AbortError") return;
         setError(true);
         setLoading(false);
       });
+    return () => controller.abort();
   }, [workspaceName, hash]);
 
   if (loading) {

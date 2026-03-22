@@ -36,6 +36,24 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
     mutateAll();
   }, [mutateRunning, mutateAll]);
 
+  // When a running operation disappears from runningOps (i.e., it completed),
+  // trigger a revalidation of allOps so the completed status appears promptly.
+  const prevRunningIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentIds = new Set((runningOps ?? []).map((op) => op.id));
+    const prevIds = prevRunningIdsRef.current;
+    // Check if any previously running operation is no longer running
+    if (prevIds.size > 0) {
+      for (const id of prevIds) {
+        if (!currentIds.has(id)) {
+          mutateAll();
+          break;
+        }
+      }
+    }
+    prevRunningIdsRef.current = currentIds;
+  }, [runningOps, mutateAll]);
+
   // Merge: running operations (fresh) override stale entries from allOps
   const mergedOps = (() => {
     const running = runningOps ?? [];

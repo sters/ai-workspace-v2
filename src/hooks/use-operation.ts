@@ -144,7 +144,12 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
       if (!res.ok) {
         throw new Error(await res.text());
       }
-      const op: OperationListItem = await res.json();
+      const json: unknown = await res.json();
+      const result = operationListItemSchema.safeParse(json);
+      if (!result.success) {
+        throw new Error("Invalid operation response from server");
+      }
+      const op = result.data as OperationListItem;
       setOperation(op);
       return op;
     },

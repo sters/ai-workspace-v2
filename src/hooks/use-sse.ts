@@ -128,6 +128,11 @@ export function useSSE(operationId: string | null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = 0;
       }
+      // Flush any remaining batched events before cleanup
+      if (batchRef.current.length > 0) {
+        dispatch({ type: "append", events: batchRef.current });
+        batchRef.current = [];
+      }
     };
   }, [operationId]);
 
