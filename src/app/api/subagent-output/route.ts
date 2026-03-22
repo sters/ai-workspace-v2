@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { statSync, watch, type FSWatcher } from "node:fs";
 import path from "node:path";
 
@@ -29,10 +30,10 @@ export async function GET(request: Request) {
   const pathParam = url.searchParams.get("path");
 
   if (!pathParam || !path.isAbsolute(pathParam)) {
-    return new Response("path must be an absolute path", { status: 400 });
+    return NextResponse.json({ error: "path must be an absolute path" }, { status: 400 });
   }
   if (!isPathAllowed(pathParam)) {
-    return new Response("path not allowed", { status: 403 });
+    return NextResponse.json({ error: "path not allowed" }, { status: 403 });
   }
 
   // Re-bind as non-nullable for use inside closures

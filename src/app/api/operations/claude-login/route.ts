@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
-import { startOperationPipeline } from "@/lib/pipeline-manager";
+import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { buildClaudeLoginPipeline } from "@/lib/pipelines/claude-login";
 
+export const dynamic = "force-dynamic";
+
 export async function POST() {
-  const phases = buildClaudeLoginPipeline();
-  const operation = startOperationPipeline("claude-login", "claude-login", phases);
-  return NextResponse.json(operation);
+  try {
+    const phases = buildClaudeLoginPipeline();
+    const operation = startOperationPipeline("claude-login", "claude-login", phases);
+    return NextResponse.json(operation);
+  } catch (err) {
+    if (err instanceof ConcurrencyLimitError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    throw err;
+  }
 }

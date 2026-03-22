@@ -3,8 +3,10 @@ import { workspaceSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 import { getConfig } from "@/lib/config";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const parsed = parseBody(workspaceSchema, body);
   if (!parsed.success) return parsed.response;
 

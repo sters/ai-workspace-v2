@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "node:fs";
 import path from "node:path";
+import z from "zod";
 import { parse as parseYaml } from "yaml";
 import {
   CONFIG_FILE_PATH,
   _resetConfig,
 } from "@/lib/config";
+import { parseBody } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
+
+const aiwSettingsSchema = z.object({
+  content: z.string({
+    required_error: "content is required",
+    invalid_type_error: "content is required",
+  }),
+});
 
 export async function GET() {
   try {
@@ -28,21 +37,16 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { content } = body;
-
-    if (typeof content !== "string") {
-      return NextResponse.json(
-        { error: "content is required" },
-        { status: 400 },
-      );
-    }
+    const body = await request.json().catch(() => ({}));
+    const parsed = parseBody(aiwSettingsSchema, body);
+    if (!parsed.success) return parsed.response;
+    const { content } = parsed.data;
 
     // Validate YAML syntax
     if (content.trim()) {
       try {
-        const parsed = parseYaml(content);
-        if (parsed !== null && typeof parsed !== "object") {
+        const yamlParsed = parseYaml(content);
+        if (yamlParsed !== null && typeof yamlParsed !== "object") {
           return NextResponse.json(
             { error: "Config must be a YAML mapping (object), not a scalar or array" },
             { status: 400 },

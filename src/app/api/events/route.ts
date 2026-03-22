@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const operationId = url.searchParams.get("operationId");
 
   if (!operationId) {
-    return new Response("operationId is required", { status: 400 });
+    return NextResponse.json({ error: "operationId is required" }, { status: 400 });
   }
 
   const operation = getOperation(operationId);
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
     const stored = readOperationLog(operationId);
     if (!stored) {
       console.log(`[events][${operationId}] operation not found`);
-      return new Response("operation not found", { status: 404 });
+      return NextResponse.json({ error: "operation not found" }, { status: 404 });
     }
 
     // Completed on disk → return JSON
