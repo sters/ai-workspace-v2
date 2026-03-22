@@ -24,14 +24,14 @@ import { CONFIG_DEFAULTS, CONFIG_FILE_PATH, OPERATION_TYPE_NAMES } from "./defau
  * This function moves the `review` object into `operations.typeOverrides.review`.
  */
 export function normalizeRawConfig(raw: Record<string, unknown>): Partial<AppConfig> {
-  const result = { ...raw } as Record<string, unknown>;
+  const result = { ...raw };
 
-  if (result.operations && typeof result.operations === "object") {
-    const ops = { ...result.operations as Record<string, unknown> };
+  if (result.operations && typeof result.operations === "object" && !Array.isArray(result.operations)) {
+    const ops = { ...(result.operations as Record<string, unknown>) };
     const typeOverrides: Record<string, Partial<OperationTypeSettings>> = {};
 
     for (const key of Object.keys(ops)) {
-      if (OPERATION_TYPE_NAMES.has(key) && ops[key] && typeof ops[key] === "object") {
+      if (OPERATION_TYPE_NAMES.has(key) && ops[key] && typeof ops[key] === "object" && !Array.isArray(ops[key])) {
         typeOverrides[key] = ops[key] as Partial<OperationTypeSettings>;
         delete ops[key];
       }
@@ -81,24 +81,20 @@ function envOverrides(): Partial<AppConfig> {
   const chatPort = process.env.AIW_CHAT_PORT
     ? parseInt(process.env.AIW_CHAT_PORT, 10)
     : undefined;
-  if (port !== undefined || chatPort !== undefined) {
-    result.server = {
-      ...(port !== undefined && { port }),
-      ...(chatPort !== undefined && { chatPort }),
-    } as AppConfig["server"];
+  if ((port !== undefined && !Number.isNaN(port)) || (chatPort !== undefined && !Number.isNaN(chatPort))) {
+    const serverOverride: Partial<AppConfig["server"]> = {};
+    if (port !== undefined && !Number.isNaN(port)) serverOverride.port = port;
+    if (chatPort !== undefined && !Number.isNaN(chatPort)) serverOverride.chatPort = chatPort;
+    result.server = serverOverride as AppConfig["server"];
   }
 
   if (process.env.AIW_CLAUDE_PATH) {
-    result.claude = {
-      ...result.claude,
-      path: process.env.AIW_CLAUDE_PATH,
-    } as AppConfig["claude"];
+    const claudeOverride: Partial<AppConfig["claude"]> = { ...result.claude, path: process.env.AIW_CLAUDE_PATH };
+    result.claude = claudeOverride as AppConfig["claude"];
   }
   if (process.env.AIW_CLAUDE_USE_CLI !== undefined) {
-    result.claude = {
-      ...result.claude,
-      useCli: process.env.AIW_CLAUDE_USE_CLI !== "false",
-    } as AppConfig["claude"];
+    const claudeOverride: Partial<AppConfig["claude"]> = { ...result.claude, useCli: process.env.AIW_CLAUDE_USE_CLI !== "false" };
+    result.claude = claudeOverride as AppConfig["claude"];
   }
 
   if (process.env.AIW_EDITOR) {

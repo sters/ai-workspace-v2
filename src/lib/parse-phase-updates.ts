@@ -44,7 +44,8 @@ function parseAndUpsert(
 ): void {
   try {
     const data = JSON.parse(jsonStr);
-    const idx = data.phaseIndex as number;
+    if (typeof data?.phaseIndex !== "number") return;
+    const idx = data.phaseIndex;
     const existing = phaseMap.get(idx);
     if (existing) {
       existing.status = data.phaseStatus;

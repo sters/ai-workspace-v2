@@ -75,26 +75,34 @@ export function enrichPermissionDenials(entries: LogEntry[]): LogEntry[] {
   return result;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function summarizeToolInput(name: string, input: any): string {
+function getStr(input: Record<string, unknown>, key: string): string {
+  const val = input[key];
+  return typeof val === "string" ? val : "";
+}
+
+function summarizeToolInput(name: string, input: Record<string, unknown>): string {
   switch (name) {
     case "Bash":
-      return `$ ${input?.command ?? ""}`;
+      return `$ ${getStr(input, "command")}`;
     case "Read":
     case "Write":
     case "Edit":
-      return input?.file_path ?? "";
+      return getStr(input, "file_path");
     case "Glob":
-      return input?.pattern ?? "";
+      return getStr(input, "pattern");
     case "Grep":
-      return `/${input?.pattern ?? ""}/`;
+      return `/${getStr(input, "pattern")}/`;
     case "Task":
-    case "Agent":
-      return input?.description ?? input?.prompt?.slice(0, 80) ?? "";
+    case "Agent": {
+      const desc = getStr(input, "description");
+      if (desc) return desc;
+      const prompt = getStr(input, "prompt");
+      return prompt.length > 80 ? prompt.slice(0, 80) : prompt;
+    }
     case "WebFetch":
-      return input?.url ?? "";
+      return getStr(input, "url");
     case "WebSearch":
-      return input?.query ?? "";
+      return getStr(input, "query");
     case "StructuredOutput": {
       const json = JSON.stringify(input);
       return json.length > 120 ? json.slice(0, 120) + "…" : json;
@@ -188,7 +196,11 @@ export function parseStreamEvent(raw: string): LogEntry[] {
             ? block.content
             : Array.isArray(block.content)
               ? block.content
-                  .map((c: unknown) => (c && typeof c === "object" && "text" in c ? (c as { text: string }).text : ""))
+                  .map((c: unknown) =>
+                    typeof c === "object" && c !== null && "text" in c
+                      ? String((c as { text: unknown }).text ?? "")
+                      : "",
+                  )
                   .filter(Boolean)
                   .join("\n")
               : "";
