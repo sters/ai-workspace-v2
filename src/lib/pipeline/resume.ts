@@ -3,17 +3,17 @@ import type { PipelinePhase } from "@/types/pipeline";
 import type { ManagedOperation } from "./types";
 import type { InteractionLevel } from "@/types/prompts";
 import { operations } from "./store";
-import { MAX_CONCURRENT_OPERATIONS, getTimeoutDefaults } from "./constants";
-import { emitStatus, markComplete } from "./events";
+import { MAX_CONCURRENT_OPERATIONS } from "./constants";
+import { emitStatus } from "./events";
 import { gcCompletedOperations } from "./gc";
-import { getPhaseLabel, emitPhaseUpdate } from "./phase-helpers";
-import { runFunctionPhase, runSinglePhase, runGroupPhase } from "./phase-runners";
+import { getPhaseLabel } from "./phase-helpers";
 import {
   listRunningOperations,
   updateOperationStatus,
   updateOperationMeta,
   startAutoFlush,
 } from "@/lib/db";
+import { executePipelinePhases } from "./execute-phases";
 
 // ---------------------------------------------------------------------------
 // Non-resumable operation types — mark as failed on restart
@@ -193,77 +193,24 @@ function resumeOperationPipeline(
   operations.set(existingOp.id, managed);
   emitStatus(managed, `Resuming pipeline from phase ${resumeFromPhase + 1}/${phases.length}`);
 
-  (async () => {
-    let pipelineSuccess = true;
-
-    try {
-      for (let i = resumeFromPhase; i < phases.length; i++) {
-        if (managed.abortController.signal.aborted) {
-          emitStatus(managed, "Operation cancelled");
-          pipelineSuccess = false;
-          for (let j = i; j < phases.length; j++) {
-            emitPhaseUpdate(managed, j, phaseInfos[j].label, "skipped");
-          }
-          break;
-        }
-
-        const phase = phases[i];
-        const phaseNum = i + 1;
-        const phaseLabel = phaseInfos[i].label;
-        const phaseExtra = { phaseIndex: i, phaseLabel };
-
-        const timeouts = getTimeoutDefaults(existingOp.type);
-        const defaultTimeout = phase.kind === "function"
-          ? timeouts.functionMs
-          : timeouts.claudeMs;
-        const timeoutMs = phase.timeoutMs ?? defaultTimeout;
-
-        if (phaseInfos[i]) {
-          phaseInfos[i].timeoutMs = timeoutMs;
-          phaseInfos[i].startedAt = new Date().toISOString();
-        }
-
-        emitPhaseUpdate(managed, i, phaseLabel, "running");
-
-        let timedOut = false;
-        const timeoutTimer = setTimeout(() => {
-          timedOut = true;
-          emitStatus(managed, `Phase ${phaseNum} timed out after ${timeoutMs}ms`, phaseExtra);
-          if (phase.kind === "function") {
-            managed.abortController.abort();
-          }
-          for (const [, entry] of managed.childProcesses) {
-            entry.process.kill();
-          }
-        }, timeoutMs);
-
-        let phaseSuccess: boolean;
-        if (phase.kind === "function") {
-          phaseSuccess = await runFunctionPhase(managed, phase, existingOp.id, i, phases.length, phaseExtra);
-        } else if (phase.kind === "single") {
-          phaseSuccess = await runSinglePhase(managed, phase, existingOp.id, i, phases.length, phaseExtra);
-        } else {
-          phaseSuccess = await runGroupPhase(managed, phase, existingOp.id, i, phases.length, phaseExtra);
-        }
-
-        clearTimeout(timeoutTimer);
-        if (timedOut) phaseSuccess = false;
-
-        emitPhaseUpdate(managed, i, phaseLabel, phaseSuccess ? "completed" : "failed");
-
-        if (!phaseSuccess) {
-          emitStatus(managed, `Phase ${phaseNum} failed, aborting pipeline`, phaseExtra);
-          pipelineSuccess = false;
-          break;
-        }
-      }
-    } catch (err) {
-      emitStatus(managed, `Pipeline error: ${err}`);
-      pipelineSuccess = false;
-    } finally {
-      markComplete(managed, pipelineSuccess);
-    }
-  })();
+  // WARNING: Resume does not guarantee idempotency for partially-completed phases.
+  // If a phase was "running" when the server crashed (e.g., a function phase that
+  // partially completed work like creating git branches or worktrees), it will be
+  // re-run from scratch. The rebuilt pipeline creates fresh phases, so side effects
+  // from the original run (like already-created worktree branches) could cause
+  // failures or duplicate resources. Each phase's function should ideally include
+  // its own idempotency checks (e.g., checking if a worktree already exists before
+  // creating one), but this is not enforced by the pipeline framework.
+  // Additionally, resumed pipelines do not restore PipelineOptions.onPhaseComplete
+  // callbacks, so batch pipelines that relied on PR-gating logic will skip that
+  // behavior after resume.
+  executePipelinePhases({
+    managed,
+    phases,
+    phaseInfos,
+    operationType: existingOp.type,
+    startFromPhase: resumeFromPhase,
+  });
 }
 
 // ---------------------------------------------------------------------------

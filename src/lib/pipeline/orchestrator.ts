@@ -2,12 +2,12 @@ import type { Operation, OperationPhaseInfo, OperationType } from "@/types/opera
 import type { PipelinePhase, PipelineOptions } from "@/types/pipeline";
 import type { ManagedOperation } from "./types";
 import { operations, nextId } from "./store";
-import { MAX_CONCURRENT_OPERATIONS, ConcurrencyLimitError, getTimeoutDefaults } from "./constants";
-import { emitStatus, markComplete } from "./events";
+import { MAX_CONCURRENT_OPERATIONS, ConcurrencyLimitError } from "./constants";
+import { emitStatus } from "./events";
 import { gcCompletedOperations } from "./gc";
-import { getPhaseLabel, emitPhaseUpdate } from "./phase-helpers";
-import { runFunctionPhase, runSinglePhase, runGroupPhase } from "./phase-runners";
+import { getPhaseLabel } from "./phase-helpers";
 import { insertOperation, startAutoFlush } from "@/lib/db";
+import { executePipelinePhases } from "./execute-phases";
 
 export function startOperationPipeline(
   type: OperationType,
@@ -72,99 +72,13 @@ export function startOperationPipeline(
   operations.set(id, managed);
   emitStatus(managed, `Starting pipeline with ${phases.length} phases`);
 
-  (async () => {
-    let pipelineSuccess = true;
-
-    try {
-    for (let i = 0; i < phases.length; i++) {
-      // Check if the operation was cancelled between phases
-      if (managed.abortController.signal.aborted) {
-        emitStatus(managed, "Operation cancelled");
-        pipelineSuccess = false;
-        // Mark remaining phases as skipped
-        for (let j = i; j < phases.length; j++) {
-          emitPhaseUpdate(managed, j, phaseInfos[j].label, "skipped");
-        }
-        break;
-      }
-
-      const phase = phases[i];
-      const phaseNum = i + 1;
-      const phaseLabel = phaseInfos[i].label;
-      const phaseExtra = { phaseIndex: i, phaseLabel };
-      let phaseSuccess: boolean;
-
-      // Determine timeout for this phase (per-type overrides > global defaults)
-      const timeouts = getTimeoutDefaults(type);
-      const defaultTimeout = phase.kind === "function"
-        ? timeouts.functionMs
-        : timeouts.claudeMs;
-      const timeoutMs = phase.timeoutMs ?? defaultTimeout;
-
-      // Store timeout and start time on the phase info before emitting the update
-      if (phaseInfos[i]) {
-        phaseInfos[i].timeoutMs = timeoutMs;
-        phaseInfos[i].startedAt = new Date().toISOString();
-      }
-
-      emitPhaseUpdate(managed, i, phaseLabel, "running");
-
-      // Set up timeout timer
-      let timedOut = false;
-      const timeoutTimer = setTimeout(() => {
-        timedOut = true;
-        emitStatus(managed, `Phase ${phaseNum} timed out after ${timeoutMs}ms`, phaseExtra);
-        // Abort function phases via the abort controller
-        if (phase.kind === "function") {
-          managed.abortController.abort();
-        }
-        // Kill all child processes for single/group phases
-        for (const [, entry] of managed.childProcesses) {
-          entry.process.kill();
-        }
-      }, timeoutMs);
-
-      if (phase.kind === "function") {
-        phaseSuccess = await runFunctionPhase(managed, phase, id, i, phases.length, phaseExtra);
-      } else if (phase.kind === "single") {
-        phaseSuccess = await runSinglePhase(managed, phase, id, i, phases.length, phaseExtra);
-      } else {
-        phaseSuccess = await runGroupPhase(managed, phase, id, i, phases.length, phaseExtra);
-      }
-
-      clearTimeout(timeoutTimer);
-      if (timedOut) phaseSuccess = false;
-
-      emitPhaseUpdate(managed, i, phaseLabel, phaseSuccess ? "completed" : "failed");
-
-      if (pipelineOptions?.onPhaseComplete) {
-        const action = pipelineOptions.onPhaseComplete(i, phase, phaseSuccess);
-        if (action === "abort") {
-          emitStatus(managed, `Pipeline aborted after phase ${phaseNum}`, phaseExtra);
-          pipelineSuccess = false;
-          break;
-        }
-        if (action === "skip") {
-          emitPhaseUpdate(managed, i + 1, phaseInfos[i + 1]?.label ?? "", "skipped");
-          emitStatus(managed, `Skipping phase ${phaseNum + 1}`, phaseExtra);
-          i++;
-          continue;
-        }
-      }
-
-      if (!phaseSuccess) {
-        emitStatus(managed, `Phase ${phaseNum} failed, aborting pipeline`, phaseExtra);
-        pipelineSuccess = false;
-        break;
-      }
-    }
-    } catch (err) {
-      emitStatus(managed, `Pipeline error: ${err}`);
-      pipelineSuccess = false;
-    } finally {
-      markComplete(managed, pipelineSuccess);
-    }
-  })();
+  executePipelinePhases({
+    managed,
+    phases,
+    phaseInfos,
+    operationType: type,
+    pipelineOptions,
+  });
 
   return operation;
 }

@@ -150,11 +150,21 @@ function log(operationId: string, ...args: unknown[]) {
   console.log(`[claude-cli][${operationId}]`, ...args);
 }
 
+/**
+ * Extended ClaudeProcess that exposes a callback for tracking subprocess
+ * changes (e.g., when submitAnswer spawns a new process). This is used
+ * by wireChild to keep managed.childProcesses up to date.
+ */
+export interface ClaudeProcessWithTracking extends ClaudeProcess {
+  /** Register a callback invoked when submitAnswer spawns a new subprocess. */
+  onProcessSpawned: (callback: (proc: Subprocess) => void) => void;
+}
+
 export function runClaude(
   operationId: string,
   prompt: string,
   options?: RunClaudeOptions,
-): ClaudeProcess {
+): ClaudeProcessWithTracking {
   const handlers: ((event: OperationEvent) => void)[] = [];
   const earlyEvents: OperationEvent[] = [];
 
@@ -162,6 +172,11 @@ export function runClaude(
   let pendingAskToolUseId: string | null = null;
   let currentProc: Subprocess | null = null;
   let killed = false;
+
+  // Fix 6: Callbacks invoked when submitAnswer spawns a new process, so
+  // external tracking structures (e.g., managed.childProcesses) can be
+  // updated with the new subprocess reference.
+  const processSpawnedCallbacks: ((proc: Subprocess) => void)[] = [];
 
   const emit = (event: OperationEvent) => {
     if (handlers.length === 0) {
@@ -235,6 +250,9 @@ export function runClaude(
     });
     currentProc = proc;
 
+    // Notify external tracking structures about the new subprocess
+    for (const cb of processSpawnedCallbacks) cb(proc);
+
     // Write prompt via stdin if too long for args
     if (useStdin && proc.stdin) {
       proc.stdin.write(promptOrAnswer);
@@ -245,6 +263,10 @@ export function runClaude(
     pendingAskToolUseId = null;
 
     (async () => {
+      // Fix 8: Start reading stderr concurrently with stdout to avoid
+      // pipe buffer deadlock when the CLI writes significant stderr output.
+      const stderrPromise = new Response(proc.stderr).text().catch(() => "");
+
       try {
         const reader = proc.stdout.getReader();
         const decoder = new TextDecoder();
@@ -386,9 +408,9 @@ export function runClaude(
         }
       }
 
-      // Read stderr for diagnostics
+      // Read stderr diagnostics (started concurrently before stdout loop — Fix 8)
       try {
-        const stderrText = await new Response(proc.stderr).text();
+        const stderrText = await stderrPromise;
         if (stderrText.trim()) {
           log(operationId, "stderr:", stderrText.trim().slice(0, 500));
         }
@@ -396,8 +418,18 @@ export function runClaude(
         // Ignore stderr read errors
       }
 
-      // Wait for process exit
-      const exitCode = await proc.exited;
+      // Wait for process exit with a 30-second timeout (Fix 10).
+      // If the process doesn't exit in time, send SIGKILL and return exit code 1.
+      const exitCode = await Promise.race([
+        proc.exited,
+        new Promise<number>((_, reject) =>
+          setTimeout(() => reject(new Error("Process exit timeout")), 30000),
+        ),
+      ]).catch(() => {
+        log(operationId, "process exit timeout, sending SIGKILL");
+        try { proc.kill(9); } catch { /* already exited */ }
+        return 1;
+      });
       log(operationId, "process exited with code:", exitCode);
 
       if (pendingAskToolUseId && !killed) {
@@ -429,7 +461,18 @@ export function runClaude(
     },
     kill: () => {
       killed = true;
-      currentProc?.kill();
+      if (currentProc) {
+        currentProc.kill(); // SIGTERM
+        // Fix 7: SIGKILL fallback after 5 seconds if the process doesn't exit
+        const procRef = currentProc;
+        setTimeout(() => {
+          try { procRef.kill(9); } catch { /* already exited */ }
+        }, 5000);
+      }
+    },
+    /** Register a callback invoked when submitAnswer spawns a new subprocess. */
+    onProcessSpawned: (callback: (proc: Subprocess) => void) => {
+      processSpawnedCallbacks.push(callback);
     },
     submitAnswer: (toolUseId, answers) => {
       if (toolUseId !== pendingAskToolUseId || !sessionId) return false;
