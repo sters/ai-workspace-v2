@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import {
-  CONFIG_FILE_PATH,
+  getConfigFilePath,
   _resetConfig,
 } from "@/lib/config";
 import { aiwSettingsSchema } from "@/lib/schemas";
@@ -13,13 +13,14 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const exists = fs.existsSync(CONFIG_FILE_PATH);
+    const filePath = getConfigFilePath();
+    const exists = fs.existsSync(filePath);
     let content: string | null = null;
     if (exists) {
-      content = fs.readFileSync(CONFIG_FILE_PATH, "utf-8");
+      content = fs.readFileSync(filePath, "utf-8");
     }
     return NextResponse.json({
-      filePath: CONFIG_FILE_PATH,
+      filePath,
       exists,
       content,
     });
@@ -54,11 +55,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Ensure parent directory exists
-    const dir = path.dirname(CONFIG_FILE_PATH);
+    const filePath = getConfigFilePath();
+    const dir = path.dirname(filePath);
     fs.mkdirSync(dir, { recursive: true });
 
     // Write config file
-    fs.writeFileSync(CONFIG_FILE_PATH, content, "utf-8");
+    fs.writeFileSync(filePath, content, "utf-8");
 
     // Invalidate cached config so the app picks up changes immediately
     _resetConfig();

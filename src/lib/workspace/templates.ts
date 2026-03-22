@@ -5,7 +5,7 @@
 
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import { WORKSPACE_DIR } from "../config";
+import { getWorkspaceDir } from "../config";
 import { selectTodoTemplate, REPORT_TEMPLATES } from "../templates";
 
 /**
@@ -34,7 +34,7 @@ export async function writeReportTemplates(wsPath: string): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export function prepareReviewDir(workspaceName: string): string {
-  const wsPath = path.join(WORKSPACE_DIR, workspaceName);
+  const wsPath = path.join(getWorkspaceDir(), workspaceName);
   if (!existsSync(wsPath)) {
     throw new Error(`Workspace directory not found: ${wsPath}`);
   }

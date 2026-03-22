@@ -4,7 +4,7 @@
 
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import { WORKSPACE_DIR } from "../config";
+import { getWorkspaceDir } from "../config";
 import { buildReadmeContent } from "../templates";
 import { exec, sanitizeSlug } from "./helpers";
 import type { TaskAnalysis } from "@/types/workspace";
@@ -86,14 +86,14 @@ export async function setupWorkspace(
     : `${taskType}-${slug}-${date}`;
 
   // If the directory already exists, append a numeric suffix
-  let wsPath = path.join(WORKSPACE_DIR, dirName);
+  let wsPath = path.join(getWorkspaceDir(), dirName);
   if (existsSync(wsPath)) {
     let suffix = 2;
-    while (existsSync(path.join(WORKSPACE_DIR, `${dirName}-${suffix}`))) {
+    while (existsSync(path.join(getWorkspaceDir(), `${dirName}-${suffix}`))) {
       suffix++;
     }
     dirName = `${dirName}-${suffix}`;
-    wsPath = path.join(WORKSPACE_DIR, dirName);
+    wsPath = path.join(getWorkspaceDir(), dirName);
   }
 
   // Create directories

@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // Mock the config module before importing the reader
 vi.mock("@/lib/config", () => ({
-  WORKSPACE_DIR: "/mock/workspace",
+  getWorkspaceDir: () => "/mock/workspace",
 }));
 
 const mockExistsSync = vi.fn();

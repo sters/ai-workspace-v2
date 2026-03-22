@@ -1,5 +1,5 @@
 import path from "node:path";
-import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
+import { getWorkspaceDir, resolveWorkspaceName } from "@/lib/config";
 import { runClaude } from "@/lib/claude";
 import { quickAskSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
 
   const { question } = parsed.data;
   const workspace = resolveWorkspaceName(parsed.data.workspace);
-  const workspacePath = path.join(WORKSPACE_DIR, workspace);
+  const workspacePath = path.join(getWorkspaceDir(), workspace);
   const prompt = buildQuickAskPrompt(workspace, workspacePath, question);
 
   const proc = runClaude("quick-ask", prompt, { cwd: workspacePath });

@@ -20,8 +20,8 @@ vi.mock("node:os", async () => {
 });
 
 vi.mock("@/lib/config", () => ({
-  AI_WORKSPACE_ROOT: "/workspace-root",
-  getAiWorkspaceRoot: () => "/workspace-root",
+  getResolvedWorkspaceRoot: () => "/workspace-root",
+  getResolvedWorkspaceRoot: () => "/workspace-root",
 }));
 
 async function callGET() {

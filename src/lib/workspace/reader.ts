@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
-import { WORKSPACE_DIR } from "../config";
+import { getWorkspaceDir } from "../config";
 import { parseTodoFile } from "../parsers/todo";
 import { parseReadmeMeta } from "../parsers/readme";
 import { parseReviewSummary } from "../parsers/review";
@@ -13,14 +13,14 @@ import type {
 import type { QuickSearchResult } from "@/types/search";
 
 export async function listWorkspaces(): Promise<WorkspaceSummary[]> {
-  if (!existsSync(WORKSPACE_DIR)) return [];
+  if (!existsSync(getWorkspaceDir())) return [];
 
-  const entries = readdirSync(WORKSPACE_DIR, { withFileTypes: true });
+  const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
   const workspaces: WorkspaceSummary[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const wsPath = path.join(WORKSPACE_DIR, entry.name);
+    const wsPath = path.join(getWorkspaceDir(), entry.name);
     const readmePath = path.join(wsPath, "README.md");
     if (!existsSync(readmePath)) continue;
 
@@ -42,7 +42,7 @@ export async function listWorkspaces(): Promise<WorkspaceSummary[]> {
 }
 
 export async function getWorkspaceSummary(name: string): Promise<WorkspaceSummary | null> {
-  const wsPath = path.join(WORKSPACE_DIR, name);
+  const wsPath = path.join(getWorkspaceDir(), name);
   if (!existsSync(wsPath)) return null;
 
   return buildWorkspaceSummary(name, wsPath);
@@ -117,18 +117,18 @@ async function listReviewSessions(wsPath: string): Promise<ReviewSession[]> {
 }
 
 export async function getReadme(name: string): Promise<string | null> {
-  const file = Bun.file(path.join(WORKSPACE_DIR, name, "README.md"));
+  const file = Bun.file(path.join(getWorkspaceDir(), name, "README.md"));
   return (await file.exists()) ? file.text() : null;
 }
 
 export async function getTodos(name: string): Promise<TodoFile[]> {
-  const wsPath = path.join(WORKSPACE_DIR, name);
+  const wsPath = path.join(getWorkspaceDir(), name);
   if (!existsSync(wsPath)) return [];
   return listTodoFiles(wsPath);
 }
 
 export async function getReviewSessions(name: string): Promise<ReviewSession[]> {
-  const wsPath = path.join(WORKSPACE_DIR, name);
+  const wsPath = path.join(getWorkspaceDir(), name);
   if (!existsSync(wsPath)) return [];
   return listReviewSessions(wsPath);
 }
@@ -138,7 +138,7 @@ export async function getReviewDetail(
   timestamp: string
 ): Promise<{ summary: string; files: { name: string; content: string }[] } | null> {
   const reviewDir = path.join(
-    WORKSPACE_DIR,
+    getWorkspaceDir(),
     name,
     "artifacts",
     "reviews",
@@ -163,7 +163,7 @@ export async function getReviewDetail(
 }
 
 export function getCommitDiff(name: string, hash: string): string | null {
-  const wsPath = path.join(WORKSPACE_DIR, name);
+  const wsPath = path.join(getWorkspaceDir(), name);
   if (!existsSync(path.join(wsPath, ".git"))) return null;
 
   // Validate hash format to prevent injection
@@ -182,15 +182,15 @@ export function getCommitDiff(name: string, hash: string): string | null {
 }
 
 export async function quickSearchWorkspaces(query: string): Promise<QuickSearchResult[]> {
-  if (!existsSync(WORKSPACE_DIR)) return [];
+  if (!existsSync(getWorkspaceDir())) return [];
 
-  const entries = readdirSync(WORKSPACE_DIR, { withFileTypes: true });
+  const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
   const results: QuickSearchResult[] = [];
   const lowerQuery = query.toLowerCase();
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    const readmePath = path.join(WORKSPACE_DIR, entry.name, "README.md");
+    const readmePath = path.join(getWorkspaceDir(), entry.name, "README.md");
     if (!existsSync(readmePath)) continue;
 
     try {
@@ -206,7 +206,7 @@ export async function quickSearchWorkspaces(query: string): Promise<QuickSearchR
 
       if (matches.length > 0) {
         const meta = parseReadmeMeta(content);
-        const wsPath = path.join(WORKSPACE_DIR, entry.name);
+        const wsPath = path.join(getWorkspaceDir(), entry.name);
         const stat = statSync(wsPath);
         results.push({
           workspaceName: entry.name,
@@ -229,7 +229,7 @@ export async function quickSearchWorkspaces(query: string): Promise<QuickSearchR
 }
 
 export function getHistory(name: string): HistoryEntry[] {
-  const wsPath = path.join(WORKSPACE_DIR, name);
+  const wsPath = path.join(getWorkspaceDir(), name);
   if (!existsSync(path.join(wsPath, ".git"))) return [];
 
   try {

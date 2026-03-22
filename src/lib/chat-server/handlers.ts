@@ -3,7 +3,7 @@ import { spawnClaudeTerminal } from "../claude/cli";
 import type { DataListener } from "@/types/pty";
 import { buildInitPrompt, buildReviewChatPrompt } from "@/lib/templates";
 import type { ChatSession, ClientMessage, ServerMessage, WsData } from "@/types/chat-server";
-import { AI_WORKSPACE_ROOT } from "@/lib/config/workspace";
+import { getResolvedWorkspaceRoot } from "@/lib/config";
 
 export function send(ws: { send(data: string): void }, msg: ServerMessage) {
   ws.send(JSON.stringify(msg));
@@ -35,7 +35,7 @@ export function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" 
   wsData.sessionId = sessionId;
 
   const listeners = new Set<DataListener>();
-  const root = AI_WORKSPACE_ROOT;
+  const root = getResolvedWorkspaceRoot();
   const workspacePath = path.join(root, "workspace", msg.workspaceId);
 
   const initPrompt = msg.initialPrompt

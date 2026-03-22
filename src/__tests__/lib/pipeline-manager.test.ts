@@ -11,9 +11,8 @@ import {
   killOperation,
   subscribeToOperation,
   ConcurrencyLimitError,
-  MAX_CONCURRENT_OPERATIONS,
-  DEFAULT_CLAUDE_TIMEOUT_MS,
-  DEFAULT_FUNCTION_TIMEOUT_MS,
+  getMaxConcurrentOperations,
+  getTimeoutDefaults,
 } from "@/lib/pipeline-manager";
 
 // Mock the Claude runner so we don't spawn real processes
@@ -121,7 +120,7 @@ describe("pipeline-manager concurrency", () => {
     const ops = getGlobalOps();
 
     // Fill up with running operations
-    for (let i = 0; i < MAX_CONCURRENT_OPERATIONS; i++) {
+    for (let i = 0; i < getMaxConcurrentOperations(); i++) {
       ops.set(`running-${i}`, {
         operation: { id: `running-${i}`, type: "init", workspace: "test", status: "running", startedAt: "" },
         claudeProcess: null,
@@ -144,7 +143,7 @@ describe("pipeline-manager concurrency", () => {
     const ops = getGlobalOps();
 
     // Add completed operations (should not count toward limit)
-    for (let i = 0; i < MAX_CONCURRENT_OPERATIONS + 5; i++) {
+    for (let i = 0; i < getMaxConcurrentOperations() + 5; i++) {
       ops.set(`completed-${i}`, {
         operation: { id: `completed-${i}`, type: "init", workspace: "test", status: "completed", startedAt: "" },
         claudeProcess: null,
@@ -270,7 +269,8 @@ describe("pipeline-manager phase timeout", () => {
   });
 
   it("uses correct default timeouts for each phase kind", () => {
-    expect(DEFAULT_CLAUDE_TIMEOUT_MS).toBe(20 * 60 * 1000);
-    expect(DEFAULT_FUNCTION_TIMEOUT_MS).toBe(3 * 60 * 1000);
+    const defaults = getTimeoutDefaults("init");
+    expect(defaults.claudeMs).toBe(20 * 60 * 1000);
+    expect(defaults.functionMs).toBe(3 * 60 * 1000);
   });
 });

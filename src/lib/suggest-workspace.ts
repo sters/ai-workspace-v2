@@ -7,7 +7,7 @@ import { runClaude } from "@/lib/claude";
 import { getReadme, getTodos, getReviewSessions, getReviewDetail } from "@/lib/workspace/reader";
 import { buildWorkspaceSuggesterPrompt, WORKSPACE_SUGGESTION_SCHEMA } from "@/lib/templates";
 import { insertSuggestion } from "@/lib/db";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import path from "node:path";
 
 const SUGGESTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
@@ -20,7 +20,7 @@ async function gatherOperationOutput(
     const todos = await getTodos(workspace);
     const parts: string[] = [];
     for (const todo of todos) {
-      const todoPath = path.join(WORKSPACE_DIR, workspace, todo.filename);
+      const todoPath = path.join(getWorkspaceDir(), workspace, todo.filename);
       try {
         const content = await Bun.file(todoPath).text();
         parts.push(`### TODO-${todo.repoName}.md\n\n${content}`);

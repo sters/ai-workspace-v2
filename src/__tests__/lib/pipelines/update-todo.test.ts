@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
 
 vi.mock("@/lib/config", () => ({
-  WORKSPACE_DIR: "/ws",
+  getWorkspaceDir: () => "/ws",
   getWorkspaceDir: () => "/ws",
 }));
 
@@ -58,7 +58,7 @@ describe("buildUpdateTodoPipeline", () => {
       expect(phases[0].kind).toBe("single");
     });
 
-    it("phase does not set cwd (uses AI_WORKSPACE_ROOT default)", async () => {
+    it("phase does not set cwd (uses getResolvedWorkspaceRoot default)", async () => {
       const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
       const phase = phases[0];
       if (phase.kind !== "single") throw new Error("expected single");

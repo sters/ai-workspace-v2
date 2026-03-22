@@ -1,5 +1,3 @@
-import path from "node:path";
-import os from "node:os";
 import type { AppConfig, OperationTypeSettings } from "@/types/config";
 import type { OperationType } from "@/types/operation";
 
@@ -28,13 +26,6 @@ export const CONFIG_DEFAULTS: AppConfig = {
   editor: "code {path}",
   terminal: "open -a Terminal {path}",
 };
-
-export const CONFIG_FILE_PATH = path.join(
-  os.homedir(),
-  ".config",
-  "ai-workspace",
-  "config.yml",
-);
 
 // ---------------------------------------------------------------------------
 // Operation type names (for config validation and migration)

@@ -5,7 +5,7 @@
 import type { Subprocess } from "bun";
 import type { ClaudeProcess, RunClaudeOptions, SpawnClaudeOptions, SpawnClaudeTerminalOptions, StreamEvent } from "@/types/claude";
 import type { TerminalSubprocess } from "@/types/pty";
-import { getAiWorkspaceRoot, getConfig } from "../config";
+import { getResolvedWorkspaceRoot, getConfig } from "../config";
 import type { OperationEvent } from "@/types/operation";
 import { spawnTerminal } from "../pty";
 import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
@@ -73,7 +73,7 @@ export function getClaudeEnv(
 
 /** Spawn Claude CLI asynchronously via Bun.spawn. */
 export function spawnClaude(options: SpawnClaudeOptions) {
-  const { args, cwd = getAiWorkspaceRoot(), stdin, env } = options;
+  const { args, cwd = getResolvedWorkspaceRoot(), stdin, env } = options;
   return Bun.spawn([getCliPath(), ...args], {
     cwd,
     stdout: "pipe",
@@ -85,7 +85,7 @@ export function spawnClaude(options: SpawnClaudeOptions) {
 
 /** Spawn Claude CLI synchronously via Bun.spawnSync. */
 export function spawnClaudeSync(options: Omit<SpawnClaudeOptions, "stdin">) {
-  const { args, cwd = getAiWorkspaceRoot(), env } = options;
+  const { args, cwd = getResolvedWorkspaceRoot(), env } = options;
   return Bun.spawnSync([getCliPath(), ...args], {
     cwd,
     stdout: "pipe",
@@ -96,7 +96,7 @@ export function spawnClaudeSync(options: Omit<SpawnClaudeOptions, "stdin">) {
 
 /** Spawn Claude CLI in interactive PTY mode via spawnTerminal. */
 export function spawnClaudeTerminal(options: SpawnClaudeTerminalOptions): TerminalSubprocess {
-  const { args, cwd = getAiWorkspaceRoot(), env, listeners, cols, rows } = options;
+  const { args, cwd = getResolvedWorkspaceRoot(), env, listeners, cols, rows } = options;
   return spawnTerminal(
     [getCliPath(), ...args],
     { cwd, env: env ?? getClaudeEnv(), cols, rows },
@@ -182,7 +182,7 @@ export function runClaude(
   };
 
   log(operationId, "starting CLI query");
-  log(operationId, "cwd:", options?.cwd ?? getAiWorkspaceRoot());
+  log(operationId, "cwd:", options?.cwd ?? getResolvedWorkspaceRoot());
   log(operationId, "prompt:", prompt.slice(0, 200) + (prompt.length > 200 ? "..." : ""));
   log(operationId, "getCliPath():", getCliPath());
 

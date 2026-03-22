@@ -5,8 +5,8 @@ vi.mock("@/lib/pipeline-manager", () => ({
   getOperation: vi.fn(),
 }));
 vi.mock("@/lib/config", () => ({
-  AI_WORKSPACE_ROOT: "/mock/workspace-root",
-  WORKSPACE_DIR: "/mock/workspace-root/workspace",
+  getResolvedWorkspaceRoot: () => "/mock/workspace-root",
+  getWorkspaceDir: () => "/mock/workspace-root/workspace",
   getConfig: vi.fn(() => ({
     operations: { bestOfN: 0, defaultInteractionLevel: "mid", typeOverrides: {} },
   })),
