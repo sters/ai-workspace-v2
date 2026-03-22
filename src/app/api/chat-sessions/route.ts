@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import type { ChatSessionInfo } from "@/types/chat";
 import { getConfig } from "@/lib/config";
 
+export const dynamic = "force-dynamic";
+
 const CHAT_WS_PORT = getConfig().server.chatPort;
 
 export async function GET() {

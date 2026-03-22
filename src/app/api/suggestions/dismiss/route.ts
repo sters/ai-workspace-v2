@@ -11,5 +11,8 @@ export async function POST(req: Request) {
   if (!parsed.success) return parsed.response;
 
   const ok = dismissSuggestion(parsed.data.id);
-  return NextResponse.json({ ok });
+  if (!ok) {
+    return NextResponse.json({ error: "Suggestion not found" }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true });
 }

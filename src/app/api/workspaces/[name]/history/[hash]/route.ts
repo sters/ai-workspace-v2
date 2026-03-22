@@ -7,7 +7,11 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ name: string; hash: string }> }
 ) {
-  const { name, hash } = await params;
+  const { name: rawName, hash } = await params;
+  const name = decodeURIComponent(rawName);
+  if (name.includes('..') || name.includes('/') || name.includes('\\')) {
+    return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
+  }
   const diff = getCommitDiff(name, hash);
   if (diff === null) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });

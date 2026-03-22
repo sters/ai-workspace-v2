@@ -4,6 +4,8 @@ import { buildWorkspacePrunePipeline } from "@/lib/pipelines/workspace-prune";
 import { workspacePruneSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const parsed = parseBody(workspacePruneSchema, body);

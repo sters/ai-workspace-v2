@@ -5,6 +5,8 @@ import path from "node:path";
 import { addPermissionSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const parsed = parseBody(addPermissionSchema, body);

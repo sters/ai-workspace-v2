@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { quickSearchWorkspaces } from "@/lib/workspace/reader";
 import type { QuickSearchResponse } from "@/types/search";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get("q")?.trim();
