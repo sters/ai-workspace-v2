@@ -1,6 +1,14 @@
 import { GC_MAX_AGE_MS, GC_MAX_EXITED } from "./constants";
 import type { ChatSession } from "@/types/chat-server";
-import { getStore } from "./store";
+import { getStore, persistSessionDeleted } from "./store";
+
+function tryPersistDeleted(id: string): void {
+  try {
+    persistSessionDeleted(id);
+  } catch {
+    // Best-effort: DB may be unavailable during shutdown or in test environments
+  }
+}
 
 export function gcSessions(sessions: Map<string, ChatSession>, now: number): number {
   let removed = 0;
@@ -9,6 +17,7 @@ export function gcSessions(sessions: Map<string, ChatSession>, now: number): num
   for (const [id, session] of sessions) {
     if (session.exited && session.exitedAt != null && now - session.exitedAt > GC_MAX_AGE_MS) {
       sessions.delete(id);
+      tryPersistDeleted(id);
       removed++;
     }
   }
@@ -26,6 +35,7 @@ export function gcSessions(sessions: Map<string, ChatSession>, now: number): num
     const toRemove = exitedSessions.length - GC_MAX_EXITED;
     for (let i = 0; i < toRemove; i++) {
       sessions.delete(exitedSessions[i].id);
+      tryPersistDeleted(exitedSessions[i].id);
       removed++;
     }
   }

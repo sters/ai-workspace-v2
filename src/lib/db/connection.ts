@@ -14,6 +14,7 @@ const DEFAULT_DB_PATH = path.join(
 const globalStore = globalThis as unknown as {
   __aiwDb?: Database | null;
   __aiwDbPath?: string;
+  __aiwDbResetCallbacks?: Set<() => void>;
 };
 
 /**
@@ -23,8 +24,6 @@ const globalStore = globalThis as unknown as {
  */
 export function getDb(): Database {
   if (globalStore.__aiwDb) {
-    // Run pending migrations even on cached instances (handles HMR adding new migrations)
-    runMigrations(globalStore.__aiwDb);
     return globalStore.__aiwDb;
   }
 
@@ -51,13 +50,14 @@ export function getDb(): Database {
 
   // Auto-migrate legacy JSONL files on first startup (lazy import to avoid circular deps)
   if (dbPath !== ":memory:") {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { migrateJsonlToSqlite } = require("./migrate-jsonl") as typeof import("./migrate-jsonl");
-      migrateJsonlToSqlite();
-    } catch {
-      // migrate-jsonl may not be available in all environments
-    }
+    import("./migrate-jsonl")
+      .then(({ migrateJsonlToSqlite }) => migrateJsonlToSqlite())
+      .catch((err: unknown) => {
+        // migrate-jsonl may not be available in all environments
+        if (!(err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "MODULE_NOT_FOUND")) {
+          console.warn("[db] JSONL migration failed:", err);
+        }
+      });
   }
 
   return db;
@@ -66,12 +66,16 @@ export function getDb(): Database {
 /**
  * Callbacks registered by other db modules to reset their prepared statements.
  * Called by `_resetDb()` to prevent stale statement references.
+ * Stored on globalThis to prevent duplicate registrations across HMR reloads.
  */
-const resetCallbacks: Array<() => void> = [];
+if (!globalStore.__aiwDbResetCallbacks) {
+  globalStore.__aiwDbResetCallbacks = new Set();
+}
+const resetCallbacks = globalStore.__aiwDbResetCallbacks;
 
 /** Register a callback that will be invoked when the DB is reset. */
 export function _onDbReset(cb: () => void): void {
-  resetCallbacks.push(cb);
+  resetCallbacks.add(cb);
 }
 
 /** Close and reset the database singleton. For testing only. */
