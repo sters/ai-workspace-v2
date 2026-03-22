@@ -1,10 +1,11 @@
 import type { OperationType } from "./operation";
+import type { InteractionLevel } from "./prompts";
 
 /** Settings that can be overridden per operation type. */
 export interface OperationTypeSettings {
   claudeTimeoutMinutes: number;
   functionTimeoutMinutes: number;
-  defaultInteractionLevel: "low" | "mid" | "high";
+  defaultInteractionLevel: InteractionLevel;
   /** Best-of-N parallel execution count. 0 = disabled, 2-5 = parallel count. */
   bestOfN: number;
 }

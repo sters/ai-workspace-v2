@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type z from "zod";
 import { getConfig } from "./config";
+import type { InteractionLevel } from "@/types/prompts";
 
 type ParseResult<T> =
   | { success: true; data: T }
@@ -17,8 +18,6 @@ export function parseBody<S extends z.ZodTypeAny>(schema: S, body: unknown): Par
   }
   return { success: true, data: result.data };
 }
-
-type InteractionLevel = "low" | "mid" | "high";
 
 /**
  * Fill in the config-based default for `interactionLevel` when the client

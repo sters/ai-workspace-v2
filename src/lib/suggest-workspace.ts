@@ -12,10 +12,6 @@ import path from "node:path";
 
 const SUGGESTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 
-interface SuggestionResult {
-  suggestions: { title: string; description: string }[];
-}
-
 async function gatherOperationOutput(
   workspace: string,
   source: "execute" | "review" | "autonomous-gate",
@@ -83,23 +79,27 @@ async function runSuggester(
 
   if (!resultText) return;
 
-  let parsed: SuggestionResult;
+  let parsed: unknown;
   try {
-    parsed = JSON.parse(resultText) as SuggestionResult;
+    parsed = JSON.parse(resultText);
   } catch {
     console.error("[suggest-workspace] Failed to parse suggestion result as JSON");
     return;
   }
-  if (!Array.isArray(parsed.suggestions) || parsed.suggestions.length === 0) return;
+  if (typeof parsed !== "object" || parsed === null || !("suggestions" in parsed)) return;
+  const { suggestions } = parsed as { suggestions: unknown };
+  if (!Array.isArray(suggestions) || suggestions.length === 0) return;
 
-  for (const s of parsed.suggestions) {
-    if (!s.title || !s.description) continue;
+  for (const s of suggestions) {
+    if (typeof s !== "object" || s === null) continue;
+    const item = s as Record<string, unknown>;
+    if (typeof item.title !== "string" || typeof item.description !== "string") continue;
     insertSuggestion({
       id: crypto.randomUUID(),
       sourceWorkspace: workspace,
       sourceOperationId: operationId,
-      title: s.title,
-      description: s.description,
+      title: item.title,
+      description: item.description,
     });
   }
 }

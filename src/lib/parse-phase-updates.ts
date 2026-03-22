@@ -38,6 +38,18 @@ export function parsePhaseUpdatesFromEntries(
   return Array.from(phaseMap.values()).sort((a, b) => a.index - b.index);
 }
 
+const VALID_PHASE_STATUSES = new Set<OperationPhaseInfo["status"]>([
+  "pending",
+  "running",
+  "completed",
+  "failed",
+  "skipped",
+]);
+
+function isValidPhaseStatus(value: unknown): value is OperationPhaseInfo["status"] {
+  return typeof value === "string" && VALID_PHASE_STATUSES.has(value as OperationPhaseInfo["status"]);
+}
+
 function parseAndUpsert(
   phaseMap: Map<number, OperationPhaseInfo>,
   jsonStr: string,
@@ -45,6 +57,7 @@ function parseAndUpsert(
   try {
     const data = JSON.parse(jsonStr);
     if (typeof data?.phaseIndex !== "number") return;
+    if (!isValidPhaseStatus(data.phaseStatus)) return;
     const idx = data.phaseIndex;
     const existing = phaseMap.get(idx);
     if (existing) {
