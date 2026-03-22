@@ -77,7 +77,6 @@ export function OperationPanel({
         />
         <Button
           variant="secondary"
-          className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 disabled:opacity-50"
           onClick={() => startAndNavigate("review", body())}
           disabled={isWorkspaceTypeRunning(workspaceName, "review")}
         >
@@ -106,7 +105,6 @@ export function OperationPanel({
         />
         <Button
           variant="destructive"
-          className="inline-flex items-center gap-1.5 rounded-md border border-red-300 bg-transparent px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950"
           onClick={() =>
             startAndNavigate("delete", { workspace: workspacePath })
           }

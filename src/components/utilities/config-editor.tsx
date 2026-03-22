@@ -57,7 +57,7 @@ export function ConfigEditor({
 
   const valid = isValidContent(value);
 
-  const handleSave = useCallback(async () => {
+  const handleSave = async () => {
     setSaveError(null);
     setSaveSuccess(false);
     setSaving(true);
@@ -78,7 +78,7 @@ export function ConfigEditor({
     } finally {
       setSaving(false);
     }
-  }, [saveEndpoint, saveBody, value, onSaved]);
+  };
 
   const showInvalidWarning = language === "json" && value.trim() && !valid;
 

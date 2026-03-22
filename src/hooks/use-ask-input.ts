@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import type { AskQuestion } from "@/types/claude";
 
 export function useAskInput({
@@ -108,7 +108,10 @@ export function useAskInput({
     [buildAnswers, submit]
   );
 
-  const canSubmit = !submitting && buildAnswers() !== null;
+  const canSubmit = useMemo(
+    () => !submitting && buildAnswers() !== null,
+    [submitting, buildAnswers]
+  );
 
   return {
     submitting,

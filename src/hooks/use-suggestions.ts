@@ -1,3 +1,5 @@
+"use client";
+
 import useSWR from "swr";
 import type { WorkspaceSuggestion } from "@/types/suggestion";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";

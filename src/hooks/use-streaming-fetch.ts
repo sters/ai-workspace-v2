@@ -10,11 +10,18 @@ export function useStreamingFetch() {
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const batchRef = useRef<OperationEvent[]>([]);
+  const rafRef = useRef<number>(0);
 
   const run = useCallback(async (url: string, body: Record<string, unknown>) => {
     setEvents([]);
     setError(null);
     setIsRunning(true);
+    batchRef.current = [];
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = 0;
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -47,11 +54,30 @@ export function useStreamingFetch() {
           if (!line.startsWith("data: ")) continue;
           try {
             const event: OperationEvent = JSON.parse(line.slice(6));
-            setEvents((prev) => [...prev, event]);
+            batchRef.current.push(event);
+            if (!rafRef.current) {
+              rafRef.current = requestAnimationFrame(() => {
+                rafRef.current = 0;
+                const batch = batchRef.current;
+                batchRef.current = [];
+                setEvents((prev) => prev.concat(batch));
+              });
+            }
           } catch {
             // ignore
           }
         }
+      }
+
+      // Flush any remaining batched events
+      if (batchRef.current.length > 0) {
+        if (rafRef.current) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = 0;
+        }
+        const batch = batchRef.current;
+        batchRef.current = [];
+        setEvents((prev) => prev.concat(batch));
       }
     } catch (err) {
       if ((err as Error).name !== "AbortError") {

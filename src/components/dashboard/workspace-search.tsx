@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import { Button } from "@/components/shared/buttons/button";
 import { Input } from "@/components/shared/forms/input";
@@ -11,20 +11,23 @@ import { useOperation } from "@/hooks/use-operation";
 import { parseStreamEvent } from "@/lib/parsers/stream";
 import type { QuickSearchResponse, DeepSearchResponse, DeepSearchResult, SearchMode } from "@/types/search";
 
-function updateURL(q: string | null, mode: SearchMode) {
-  const url = new URL(window.location.href);
-  if (q && mode) {
-    url.searchParams.set("q", q);
-    url.searchParams.set("mode", mode);
-  } else {
-    url.searchParams.delete("q");
-    url.searchParams.delete("mode");
-  }
-  window.history.replaceState(null, "", url.toString());
-}
-
 export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange?: (active: boolean) => void }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const updateURL = useCallback((q: string | null, mode: SearchMode) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (q && mode) {
+      params.set("q", q);
+      params.set("mode", mode);
+    } else {
+      params.delete("q");
+      params.delete("mode");
+    }
+    const qs = params.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [searchParams, router, pathname]);
   const initialQ = searchParams.get("q") ?? "";
   const initialMode = (searchParams.get("mode") as SearchMode) || null;
 
@@ -117,7 +120,7 @@ export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange
     } finally {
       setQuickLoading(false);
     }
-  }, []);
+  }, [updateURL]);
 
   const runQuickSearch = useCallback(async () => {
     const q = query.trim();
@@ -132,7 +135,7 @@ export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange
     setActiveMode("deep");
     updateURL(q, "deep");
     await start("search", { query: q });
-  }, [query, start]);
+  }, [query, start, updateURL]);
 
   const handleClear = useCallback(() => {
     setQuery("");
@@ -141,7 +144,7 @@ export function WorkspaceSearch({ onSearchActiveChange }: { onSearchActiveChange
     setQuickError(null);
     reset();
     updateURL(null, null);
-  }, [reset]);
+  }, [reset, updateURL]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
