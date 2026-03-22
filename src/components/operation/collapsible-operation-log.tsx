@@ -74,6 +74,12 @@ export function CollapsibleOperationLog({
         role="button"
         tabIndex={0}
         onClick={() => setExpanded(!expanded)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            setExpanded(!expanded);
+          }
+        }}
         className="flex w-full items-center gap-2 px-2.5 py-1.5 text-xs cursor-pointer hover:bg-accent/50"
       >
         <span className="text-muted-foreground">

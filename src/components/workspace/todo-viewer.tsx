@@ -1,11 +1,8 @@
 "use client";
 
-import type { TodoFile, TodoSection } from "@/types/workspace";
+import type { TodoSection } from "@/types/workspace";
 import { TodoItemRow } from "./todo-item";
-import { Card } from "../shared/containers/card";
-import { ProgressBar } from "../shared/feedback/progress-bar";
 import { MarkdownRenderer } from "../shared/content/markdown-renderer";
-import { StatusText } from "../shared/feedback/status-text";
 
 const NOTE_SECTION_RE = /notes/i;
 
@@ -45,45 +42,6 @@ export function SectionBlock({ section }: { section: TodoSection }) {
           <MarkdownRenderer content={section.notes.join("\n")} />
         </div>
       )}
-    </div>
-  );
-}
-
-export function TodoViewer({ todos }: { todos: TodoFile[] }) {
-  if (todos.length === 0) {
-    return <StatusText>No TODO files found.</StatusText>;
-  }
-
-  return (
-    <div className="space-y-6">
-      {todos.map((todo) => (
-        <Card key={todo.filename}>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-semibold">{todo.repoName}</h3>
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <span>{todo.completed}/{todo.total} done</span>
-              {todo.blocked > 0 && (
-                <span className="text-red-500">{todo.blocked} blocked</span>
-              )}
-              {todo.inProgress > 0 && (
-                <span className="text-amber-500">
-                  {todo.inProgress} in progress
-                </span>
-              )}
-            </div>
-          </div>
-          <ProgressBar value={todo.progress} className="mb-3" />
-          <div className="space-y-3">
-            {todo.sections.length > 0
-              ? todo.sections.map((section, i) => (
-                  <SectionBlock key={i} section={section} />
-                ))
-              : todo.items.map((item, i) => (
-                  <TodoItemRow key={i} item={item} />
-                ))}
-          </div>
-        </Card>
-      ))}
     </div>
   );
 }

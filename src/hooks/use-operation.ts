@@ -72,6 +72,8 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
   }, [storageKey, operation]);
 
   // ---------- SSE not found → clear stale stored operation immediately ----------
+  // Guard: `operation` in the condition prevents re-entry after setOperation(null),
+  // since the effect re-fires when `operation` changes but the guard short-circuits.
   useEffect(() => {
     if (sseNotFound && storageKey && operation) {
       localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
@@ -80,6 +82,8 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
   }, [sseNotFound, storageKey, operation]);
 
   // ---------- SSE error → clear stale stored operation ----------
+  // Guard: same pattern as above — `operation` null-check prevents infinite loop
+  // when setOperation(null) triggers a re-render and this effect re-fires.
   useEffect(() => {
     if (sseError && storageKey && operation) {
       // Server likely restarted and lost the operation

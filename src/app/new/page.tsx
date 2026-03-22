@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { InitOperation, InitSplitButton } from "@/components/operation/init-operation";
 import { PageHeader } from "@/components/shared/feedback/page-header";
+import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import type { InteractionLevel } from "@/types/prompts";
 
-export default function NewWorkspacePage() {
+function NewWorkspacePageContent() {
   const searchParams = useSearchParams();
   const [description, setDescription] = useState(searchParams.get("description") ?? "");
   const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
@@ -40,22 +41,11 @@ export default function NewWorkspacePage() {
               <label className="mb-1 block text-xs font-medium">
                 Interaction Level
               </label>
-              <div className="flex gap-1">
-                {(["low", "mid", "high"] as const).map((level) => (
-                  <button
-                    key={level}
-                    onClick={() => setInteractionLevel(level)}
-                    disabled={started}
-                    className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-                      interactionLevel === level
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    {level === "low" ? "Low" : level === "mid" ? "Mid" : "High"}
-                  </button>
-                ))}
-              </div>
+              <InteractionLevelSelector
+                value={interactionLevel}
+                onChange={setInteractionLevel}
+                disabled={started}
+              />
               <p className="mt-1 text-xs text-muted-foreground">
                 {interactionLevel === "low"
                   ? "AI decides autonomously. Asks only when critical info is missing."
@@ -76,5 +66,13 @@ export default function NewWorkspacePage() {
         )}
       </InitOperation>
     </div>
+  );
+}
+
+export default function NewWorkspacePage() {
+  return (
+    <Suspense>
+      <NewWorkspacePageContent />
+    </Suspense>
   );
 }

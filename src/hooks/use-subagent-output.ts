@@ -9,7 +9,6 @@ import type { SubagentOutputState } from "@/types/hooks";
  */
 export function useSubagentOutput(
   outputFile: string | undefined,
-  _isRunning: boolean,
   enabled: boolean
 ): SubagentOutputState {
   const [content, setContent] = useState("");
@@ -68,6 +67,7 @@ export function useSubagentOutput(
     es.onerror = () => {
       setError(true);
       setLoading(false);
+      es.close(); // Stop automatic reconnection
     };
 
     return () => {

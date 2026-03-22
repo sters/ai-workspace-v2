@@ -56,7 +56,7 @@ export function useHistory(name: string) {
 }
 
 export function useReviewDetail(name: string, timestamp: string | null) {
-  const { data, error, isLoading } = useSWR(
+  const { data, error, isLoading } = useSWR<{ summary: string; files: { name: string; content: string }[] }>(
     name && timestamp
       ? `/api/workspaces/${encodeURIComponent(name)}/reviews/${timestamp}`
       : null,
@@ -64,8 +64,8 @@ export function useReviewDetail(name: string, timestamp: string | null) {
   );
 
   return {
-    summary: data?.summary as string | undefined,
-    files: data?.files as { name: string; content: string }[] | undefined,
+    summary: data?.summary,
+    files: data?.files,
     isLoading,
     error,
   };
