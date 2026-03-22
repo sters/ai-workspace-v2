@@ -83,7 +83,13 @@ async function runSuggester(
 
   if (!resultText) return;
 
-  const parsed = JSON.parse(resultText) as SuggestionResult;
+  let parsed: SuggestionResult;
+  try {
+    parsed = JSON.parse(resultText) as SuggestionResult;
+  } catch {
+    console.error("[suggest-workspace] Failed to parse suggestion result as JSON");
+    return;
+  }
   if (!Array.isArray(parsed.suggestions) || parsed.suggestions.length === 0) return;
 
   for (const s of parsed.suggestions) {

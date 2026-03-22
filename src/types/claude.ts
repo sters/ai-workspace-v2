@@ -21,6 +21,9 @@ export interface RunClaudeOptions {
   skipAskUserQuestion?: boolean;
 }
 
+// TODO: Replace with Record<string, unknown> or a discriminated union once
+// cli.ts property accesses are updated with proper type narrowing.
+// Currently `any` because cli.ts accesses deeply nested properties without guards.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type StreamEvent = Record<string, any>;
 

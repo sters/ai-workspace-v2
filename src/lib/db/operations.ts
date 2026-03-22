@@ -97,6 +97,19 @@ export function _resetStatements(): void {
 _onDbReset(_resetStatements);
 
 // ---------------------------------------------------------------------------
+// Safe JSON parsing helper
+// ---------------------------------------------------------------------------
+
+function safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
+  if (!json) return fallback;
+  try {
+    return JSON.parse(json);
+  } catch {
+    return fallback;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Row ↔ Domain conversions
 // ---------------------------------------------------------------------------
 
@@ -121,9 +134,9 @@ function rowToOperation(row: OperationRow): Operation {
     status: row.status as Operation["status"],
     startedAt: row.started_at,
     ...(row.completed_at && { completedAt: row.completed_at }),
-    ...(row.children_json && { children: JSON.parse(row.children_json) }),
-    ...(row.phases_json && { phases: JSON.parse(row.phases_json) }),
-    ...(row.inputs_json && { inputs: JSON.parse(row.inputs_json) }),
+    ...(row.children_json && { children: safeJsonParse(row.children_json, []) }),
+    ...(row.phases_json && { phases: safeJsonParse(row.phases_json, []) }),
+    ...(row.inputs_json && { inputs: safeJsonParse(row.inputs_json, {}) }),
   };
 }
 
@@ -135,8 +148,8 @@ function rowToListItem(row: OperationRow): OperationListItem {
     status: row.status as Operation["status"],
     startedAt: row.started_at,
     ...(row.completed_at && { completedAt: row.completed_at }),
-    ...(row.inputs_json && { inputs: JSON.parse(row.inputs_json) }),
-    ...(row.result_summary && { resultSummary: JSON.parse(row.result_summary) }),
+    ...(row.inputs_json && { inputs: safeJsonParse(row.inputs_json, {}) }),
+    ...(row.result_summary && { resultSummary: safeJsonParse<OperationListItem["resultSummary"]>(row.result_summary, undefined) }),
   };
 }
 

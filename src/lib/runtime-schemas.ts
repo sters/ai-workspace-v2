@@ -20,8 +20,9 @@ const operationLoose = z.object({
   id: z.string(),
   type: z.string(),
   workspace: z.string(),
-  status: z.string(),
+  status: z.enum(["running", "completed", "failed"]),
   startedAt: z.string(),
+  completedAt: z.string().optional(),
 }).passthrough();
 
 export const storedHeaderSchema = z.object({
@@ -31,6 +32,10 @@ export const storedHeaderSchema = z.object({
 
 export const storedEventSchema = z.object({
   _type: z.literal("event"),
+  type: z.enum(["output", "error", "complete", "status", "terminal"]),
+  operationId: z.string(),
+  data: z.string(),
+  timestamp: z.string(),
 }).passthrough();
 
 // ---------------------------------------------------------------------------
@@ -142,8 +147,16 @@ export const operationListItemSchema = z.object({
   id: z.string(),
   type: z.string(),
   workspace: z.string(),
-  status: z.string(),
+  status: z.enum(["running", "completed", "failed"]),
   startedAt: z.string(),
+  completedAt: z.string().optional(),
+  inputs: z.record(z.string()).optional(),
+  resultSummary: z.object({
+    content: z.string(),
+    cost: z.string().optional(),
+    duration: z.string().optional(),
+  }).optional(),
+  hasPendingAsk: z.boolean().optional(),
 }).passthrough();
 
 export const operationEventSchema = z.object({
@@ -151,4 +164,7 @@ export const operationEventSchema = z.object({
   operationId: z.string(),
   data: z.string(),
   timestamp: z.string(),
+  childLabel: z.string().optional(),
+  phaseIndex: z.number().optional(),
+  phaseLabel: z.string().optional(),
 }).passthrough();
