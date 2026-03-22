@@ -63,8 +63,12 @@ Three-tier config system (priority: env vars > config file > defaults):
 ### Server-side
 
 - **Workspace state**: API routes under `src/app/api/` read workspace data directly from the filesystem (`workspace/` directory in `AIW_WORKSPACE_ROOT`). Core reading logic is in `src/lib/workspace/reader.ts`.
-- **Claude Code execution**: Operations (init, execute, review, create-pr, etc.) spawn Claude Code processes via `Bun.spawn` with `claude -p --output-format stream-json`. The pipeline manager (`src/lib/pipeline-manager.ts`) orchestrates multi-phase pipelines. Legacy SDK fallback is available via `AIW_CLAUDE_USE_CLI=false`.
+- **Pipeline orchestration**: Operations (init, execute, review, create-pr, autonomous, batch, search, etc.) are sequences of `PipelinePhase`s. Entry point: `startOperationPipeline()` in `src/lib/pipeline/orchestrator.ts`. Pipeline definitions per operation type in `src/lib/pipelines/`. Max 3 concurrent operations, with automatic resume of interrupted operations on restart.
+- **Claude Code execution**: Spawns Claude Code processes via `Bun.spawn` with `claude -p --output-format stream-json` (`src/lib/claude/cli.ts`). Handles `AskUserQuestion` via `--resume {session_id}`. Legacy SDK fallback is available via `AIW_CLAUDE_USE_CLI=false`.
+- **SQLite persistence**: All data in `~/.config/ai-workspace/db.sqlite` via `bun:sqlite`. Events are buffered in memory and flushed every 500ms or 50 events (`src/lib/db/event-buffer.ts`).
+- **Configuration**: Three-tier config resolution (env vars > config file > defaults) in `src/lib/config/resolver.ts`, cached on `globalThis`.
 - **Parsers** (`src/lib/parsers/`): Extract structured data from markdown — TODO items, README metadata, review summaries, and stream-json log entries.
+- **Web Push notifications** (`src/lib/web-push/`): Browser push notifications for operation completion events.
 
 ### Client-side
 
@@ -74,11 +78,26 @@ Three-tier config system (priority: env vars > config file > defaults):
 
 ### Pages
 
-- `/` — Dashboard listing all workspaces
+- `/` — Dashboard listing all workspaces with search
+- `/new` — New workspace creation
+- `/suggestions` — Workspace suggestions
 - `/workspace/[name]` — Workspace detail with tabs: Overview, TODOs, Reviews, History, Operations
-- `/workspace/[name]/chat` — Chat interface for workspace
 - `/workspace/[name]/todo` — TODO management
-- `/utilities` — Utility hub: claude-auth, claude-version, claude-settings, mcp-servers, running operations, workspace-prune
+- `/workspace/[name]/review/[timestamp]` — Individual review detail
+- `/workspace/[name]/chat/quick` — Quick ask interface
+- `/workspace/[name]/chat/interactive` — Full interactive chat with terminal
+- `/workspace/[name]/operations` — Operations history
+- `/workspace/[name]/history` — Git/operation history timeline
+- `/utilities` — Utility hub:
+  - `aiw-settings` — Application settings viewer/editor
+  - `claude-auth` — Claude authentication
+  - `claude-settings` — Claude settings browser (project / local / user scopes)
+  - `claude-version` — Claude version info
+  - `mcp-servers` — MCP server management
+  - `check-update` — Update checker
+  - `running` — Running operations monitor
+  - `operation-prune` — Operation cleanup
+  - `workspace-prune` — Workspace cleanup
 
 ## Claude Settings and MCP Servers
 
@@ -142,5 +161,11 @@ bunx vitest run <file> # Single file
 - **TypeScript** (strict mode)
 - **Tailwind CSS 3** with shadcn/ui-style theme
 - **SWR** for data fetching
+- **Monaco Editor** (`@monaco-editor/react`) for code/config editing
+- **xterm.js** (`@xterm/xterm`) for terminal UI
+- **Zod** for request/runtime data validation
+- **react-markdown** + **remark-gfm** for markdown rendering
+- **lucide-react** for icons
+- **web-push** for browser push notifications
 - **Vitest** + **@testing-library/react** for testing
 - **Claude Code CLI** (`claude -p --output-format stream-json`) for headless execution (legacy SDK fallback via `AIW_CLAUDE_USE_CLI=false`)
