@@ -6,8 +6,7 @@ import { runClaude as runSDK } from "./sdk";
 import type { RunClaudeOptions } from "@/types/claude";
 import { getConfig } from "../config";
 
-const USE_CLI = getConfig().claude.useCli;
-
 export function runClaude(operationId: string, prompt: string, options?: RunClaudeOptions) {
-  return USE_CLI ? runCLI(operationId, prompt, options) : runSDK(operationId, prompt, options);
+  const useCli = getConfig().claude.useCli;
+  return useCli ? runCLI(operationId, prompt, options) : runSDK(operationId, prompt, options);
 }

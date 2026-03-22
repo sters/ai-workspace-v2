@@ -30,5 +30,7 @@ export {
 export {
   AI_WORKSPACE_ROOT,
   WORKSPACE_DIR,
+  getAiWorkspaceRoot,
+  getWorkspaceDir,
   resolveWorkspaceName,
 } from "./workspace";

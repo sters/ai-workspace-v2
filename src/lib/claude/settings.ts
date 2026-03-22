@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
-import { AI_WORKSPACE_ROOT } from "../config";
+import { getAiWorkspaceRoot } from "../config";
 import { SETTINGS_SCOPES, type SettingsScope, type SettingsFileInfo } from "@/types/claude";
 export type { SettingsScope, SettingsFileInfo };
 
@@ -12,9 +12,9 @@ export function isValidScope(scope: string): scope is SettingsScope {
 export function getSettingsFilePath(scope: SettingsScope): string {
   switch (scope) {
     case "project":
-      return path.join(AI_WORKSPACE_ROOT, ".claude", "settings.json");
+      return path.join(getAiWorkspaceRoot(), ".claude", "settings.json");
     case "local":
-      return path.join(AI_WORKSPACE_ROOT, ".claude", "settings.local.json");
+      return path.join(getAiWorkspaceRoot(), ".claude", "settings.local.json");
     case "user":
       return path.join(os.homedir(), ".claude", "settings.json");
   }

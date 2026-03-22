@@ -1,4 +1,3 @@
-import { getOperation } from "@/lib/pipeline-manager";
 import { getReviewSessions, getReviewDetail, getTodos, getReadme } from "@/lib/workspace/reader";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { buildInitPipeline } from "./init";
@@ -7,8 +6,9 @@ import { buildReviewPipeline } from "./review";
 import { buildCreatePrPipeline } from "./create-pr";
 import { buildUpdateTodoPipeline } from "./update-todo";
 import { runSubPhases } from "./actions/run-sub-phases";
+import { resolveWorkspace } from "./actions/resolve-workspace";
 import { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "@/lib/templates/prompts/autonomous-gate";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import path from "node:path";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
@@ -17,12 +17,6 @@ const DEFAULT_MAX_LOOPS = 3;
 
 const DEFAULT_UPDATE_TODO_INSTRUCTION =
   "Update TODO item statuses to reflect current implementation progress.";
-
-/** Resolve the workspace name from the running operation. */
-function resolveWorkspace(operationId: string, fallback?: string): string {
-  const op = getOperation(operationId);
-  return op?.workspace || fallback || "";
-}
 
 interface AutonomousGateResult {
   shouldLoop: boolean;
@@ -59,7 +53,7 @@ async function runAutonomousGate(
   const todoSummaries = await getTodos(workspace);
   const todoFiles: { repoName: string; content: string }[] = [];
   for (const todo of todoSummaries) {
-    const todoPath = path.join(WORKSPACE_DIR, workspace, todo.filename);
+    const todoPath = path.join(getWorkspaceDir(), workspace, todo.filename);
     try {
       const content = await Bun.file(todoPath).text();
       todoFiles.push({ repoName: todo.repoName, content });

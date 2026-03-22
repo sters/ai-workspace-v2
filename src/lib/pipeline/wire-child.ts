@@ -48,6 +48,17 @@ export function wireChild(
 
   return new Promise<WireChildResult>((resolve) => {
     let resolved = false;
+    const signal = managed.abortController.signal;
+
+    // Abort listener — cleaned up when the complete event fires
+    const onAbort = () => {
+      if (resolved) return;
+      resolved = true;
+      const child = managed.operation.children?.find((c) => c.id === childId);
+      if (child) child.status = "failed";
+      managed.childProcesses.delete(childId);
+      resolve({ success: false, resultText: undefined });
+    };
 
     process.onEvent((event) => {
       const tagged: OperationEvent = {
@@ -61,7 +72,9 @@ export function wireChild(
       if (event.type === "complete") {
         if (resolved) return;
         resolved = true;
-        // Fix 9: Wrap JSON.parse in try/catch so a single malformed event
+        // Remove abort listener to avoid holding references after completion
+        signal.removeEventListener("abort", onAbort);
+        // Wrap JSON.parse in try/catch so a single malformed event
         // doesn't crash the entire operation.
         let success = false;
         try {
@@ -79,15 +92,6 @@ export function wireChild(
     });
 
     // If the operation is cancelled, resolve immediately as failed
-    const signal = managed.abortController.signal;
-    const onAbort = () => {
-      if (resolved) return;
-      resolved = true;
-      const child = managed.operation.children?.find((c) => c.id === childId);
-      if (child) child.status = "failed";
-      managed.childProcesses.delete(childId);
-      resolve({ success: false, resultText: undefined });
-    };
     if (signal.aborted) {
       onAbort();
     } else {

@@ -65,7 +65,7 @@ export function buildWorkspacePrunePipeline(days: number): PipelinePhase[] {
         for (const ws of stale) {
           if (ctx.signal.aborted) break;
           try {
-            deleteWorkspace(ws.name);
+            await deleteWorkspace(ws.name);
             deleted++;
             ctx.emitStatus(`  Deleted: ${ws.name}`);
           } catch (err) {

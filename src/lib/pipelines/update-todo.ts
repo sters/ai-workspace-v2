@@ -1,5 +1,5 @@
 import path from "node:path";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildUpdaterPrompt } from "@/lib/templates";
 import { runBestOfNFiles } from "./actions/best-of-n-files";
@@ -15,7 +15,7 @@ export async function buildUpdateTodoPipeline(input: {
   interactionLevel?: InteractionLevel;
 }): Promise<PipelinePhase[]> {
   const { workspace, instruction, repo, bestOfN, bestOfNConfirm, interactionLevel } = input;
-  const workspacePath = path.join(WORKSPACE_DIR, workspace);
+  const workspacePath = path.join(getWorkspaceDir(), workspace);
 
   const readmeFile = Bun.file(path.join(workspacePath, "README.md"));
   const readmeContent = (await readmeFile.exists())

@@ -2,9 +2,9 @@ import path from "node:path";
 import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildCreateTodoFromReviewPrompt } from "@/lib/templates";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import type { PipelinePhase } from "@/types/pipeline";
-import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
+import { getTimeoutDefaults } from "@/lib/pipeline-manager";
 import { buildCommitSnapshotPhase } from "./actions/commit-snapshot";
 import { buildCoordinateTodosPhase } from "./actions/coordinate-todos";
 import { buildReviewTodosPhase } from "./actions/review-todos";
@@ -14,7 +14,7 @@ export function buildCreateTodoPipeline(
   reviewTimestamp: string,
   instruction?: string,
 ): PipelinePhase[] {
-  const wsPath = path.join(WORKSPACE_DIR, workspace);
+  const wsPath = path.join(getWorkspaceDir(), workspace);
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);
 
   return [
@@ -22,7 +22,7 @@ export function buildCreateTodoPipeline(
     {
       kind: "function",
       label: "Plan TODO from review",
-      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
+      timeoutMs: getTimeoutDefaults("create-todo").claudeMs,
       fn: async (ctx) => {
         const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
         const repos = listWorkspaceRepos(workspace);
@@ -61,7 +61,7 @@ export function buildCreateTodoPipeline(
     {
       kind: "function",
       label: "Coordinate TODOs",
-      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
+      timeoutMs: getTimeoutDefaults("create-todo").claudeMs,
       fn: (ctx) => {
         const repos = listWorkspaceRepos(workspace);
         return buildCoordinateTodosPhase({
@@ -75,7 +75,7 @@ export function buildCreateTodoPipeline(
     {
       kind: "function",
       label: "Review TODOs",
-      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
+      timeoutMs: getTimeoutDefaults("create-todo").claudeMs,
       fn: (ctx) => {
         const repos = listWorkspaceRepos(workspace);
         return buildReviewTodosPhase({

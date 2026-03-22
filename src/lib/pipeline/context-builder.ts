@@ -99,7 +99,7 @@ export function buildPhaseFunctionContext(
     },
     runChild: async (label, prompt, childOptions) => {
       const cid = `${operationId}-phase-${phaseIndex}-fn-${childCounter++}`;
-      operation.children!.push({ id: cid, label, status: "running" });
+      (operation.children ??= []).push({ id: cid, label, status: "running" });
       const claudeOpts: RunClaudeOptions | undefined =
         (childOptions?.jsonSchema || childOptions?.cwd || childOptions?.addDirs || childOptions?.skipAskUserQuestion)
           ? { jsonSchema: childOptions.jsonSchema, cwd: childOptions.cwd, addDirs: childOptions.addDirs, skipAskUserQuestion: childOptions.skipAskUserQuestion }
@@ -126,7 +126,7 @@ export function buildPhaseFunctionContext(
       const promises = children.map(async (child) => {
         return sem.run(async () => {
           const cid = `${operationId}-phase-${phaseIndex}-fn-${childCounter++}`;
-          operation.children!.push({ id: cid, label: child.label, status: "running" });
+          (operation.children ??= []).push({ id: cid, label: child.label, status: "running" });
           const claudeOpts: RunClaudeOptions | undefined =
             (child.cwd || child.addDirs || child.jsonSchema || child.skipAskUserQuestion)
               ? { cwd: child.cwd, addDirs: child.addDirs, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion }

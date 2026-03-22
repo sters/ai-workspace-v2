@@ -2,7 +2,7 @@ import type { Operation, OperationPhaseInfo, OperationType } from "@/types/opera
 import type { PipelinePhase, PipelineOptions } from "@/types/pipeline";
 import type { ManagedOperation } from "./types";
 import { operations, nextId } from "./store";
-import { MAX_CONCURRENT_OPERATIONS, ConcurrencyLimitError } from "./constants";
+import { getMaxConcurrentOperations, ConcurrencyLimitError } from "./constants";
 import { emitStatus } from "./events";
 import { gcCompletedOperations } from "./gc";
 import { getPhaseLabel } from "./phase-helpers";
@@ -23,7 +23,7 @@ export function startOperationPipeline(
   for (const managed of operations.values()) {
     if (managed.operation.status === "running") running++;
   }
-  if (running >= MAX_CONCURRENT_OPERATIONS) {
+  if (running >= getMaxConcurrentOperations()) {
     throw new ConcurrencyLimitError(running);
   }
 

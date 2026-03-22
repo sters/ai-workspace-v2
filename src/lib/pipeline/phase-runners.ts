@@ -18,7 +18,7 @@ export async function runFunctionPhase(
   const phaseNum = phaseIndex + 1;
   emitStatus(managed, `Phase ${phaseNum}/${totalPhases}: ${phase.label}`, phaseExtra);
   const childId = `${operationId}-phase-${phaseIndex}`;
-  managed.operation.children!.push({ id: childId, label: phase.label, status: "running" });
+  (managed.operation.children ??= []).push({ id: childId, label: phase.label, status: "running" });
 
   let phaseSuccess = false;
   try {
@@ -33,7 +33,7 @@ export async function runFunctionPhase(
     }
   }
 
-  const child = managed.operation.children!.find((c) => c.id === childId);
+  const child = (managed.operation.children ??= []).find((c) => c.id === childId);
   if (child) child.status = phaseSuccess ? "completed" : "failed";
   return phaseSuccess;
 }
@@ -49,7 +49,7 @@ export async function runSinglePhase(
   const phaseNum = phaseIndex + 1;
   emitStatus(managed, `Phase ${phaseNum}/${totalPhases}: ${phase.label}`, phaseExtra);
   const childId = `${operationId}-phase-${phaseIndex}`;
-  managed.operation.children!.push({ id: childId, label: phase.label, status: "running" });
+  (managed.operation.children ??= []).push({ id: childId, label: phase.label, status: "running" });
   const singleOpts = (phase.cwd || phase.addDirs)
     ? { cwd: phase.cwd, addDirs: phase.addDirs }
     : undefined;
@@ -74,10 +74,10 @@ export async function runGroupPhase(
   const groupPromises = phase.children.map(async (child, j) => {
     return groupSem.run(async () => {
       const childId = `${operationId}-phase-${phaseIndex}-child-${j}`;
-      managed.operation.children!.push({ id: childId, label: child.label, status: "running" });
+      (managed.operation.children ??= []).push({ id: childId, label: child.label, status: "running" });
       const claudeOpts: RunClaudeOptions | undefined =
-        (child.cwd || child.addDirs || child.jsonSchema)
-          ? { cwd: child.cwd, addDirs: child.addDirs, jsonSchema: child.jsonSchema }
+        (child.cwd || child.addDirs || child.jsonSchema || child.skipAskUserQuestion)
+          ? { cwd: child.cwd, addDirs: child.addDirs, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion }
           : undefined;
       const process = runClaude(childId, child.prompt, claudeOpts);
       const result = await wireChild(managed, childId, child.label, process, phaseExtra);

@@ -5,7 +5,7 @@
  */
 
 import path from "node:path";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import { getReadme } from "@/lib/workspace/reader";
 import {
   createSubWorktrees,
@@ -242,7 +242,7 @@ export async function buildBestOfNPipeline(
           addDirs.push(repo.worktreePath);
         }
 
-        const wsPath = path.join(WORKSPACE_DIR, workspace);
+        const wsPath = path.join(getWorkspaceDir(), workspace);
         let reviewResultText: string | undefined;
 
         const ok = await ctx.runChild("Best-of-N Reviewer", prompt, {

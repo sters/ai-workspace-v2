@@ -1,5 +1,5 @@
 import path from "node:path";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import { getReadme } from "@/lib/workspace/reader";
 import { parseReadmeMeta } from "@/lib/parsers/readme";
 import {
@@ -35,7 +35,7 @@ export async function buildExecutePipeline(input: {
   const repos = repository
     ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
     : allRepos;
-  const wsPath = path.join(WORKSPACE_DIR, workspace);
+  const wsPath = path.join(getWorkspaceDir(), workspace);
 
   if (meta.taskType === "review") {
     return []; // Review workspaces skip execute entirely

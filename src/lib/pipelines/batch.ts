@@ -1,4 +1,3 @@
-import { getOperation } from "@/lib/pipeline-manager";
 import { getReviewSessions } from "@/lib/workspace/reader";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { getOperationConfig } from "@/lib/config";
@@ -9,6 +8,7 @@ import { buildCreatePrPipeline } from "./create-pr";
 import { buildUpdateTodoPipeline } from "./update-todo";
 import { buildBestOfNPipeline } from "./best-of-n";
 import { runSubPhases } from "./actions/run-sub-phases";
+import { resolveWorkspace } from "./actions/resolve-workspace";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 
@@ -20,12 +20,6 @@ type BatchMode =
 
 const DEFAULT_UPDATE_TODO_INSTRUCTION =
   "Update TODO item statuses to reflect current implementation progress.";
-
-/** Resolve the workspace name from the running operation. */
-function resolveWorkspace(operationId: string, fallback?: string): string {
-  const op = getOperation(operationId);
-  return op?.workspace || fallback || "";
-}
 
 export function buildBatchPipeline(input: {
   mode: BatchMode;

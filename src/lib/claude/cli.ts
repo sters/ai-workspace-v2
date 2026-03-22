@@ -5,7 +5,7 @@
 import type { Subprocess } from "bun";
 import type { ClaudeProcess, RunClaudeOptions, SpawnClaudeOptions, SpawnClaudeTerminalOptions, StreamEvent } from "@/types/claude";
 import type { TerminalSubprocess } from "@/types/pty";
-import { AI_WORKSPACE_ROOT, getConfig } from "../config";
+import { getAiWorkspaceRoot, getConfig } from "../config";
 import type { OperationEvent } from "@/types/operation";
 import { spawnTerminal } from "../pty";
 import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
@@ -73,7 +73,7 @@ export function getClaudeEnv(
 
 /** Spawn Claude CLI asynchronously via Bun.spawn. */
 export function spawnClaude(options: SpawnClaudeOptions) {
-  const { args, cwd = AI_WORKSPACE_ROOT, stdin, env } = options;
+  const { args, cwd = getAiWorkspaceRoot(), stdin, env } = options;
   return Bun.spawn([getCliPath(), ...args], {
     cwd,
     stdout: "pipe",
@@ -85,7 +85,7 @@ export function spawnClaude(options: SpawnClaudeOptions) {
 
 /** Spawn Claude CLI synchronously via Bun.spawnSync. */
 export function spawnClaudeSync(options: Omit<SpawnClaudeOptions, "stdin">) {
-  const { args, cwd = AI_WORKSPACE_ROOT, env } = options;
+  const { args, cwd = getAiWorkspaceRoot(), env } = options;
   return Bun.spawnSync([getCliPath(), ...args], {
     cwd,
     stdout: "pipe",
@@ -96,18 +96,13 @@ export function spawnClaudeSync(options: Omit<SpawnClaudeOptions, "stdin">) {
 
 /** Spawn Claude CLI in interactive PTY mode via spawnTerminal. */
 export function spawnClaudeTerminal(options: SpawnClaudeTerminalOptions): TerminalSubprocess {
-  const { args, cwd = AI_WORKSPACE_ROOT, env, listeners, cols, rows } = options;
+  const { args, cwd = getAiWorkspaceRoot(), env, listeners, cols, rows } = options;
   return spawnTerminal(
     [getCliPath(), ...args],
     { cwd, env: env ?? getClaudeEnv(), cols, rows },
     listeners,
   );
 }
-
-// Always pass prompts via stdin to avoid exposing them in the process list.
-// Previously used a 200k char threshold, but even short prompts are visible
-// in `ps` output when passed as command-line arguments.
-const MAX_PROMPT_ARG_LENGTH = 0;
 
 /** Patterns that indicate a fatal API error that should stop the process immediately. */
 const FATAL_ERROR_PATTERNS = [/API Error:\s*401/i, /authentication_failed/i];
@@ -187,7 +182,7 @@ export function runClaude(
   };
 
   log(operationId, "starting CLI query");
-  log(operationId, "cwd:", options?.cwd ?? AI_WORKSPACE_ROOT);
+  log(operationId, "cwd:", options?.cwd ?? getAiWorkspaceRoot());
   log(operationId, "prompt:", prompt.slice(0, 200) + (prompt.length > 200 ? "..." : ""));
   log(operationId, "getCliPath():", getCliPath());
 
@@ -197,7 +192,7 @@ export function runClaude(
   let hasStructuredOutput = false;
 
   function spawnAndStream(promptOrAnswer: string, resumeSessionId?: string) {
-    const useStdin = promptOrAnswer.length > MAX_PROMPT_ARG_LENGTH;
+    // Always pass prompts via stdin to avoid exposing them in the process list.
 
     // When addDirs are specified, auto-allow Edit/Write scoped to those
     // directories plus Bash(git:*) so Claude can modify files and run git
@@ -218,7 +213,7 @@ export function runClaude(
       : [];
 
     const cliArgs = [
-      "-p", useStdin ? "-" : promptOrAnswer,
+      "-p", "-",
       "--output-format", "stream-json",
       "--verbose",
       ...(options?.jsonSchema ? ["--json-schema", JSON.stringify(options.jsonSchema)] : []),
@@ -239,24 +234,26 @@ export function runClaude(
         timestamp: new Date().toISOString(),
       });
     }
-    if (useStdin) {
-      log(operationId, "using stdin for prompt (length:", promptOrAnswer.length, ")");
-    }
+    log(operationId, "using stdin for prompt (length:", promptOrAnswer.length, ")");
 
     const proc = spawnClaude({
       args: cliArgs,
       cwd: options?.cwd,
-      stdin: useStdin ? "pipe" : undefined,
+      stdin: "pipe",
     });
     currentProc = proc;
 
     // Notify external tracking structures about the new subprocess
     for (const cb of processSpawnedCallbacks) cb(proc);
 
-    // Write prompt via stdin if too long for args
-    if (useStdin && proc.stdin) {
-      proc.stdin.write(promptOrAnswer);
-      proc.stdin.end();
+    // Write prompt via stdin
+    if (proc.stdin) {
+      try {
+        proc.stdin.write(promptOrAnswer);
+        proc.stdin.end();
+      } catch (err) {
+        log(operationId, "stdin write error (process may have already exited):", err);
+      }
     }
 
     // Reset pending ask for the new process

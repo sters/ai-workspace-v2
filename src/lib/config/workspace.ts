@@ -29,7 +29,26 @@ function resolveRoot(): string {
   return fallback;
 }
 
+/** Get the ai-workspace root directory (reads config/env at call time). */
+export function getAiWorkspaceRoot(): string {
+  return resolveRoot();
+}
+
+/** Get the workspace directory (reads config/env at call time). */
+export function getWorkspaceDir(): string {
+  return path.join(resolveRoot(), "workspace");
+}
+
+/**
+ * @deprecated Use `getAiWorkspaceRoot()` instead. This constant is evaluated
+ * once at module load time and may become stale if config/env changes.
+ */
 export const AI_WORKSPACE_ROOT = resolveRoot();
+
+/**
+ * @deprecated Use `getWorkspaceDir()` instead. This constant is evaluated
+ * once at module load time and may become stale if config/env changes.
+ */
 export const WORKSPACE_DIR = path.join(AI_WORKSPACE_ROOT, "workspace");
 
 export function resolveWorkspaceName(input: string): string {

@@ -1,6 +1,6 @@
 import { statSync } from "node:fs";
 import path from "node:path";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import { buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "@/lib/templates/prompts/search";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { DeepSearchResult } from "@/types/search";
@@ -17,9 +17,9 @@ export function buildSearchPipeline(query: string): PipelinePhase[] {
         let resultText = "";
         const success = await ctx.runChild(
           "deep-search",
-          buildSearchPrompt(query, WORKSPACE_DIR),
+          buildSearchPrompt(query, getWorkspaceDir()),
           {
-            cwd: WORKSPACE_DIR,
+            cwd: getWorkspaceDir(),
             jsonSchema: DEEP_SEARCH_SCHEMA as Record<string, unknown>,
             onResultText: (text) => {
               resultText = text;
@@ -45,8 +45,8 @@ export function buildSearchPipeline(query: string): PipelinePhase[] {
           // Sort by last modified (most recent first), same as listWorkspaces()
           results.sort((a, b) => {
             try {
-              const mtimeA = statSync(path.join(WORKSPACE_DIR, a.workspaceName)).mtime.getTime();
-              const mtimeB = statSync(path.join(WORKSPACE_DIR, b.workspaceName)).mtime.getTime();
+              const mtimeA = statSync(path.join(getWorkspaceDir(), a.workspaceName)).mtime.getTime();
+              const mtimeB = statSync(path.join(getWorkspaceDir(), b.workspaceName)).mtime.getTime();
               return mtimeB - mtimeA;
             } catch {
               return 0;
