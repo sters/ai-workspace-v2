@@ -11,7 +11,7 @@ vi.mock("@/lib/workspace/helpers", () => ({
 }));
 
 vi.mock("@/lib/config", () => ({
-  WORKSPACE_DIR: "/tmp/test-workspace",
+  getWorkspaceDir: () => "/tmp/test-workspace",
   getWorkspaceDir: () => "/tmp/test-workspace",
 }));
 

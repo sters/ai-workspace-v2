@@ -1,20 +1,31 @@
 // Defaults & constants
 export {
   CONFIG_DEFAULTS,
-  CONFIG_FILE_PATH,
   OPERATION_TYPE_NAMES,
   KNOWN_CONFIG_KEYS,
 } from "./defaults";
 export type { ConfigKeyDef } from "./defaults";
 
+// Workspace config directory
+export {
+  CONFIG_BASE_DIR,
+  getWorkspaceConfigDir,
+  getWorkspaceDbPath,
+  getWorkspaceConfigFilePath,
+} from "./workspace-dir";
+
 // Config resolution
 export {
   getConfig,
+  getConfigFilePath,
   getOperationConfig,
+  getResolvedWorkspaceRoot,
   mergeConfig,
   loadConfigFile,
   normalizeRawConfig,
+  setWorkspaceRoot,
   _resetConfig,
+  _resetWorkspaceRoot,
   _setConfigFilePath,
 } from "./resolver";
 
@@ -28,9 +39,6 @@ export {
 
 // Workspace paths
 export {
-  AI_WORKSPACE_ROOT,
-  WORKSPACE_DIR,
-  getAiWorkspaceRoot,
   getWorkspaceDir,
   resolveWorkspaceName,
 } from "./workspace";

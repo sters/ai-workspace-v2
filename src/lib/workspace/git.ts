@@ -4,7 +4,7 @@
 
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
-import { WORKSPACE_DIR } from "../config";
+import { getWorkspaceDir } from "../config";
 import { deleteStoredOperationsForWorkspace } from "../operation-store";
 import { exec, repoDir } from "./helpers";
 import type { WorkspaceRepo } from "@/types/workspace";
@@ -14,7 +14,7 @@ import type { WorkspaceRepo } from "@/types/workspace";
 // ---------------------------------------------------------------------------
 
 export function listWorkspaceRepos(workspaceName: string): WorkspaceRepo[] {
-  const wsPath = path.join(WORKSPACE_DIR, workspaceName);
+  const wsPath = path.join(getWorkspaceDir(), workspaceName);
   if (!existsSync(wsPath)) return [];
 
   const repos: WorkspaceRepo[] = [];
@@ -56,7 +56,7 @@ export async function commitWorkspaceSnapshot(
   workspaceName: string,
   message?: string,
 ): Promise<boolean> {
-  const wsPath = path.join(WORKSPACE_DIR, workspaceName);
+  const wsPath = path.join(getWorkspaceDir(), workspaceName);
   if (!existsSync(path.join(wsPath, ".git"))) return false;
 
   // Check for changes
@@ -119,7 +119,7 @@ export async function commitWorkspaceSnapshot(
 // ---------------------------------------------------------------------------
 
 export function deleteWorkspace(workspaceName: string): void {
-  const wsPath = path.join(WORKSPACE_DIR, workspaceName);
+  const wsPath = path.join(getWorkspaceDir(), workspaceName);
   if (!existsSync(wsPath)) {
     throw new Error(`Workspace directory not found: ${wsPath}`);
   }

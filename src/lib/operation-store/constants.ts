@@ -1,8 +1,8 @@
 import path from "node:path";
-import { AI_WORKSPACE_ROOT } from "../config";
+import { getResolvedWorkspaceRoot } from "../config";
 
 /** Base directory for legacy JSONL files. Used by migrate-jsonl.ts. */
-export const OPERATIONS_DIR = path.join(AI_WORKSPACE_ROOT, ".operations");
+export const OPERATIONS_DIR = path.join(getResolvedWorkspaceRoot(), ".operations");
 
 const VALID_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 /** Workspace names are directory basenames — disallow path separators and traversal. */

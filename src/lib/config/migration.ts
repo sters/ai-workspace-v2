@@ -2,7 +2,6 @@ import fs from "node:fs";
 import path from "node:path";
 import type { OperationTypeSettings } from "@/types/config";
 import {
-  CONFIG_FILE_PATH,
   KNOWN_CONFIG_KEYS,
   OPERATION_TYPE_NAMES,
   OVERRIDABLE_SETTINGS_KEYS,
@@ -54,7 +53,7 @@ export function generateDefaultConfigContent(): string {
  * Create the config file with commented-out defaults if it doesn't exist.
  * Returns true if the file was created, false if it already exists.
  */
-export function ensureConfigFile(filePath: string = CONFIG_FILE_PATH): boolean {
+export function ensureConfigFile(filePath: string): boolean {
   if (fs.existsSync(filePath)) {
     migrateConfigFile(filePath);
     return false;

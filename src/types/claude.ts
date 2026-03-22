@@ -13,7 +13,7 @@ export interface ClaudeProcess {
 export interface RunClaudeOptions {
   /** JSON Schema to constrain the model's final text response via --json-schema. */
   jsonSchema?: Record<string, unknown>;
-  /** Working directory for the spawned process. Defaults to AI_WORKSPACE_ROOT. */
+  /** Working directory for the spawned process. Defaults to getResolvedWorkspaceRoot(). */
   cwd?: string;
   /** Additional directories to expose via --add-dir. */
   addDirs?: string[];

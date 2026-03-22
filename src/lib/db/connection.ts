@@ -1,15 +1,9 @@
 import { Database } from "bun:sqlite";
 import path from "node:path";
-import os from "node:os";
 import fs from "node:fs";
 import { runMigrations } from "./migrations";
-
-const DEFAULT_DB_PATH = path.join(
-  os.homedir(),
-  ".config",
-  "ai-workspace",
-  "db.sqlite",
-);
+import { getWorkspaceDbPath } from "@/lib/config/workspace-dir";
+import { getResolvedWorkspaceRoot } from "@/lib/config/resolver";
 
 const globalStore = globalThis as unknown as {
   __aiwDb?: Database | null;
@@ -27,7 +21,7 @@ export function getDb(): Database {
     return globalStore.__aiwDb;
   }
 
-  const dbPath = globalStore.__aiwDbPath ?? DEFAULT_DB_PATH;
+  const dbPath = globalStore.__aiwDbPath ?? getWorkspaceDbPath(getResolvedWorkspaceRoot());
 
   // Ensure the directory exists for file-based databases
   if (dbPath !== ":memory:") {

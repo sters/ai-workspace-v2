@@ -1,8 +1,10 @@
 import fs from "node:fs";
+import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import type { AppConfig, OperationTypeSettings } from "@/types/config";
 import type { OperationType } from "@/types/operation";
-import { CONFIG_DEFAULTS, CONFIG_FILE_PATH, OPERATION_TYPE_NAMES } from "./defaults";
+import { CONFIG_DEFAULTS, OPERATION_TYPE_NAMES } from "./defaults";
+import { getWorkspaceConfigFilePath } from "./workspace-dir";
 
 // ---------------------------------------------------------------------------
 // YAML loading
@@ -220,14 +222,41 @@ export function getOperationConfig(type: OperationType): OperationTypeSettings {
 const globalStore = globalThis as unknown as {
   __aiwAppConfig?: AppConfig | null;
   __aiwConfigFilePath?: string;
+  __aiwWorkspaceRoot?: string;
 };
+
+/**
+ * Set the workspace root early in startup. Must be called before getConfig().
+ * This determines where config.yml and db.sqlite are stored.
+ */
+export function setWorkspaceRoot(root: string): void {
+  globalStore.__aiwWorkspaceRoot = path.resolve(root);
+}
+
+/**
+ * Get the workspace root, if set. Falls back to env var or cwd.
+ */
+export function getResolvedWorkspaceRoot(): string {
+  if (globalStore.__aiwWorkspaceRoot) return globalStore.__aiwWorkspaceRoot;
+  if (process.env.AIW_WORKSPACE_ROOT) return path.resolve(process.env.AIW_WORKSPACE_ROOT);
+  return process.cwd();
+}
+
+/**
+ * Get the active config file path based on current workspace root.
+ * If `_setConfigFilePath()` was used (for testing), that takes precedence.
+ */
+export function getConfigFilePath(): string {
+  if (globalStore.__aiwConfigFilePath) return globalStore.__aiwConfigFilePath;
+  return getWorkspaceConfigFilePath(getResolvedWorkspaceRoot());
+}
 
 /**
  * Get the resolved app config (cached). Priority: env > config.yml > defaults.
  */
 export function getConfig(): AppConfig {
   if (globalStore.__aiwAppConfig) return globalStore.__aiwAppConfig;
-  const filePath = globalStore.__aiwConfigFilePath ?? CONFIG_FILE_PATH;
+  const filePath = getConfigFilePath();
   const fileConfig = loadConfigFile(filePath);
   globalStore.__aiwAppConfig = mergeConfig(CONFIG_DEFAULTS, fileConfig, envOverrides());
   return globalStore.__aiwAppConfig;
@@ -236,6 +265,11 @@ export function getConfig(): AppConfig {
 /** Reset the cached config so the next getConfig() call reloads from disk. */
 export function _resetConfig(): void {
   globalStore.__aiwAppConfig = null;
+}
+
+/** Reset the workspace root (for testing). */
+export function _resetWorkspaceRoot(): void {
+  delete globalStore.__aiwWorkspaceRoot;
 }
 
 /** Override the config file path (for testing). Pass null to restore default. */

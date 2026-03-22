@@ -112,16 +112,22 @@ if (isBunx && resolvedGitHash) {
   await Promise.race([doCheck(), Bun.sleep(3000)]);
 }
 
-// Ensure config file exists, then load config
-import { getConfig, ensureConfigFile, CONFIG_FILE_PATH } from "../src/lib/config";
-if (ensureConfigFile()) {
-  console.log(`Created config: ${CONFIG_FILE_PATH}`);
-}
-const appConfig = getConfig();
+// Step 1: Resolve workspace root from CLI arg, env var, or cwd (NOT from config — avoids chicken-and-egg)
+import { setWorkspaceRoot, getConfig, getConfigFilePath, ensureConfigFile } from "../src/lib/config";
 
 const args = process.argv.slice(2).filter((a) => !a.startsWith("--"));
-let root = args[0] || process.env.AIW_WORKSPACE_ROOT || appConfig.workspaceRoot || process.cwd();
+let root = args[0] || process.env.AIW_WORKSPACE_ROOT || process.cwd();
 root = resolve(root);
+
+// Step 2: Register workspace root so config/db paths are derived from it
+setWorkspaceRoot(root);
+
+// Step 3: Ensure config file exists, then load config
+const configPath = getConfigFilePath();
+if (ensureConfigFile(configPath)) {
+  console.log(`Created config: ${configPath}`);
+}
+const appConfig = getConfig();
 
 const workspaceDir = resolve(root, "workspace");
 const repositoriesDir = resolve(root, "repositories");

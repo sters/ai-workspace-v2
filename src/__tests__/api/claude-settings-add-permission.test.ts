@@ -33,8 +33,8 @@ vi.mock("node:os", async () => {
 });
 
 vi.mock("@/lib/config", () => ({
-  AI_WORKSPACE_ROOT: "/workspace-root",
-  getAiWorkspaceRoot: () => "/workspace-root",
+  getResolvedWorkspaceRoot: () => "/workspace-root",
+  getResolvedWorkspaceRoot: () => "/workspace-root",
   getConfig: () => ({ operations: { defaultInteractionLevel: "mid" } }),
 }));
 

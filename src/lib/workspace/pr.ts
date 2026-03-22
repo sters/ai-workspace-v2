@@ -4,7 +4,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { WORKSPACE_DIR } from "../config";
+import { getWorkspaceDir } from "../config";
 import { exec } from "./helpers";
 import type { ExistingPR, RepoChanges } from "@/types/workspace";
 
@@ -63,7 +63,7 @@ export function getRepoChanges(
   repoPath: string,
   baseBranch: string,
 ): RepoChanges {
-  const worktreePath = path.join(WORKSPACE_DIR, workspaceName, repoPath);
+  const worktreePath = path.join(getWorkspaceDir(), workspaceName, repoPath);
 
   // Fetch latest
   try {

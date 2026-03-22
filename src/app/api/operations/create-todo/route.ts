@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
+import { getWorkspaceDir, resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { createTodoSchema } from "@/lib/schemas";
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   const workspace = resolveWorkspaceName(data.workspace);
   const { reviewTimestamp, instruction, interactionLevel } = data;
-  const wsPath = path.join(WORKSPACE_DIR, workspace);
+  const wsPath = path.join(getWorkspaceDir(), workspace);
 
   // Validate review directory exists
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);
