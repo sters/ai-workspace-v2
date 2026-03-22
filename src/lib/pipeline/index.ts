@@ -1,6 +1,7 @@
 export { startOperationPipeline } from "./orchestrator";
 export {
   MAX_CONCURRENT_OPERATIONS,
+  getMaxConcurrentOperations,
   ConcurrencyLimitError,
   DEFAULT_CLAUDE_TIMEOUT_MS,
   DEFAULT_FUNCTION_TIMEOUT_MS,

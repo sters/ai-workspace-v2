@@ -83,13 +83,11 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
         if (phase.kind === "function" && phaseAbortController) {
           phaseAbortController.abort();
         }
-        // Kill all child processes for single/group phases
+        // Kill all child processes for single/group phases.
+        // ClaudeProcess.kill() sends SIGTERM and internally schedules
+        // SIGKILL after 5 seconds, so no additional fallback is needed.
         for (const [, entry] of managed.childProcesses) {
           try { entry.process.kill(); } catch { /* already exited */ }
-          // SIGKILL fallback after 5 seconds (Fix 7)
-          setTimeout(() => {
-            try { entry.process.kill(); } catch { /* already exited */ }
-          }, 5000);
         }
       }, timeoutMs);
 

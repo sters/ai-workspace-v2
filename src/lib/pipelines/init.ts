@@ -24,7 +24,7 @@ import {
 import { runBestOfNFiles } from "./actions/best-of-n-files";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
-import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
+import { getTimeoutDefaults } from "@/lib/pipeline-manager";
 import { buildCommitSnapshotPhase } from "./actions/commit-snapshot";
 import { buildCoordinateTodosPhase } from "./actions/coordinate-todos";
 import { buildDiscoverConstraintsPhase } from "./actions/discover-constraints";
@@ -431,7 +431,7 @@ export function buildInitPipeline(
     {
       kind: "function",
       label: "Discover repo constraints",
-      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
+      timeoutMs: getTimeoutDefaults("init").claudeMs,
       fn: (ctx) => buildDiscoverConstraintsPhase({
         workspace: wsName,
         wsPath,
@@ -525,7 +525,7 @@ export function buildInitPipeline(
     {
       kind: "function",
       label: "Coordinate TODOs",
-      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
+      timeoutMs: getTimeoutDefaults("init").claudeMs,
       fn: (ctx) => {
         if (analysis?.taskType === "review") {
           ctx.emitStatus("Review workspace — skipping TODO coordination");
@@ -542,7 +542,7 @@ export function buildInitPipeline(
     {
       kind: "function",
       label: "Review TODOs",
-      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
+      timeoutMs: getTimeoutDefaults("init").claudeMs,
       fn: (ctx) => {
         if (analysis?.taskType === "review") {
           ctx.emitStatus("Review workspace — skipping TODO review");

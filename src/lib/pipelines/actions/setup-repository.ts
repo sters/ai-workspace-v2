@@ -5,7 +5,7 @@
 
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import { exec, repoDir, detectBaseBranch } from "@/lib/workspace/helpers";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 
@@ -28,7 +28,7 @@ export function setupRepository(
 
   const repoName = path.basename(repoPathInput);
   const repoAbsPath = path.join(repoDir(), actualRepoPath);
-  const wsPath = path.join(WORKSPACE_DIR, workspaceName);
+  const wsPath = path.join(getWorkspaceDir(), workspaceName);
 
   if (!existsSync(wsPath)) {
     throw new Error(`Workspace directory does not exist: ${wsPath}`);

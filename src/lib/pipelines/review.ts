@@ -1,5 +1,5 @@
 import path from "node:path";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import { getReadme } from "@/lib/workspace/reader";
 import { parseReadmeMeta } from "@/lib/parsers/readme";
 import {
@@ -18,7 +18,7 @@ import {
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
-import { DEFAULT_CLAUDE_TIMEOUT_MS } from "@/lib/pipeline-manager";
+import { getTimeoutDefaults } from "@/lib/pipeline-manager";
 
 export async function buildReviewPipeline(input: {
   workspace: string;
@@ -33,7 +33,7 @@ export async function buildReviewPipeline(input: {
   const repos = repository
     ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
     : allRepos;
-  const wsPath = path.join(WORKSPACE_DIR, workspace);
+  const wsPath = path.join(getWorkspaceDir(), workspace);
 
   // Write report templates (idempotent — ensures templates exist for older workspaces)
   await writeReportTemplates(wsPath);
@@ -123,7 +123,7 @@ export async function buildReviewPipeline(input: {
     {
       kind: "function",
       label: "Collect review results",
-      timeoutMs: DEFAULT_CLAUDE_TIMEOUT_MS,
+      timeoutMs: getTimeoutDefaults("review").claudeMs,
       fn: async (ctx) => {
         // List actual review/verify files using Bun.Glob
         const reviewGlob = new Bun.Glob("REVIEW-*");

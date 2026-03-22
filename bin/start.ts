@@ -222,6 +222,8 @@ process.on("SIGTERM", killAll);
 // Wait for Next.js to exit, then clean up chat server
 const nextExitCode = await nextServer.exited;
 chatServer.kill();
+// Wait for chat server to exit so its cleanup runs before we exit
+await chatServer.exited;
 
 // The SIGINT handler already started draining stdin in raw mode to catch
 // terminal escape sequence responses. Wait a bit for any remaining responses

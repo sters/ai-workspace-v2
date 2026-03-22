@@ -8,7 +8,7 @@ import {
   checkExistingPR,
   readPRTemplate,
 } from "@/lib/workspace";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import { buildPRCreatorPrompt } from "@/lib/templates";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
@@ -57,7 +57,7 @@ export async function buildCreatePrPipeline(input: {
     return {
       label: repo.repoName,
       prompt,
-      addDirs: [path.join(WORKSPACE_DIR, workspace)],
+      addDirs: [path.join(getWorkspaceDir(), workspace)],
     };
   });
 

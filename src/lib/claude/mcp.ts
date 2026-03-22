@@ -1,7 +1,7 @@
 import path from "node:path";
 import os from "node:os";
 import { spawnClaudeSync } from "./cli";
-import { AI_WORKSPACE_ROOT } from "../config";
+import { getAiWorkspaceRoot } from "../config";
 import type {
   McpAuthStatus,
   McpConnectionStatus,
@@ -66,8 +66,8 @@ async function readLocalMcpServers(): Promise<McpServerEntry[]> {
     const projects = data.projects;
     if (!projects || typeof projects !== "object") return [];
 
-    // AI_WORKSPACE_ROOT may be relative; resolve to absolute to match the key
-    const absRoot = path.resolve(AI_WORKSPACE_ROOT);
+    // getAiWorkspaceRoot() may be relative; resolve to absolute to match the key
+    const absRoot = path.resolve(getAiWorkspaceRoot());
     const projectConfig = projects[absRoot];
     const projResult = claudeJsonProjectSchema.safeParse(projectConfig);
     if (!projResult.success) return [];
@@ -87,7 +87,7 @@ async function readLocalMcpServers(): Promise<McpServerEntry[]> {
 export async function readMcpServers(): Promise<McpServerEntry[]> {
   const [projectServers, localServers] = await Promise.all([
     readMcpServersFromFile(
-      path.join(AI_WORKSPACE_ROOT, ".mcp.json"),
+      path.join(getAiWorkspaceRoot(), ".mcp.json"),
       "project"
     ),
     readLocalMcpServers(),

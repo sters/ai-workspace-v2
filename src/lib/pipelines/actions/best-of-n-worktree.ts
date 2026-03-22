@@ -5,7 +5,7 @@
 
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { getWorkspaceDir } from "@/lib/config";
 import { exec, repoDir } from "@/lib/workspace/helpers";
 import type { WorkspaceRepo } from "@/types/workspace";
 
@@ -30,7 +30,7 @@ export function createSubWorktrees(
   n: number,
   emitStatus: (message: string) => void,
 ): SubWorktree[] {
-  const wsPath = path.join(WORKSPACE_DIR, workspaceName);
+  const wsPath = path.join(getWorkspaceDir(), workspaceName);
   const subWorktrees: SubWorktree[] = [];
 
   for (let i = 0; i < n; i++) {
@@ -171,7 +171,7 @@ export function cleanupSubWorktrees(
   repos: WorkspaceRepo[],
   emitStatus: (message: string) => void,
 ): void {
-  const wsPath = path.join(WORKSPACE_DIR, workspaceName);
+  const wsPath = path.join(getWorkspaceDir(), workspaceName);
 
   for (const sub of subWorktrees) {
     for (const repo of repos) {

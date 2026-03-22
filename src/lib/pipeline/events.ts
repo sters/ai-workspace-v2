@@ -72,11 +72,12 @@ export function markComplete(managed: ManagedOperation, success: boolean) {
   // Events are already flushed above, so writeOperationLog only updates the operation row.
   const eventsSnapshot = managed.events.slice();
   const operationSnapshot = { ...managed.operation };
+  // Clear events synchronously after taking snapshot to avoid data loss window.
+  // Late-connecting SSE clients will query events from SQLite via getOperationEvents.
+  managed.events.length = 0;
   import("../operation-store")
     .then(({ writeOperationLog }) => {
       writeOperationLog(operationSnapshot, eventsSnapshot);
-      // Events are now in SQLite — free them from memory
-      managed.events.length = 0;
     })
     .catch((err) => console.warn("[pipeline-manager] Failed to persist operation log:", err));
 

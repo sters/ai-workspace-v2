@@ -3,7 +3,7 @@ import type { PipelinePhase } from "@/types/pipeline";
 import type { ManagedOperation } from "./types";
 import type { InteractionLevel } from "@/types/prompts";
 import { operations } from "./store";
-import { MAX_CONCURRENT_OPERATIONS } from "./constants";
+import { getMaxConcurrentOperations } from "./constants";
 import { emitStatus } from "./events";
 import { gcCompletedOperations } from "./gc";
 import { getPhaseLabel } from "./phase-helpers";
@@ -157,7 +157,7 @@ function resumeOperationPipeline(
   for (const managed of operations.values()) {
     if (managed.operation.status === "running") running++;
   }
-  if (running >= MAX_CONCURRENT_OPERATIONS) {
+  if (running >= getMaxConcurrentOperations()) {
     console.warn(`[resume] Concurrency limit reached, marking ${existingOp.id} as failed`);
     updateOperationStatus(existingOp.id, "failed", new Date().toISOString());
     return;
@@ -201,9 +201,10 @@ function resumeOperationPipeline(
   // failures or duplicate resources. Each phase's function should ideally include
   // its own idempotency checks (e.g., checking if a worktree already exists before
   // creating one), but this is not enforced by the pipeline framework.
-  // Additionally, resumed pipelines do not restore PipelineOptions.onPhaseComplete
-  // callbacks, so batch pipelines that relied on PR-gating logic will skip that
-  // behavior after resume.
+  // Note: Resumed pipelines do not restore PipelineOptions.onPhaseComplete callbacks.
+  // This is acceptable because batch/autonomous pipelines use inline closure
+  // variables (e.g., skipPr) rather than onPhaseComplete for gate logic, and the
+  // rebuilt pipeline creates fresh closure state that works correctly.
   executePipelinePhases({
     managed,
     phases,

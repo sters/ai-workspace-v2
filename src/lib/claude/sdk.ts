@@ -1,6 +1,6 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { getCliPath } from "./cli";
-import { AI_WORKSPACE_ROOT } from "../config";
+import { getAiWorkspaceRoot } from "../config";
 import type { OperationEvent } from "@/types/operation";
 import type { ClaudeProcess } from "@/types/claude";
 
@@ -31,7 +31,7 @@ export function runClaude(
     }
   };
 
-  const cwd = AI_WORKSPACE_ROOT;
+  const cwd = getAiWorkspaceRoot();
 
   log(operationId, "starting SDK query");
   log(operationId, "cwd:", cwd);
