@@ -21,7 +21,7 @@ bunx vitest run src/__tests__/lib/parsers/todo.test.ts  # Single test file
 
 ## Configuration
 
-Three-tier config (priority: env vars > `~/.config/ai-workspace/config.yml` > defaults). Config resolution in `src/lib/app-config.ts`, cached on `globalThis`.
+Three-tier config (priority: env vars > `~/.config/ai-workspace/config.yml` > defaults). Config resolution in `src/lib/config/resolver.ts`, cached on `globalThis`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
