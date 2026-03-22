@@ -1,5 +1,5 @@
 import path from "node:path";
-import { WORKSPACE_DIR } from "@/lib/config";
+import { WORKSPACE_DIR, resolveWorkspaceName } from "@/lib/config";
 import { runClaude } from "@/lib/claude";
 import { quickAskSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
@@ -12,7 +12,8 @@ export async function POST(request: Request) {
   const parsed = parseBody(quickAskSchema, body);
   if (!parsed.success) return parsed.response;
 
-  const { workspace, question } = parsed.data;
+  const { question } = parsed.data;
+  const workspace = resolveWorkspaceName(parsed.data.workspace);
   const workspacePath = path.join(WORKSPACE_DIR, workspace);
   const prompt = buildQuickAskPrompt(workspace, workspacePath, question);
 
@@ -21,12 +22,24 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
-      const send = (data: string) =>
-        controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+      const send = (data: string) => {
+        try {
+          controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+        } catch {
+          // stream already closed
+        }
+      };
 
       proc.onEvent((event) => {
         send(JSON.stringify(event));
-        if (event.type === "complete") controller.close();
+        if (event.type === "complete") {
+          try { controller.close(); } catch { /* already closed */ }
+        }
+      });
+
+      request.signal.addEventListener("abort", () => {
+        proc.kill();
+        try { controller.close(); } catch { /* already closed */ }
       });
     },
     cancel() {
@@ -37,8 +50,8 @@ export async function POST(request: Request) {
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
     },
   });
 }
