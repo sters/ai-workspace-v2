@@ -23,7 +23,7 @@ export function TodoItemRow({ item }: { item: TodoItemType }) {
         className={cn("flex items-start gap-2 py-1", statusStyles[item.status])}
         style={{ paddingLeft: `${item.indent * 0.75 + 0.5}rem` }}
       >
-        <span className="flex-shrink-0 text-sm">{statusIcons[item.status]}</span>
+        <span className="shrink-0 text-sm">{statusIcons[item.status]}</span>
         <span className="text-sm">{item.text}</span>
       </div>
       {item.children.length > 0 && (
