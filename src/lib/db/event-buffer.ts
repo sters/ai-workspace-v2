@@ -56,6 +56,13 @@ export function flushEvents(operationId: string): void {
     appendEvents(eventsToFlush);
     entry.consecutiveFailures = 0;
   } catch (err) {
+    // If the operation row was deleted (e.g. workspace deletion), discard events silently
+    if (err instanceof Error && "code" in err && (err as { code: string }).code === "SQLITE_CONSTRAINT_FOREIGNKEY") {
+      console.info(`[event-buffer] Operation ${operationId} no longer exists, discarding ${eventsToFlush.length} event(s)`);
+      entry.consecutiveFailures = 0;
+      return;
+    }
+
     entry.consecutiveFailures++;
     if (entry.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
       console.error(`[event-buffer] ${MAX_CONSECUTIVE_FAILURES} consecutive flush failures for ${operationId}, dropping ${eventsToFlush.length} event(s):`, err);

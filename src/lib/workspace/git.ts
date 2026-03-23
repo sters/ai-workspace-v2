@@ -5,7 +5,6 @@
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
-import { deleteStoredOperationsForWorkspace } from "../operation-store";
 import { exec, repoDir } from "./helpers";
 import type { WorkspaceRepo } from "@/types/workspace";
 
@@ -134,10 +133,7 @@ export function deleteWorkspace(workspaceName: string): void {
     }
   }
 
-  // Remove stored operation logs for this workspace
-  deleteStoredOperationsForWorkspace(workspaceName);
-
-  // Remove workspace directory
+  // Remove workspace directory (operation logs are kept in SQLite for history)
   rmSync(wsPath, { recursive: true, force: true });
 
   // Prune worktree references
