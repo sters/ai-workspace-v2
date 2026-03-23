@@ -20,17 +20,15 @@ export async function runFunctionPhase(
   const childId = `${operationId}-phase-${phaseIndex}`;
   (managed.operation.children ??= []).push({ id: childId, label: phase.label, status: "running" });
 
-  let phaseSuccess = false;
+  let phaseSuccess: boolean;
   try {
     const ctx = buildPhaseFunctionContext(managed, operationId, phaseIndex, phaseExtra);
     phaseSuccess = await phase.fn(ctx);
   } catch (err) {
-    if (managed.abortController.signal.aborted) {
-      phaseSuccess = false;
-    } else {
+    if (!managed.abortController.signal.aborted) {
       emitStatus(managed, `Phase ${phaseNum} error: ${err}`, phaseExtra);
-      phaseSuccess = false;
     }
+    phaseSuccess = false;
   }
 
   const child = (managed.operation.children ??= []).find((c) => c.id === childId);

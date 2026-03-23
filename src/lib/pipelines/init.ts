@@ -222,9 +222,9 @@ export function buildInitPipeline(
             return true;
           }
 
-          let action: "select" | "synthesize" = "select";
-          let candidateNum = 1;
-          let reasoning = "";
+          let action: "select" | "synthesize";
+          let candidateNum: number;
+          let reasoning: string;
           try {
             const decision = JSON.parse(reviewResultText ?? "{}");
             action = decision.action ?? "select";

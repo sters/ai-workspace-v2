@@ -93,7 +93,7 @@ export function setupRepository(
 
     // Detect ticket ID
     let ticketId = "";
-    let description = "";
+    let description: string;
     if (parts.length > 1 && /^[A-Z]+[-]?\d+$/i.test(parts[1])) {
       ticketId = parts[1];
       description = workspaceName
