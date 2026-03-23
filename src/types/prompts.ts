@@ -153,6 +153,28 @@ export interface WorkspaceSuggesterInput {
   operationOutput: string;
 }
 
+export interface DiscoveryInput {
+  /** The workspace being analyzed. */
+  workspace: {
+    name: string;
+    title: string;
+    taskType: string;
+    progress: number;
+    repositories: string[];
+    readmeContent: string;
+    todos: { repoName: string; completed: number; pending: number; blocked: number; total: number }[];
+  };
+  /** Operations that ran against this workspace. */
+  operations: {
+    type: string;
+    completedAt: string;
+    inputs: Record<string, unknown>;
+    resultSummary: string;
+  }[];
+  /** Names of all other existing workspaces (for deduplication). */
+  otherWorkspaceNames: string[];
+}
+
 export interface BestOfNFileSynthesizerInput {
   operationType: string;
   candidates: { label: string; files: { name: string; content: string }[] }[];
