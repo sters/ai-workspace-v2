@@ -51,19 +51,19 @@ const mcpStdioConfigSchema = z.object({
   type: z.literal("stdio").optional(),
   command: z.string(),
   args: z.array(z.string()).optional(),
-  env: z.record(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
 }).passthrough();
 
 const mcpSseConfigSchema = z.object({
   type: z.literal("sse"),
   url: z.string(),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
 }).passthrough();
 
 const mcpHttpConfigSchema = z.object({
   type: z.literal("http"),
   url: z.string(),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
 }).passthrough();
 
 export const mcpServerConfigSchema = z.union([
@@ -73,11 +73,11 @@ export const mcpServerConfigSchema = z.union([
 ]);
 
 export const mcpFileSchema = z.object({
-  mcpServers: z.record(z.unknown()),
+  mcpServers: z.record(z.string(), z.unknown()),
 }).passthrough();
 
 export const claudeJsonProjectSchema = z.object({
-  mcpServers: z.record(z.unknown()),
+  mcpServers: z.record(z.string(), z.unknown()),
 }).passthrough();
 
 // ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ export const askQuestionItemSchema = z.object({
 
 export const permissionDenialItemSchema = z.object({
   tool_name: z.string(),
-  tool_input: z.record(z.unknown()).optional(),
+  tool_input: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const toolResultBlockSchema = z.object({
@@ -162,7 +162,7 @@ export const operationListItemSchema = z.object({
     timeoutMs: z.number().optional(),
     startedAt: z.string().optional(),
   }).optional(),
-  inputs: z.record(z.string()).optional(),
+  inputs: z.record(z.string(), z.string()).optional(),
   resultSummary: z.object({
     content: z.string(),
     cost: z.string().optional(),

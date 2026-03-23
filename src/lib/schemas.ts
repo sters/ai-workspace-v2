@@ -115,7 +115,7 @@ export const mcpAuthSchema = z.object({
 export const mcpAddSchema = z.object({
   name: z.string().min(1, "name is required"),
   transport: z.enum(["stdio", "sse", "http"], {
-    errorMap: () => ({ message: "transport must be one of: stdio, sse, http" }),
+    error: "transport must be one of: stdio, sse, http",
   }),
   url: z.string().min(1, "url is required"),
   scope: z.enum(["project", "local"]).optional(),
@@ -132,7 +132,7 @@ export const chatSessionKillSchema = z.object({
 
 export const claudeSettingsWriteSchema = z.object({
   scope: z.enum(["project", "local", "user"], {
-    errorMap: () => ({ message: "Invalid scope. Must be one of: project, local, user" }),
+    error: "Invalid scope. Must be one of: project, local, user",
   }),
   content: z.string().min(1, "content is required"),
 });
@@ -151,8 +151,7 @@ export const suggestionAcceptSchema = z.object({
 
 export const aiwSettingsSchema = z.object({
   content: z.string({
-    required_error: "content is required",
-    invalid_type_error: "content is required",
+    error: "content is required",
   }),
 });
 
