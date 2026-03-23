@@ -76,7 +76,7 @@ export function wireChild(
         signal.removeEventListener("abort", onAbort);
         // Wrap JSON.parse in try/catch so a single malformed event
         // doesn't crash the entire operation.
-        let success = false;
+        let success: boolean;
         try {
           const data = JSON.parse(event.data);
           success = data.exitCode === 0;
