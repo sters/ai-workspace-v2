@@ -39,7 +39,7 @@ Per-workspace config stored in `~/.config/ai-workspace/{basename}-{hash}/config.
 
 ### Key architectural patterns
 
-- **SQLite persistence** — Per-workspace database in `~/.config/ai-workspace/{basename}-{hash}/db.sqlite` via `bun:sqlite`. DB singleton on `globalThis` (`src/lib/db/connection.ts`). Events are buffered in memory and flushed every 500ms or 50 events (`src/lib/db/event-buffer.ts`).
+- **SQLite persistence** — Per-workspace database in `~/.config/ai-workspace/{basename}-{hash}/db.sqlite` via `bun:sqlite`. DB singleton on `globalThis` (`src/lib/db/connection.ts`). Events are buffered in memory and flushed every 5s or 50 events (`src/lib/db/event-buffer.ts`).
 - **Pipeline orchestration** — Operations are sequences of `PipelinePhase`s (single child, parallel group, or TypeScript function). Entry point: `startOperationPipeline()` in `src/lib/pipeline/orchestrator.ts`. Max 3 concurrent operations. Pipeline definitions per operation type in `src/lib/pipelines/`. Recovers interrupted operations on restart (`src/lib/pipeline/resume.ts`).
 - **Claude CLI execution** — `src/lib/claude/cli.ts` spawns `claude -p --output-format stream-json`. Handles `AskUserQuestion` via `--resume {session_id}`. Facade in `src/lib/claude/index.ts` delegates to CLI or SDK.
 - **SSE streaming** — Clients connect to `/api/events?operationId=` for real-time operation output. Replays existing events on connection.

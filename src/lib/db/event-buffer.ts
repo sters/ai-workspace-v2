@@ -1,7 +1,7 @@
 import type { OperationEvent } from "@/types/operation";
 import { appendEvents } from "./events";
 
-const FLUSH_INTERVAL_MS = 500;
+const FLUSH_INTERVAL_MS = 5000;
 const FLUSH_THRESHOLD = 50;
 const MAX_BUFFER_SIZE = 10000;
 const MAX_CONSECUTIVE_FAILURES = 5;
