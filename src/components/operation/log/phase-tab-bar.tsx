@@ -21,7 +21,7 @@ export function PhaseTabBar({
         onClick={() => onTabClick("all")}
         className={`rounded-md px-2.5 py-1 text-left text-xs font-medium transition-colors ${
           activeTab === "all"
-            ? "bg-background text-foreground shadow-sm"
+            ? "bg-background text-foreground shadow-xs"
             : "hover:bg-background/50"
         }`}
       >
@@ -34,7 +34,7 @@ export function PhaseTabBar({
           onClick={() => onTabClick(phase.index)}
           className={`flex items-center gap-2 rounded-md px-2.5 py-1 text-left text-xs font-medium transition-colors ${
             activeTab === phase.index
-              ? "bg-background text-foreground shadow-sm"
+              ? "bg-background text-foreground shadow-xs"
               : "hover:bg-background/50"
           }`}
         >

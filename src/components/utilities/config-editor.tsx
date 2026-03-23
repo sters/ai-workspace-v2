@@ -95,7 +95,7 @@ export function ConfigEditor({
         )}
       </div>
 
-      <div className={`h-[32rem] rounded-md border ${showInvalidWarning ? "border-red-500" : ""}`}>
+      <div className={`h-128 rounded-md border ${showInvalidWarning ? "border-red-500" : ""}`}>
         <MonacoEditorLazy
           language={language}
           value={value}

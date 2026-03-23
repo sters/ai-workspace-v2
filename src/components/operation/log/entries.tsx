@@ -68,7 +68,7 @@ export function EntryRow({ entry }: { entry: LogEntry }) {
       );
     case "system":
       return (
-        <div className="whitespace-pre-wrap break-words text-xs text-muted-foreground italic">
+        <div className="whitespace-pre-wrap wrap-break-word text-xs text-muted-foreground italic">
           {entry.content}
         </div>
       );

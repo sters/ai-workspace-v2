@@ -25,7 +25,7 @@ export function OperationInputs({ inputs }: { inputs: Record<string, string> }) 
             <span className="text-xs font-medium text-muted-foreground">
               {INPUT_LABELS[key] ?? key}
             </span>
-            <p className="whitespace-pre-wrap break-words text-sm">{value}</p>
+            <p className="whitespace-pre-wrap wrap-break-word text-sm">{value}</p>
           </div>
         ))}
       </div>

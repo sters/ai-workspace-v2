@@ -55,7 +55,7 @@ export function AddMcpServerForm({ onAdded }: { onAdded: () => void }) {
     <Card className="mb-4">
       <h2 className="mb-3 text-sm font-semibold">Add MCP Server</h2>
       <div className="flex items-end gap-2">
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <label className="mb-1 block text-xs text-muted-foreground">
             Scope
           </label>
@@ -68,7 +68,7 @@ export function AddMcpServerForm({ onAdded }: { onAdded: () => void }) {
             <option value="local">local</option>
           </select>
         </div>
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           <label className="mb-1 block text-xs text-muted-foreground">
             Transport
           </label>
@@ -82,7 +82,7 @@ export function AddMcpServerForm({ onAdded }: { onAdded: () => void }) {
             <option value="http">http</option>
           </select>
         </div>
-        <div className="w-40 flex-shrink-0">
+        <div className="w-40 shrink-0">
           <label className="mb-1 block text-xs text-muted-foreground">
             Name
           </label>
@@ -113,7 +113,7 @@ export function AddMcpServerForm({ onAdded }: { onAdded: () => void }) {
           variant="primary"
           onClick={handleSubmit}
           disabled={submitting || !name.trim() || !url.trim()}
-          className="h-8 flex-shrink-0"
+          className="h-8 shrink-0"
         >
           {submitting ? "Adding..." : "Add"}
         </Button>
