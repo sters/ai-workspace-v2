@@ -126,7 +126,7 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
       setLocalOps((prev) => [op, ...prev]);
       mutate();
     },
-    [mutate]
+    [setLocalOps, mutate]
   );
 
   const handleCancel = useCallback(

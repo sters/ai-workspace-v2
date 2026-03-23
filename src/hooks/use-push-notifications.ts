@@ -5,24 +5,23 @@ import { useCallback, useEffect, useState } from "react";
 type PushState = "unsupported" | "default" | "denied" | "granted" | "subscribed";
 
 export function usePushNotifications() {
-  const [state, setState] = useState<PushState>("default");
+  const [state, setState] = useState<PushState>(() => {
+    if (typeof window === "undefined") return "default";
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return "unsupported";
+    if (Notification.permission === "denied") return "denied";
+    return "default";
+  });
 
+  // Async subscription check — setState in callback is OK
   useEffect(() => {
-    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-      setState("unsupported");
-      return;
-    }
-    if (Notification.permission === "denied") {
-      setState("denied");
-      return;
-    }
-    // Check if already subscribed
+    if (state !== "default" || typeof window === "undefined") return;
+    if (!("serviceWorker" in navigator)) return;
     navigator.serviceWorker.ready.then((reg) => {
       reg.pushManager.getSubscription().then((sub) => {
         setState(sub ? "subscribed" : Notification.permission === "granted" ? "granted" : "default");
       });
     });
-  }, []);
+  }, [state]);
 
   const subscribe = useCallback(async () => {
     if (!("serviceWorker" in navigator)) return;

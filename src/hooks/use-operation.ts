@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import { useSSE } from "./use-sse";
 import { operationListItemSchema } from "@/lib/runtime-schemas";
@@ -14,49 +14,86 @@ const STORAGE_PREFIX = "aiw-op:";
  *                    away and returning automatically reconnects to the SSE stream.
  */
 export function useOperation(storageKey?: string, initialOperationId?: string) {
-  const [operation, setOperation] = useState<OperationListItem | null>(null);
-  const restoredRef = useRef(false);
-
-  // ---------- Restore from initialOperationId or localStorage on mount ----------
-  useEffect(() => {
-    if (restoredRef.current) return;
-    restoredRef.current = true;
-
-    // If an explicit operation ID was provided, fetch it from the server
-    if (initialOperationId) {
-      fetch(`/api/operations`)
-        .then((r) => r.json())
-        .then((ops: OperationListItem[]) => {
-          const op = ops.find((o) => o.id === initialOperationId);
-          if (op) setOperation(op);
-        })
-        .catch(() => {});
-      return;
-    }
-
-    if (!storageKey) return;
+  // Restore from localStorage via lazy initializer (runs once, client-only)
+  const [baseOperation, setBaseOperation] = useState<OperationListItem | null>(() => {
+    if (typeof window === "undefined" || initialOperationId || !storageKey) return null;
     try {
       const raw = localStorage.getItem(`${STORAGE_PREFIX}${storageKey}`);
-      if (!raw) return;
+      if (!raw) return null;
       const result = operationListItemSchema.safeParse(JSON.parse(raw));
       if (result.success) {
         const op = result.data as OperationListItem;
-        // Auto-clear completed/failed operations on navigation
         if (op.status === "completed" || op.status === "failed") {
           localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
-          return;
+          return null;
         }
-        setOperation(op);
+        return op;
       }
     } catch (err) {
       console.warn("[use-operation] localStorage restore failed:", err);
     }
-  }, [storageKey, initialOperationId]);
+    return null;
+  });
+
+  // Fetch initial operation by ID (async — setState in callback is OK)
+  useEffect(() => {
+    if (!initialOperationId) return;
+    fetch(`/api/operations`)
+      .then((r) => r.json())
+      .then((ops: OperationListItem[]) => {
+        const op = ops.find((o) => o.id === initialOperationId);
+        if (op) setBaseOperation(op);
+      })
+      .catch(() => {});
+  }, [initialOperationId]);
 
   // ---------- SSE ----------
   const { events, connected, error: sseError, notFound: sseNotFound, clear } = useSSE(
-    operation?.id ?? null
+    baseOperation?.id ?? null
   );
+
+  // Clear stale operation during render when SSE reports errors
+  if ((sseNotFound || sseError) && baseOperation) {
+    setBaseOperation(null);
+  }
+
+  // ---------- Derive effective operation from base + events (no effect needed) ----------
+  const operation = useMemo(() => {
+    if (!baseOperation) return null;
+
+    let result = baseOperation;
+
+    // Detect __setWorkspace (use last occurrence)
+    for (const event of events) {
+      if (event.type === "status" && event.data.startsWith("__setWorkspace:")) {
+        const ws = event.data.slice("__setWorkspace:".length);
+        if (result.workspace !== ws) {
+          result = { ...result, workspace: ws };
+        }
+      }
+    }
+
+    // Detect pipeline-level complete (no childLabel)
+    if (result.status === "running") {
+      const completeEvent = events.findLast(
+        (e) => e.type === "complete" && !e.childLabel
+      );
+      if (completeEvent) {
+        try {
+          const d = JSON.parse(completeEvent.data);
+          result = {
+            ...result,
+            status: d.exitCode === 0 ? "completed" : "failed",
+            completedAt: completeEvent.timestamp,
+          };
+        } catch (err) {
+          console.warn("[use-operation] complete event parse failed:", err);
+        }
+      }
+    }
+
+    return result;
+  }, [baseOperation, events]);
 
   // ---------- Persist to localStorage ----------
   useEffect(() => {
@@ -70,67 +107,6 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
       localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
     }
   }, [storageKey, operation]);
-
-  // ---------- SSE not found → clear stale stored operation immediately ----------
-  // Guard: `operation` in the condition prevents re-entry after setOperation(null),
-  // since the effect re-fires when `operation` changes but the guard short-circuits.
-  useEffect(() => {
-    if (sseNotFound && storageKey && operation) {
-      localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
-      setOperation(null);
-    }
-  }, [sseNotFound, storageKey, operation]);
-
-  // ---------- SSE error → clear stale stored operation ----------
-  // Guard: same pattern as above — `operation` null-check prevents infinite loop
-  // when setOperation(null) triggers a re-render and this effect re-fires.
-  useEffect(() => {
-    if (sseError && storageKey && operation) {
-      // Server likely restarted and lost the operation
-      localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
-      setOperation(null);
-    }
-  }, [sseError, storageKey, operation]);
-
-  // ---------- Scan all events for __setWorkspace and complete ----------
-  // Events may arrive in batches (via requestAnimationFrame in useSSE),
-  // so we must scan all events rather than only checking the last one.
-  useEffect(() => {
-    // Detect __setWorkspace (use last occurrence)
-    let ws: string | undefined;
-    for (const event of events) {
-      if (event.type === "status" && event.data.startsWith("__setWorkspace:")) {
-        ws = event.data.slice("__setWorkspace:".length);
-      }
-    }
-    if (ws) {
-      setOperation((prev) => {
-        if (!prev || prev.workspace === ws) return prev;
-        return { ...prev, workspace: ws };
-      });
-    }
-
-    // Detect pipeline-level complete (no childLabel)
-    const completeEvent = events.findLast(
-      (e) => e.type === "complete" && !e.childLabel
-    );
-    if (completeEvent && operation?.status === "running") {
-      try {
-        const d = JSON.parse(completeEvent.data);
-        setOperation((prev) =>
-          prev
-            ? {
-                ...prev,
-                status: d.exitCode === 0 ? "completed" : "failed",
-                completedAt: new Date().toISOString(),
-              }
-            : null
-        );
-      } catch (err) {
-        console.warn("[use-operation] complete event parse failed:", err);
-      }
-    }
-  }, [events, operation?.status]);
 
   // ---------- Actions ----------
   const start = useCallback(
@@ -150,23 +126,23 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
         throw new Error("Invalid operation response from server");
       }
       const op = result.data as OperationListItem;
-      setOperation(op);
+      setBaseOperation(op);
       return op;
     },
     [clear]
   );
 
   const cancel = useCallback(async () => {
-    if (!operation) return;
+    if (!baseOperation) return;
     try {
-      await killOperation(operation.id);
+      await killOperation(baseOperation.id);
     } catch (err) {
       console.warn("[use-operation] kill failed:", err);
     }
-  }, [operation]);
+  }, [baseOperation]);
 
   const reset = useCallback(() => {
-    setOperation(null);
+    setBaseOperation(null);
     clear();
     if (storageKey) {
       localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);

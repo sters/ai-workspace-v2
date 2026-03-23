@@ -15,30 +15,34 @@ export function useSubagentOutput(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const esRef = useRef<EventSource | null>(null);
-  const prevFileRef = useRef<string | undefined>(undefined);
 
-  // Reset accumulated content when outputFile changes
-  useEffect(() => {
-    if (prevFileRef.current !== outputFile) {
-      prevFileRef.current = outputFile;
+  // Track previous props with state to reset when they change (React recommended pattern)
+  const [prevFile, setPrevFile] = useState(outputFile);
+  const [prevEnabled, setPrevEnabled] = useState(enabled);
+
+  if (prevFile !== outputFile || prevEnabled !== enabled) {
+    setPrevFile(outputFile);
+    setPrevEnabled(enabled);
+    if (!enabled || !outputFile) {
+      if (loading) setLoading(false);
+      if (content) setContent("");
+      if (error) setError(false);
+    } else {
       setContent("");
       setError(false);
+      setLoading(true);
     }
-  }, [outputFile]);
+  }
 
-  // Manage EventSource connection
+  // Manage EventSource connection — setState only in callbacks
   useEffect(() => {
     if (!enabled || !outputFile) {
       if (esRef.current) {
         esRef.current.close();
         esRef.current = null;
-        setLoading(false);
       }
       return;
     }
-
-    setLoading(true);
-    setError(false);
 
     const es = new EventSource(
       `/api/subagent-output?path=${encodeURIComponent(outputFile)}`

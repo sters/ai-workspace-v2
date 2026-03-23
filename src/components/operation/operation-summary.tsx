@@ -14,7 +14,7 @@ export function formatRemaining(ms: number): string {
 }
 
 export function useNow(intervalMs: number) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (intervalMs <= 0) return;
     const id = setInterval(() => setNow(Date.now()), intervalMs);
