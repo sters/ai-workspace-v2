@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { OperationLogProps } from "@/types/components";
 import { parseStreamEvent, enrichPermissionDenials } from "@/lib/parsers/stream";
 import { parsePhaseUpdatesFromEntries } from "@/lib/parse-phase-updates";
@@ -16,8 +16,8 @@ export function OperationLog({
   events,
   isRunning,
 }: OperationLogProps) {
-  const [activePhaseTab, setActivePhaseTab] = useState<number | "all">("all");
-  const userSelectedTabRef = useRef(false);
+  // null = auto mode (follow latest running phase), number/"all" = user-selected
+  const [userSelectedTab, setUserSelectedTab] = useState<number | "all" | null>(null);
 
   const entries = useMemo(() => {
     const result: LogEntry[] = [];
@@ -76,14 +76,13 @@ export function OperationLog({
     [entries],
   );
 
-  // Auto-switch to the latest running phase (unless user manually selected a tab)
-  useEffect(() => {
-    if (!livePhases || userSelectedTabRef.current) return;
+  // Derive active tab: user selection takes priority, otherwise follow latest running phase
+  const activePhaseTab = useMemo(() => {
+    if (userSelectedTab !== null) return userSelectedTab;
+    if (!livePhases) return "all" as const;
     const running = livePhases.filter((p) => p.status === "running");
-    if (running.length > 0) {
-      setActivePhaseTab(running[running.length - 1].index);
-    }
-  }, [livePhases]);
+    return running.length > 0 ? running[running.length - 1].index : "all" as const;
+  }, [userSelectedTab, livePhases]);
 
   // Filter entries by phase when a specific tab is selected
   const filteredEntries = useMemo(() => {
@@ -121,8 +120,7 @@ export function OperationLog({
   const pendingAsk = isRunning ? findPendingAsk(entries) : null;
 
   const handleTabClick = (tab: number | "all") => {
-    userSelectedTabRef.current = tab !== "all";
-    setActivePhaseTab(tab);
+    setUserSelectedTab(tab === "all" ? null : tab);
   };
 
   return (
