@@ -18,6 +18,7 @@ let _listByStatus: Statement | null = null;
 let _deleteById: Statement | null = null;
 let _deleteByWorkspace: Statement | null = null;
 let _listWithAge: Statement | null = null;
+let _listRecentCompleted: Statement | null = null;
 
 function stmts(db: Database) {
   if (!_insert) {
@@ -72,6 +73,11 @@ function stmts(db: Database) {
       "SELECT id, type, workspace, started_at FROM operations ORDER BY started_at ASC",
     );
   }
+  if (!_listRecentCompleted) {
+    _listRecentCompleted = db.prepare(
+      "SELECT * FROM operations WHERE status = 'completed' ORDER BY completed_at DESC LIMIT ?",
+    );
+  }
   return {
     insert: _insert,
     updateStatus: _updateStatus,
@@ -84,6 +90,7 @@ function stmts(db: Database) {
     deleteById: _deleteById,
     deleteByWorkspace: _deleteByWorkspace,
     listWithAge: _listWithAge,
+    listRecentCompleted: _listRecentCompleted,
   };
 }
 
@@ -100,6 +107,7 @@ export function _resetStatements(): void {
   _deleteById = null;
   _deleteByWorkspace = null;
   _listWithAge = null;
+  _listRecentCompleted = null;
 }
 
 _onDbReset(_resetStatements);
@@ -275,4 +283,11 @@ export function deleteOperationsForWorkspace(workspace: string): boolean {
   const s = stmts(db);
   const result = s.deleteByWorkspace.run(workspace);
   return result.changes > 0;
+}
+
+export function listRecentCompletedOperations(limit: number = 20): OperationListItem[] {
+  const db = getDb();
+  const s = stmts(db);
+  const rows = s.listRecentCompleted.all(limit) as OperationRow[];
+  return rows.map(rowToListItem);
 }

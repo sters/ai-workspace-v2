@@ -17,6 +17,7 @@ const UTILITY_TYPE_PATHS: Partial<Record<OperationType, string>> = {
   "operation-prune": "/utilities/operation-prune",
   "mcp-auth": "/utilities/mcp-servers",
   "claude-login": "/utilities/claude-auth",
+  "discovery": "/suggestions/discover",
 };
 
 function getViewHref(op: OperationListItem): string | null {

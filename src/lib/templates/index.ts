@@ -34,4 +34,6 @@ export {
   AUTONOMOUS_GATE_SCHEMA,
   buildWorkspaceSuggesterPrompt,
   WORKSPACE_SUGGESTION_SCHEMA,
+  buildDiscoveryPrompt,
+  DISCOVERY_SCHEMA,
 } from "./prompts";

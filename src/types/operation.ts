@@ -12,7 +12,8 @@ export type OperationType =
   | "claude-login"
   | "batch"
   | "autonomous"
-  | "search";
+  | "search"
+  | "discovery";
 
 export type OperationStatus = "running" | "completed" | "failed";
 

@@ -23,3 +23,4 @@ export {
 } from "./best-of-n-reviewer";
 export { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "./autonomous-gate";
 export { buildWorkspaceSuggesterPrompt, WORKSPACE_SUGGESTION_SCHEMA } from "./workspace-suggester";
+export { buildDiscoveryPrompt, DISCOVERY_SCHEMA } from "./discovery";

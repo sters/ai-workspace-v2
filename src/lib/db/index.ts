@@ -14,6 +14,7 @@ export {
   listOperationsWithAge,
   deleteOperation,
   deleteOperationsForWorkspace,
+  listRecentCompletedOperations,
   _resetStatements,
 } from "./operations";
 

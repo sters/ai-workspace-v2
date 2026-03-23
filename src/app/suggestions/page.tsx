@@ -6,7 +6,6 @@ import { useOperation } from "@/hooks/use-operation";
 import { useSuggestions } from "@/hooks/use-suggestions";
 import { postJson } from "@/lib/api";
 import { INIT_STORAGE_KEY, InitSplitButton } from "@/components/operation/init-operation";
-import { PageHeader } from "@/components/shared/feedback/page-header";
 import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import { X } from "lucide-react";
 import type { InteractionLevel } from "@/types/prompts";
@@ -36,11 +35,6 @@ export default function SuggestionsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Suggestions"
-        description="Out-of-scope items discovered during operations. Click a suggestion to create a new workspace."
-      />
-
       <div className="space-y-4">
         <div>
           <label className="mb-1 block text-xs font-medium">
