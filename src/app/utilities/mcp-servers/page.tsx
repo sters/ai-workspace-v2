@@ -8,7 +8,7 @@ import { Card } from "@/components/shared/containers/card";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { fetcher } from "@/lib/api";
-import type { McpServerEntry, McpConnectionStatus } from "@/types/claude";
+import type { McpServerEntry, McpConnectionStatus, McpServerTools } from "@/types/claude";
 
 export default function McpServersPage() {
   const { data, error, isLoading, mutate } = useSWR<{
@@ -22,8 +22,18 @@ export default function McpServersPage() {
     revalidateOnReconnect: false,
   });
 
+  const { data: toolsData } = useSWR<{ tools: McpServerTools[] }>(
+    "/api/mcp-servers/tools",
+    fetcher,
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+
   const statusMap = new Map(
     (statusData?.statuses ?? []).map((s) => [s.name, s])
+  );
+
+  const toolsMap = new Map(
+    (toolsData?.tools ?? []).map((t) => [t.name, t.tools])
   );
 
   const handleSaved = useCallback(() => {
@@ -64,6 +74,7 @@ export default function McpServersPage() {
               key={`${server.scope}-${server.name}-${i}`}
               server={server}
               connectionStatus={statusMap.get(server.name)}
+              tools={toolsMap.get(server.name)}
               onSaved={handleSaved}
             />
           ))}
