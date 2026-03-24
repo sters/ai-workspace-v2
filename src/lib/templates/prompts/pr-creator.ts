@@ -81,6 +81,7 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
    - Title: concise, under 70 characters
    - If a PR Template is provided above, fill in each section of the template with the relevant change information. Do NOT search for a template file.
    - If no PR Template is provided, use a standard format
+   - Do NOT include a list of changed files unless the PR Template explicitly requires it — reviewers can see the diff directly
    - Include ticket URLs in "Related issues" section
 
 3. **Push and Create**:
@@ -92,7 +93,7 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 ### If Updating an Existing PR
 
 1. **Use the Existing PR Body as the base** — preserve its structure, formatting, and any content the user has manually added
-2. **Update only the sections that describe what this PR is** (summary, changed files, implementation details) to reflect the current full set of changes. The description should explain "what this PR is", not log each update or review feedback.
+2. **Update only the sections that describe what this PR is** (summary, implementation details) to reflect the current full set of changes. The description should explain "what this PR is", not log each update or review feedback.
 3. **Do NOT add** update history, incremental change logs, or review feedback sections
 4. **Keep everything else unchanged** — do NOT remove or rewrite user-added notes, QA results, manual annotations, or any human-added content
 5. **Update the title** if the scope of changes has significantly shifted
