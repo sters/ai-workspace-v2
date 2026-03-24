@@ -13,14 +13,17 @@ import type { McpServerEntry, McpConnectionStatus } from "@/types/claude";
 export function ServerCard({
   server,
   connectionStatus,
+  tools,
   onSaved,
 }: {
   server: McpServerEntry;
   connectionStatus?: McpConnectionStatus;
+  tools?: string[];
   onSaved: () => void;
 }) {
   const needsAuth = connectionStatus?.status === "needs_auth";
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [toolsExpanded, setToolsExpanded] = useState(false);
 
   const handleRemove = useCallback(async () => {
     const result = await removeMcpServer({ name: server.name, scope: server.scope });
@@ -67,6 +70,14 @@ export function ServerCard({
         <h2 className="font-semibold">{server.name}</h2>
         <ScopeBadge scope={server.scope} />
         <ConnectionBadge connectionStatus={connectionStatus} />
+        {tools && tools.length > 0 && (
+          <button
+            onClick={() => setToolsExpanded((v) => !v)}
+            className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 transition-colors"
+          >
+            {tools.length} tool{tools.length !== 1 ? "s" : ""}
+          </button>
+        )}
         <div className="ml-auto flex items-center gap-2">
           {!mcpAuth.isRunning && !mcpAuth.operation && (
             <>
@@ -140,6 +151,16 @@ export function ServerCard({
           </span>
         )}
       </div>
+
+      {toolsExpanded && tools && tools.length > 0 && (
+        <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs">
+          {tools.map((tool) => (
+            <li key={tool} className="font-mono text-muted-foreground">
+              {tool}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* MCP Auth terminal — inline xterm.js readonly display */}
       {mcpAuth.operation && mcpAuth.events.length > 0 && (

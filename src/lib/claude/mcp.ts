@@ -1,15 +1,17 @@
 import path from "node:path";
 import os from "node:os";
-import { spawnClaudeSync } from "./cli";
+import { spawnClaude, spawnClaudeSync } from "./cli";
 import { getResolvedWorkspaceRoot } from "../config";
 import type {
   McpAuthStatus,
   McpConnectionStatus,
   McpServerConfig,
   McpServerEntry,
+  McpServerTools,
   McpSSEServerConfig,
   McpStdioServerConfig,
   McpHttpServerConfig,
+  StreamEvent,
 } from "@/types/claude";
 import { mcpFileSchema, mcpServerConfigSchema, claudeJsonProjectSchema } from "../runtime-schemas";
 
@@ -140,4 +142,88 @@ export function getMcpStatuses(): McpConnectionStatus[] {
     throw new Error(stderr || "claude mcp list failed");
   }
   return parseClaudeMcpList(result.stdout.toString());
+}
+
+// ---------------------------------------------------------------------------
+// MCP tool listing (parsed from system init event's tools array)
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract MCP tools from the `system` init event's `tools` array.
+ * MCP tools follow the naming convention `mcp__{serverName}__{toolName}`.
+ * Groups them by server name.
+ */
+export function parseMcpToolsFromInitEvent(tools: string[]): McpServerTools[] {
+  const serverMap = new Map<string, string[]>();
+
+  for (const tool of tools) {
+    if (!tool.startsWith("mcp__")) continue;
+    // mcp__{serverName}__{toolName}
+    const rest = tool.slice(5); // remove "mcp__"
+    const sep = rest.indexOf("__");
+    if (sep === -1) continue;
+    const serverName = rest.slice(0, sep);
+    const toolName = rest.slice(sep + 2);
+    if (!serverMap.has(serverName)) {
+      serverMap.set(serverName, []);
+    }
+    serverMap.get(serverName)!.push(toolName);
+  }
+
+  return Array.from(serverMap.entries()).map(([name, toolNames]) => ({
+    name,
+    tools: toolNames,
+  }));
+}
+
+/**
+ * Spawn `claude -p` with a minimal prompt, read the system init event,
+ * and extract MCP tool names from the tools array.
+ * Kills the process as soon as the init event is found to avoid wasting tokens.
+ */
+export async function getMcpTools(): Promise<McpServerTools[]> {
+  const proc = spawnClaude({
+    args: [
+      "-p", "-",
+      "--output-format", "stream-json",
+      "--verbose",
+      "--model", "haiku",
+    ],
+    stdin: "pipe",
+  });
+
+  // Send a trivial prompt — we only need the system init event
+  if (proc.stdin) {
+    proc.stdin.write("Say OK");
+    proc.stdin.end();
+  }
+
+  // Stream stdout incrementally and kill as soon as init event is found
+  try {
+    const reader = proc.stdout.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const result = Bun.JSONL.parseChunk(buffer);
+      if (result.read > 0) {
+        buffer = buffer.slice(result.read);
+      }
+
+      for (const parsed of result.values as StreamEvent[]) {
+        if (parsed.type === "system" && parsed.subtype === "init" && Array.isArray(parsed.tools)) {
+          proc.kill();
+          return parseMcpToolsFromInitEvent(parsed.tools);
+        }
+      }
+    }
+  } catch {
+    // Process may have been killed
+  }
+
+  return [];
 }

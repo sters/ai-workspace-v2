@@ -163,6 +163,11 @@ export type McpConnectionStatus = {
   statusText: string;
 };
 
+export type McpServerTools = {
+  name: string;
+  tools: string[];
+};
+
 // ---------------------------------------------------------------------------
 // MCP server config types
 // ---------------------------------------------------------------------------
