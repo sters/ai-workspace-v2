@@ -35,12 +35,17 @@ export function generateDefaultConfigContent(): string {
     "#   functionTimeoutMinutes: 3",
     "#   defaultInteractionLevel: mid   # low / mid / high",
     "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates",
+    "#   model: null                    # null = CLI default (opus / sonnet / haiku)",
     "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
     "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
     "#   #   claudeTimeoutMinutes: 20",
     "#   #   functionTimeoutMinutes: 3",
     "#   #   defaultInteractionLevel: mid",
     "#   #   bestOfN: 0",
+    "#   #   model: sonnet",
+    "#   #   steps:",
+    "#   #     <step-type>:",
+    "#   #       model: haiku",
     "",
     "# editor: code {path}",
     "# terminal: open -a Terminal {path}",
@@ -157,6 +162,10 @@ const TYPE_OVERRIDE_HINT_LINES = [
   "#   #   functionTimeoutMinutes: 3",
   "#   #   defaultInteractionLevel: mid",
   "#   #   bestOfN: 0",
+  "#   #   model: sonnet",
+  "#   #   steps:",
+  "#   #     <step-type>:",
+  "#   #       model: haiku",
 ];
 
 /**
@@ -204,6 +213,10 @@ function commentOutUnknownKeys(lines: string[]): string[] {
   let sectionCommentedOut = false;
   // Track operation-type sub-section within "operations" (e.g., "review", "execute")
   let opsSubSection: string | null = null;
+  // Track whether we are inside a "steps:" block within an operation-type sub-section.
+  // All keys inside "steps:" are arbitrary step type names and should NOT be commented out.
+  let inStepsBlock = false;
+  let stepsIndent = 0;
 
   return lines.map((line) => {
     const parsed = parseConfigLine(line);
@@ -211,6 +224,7 @@ function commentOutUnknownKeys(lines: string[]): string[] {
     if (parsed.type === "top-key") {
       sectionCommentedOut = false;
       opsSubSection = null;
+      inStepsBlock = false;
       if (SECTION_NAMES.has(parsed.key!)) {
         currentSection = parsed.key!;
       } else {
@@ -234,13 +248,29 @@ function commentOutUnknownKeys(lines: string[]): string[] {
           return `# ${line}`;
         }
         if (currentSection === "operations") {
+          // If inside a steps block, allow all keys (arbitrary step type names and their settings)
+          if (inStepsBlock && parsed.indent != null && parsed.indent > stepsIndent) {
+            return line;
+          }
+          // Leaving the steps block
+          if (inStepsBlock && parsed.indent != null && parsed.indent <= stepsIndent) {
+            inStepsBlock = false;
+          }
+
           // Check for operation-type sub-section headers (2-space indent)
           if (parsed.indent === 2 && OPERATION_TYPE_NAMES.has(parsed.key!)) {
             opsSubSection = parsed.key!;
+            inStepsBlock = false;
             return line; // Valid sub-section header
           }
           // Check for keys inside an operation-type sub-section (4+ space indent)
           if (opsSubSection && parsed.indent != null && parsed.indent >= 4) {
+            // Detect "steps:" header
+            if (parsed.key === "steps") {
+              inStepsBlock = true;
+              stepsIndent = parsed.indent;
+              return line;
+            }
             if (OVERRIDABLE_SETTINGS_KEYS.has(parsed.key! as keyof OperationTypeSettings)) {
               return line; // Valid overridable setting
             }
@@ -249,6 +279,7 @@ function commentOutUnknownKeys(lines: string[]): string[] {
           // Regular operations nested key (2-space indent, not a sub-section)
           if (parsed.indent === 2) {
             opsSubSection = null; // Left the sub-section
+            inStepsBlock = false;
           }
           const isKnown = KNOWN_CONFIG_KEYS.some(
             (k) => k.section === "operations" && k.key === parsed.key!,
@@ -263,13 +294,23 @@ function commentOutUnknownKeys(lines: string[]): string[] {
           if (!isKnown) return `# ${line}`;
         }
       } else {
-        // Track sub-section from commented lines too
-        if (currentSection === "operations" && parsed.indent === 2) {
-          if (OPERATION_TYPE_NAMES.has(parsed.key!)) {
-            opsSubSection = parsed.key!;
-          } else if (!OVERRIDABLE_SETTINGS_KEYS.has(parsed.key! as keyof OperationTypeSettings)
-            && !KNOWN_CONFIG_KEYS.some((k) => k.section === "operations" && k.key === parsed.key!)) {
-            opsSubSection = null;
+        // Track sub-section and steps from commented lines too
+        if (currentSection === "operations") {
+          if (inStepsBlock && parsed.indent != null && parsed.indent <= stepsIndent) {
+            inStepsBlock = false;
+          }
+          if (parsed.indent === 2) {
+            if (OPERATION_TYPE_NAMES.has(parsed.key!)) {
+              opsSubSection = parsed.key!;
+              inStepsBlock = false;
+            } else if (!OVERRIDABLE_SETTINGS_KEYS.has(parsed.key! as keyof OperationTypeSettings)
+              && !KNOWN_CONFIG_KEYS.some((k) => k.section === "operations" && k.key === parsed.key!)) {
+              opsSubSection = null;
+              inStepsBlock = false;
+            }
+          } else if (opsSubSection && parsed.indent != null && parsed.indent >= 4 && parsed.key === "steps") {
+            inStepsBlock = true;
+            stepsIndent = parsed.indent;
           }
         }
       }
@@ -278,6 +319,7 @@ function commentOutUnknownKeys(lines: string[]): string[] {
     // Track section from commented headers too
     if (parsed.type === "top-key" && parsed.commented) {
       opsSubSection = null;
+      inStepsBlock = false;
       if (SECTION_NAMES.has(parsed.key!)) {
         currentSection = parsed.key!;
       } else {

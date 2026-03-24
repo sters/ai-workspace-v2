@@ -1,6 +1,7 @@
 import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import { buildReviewerPrompt } from "@/lib/templates";
-import type { PipelinePhaseFunction } from "@/types/pipeline";
+import { STEP_TYPES } from "@/types/pipeline";
+import type { GroupChild, PipelinePhaseFunction } from "@/types/pipeline";
 
 export function buildReviewTodosPhase(input: {
   workspace: string;
@@ -18,7 +19,7 @@ export function buildReviewTodosPhase(input: {
         return true;
       }
 
-      const children: { label: string; prompt: string; cwd?: string; addDirs?: string[] }[] = [];
+      const children: GroupChild[] = [];
       for (const repo of input.repos) {
         const todoFile = Bun.file(
           `${input.wsPath}/TODO-${repo.repoName}.md`,
@@ -28,6 +29,7 @@ export function buildReviewTodosPhase(input: {
 
         children.push({
           label: `review-${repo.repoName}`,
+          stepType: STEP_TYPES.REVIEW_TODOS,
           prompt: buildReviewerPrompt({
             workspaceName: input.workspace,
             repoName: repo.repoName,

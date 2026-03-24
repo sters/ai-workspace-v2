@@ -1,6 +1,15 @@
 import type { OperationEvent, OperationStatus } from "./operation";
 import type { DataListener } from "./pty";
 
+/** Known Claude model short aliases accepted by the CLI --model flag. */
+export const CLAUDE_MODELS = {
+  OPUS: "opus",
+  SONNET: "sonnet",
+  HAIKU: "haiku",
+} as const;
+
+export type ClaudeModel = (typeof CLAUDE_MODELS)[keyof typeof CLAUDE_MODELS];
+
 export interface ClaudeProcess {
   id: string;
   onEvent: (handler: (event: OperationEvent) => void) => void;
@@ -19,6 +28,8 @@ export interface RunClaudeOptions {
   addDirs?: string[];
   /** When true, let the CLI auto-error response to AskUserQuestion flow through instead of killing the process and waiting for user input. Claude will see the error and continue without the user's answer. */
   skipAskUserQuestion?: boolean;
+  /** Claude model to use (e.g. "opus", "sonnet", "haiku"). Passed as --model to CLI. */
+  model?: ClaudeModel;
 }
 
 // TODO: Replace with Record<string, unknown> or a discriminated union once

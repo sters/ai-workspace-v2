@@ -189,6 +189,11 @@ export function mergeConfig(
         file.operations?.bestOfN,
         defaults.operations.bestOfN,
       ),
+      model: pick(
+        env.operations?.model,
+        file.operations?.model,
+        defaults.operations.model,
+      ),
       typeOverrides: mergedTypeOverrides,
     },
     editor: pick(env.editor, file.editor, defaults.editor),
@@ -212,6 +217,8 @@ export function getOperationConfig(type: OperationType): OperationTypeSettings {
     functionTimeoutMinutes: overrides?.functionTimeoutMinutes ?? cfg.operations.functionTimeoutMinutes,
     defaultInteractionLevel: overrides?.defaultInteractionLevel ?? cfg.operations.defaultInteractionLevel,
     bestOfN: overrides?.bestOfN ?? cfg.operations.bestOfN,
+    model: overrides?.model ?? cfg.operations.model,
+    steps: overrides?.steps,
   };
 }
 

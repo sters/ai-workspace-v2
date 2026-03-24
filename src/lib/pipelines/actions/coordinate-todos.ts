@@ -1,6 +1,7 @@
 import path from "node:path";
 import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import { buildCoordinatorPrompt } from "@/lib/templates";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhaseFunction } from "@/types/pipeline";
 
 export function buildCoordinateTodosPhase(input: {
@@ -43,7 +44,7 @@ export function buildCoordinateTodosPhase(input: {
       });
 
       ctx.emitStatus("Coordinating TODOs across repositories");
-      return ctx.runChild("Coordinate TODOs", prompt, { addDirs: [input.wsPath] });
+      return ctx.runChild("Coordinate TODOs", prompt, { addDirs: [input.wsPath], stepType: STEP_TYPES.COORDINATE_TODOS });
     },
   };
 }

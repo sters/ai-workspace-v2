@@ -3,6 +3,7 @@ import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildCreateTodoFromReviewPrompt } from "@/lib/templates";
 import { getWorkspaceDir } from "@/lib/config";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import { getTimeoutDefaults } from "@/lib/pipeline-manager";
 import { buildCommitSnapshotPhase } from "./actions/commit-snapshot";
@@ -34,6 +35,7 @@ export function buildCreateTodoPipeline(
 
         const children = repos.map((repo) => ({
           label: `plan-${repo.repoName}`,
+          stepType: STEP_TYPES.PLAN_TODO_FROM_REVIEW,
           prompt: buildCreateTodoFromReviewPrompt({
             workspaceName: workspace,
             repoPath: repo.repoPath,

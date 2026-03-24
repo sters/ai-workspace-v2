@@ -16,6 +16,7 @@ import {
 } from "@/lib/templates";
 import { writeReportTemplates } from "@/lib/workspace";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
 
@@ -61,7 +62,7 @@ export async function buildExecutePipeline(input: {
     });
 
     return [
-      { kind: "single", label: "Research", prompt },
+      { kind: "single", label: "Research", prompt, stepType: STEP_TYPES.RESEARCH },
     ];
   }
 
@@ -178,6 +179,7 @@ async function executeRepoLane(
     });
     return ctx.runChild(repo.repoName, prompt, {
       addDirs: [wsPath],
+      stepType: STEP_TYPES.EXECUTE,
     });
   }
 
@@ -234,7 +236,7 @@ async function executeRepoLane(
     const success = await ctx.runChild(
       `${repo.repoName} [batch ${i + 1}/${totalBatches}]`,
       prompt,
-      { addDirs: [wsPath] },
+      { addDirs: [wsPath], stepType: STEP_TYPES.EXECUTE },
     );
 
     if (!success) {

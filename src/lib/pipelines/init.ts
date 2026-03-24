@@ -22,6 +22,7 @@ import {
   BEST_OF_N_REVIEW_SCHEMA,
 } from "@/lib/templates";
 import { runBestOfNFiles } from "./actions/best-of-n-files";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 import { getTimeoutDefaults } from "@/lib/pipeline-manager";
@@ -137,6 +138,7 @@ export function buildInitPipeline(
         const runOnce = (label?: string) =>
           ctx.runChild(label ?? "Analyze & draft README", prompt, {
             jsonSchema: INIT_ANALYSIS_SCHEMA,
+            stepType: STEP_TYPES.ANALYZE_README,
             onResultText: (text) => {
               analysis = parseAnalysis(text, description);
             },
@@ -171,6 +173,7 @@ export function buildInitPipeline(
               label: `${label}: Analyze & draft README`,
               prompt,
               jsonSchema: INIT_ANALYSIS_SCHEMA as Record<string, unknown>,
+              stepType: STEP_TYPES.ANALYZE_README,
               onResultText: (text: string) => {
                 candidateAnalyses.set(label, parseAnalysis(text, description));
               },
@@ -462,6 +465,7 @@ export function buildInitPipeline(
         const buildPlannerChildren = (todoOutputDir?: string, addDirsOverride?: string[]) =>
           repoResults.map((repo) => ({
             label: `plan-${repo.repoName}`,
+            stepType: STEP_TYPES.PLAN_TODO,
             prompt: buildPlannerPrompt({
               workspaceName: wsName,
               repoPath: repo.repoPath,

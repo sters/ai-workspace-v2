@@ -55,6 +55,8 @@ export const OVERRIDABLE_SETTINGS_KEYS = new Set<keyof OperationTypeSettings>([
   "functionTimeoutMinutes",
   "defaultInteractionLevel",
   "bestOfN",
+  "model",
+  "steps",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -84,6 +86,7 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "functionTimeoutMinutes", section: "operations", defaultLine: "#   functionTimeoutMinutes: 3" },
   { key: "defaultInteractionLevel", section: "operations", defaultLine: "#   defaultInteractionLevel: mid   # low / mid / high" },
   { key: "bestOfN", section: "operations", defaultLine: "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates" },
+  { key: "model", section: "operations", defaultLine: "#   model: null                    # null = CLI default (opus / sonnet / haiku)" },
   { key: "editor", section: null, defaultLine: "# editor: code {path}" },
   { key: "terminal", section: null, defaultLine: "# terminal: open -a Terminal {path}" },
 ];

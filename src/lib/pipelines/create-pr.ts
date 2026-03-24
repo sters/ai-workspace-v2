@@ -10,6 +10,7 @@ import {
 } from "@/lib/workspace";
 import { getWorkspaceDir } from "@/lib/config";
 import { buildPRCreatorPrompt } from "@/lib/templates";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
 
@@ -57,6 +58,7 @@ export async function buildCreatePrPipeline(input: {
     return {
       label: repo.repoName,
       prompt,
+      stepType: STEP_TYPES.CREATE_PR,
       addDirs: [path.join(getWorkspaceDir(), workspace)],
     };
   });
