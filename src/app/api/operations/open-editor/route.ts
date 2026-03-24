@@ -1,9 +1,8 @@
 import { existsSync } from "node:fs";
-import path from "node:path";
 import { NextResponse } from "next/server";
 import { workspaceSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
-import { getConfig, getWorkspaceDir, resolveWorkspaceName } from "@/lib/config";
+import { getConfig, resolveWorkspacePath } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
 
@@ -12,9 +11,8 @@ export async function POST(request: Request) {
   const parsed = parseBody(workspaceSchema, body);
   if (!parsed.success) return parsed.response;
 
-  const workspace = resolveWorkspaceName(parsed.data.workspace);
-  const workspacePath = path.join(getWorkspaceDir(), workspace);
-  if (!existsSync(workspacePath)) {
+  const workspacePath = resolveWorkspacePath(parsed.data.workspace);
+  if (!workspacePath || !existsSync(workspacePath)) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 

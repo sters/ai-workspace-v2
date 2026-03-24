@@ -9,3 +9,18 @@ export function getWorkspaceDir(): string {
 export function resolveWorkspaceName(input: string): string {
   return path.basename(input);
 }
+
+/**
+ * Resolve an input path to an absolute path within the workspace root.
+ * Accepts both absolute paths (already under workspace root) and bare
+ * workspace names. Returns `null` if the resolved path escapes the root.
+ */
+export function resolveWorkspacePath(input: string): string | null {
+  const root = getResolvedWorkspaceRoot();
+  const resolved = path.isAbsolute(input)
+    ? path.resolve(input)
+    : path.resolve(getWorkspaceDir(), input);
+  // Ensure the path is within the workspace root (prevent traversal)
+  if (!resolved.startsWith(root + path.sep) && resolved !== root) return null;
+  return resolved;
+}
