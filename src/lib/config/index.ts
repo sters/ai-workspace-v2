@@ -44,4 +44,5 @@ export {
 export {
   getWorkspaceDir,
   resolveWorkspaceName,
+  resolveWorkspacePath,
 } from "./workspace";
