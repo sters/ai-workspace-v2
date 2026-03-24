@@ -29,6 +29,9 @@ export {
   _setConfigFilePath,
 } from "./resolver";
 
+// Model resolution
+export { resolveModel } from "./model";
+
 // Migration & generation
 export {
   ensureConfigFile,

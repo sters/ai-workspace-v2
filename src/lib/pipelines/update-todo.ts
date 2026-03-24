@@ -3,6 +3,7 @@ import { getWorkspaceDir } from "@/lib/config";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildUpdaterPrompt } from "@/lib/templates";
 import { runBestOfNFiles } from "./actions/best-of-n-files";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 
@@ -69,12 +70,13 @@ export async function buildUpdateTodoPipeline(input: {
           buildChildren: (candidateDir) => [{
             label: "Update TODOs",
             prompt: buildPromptForDir(candidateDir),
+            stepType: STEP_TYPES.UPDATE_TODO,
             addDirs: [candidateDir, ...repos.map((r) => r.worktreePath)],
           }],
           confirm: bestOfNConfirm,
           interactionLevel,
           runNormal: async (innerCtx) => {
-            return innerCtx.runChild("Update TODOs", prompt, { addDirs: [workspacePath] });
+            return innerCtx.runChild("Update TODOs", prompt, { addDirs: [workspacePath], stepType: STEP_TYPES.UPDATE_TODO });
           },
         });
       },
@@ -82,6 +84,6 @@ export async function buildUpdateTodoPipeline(input: {
   }
 
   return [
-    { kind: "single", label: "Update TODOs", prompt, addDirs: [workspacePath] },
+    { kind: "single", label: "Update TODOs", prompt, stepType: STEP_TYPES.UPDATE_TODO, addDirs: [workspacePath] },
   ];
 }

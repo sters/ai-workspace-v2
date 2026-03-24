@@ -20,6 +20,7 @@ import {
   BEST_OF_N_REVIEW_SCHEMA,
 } from "@/lib/templates";
 import { runSubPhases } from "./actions/run-sub-phases";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
 import type { InteractionLevel } from "@/types/prompts";
@@ -249,6 +250,7 @@ export async function buildBestOfNPipeline(
           cwd: wsPath,
           addDirs,
           jsonSchema: BEST_OF_N_REVIEW_SCHEMA as unknown as Record<string, unknown>,
+          stepType: STEP_TYPES.BEST_OF_N_REVIEWER,
           onResultText: (text) => { reviewResultText = text; },
         });
 

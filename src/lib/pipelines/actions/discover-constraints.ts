@@ -1,5 +1,6 @@
 import path from "node:path";
 import { buildRepoConstraintsPrompt } from "@/lib/templates";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhaseFunction } from "@/types/pipeline";
 
 export function buildDiscoverConstraintsPhase(input: {
@@ -20,6 +21,7 @@ export function buildDiscoverConstraintsPhase(input: {
 
       const children = input.repos.map((repo) => ({
         label: `constraints-${repo.repoName}`,
+        stepType: STEP_TYPES.DISCOVER_CONSTRAINTS,
         prompt: buildRepoConstraintsPrompt({
           workspaceName: input.workspace,
           repoName: repo.repoName,

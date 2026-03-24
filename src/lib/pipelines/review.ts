@@ -16,6 +16,7 @@ import {
   buildCollectorPrompt,
 } from "@/lib/templates";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
 import { getTimeoutDefaults } from "@/lib/pipeline-manager";
@@ -58,6 +59,7 @@ export async function buildReviewPipeline(input: {
     // Code reviewer
     reviewChildren.push({
       label: `review-${repo.repoName}`,
+      stepType: STEP_TYPES.CODE_REVIEW,
       prompt: buildCodeReviewerPrompt({
         workspaceName: workspace,
         repoPath: repo.repoPath,
@@ -81,6 +83,7 @@ export async function buildReviewPipeline(input: {
 
     reviewChildren.push({
       label: `verify-todo-${repo.repoName}`,
+      stepType: STEP_TYPES.VERIFY_TODO,
       prompt: buildTodoVerifierPrompt({
         workspaceName: workspace,
         repoPath: repo.repoPath,
@@ -98,6 +101,7 @@ export async function buildReviewPipeline(input: {
     const readmeVerifyFileName = `VERIFY-README-${orgName}_${repo.repoName}.md`;
     reviewChildren.push({
       label: `verify-readme-${repo.repoName}`,
+      stepType: STEP_TYPES.VERIFY_README,
       prompt: buildReadmeVerifierPrompt({
         workspaceName: workspace,
         repoPath: repo.repoPath,
@@ -142,7 +146,7 @@ export async function buildReviewPipeline(input: {
           readmeVerifyFiles: [...actualReadmeVerifyFiles].map((f) => path.join(reviewDir, f)),
         });
 
-        const ok = await ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir] });
+        const ok = await ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir], stepType: STEP_TYPES.COLLECT_REVIEWS });
         if (ok) {
           triggerWorkspaceSuggestion(workspace, ctx.operationId, "review");
         }

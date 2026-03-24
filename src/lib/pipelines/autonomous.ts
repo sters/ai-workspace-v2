@@ -10,6 +10,7 @@ import { resolveWorkspace } from "./actions/resolve-workspace";
 import { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "@/lib/templates/prompts/autonomous-gate";
 import { getWorkspaceDir } from "@/lib/config";
 import path from "node:path";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 
@@ -80,6 +81,7 @@ async function runAutonomousGate(
   let resultText = "";
   const ok = await ctx.runChild("Autonomous Gate", prompt, {
     jsonSchema: AUTONOMOUS_GATE_SCHEMA,
+    stepType: STEP_TYPES.AUTONOMOUS_GATE,
     onResultText: (text) => { resultText = text; },
     skipAskUserQuestion: true,
   });

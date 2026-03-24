@@ -1,5 +1,29 @@
-import type { AskQuestion } from "./claude";
+import type { AskQuestion, ClaudeModel } from "./claude";
 import type { WorkspaceRepo } from "./workspace";
+
+/** All known step type identifiers for config-based model resolution. */
+export const STEP_TYPES = {
+  CODE_REVIEW: "code-review",
+  VERIFY_TODO: "verify-todo",
+  VERIFY_README: "verify-readme",
+  COLLECT_REVIEWS: "collect-reviews",
+  EXECUTE: "execute",
+  RESEARCH: "research",
+  ANALYZE_README: "analyze-readme",
+  DISCOVER_CONSTRAINTS: "discover-constraints",
+  PLAN_TODO: "plan-todo",
+  COORDINATE_TODOS: "coordinate-todos",
+  REVIEW_TODOS: "review-todos",
+  CREATE_PR: "create-pr",
+  UPDATE_TODO: "update-todo",
+  PLAN_TODO_FROM_REVIEW: "plan-todo-from-review",
+  DEEP_SEARCH: "deep-search",
+  AUTONOMOUS_GATE: "autonomous-gate",
+  BEST_OF_N_REVIEWER: "best-of-n-reviewer",
+  BEST_OF_N_SYNTHESIZER: "best-of-n-synthesizer",
+} as const;
+
+export type StepType = (typeof STEP_TYPES)[keyof typeof STEP_TYPES];
 
 export interface GroupChild {
   label: string;
@@ -14,6 +38,10 @@ export interface GroupChild {
   onResultText?: (text: string) => void;
   /** When true, skip AskUserQuestion instead of waiting for user input. */
   skipAskUserQuestion?: boolean;
+  /** Claude model override for this child. */
+  model?: ClaudeModel;
+  /** Step type identifier for config-based model resolution. */
+  stepType?: StepType;
 }
 
 export interface PipelinePhaseSingle {
@@ -25,6 +53,10 @@ export interface PipelinePhaseSingle {
   /** Additional directories to expose via --add-dir. */
   addDirs?: string[];
   timeoutMs?: number;
+  /** Claude model override for this phase. */
+  model?: ClaudeModel;
+  /** Step type identifier for config-based model resolution. */
+  stepType?: StepType;
 }
 
 export interface PipelinePhaseGroup {
@@ -44,6 +76,10 @@ export interface RunChildOptions {
   addDirs?: string[];
   /** When true, skip AskUserQuestion instead of waiting for user input. */
   skipAskUserQuestion?: boolean;
+  /** Claude model override for this child. */
+  model?: ClaudeModel;
+  /** Step type identifier for config-based model resolution. */
+  stepType?: StepType;
 }
 
 export interface PhaseFunctionContext {

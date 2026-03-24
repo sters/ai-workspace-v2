@@ -1,5 +1,11 @@
+import type { ClaudeModel } from "./claude";
 import type { OperationType } from "./operation";
 import type { InteractionLevel } from "./prompts";
+
+/** Per-step settings within an operation type override. */
+export interface StepSettings {
+  model?: ClaudeModel;
+}
 
 /** Settings that can be overridden per operation type. */
 export interface OperationTypeSettings {
@@ -8,6 +14,10 @@ export interface OperationTypeSettings {
   defaultInteractionLevel: InteractionLevel;
   /** Best-of-N parallel execution count. 0 = disabled, 2-5 = parallel count. */
   bestOfN: number;
+  /** Default Claude model for this operation type. */
+  model?: ClaudeModel;
+  /** Per-step model overrides within this operation type. */
+  steps?: Record<string, StepSettings>;
 }
 
 export interface AppConfig {

@@ -7,6 +7,7 @@
 import { mkdirSync, copyFileSync, existsSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { STEP_TYPES } from "@/types/pipeline";
 import type { PhaseFunctionContext, GroupChild } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 import {
@@ -181,6 +182,7 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
     let reviewResultText: string | undefined;
     const reviewOk = await ctx.runChild("Best-of-N File Reviewer", reviewPrompt, {
       jsonSchema: BEST_OF_N_REVIEW_SCHEMA as unknown as Record<string, unknown>,
+      stepType: STEP_TYPES.BEST_OF_N_REVIEWER,
       onResultText: (text) => { reviewResultText = text; },
     });
 
@@ -256,6 +258,7 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
 
     const synthOk = await ctx.runChild("Best-of-N Synthesizer", synthPrompt, {
       addDirs: [commonParent, ...successful.map((c) => c.dir)],
+      stepType: STEP_TYPES.BEST_OF_N_SYNTHESIZER,
     });
 
     if (!synthOk) {
