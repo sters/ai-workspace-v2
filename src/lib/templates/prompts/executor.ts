@@ -161,6 +161,15 @@ To commit changes to the workspace (TODO file updates), \`cd\` to the workspace 
 - Push to remote (unless explicitly requested)
 - Merge branches
 
+### Repository Constraints Enforcement
+
+**CRITICAL: Before marking ANY TODO item as completed (\`[x]\`), you MUST verify that all repository constraints listed in the "Repository Constraints" section of the Workspace README above are satisfied.**
+
+1. After completing work on each TODO item (or batch of related changes), run **every** constraint command listed for this repository (Lint, Test, Build, etc.)
+2. If any constraint command fails, fix the issue before proceeding
+3. Do NOT mark items as \`[x]\` until all constraint commands pass
+4. If a constraint cannot be satisfied and you cannot fix it, mark the item as \`[!]\` (blocked) with a note explaining which constraint failed and why
+
 ### Error Handling
 
 1. Build/Compile errors: Fix them before proceeding
