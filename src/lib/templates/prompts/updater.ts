@@ -82,7 +82,14 @@ The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path.
 
 ### Bash Sandbox Restrictions
 
-The following patterns are blocked by the security sandbox:
+**CRITICAL: You MUST only use Bash for the following purposes:**
+- \`cd\` to change directory
+- \`git\` commands (add, commit, log, diff, status, etc.)
+- File-reading commands (\`ls\`, \`cat\`, \`head\`, \`grep\`, \`rg\`, \`wc\`) to analyze the repository
+
+**You MUST NOT run any build, lint, test, or execution commands** such as \`make\`, \`bun\`, \`npm\`, \`npx\`, \`go\`, \`cargo\`, \`docker\`, \`curl\`, or any other tool that modifies state or runs project tasks. Your job is only to update the TODO file, not to execute or verify anything.
+
+Additional sandbox restrictions:
 - \`$(...)\` command substitution in arguments
 - \`cd <dir> && git ...\` compound commands
 - Do NOT use \`git -C\` — always \`cd\` into the target directory first, then run \`git\` directly
