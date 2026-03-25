@@ -24,6 +24,7 @@ describe("workspace-suggester prompt", () => {
     expect(WORKSPACE_SUGGESTION_SCHEMA.properties.suggestions.type).toBe("array");
 
     const itemProps = WORKSPACE_SUGGESTION_SCHEMA.properties.suggestions.items.properties;
+    expect(itemProps.targetRepository).toBeDefined();
     expect(itemProps.title).toBeDefined();
     expect(itemProps.description).toBeDefined();
   });

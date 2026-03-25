@@ -102,8 +102,9 @@ describe("DISCOVERY_SCHEMA", () => {
     expect(DISCOVERY_SCHEMA.properties.suggestions.type).toBe("array");
   });
 
-  it("suggestion items require title and description", () => {
+  it("suggestion items require targetRepository, title and description", () => {
     const items = DISCOVERY_SCHEMA.properties.suggestions.items;
+    expect(items.required).toContain("targetRepository");
     expect(items.required).toContain("title");
     expect(items.required).toContain("description");
   });

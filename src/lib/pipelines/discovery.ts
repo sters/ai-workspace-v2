@@ -123,6 +123,7 @@ export function buildDiscoveryPipeline(): PipelinePhase[] {
               id: crypto.randomUUID(),
               sourceWorkspace: wsName,
               sourceOperationId: ctx.operationId,
+              targetRepository: typeof item.targetRepository === "string" ? item.targetRepository : "",
               title: item.title,
               description: item.description,
             });
