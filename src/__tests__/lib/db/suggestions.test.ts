@@ -22,6 +22,7 @@ describe("db/suggestions", () => {
       id: "s1",
       sourceWorkspace: "ws-1",
       sourceOperationId: "op-1",
+      targetRepository: "repo-a",
       title: "Fix auth flow",
       description: "Auth needs rework",
     });
@@ -31,6 +32,7 @@ describe("db/suggestions", () => {
     expect(s!.id).toBe("s1");
     expect(s!.sourceWorkspace).toBe("ws-1");
     expect(s!.sourceOperationId).toBe("op-1");
+    expect(s!.targetRepository).toBe("repo-a");
     expect(s!.title).toBe("Fix auth flow");
     expect(s!.description).toBe("Auth needs rework");
     expect(s!.dismissed).toBe(false);
@@ -42,6 +44,7 @@ describe("db/suggestions", () => {
       id: "s1",
       sourceWorkspace: "ws-1",
       sourceOperationId: "op-1",
+      targetRepository: "repo-a",
       title: "Title 1",
       description: "Desc 1",
     });
@@ -49,6 +52,7 @@ describe("db/suggestions", () => {
       id: "s2",
       sourceWorkspace: "ws-1",
       sourceOperationId: "op-2",
+      targetRepository: "repo-b",
       title: "Title 2",
       description: "Desc 2",
     });
@@ -62,6 +66,7 @@ describe("db/suggestions", () => {
       id: "s1",
       sourceWorkspace: "ws-1",
       sourceOperationId: "op-1",
+      targetRepository: "repo-a",
       title: "Title 1",
       description: "Desc 1",
     });

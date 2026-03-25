@@ -7,6 +7,7 @@ import { useSuggestions } from "@/hooks/use-suggestions";
 import { postJson } from "@/lib/api";
 import { INIT_STORAGE_KEY, InitSplitButton } from "@/components/operation/init-operation";
 import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
+import { CollapsibleSection } from "@/components/shared/containers/collapsible-section";
 import { X } from "lucide-react";
 import type { InteractionLevel } from "@/types/prompts";
 import type { OperationType } from "@/types/operation";
@@ -57,40 +58,56 @@ export default function SuggestionsPage() {
           </p>
         )}
 
-        <div className="space-y-2">
-          {suggestions.map((s) => (
-            <div
-              key={s.id}
-              className="rounded-lg border bg-card p-4"
+        <div className="space-y-4">
+          {Object.entries(
+            suggestions.reduce<Record<string, typeof suggestions>>((acc, s) => {
+              const key = s.targetRepository || "(unknown)";
+              (acc[key] ??= []).push(s);
+              return acc;
+            }, {}),
+          ).map(([repo, items]) => (
+            <CollapsibleSection
+              key={repo}
+              title={repo}
+              badge={`(${items.length})`}
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <h3 className="text-sm font-medium">{s.title}</h3>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    from {s.sourceWorkspace}
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {s.description}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleDismiss(s.id)}
-                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
-                  title="Dismiss"
-                  aria-label="Dismiss suggestion"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+              <div className="space-y-2">
+                {items.map((s) => (
+                  <div
+                    key={s.id}
+                    className="rounded-lg border bg-card p-4"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-sm font-medium">{s.title}</h3>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          from {s.sourceWorkspace}
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {s.description}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDismiss(s.id)}
+                        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/20 hover:text-destructive"
+                        title="Dismiss"
+                        aria-label="Dismiss suggestion"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="mt-3">
+                      <InitSplitButton
+                        description={s.description}
+                        interactionLevel={interactionLevel}
+                        start={(type, body) => handleStart(s.id, type, body)}
+                        disabled={starting}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="mt-3">
-                <InitSplitButton
-                  description={s.description}
-                  interactionLevel={interactionLevel}
-                  start={(type, body) => handleStart(s.id, type, body)}
-                  disabled={starting}
-                />
-              </div>
-            </div>
+            </CollapsibleSection>
           ))}
         </div>
       </div>

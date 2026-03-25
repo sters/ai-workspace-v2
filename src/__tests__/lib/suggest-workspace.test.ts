@@ -42,7 +42,7 @@ describe("triggerWorkspaceSuggestion", () => {
   it("inserts suggestions when Claude returns valid results", async () => {
     const resultJson = JSON.stringify({
       suggestions: [
-        { title: "Fix logging", description: "Logging module needs cleanup" },
+        { targetRepository: "repo-a", title: "Fix logging", description: "Logging module needs cleanup" },
       ],
     });
 

@@ -13,6 +13,10 @@ export const DISCOVERY_SCHEMA = {
       items: {
         type: "object",
         properties: {
+          targetRepository: {
+            type: "string",
+            description: "Name of the primary target repository for this suggestion. Use the repository alias/short name.",
+          },
           title: {
             type: "string",
             description: "Short title for the suggested workspace (max 80 chars).",
@@ -22,7 +26,7 @@ export const DISCOVERY_SCHEMA = {
             description: "Actionable description of the work. Include target repositories and concrete scope.",
           },
         },
-        required: ["title", "description"],
+        required: ["targetRepository", "title", "description"],
         additionalProperties: false,
       },
       description: "Discovered workspace candidates. Empty array if none found.",
@@ -111,7 +115,8 @@ Do NOT suggest:
 - Vague ideas without a concrete action.
 
 Each suggestion must have:
+- A **targetRepository** — the repository alias/short name where the work should be done.
 - A **title** (concise, max 80 chars)
-- A **description** that specifies the target repositories, the concrete problem, and what the new workspace should accomplish. The description should be detailed enough to use directly as input for \`workspace init\`.
+- A **description** that specifies the concrete problem and what the new workspace should accomplish. The description should be detailed enough to use directly as input for \`workspace init\`.
 `;
 }

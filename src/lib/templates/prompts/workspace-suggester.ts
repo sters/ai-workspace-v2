@@ -14,6 +14,10 @@ export const WORKSPACE_SUGGESTION_SCHEMA = {
       items: {
         type: "object",
         properties: {
+          targetRepository: {
+            type: "string",
+            description: "Name of the primary target repository for this suggestion. Use the repository alias/short name.",
+          },
           title: {
             type: "string",
             description: "Short title for the suggested workspace (max 80 chars).",
@@ -23,7 +27,7 @@ export const WORKSPACE_SUGGESTION_SCHEMA = {
             description: "Description of the work to be done, suitable as input for workspace init.",
           },
         },
-        required: ["title", "description"],
+        required: ["targetRepository", "title", "description"],
         additionalProperties: false,
       },
       description: "List of out-of-scope items that could become new workspaces. Empty array if none found.",
@@ -64,6 +68,8 @@ You are a workspace suggester agent. Your job is to compare the operation output
 
 ### Output
 
-Respond with a JSON object matching the schema. Return an empty suggestions array if no out-of-scope items are found. Each suggestion should have a clear, actionable description that could be used to initialize a new workspace.
+Respond with a JSON object matching the schema. Return an empty suggestions array if no out-of-scope items are found. Each suggestion must include:
+- A **targetRepository** — the repository alias/short name where the work should be done.
+- A clear, actionable **description** that could be used to initialize a new workspace.
 `;
 }

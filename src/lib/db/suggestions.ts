@@ -14,8 +14,8 @@ let _get: Statement | null = null;
 function stmts(db: Database) {
   if (!_insert) {
     _insert = db.prepare(`
-      INSERT INTO workspace_suggestions (id, source_workspace, source_operation_id, title, description)
-      VALUES ($id, $sourceWorkspace, $sourceOperationId, $title, $description)
+      INSERT INTO workspace_suggestions (id, source_workspace, source_operation_id, target_repository, title, description)
+      VALUES ($id, $sourceWorkspace, $sourceOperationId, $targetRepository, $title, $description)
     `);
   }
   if (!_listActive) {
@@ -52,6 +52,7 @@ interface SuggestionRow {
   id: string;
   source_workspace: string;
   source_operation_id: string;
+  target_repository: string;
   title: string;
   description: string;
   dismissed: number;
@@ -63,6 +64,7 @@ function rowToDomain(row: SuggestionRow): WorkspaceSuggestion {
     id: row.id,
     sourceWorkspace: row.source_workspace,
     sourceOperationId: row.source_operation_id,
+    targetRepository: row.target_repository,
     title: row.title,
     description: row.description,
     dismissed: row.dismissed === 1,
@@ -78,6 +80,7 @@ export function insertSuggestion(s: {
   id: string;
   sourceWorkspace: string;
   sourceOperationId: string;
+  targetRepository: string;
   title: string;
   description: string;
 }): void {
@@ -87,6 +90,7 @@ export function insertSuggestion(s: {
     $id: s.id,
     $sourceWorkspace: s.sourceWorkspace,
     $sourceOperationId: s.sourceOperationId,
+    $targetRepository: s.targetRepository,
     $title: s.title,
     $description: s.description,
   });

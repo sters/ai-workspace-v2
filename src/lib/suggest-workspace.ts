@@ -98,6 +98,7 @@ async function runSuggester(
       id: crypto.randomUUID(),
       sourceWorkspace: workspace,
       sourceOperationId: operationId,
+      targetRepository: typeof item.targetRepository === "string" ? item.targetRepository : "",
       title: item.title,
       description: item.description,
     });

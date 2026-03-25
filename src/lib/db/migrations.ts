@@ -80,6 +80,14 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 3,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE workspace_suggestions ADD COLUMN target_repository TEXT NOT NULL DEFAULT '';
+      `);
+    },
+  },
 ];
 
 /**

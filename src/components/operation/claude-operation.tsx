@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useOperation } from "@/hooks/use-operation";
 import { CollapsibleOperationLog } from "./collapsible-operation-log";
 import { OperationInputs } from "./operation-inputs";
-import { StatusBadge } from "../shared/feedback/status-badge";
+import { OperationSummary, useNow } from "./operation-summary";
 import { Button } from "../shared/buttons/button";
 import { Spinner } from "../shared/feedback/spinner";
 import type { OperationType, OperationContext } from "@/types/operation";
@@ -37,6 +37,7 @@ export function ClaudeOperation({
   const { operation, events, isRunning, start, cancel, reset } =
     useOperation(storageKey, initialOperationId);
   const [loading, setLoading] = useState(false);
+  const now = useNow(1000);
 
   const handleStart = async (
     type: OperationType,
@@ -63,9 +64,8 @@ export function ClaudeOperation({
 
   const isDone = !effectiveRunning && operation && (operation.status === "completed" || operation.status === "failed");
 
-  const statusBlock = operation && (
+  const actionButtons = operation && (
     <div className="flex items-center gap-2">
-      <StatusBadge label={operation.status} variant={operation.status} />
       {isRunning ? (
         <Button variant="destructive-sm" onClick={cancel}>
           Cancel
@@ -89,6 +89,13 @@ export function ClaudeOperation({
           </Button>
         </>
       )}
+    </div>
+  );
+
+  const statusBlock = operation && (
+    <div className="flex items-start gap-2">
+      <OperationSummary operation={operation} now={now} />
+      <div className="shrink-0">{actionButtons}</div>
     </div>
   );
 
@@ -116,10 +123,8 @@ export function ClaudeOperation({
   if (vertical) {
     return (
       <div className="space-y-3">
-        {statusBlock && (
-          <div className="flex justify-end">{statusBlock}</div>
-        )}
         {childContent}
+        {statusBlock}
         {inputsBlock}
         {startingIndicator}
         {operation && events.length > 0 && (
@@ -135,11 +140,8 @@ export function ClaudeOperation({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {childContent}
-        {statusBlock && <div className="ml-auto">{statusBlock}</div>}
-      </div>
-
+      {childContent}
+      {statusBlock}
       {inputsBlock}
       {startingIndicator}
       {operation && events.length > 0 && (
