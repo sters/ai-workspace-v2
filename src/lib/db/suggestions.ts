@@ -10,6 +10,7 @@ let _insert: Statement | null = null;
 let _listActive: Statement | null = null;
 let _dismiss: Statement | null = null;
 let _get: Statement | null = null;
+let _prune: Statement | null = null;
 
 function stmts(db: Database) {
   if (!_insert) {
@@ -31,7 +32,12 @@ function stmts(db: Database) {
   if (!_get) {
     _get = db.prepare("SELECT * FROM workspace_suggestions WHERE id = ?");
   }
-  return { insert: _insert, listActive: _listActive, dismiss: _dismiss, get: _get };
+  if (!_prune) {
+    _prune = db.prepare(
+      "DELETE FROM workspace_suggestions WHERE created_at < datetime('now', '-' || ? || ' days')",
+    );
+  }
+  return { insert: _insert, listActive: _listActive, dismiss: _dismiss, get: _get, prune: _prune };
 }
 
 /** Reset cached statements (needed when DB is reset in tests). */
@@ -40,6 +46,7 @@ export function _resetSuggestionStatements(): void {
   _listActive = null;
   _dismiss = null;
   _get = null;
+  _prune = null;
 }
 
 _onDbReset(_resetSuggestionStatements);
@@ -115,4 +122,12 @@ export function getSuggestion(id: string): WorkspaceSuggestion | null {
   const st = stmts(db);
   const row = st.get.get(id) as SuggestionRow | null;
   return row ? rowToDomain(row) : null;
+}
+
+/** Delete suggestions older than `days` days. Returns number of deleted rows. */
+export function pruneSuggestions(days: number): number {
+  const db = getDb();
+  const st = stmts(db);
+  const result = st.prune.run(days);
+  return result.changes;
 }
