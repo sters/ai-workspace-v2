@@ -53,6 +53,11 @@ Only include commands that actually exist in the repository. Do not guess or fab
 
 After that, run commands as separate Bash calls. Do NOT use \`git -C\`.
 
+### Language
+
+- **Always write all output in English**, regardless of the language used in the workspace README.
+- Only use a non-English language if the user explicitly requests it.
+
 ### Guidelines
 
 1. Only report constraints that are clearly documented or discoverable from the repository

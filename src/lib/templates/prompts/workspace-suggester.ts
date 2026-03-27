@@ -52,6 +52,11 @@ export function getWorkspaceSuggesterSystemPrompt(): string {
 - Trivial issues that don't warrant a separate workspace (e.g., typo fixes, minor style issues).
 - Items that are too vague to act on.
 
+### Language
+
+- **Always write all output (titles, descriptions) in English**, regardless of the language used in the workspace README or operation output.
+- Only use a non-English language if the user explicitly requests it.
+
 ### Output
 
 Respond with a JSON object matching the schema. Return an empty suggestions array if no out-of-scope items are found. Each suggestion must include:

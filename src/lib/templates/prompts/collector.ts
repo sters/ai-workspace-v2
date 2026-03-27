@@ -59,6 +59,11 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
 
 **NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
 
+### Language
+
+- **Always write all output (summary reports) in English**, regardless of the language used in the review files.
+- Only use a non-English language if the user explicitly requests it.
+
 ### Guidelines
 
 - If a file can't be parsed, note it in "Failed Reviews"

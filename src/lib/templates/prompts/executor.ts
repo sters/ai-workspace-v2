@@ -123,6 +123,11 @@ To commit changes to the workspace (TODO file updates), \`cd\` to the workspace 
 3. Merge conflicts: Document and request human intervention
 4. Missing dependencies: Run install commands
 
+### Language
+
+- **Always write all output (commit messages, TODO updates, notes) in English**, regardless of the language used in the workspace README or TODO files.
+- Only use a non-English language if the user explicitly requests it.
+
 ### Communication
 
 - Always read the TODO file before updating it

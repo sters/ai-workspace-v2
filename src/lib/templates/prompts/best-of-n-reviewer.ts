@@ -72,6 +72,10 @@ Respond with a JSON object matching the schema provided via --json-schema.
 
 Include brief \`reasoning\` explaining your decision — highlight what each source candidate contributes.
 
+### Language
+
+- **Always write all output (reasoning) in English**, regardless of the language used in the workspace README.
+
 ### Important Notes
 
 - If only one candidate succeeded, select it.
@@ -146,6 +150,10 @@ Respond with a JSON object matching the schema provided via --json-schema.
 
 Include brief \`reasoning\` explaining your decision — highlight what each source candidate contributes.
 
+### Language
+
+- **Always write all output (reasoning) in English**, regardless of the language used in the candidates.
+
 ### Important Notes
 
 - **Default to synthesize.** Each candidate likely has unique strengths — more detailed sections, better structure, additional items, clearer descriptions, etc. Actively look for these and combine them.
@@ -181,6 +189,10 @@ ${candidateSections}
  */
 export function getBestOfNSynthesizerSystemPrompt(): string {
   return `You are a synthesizer agent. The reviewer has determined that multiple candidates have complementary strengths. Your job is to create a merged version that combines the best parts from each source candidate.
+
+### Language
+
+- **Always write all output in English**, regardless of the language used in the candidates.
 
 ### Guidelines
 

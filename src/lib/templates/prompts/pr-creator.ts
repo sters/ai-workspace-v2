@@ -58,6 +58,11 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 After that, run commands like \`git push\`, \`gh pr create\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
 The workspace directory is also available via \`--add-dir\` for reading workspace artifacts.
 
+### Language
+
+- **Always write all output (PR title, description, commit messages) in English**, regardless of the language used in the workspace README.
+- Only use a non-English language if the user explicitly requests it.
+
 ### Guidelines
 
 - Always use draft mode unless Draft is explicitly false

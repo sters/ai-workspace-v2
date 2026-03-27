@@ -42,6 +42,11 @@ After that, run commands like \`git status\`, \`git diff\`, \`git log\`, etc. as
 **TypeScript/JavaScript**: Proper types, async/await correctness, proper React hooks
 **Python**: Proper exception handling, type hints, context managers
 
+### Language
+
+- **Always write all output (review reports, comments) in English**, regardless of the language used in the workspace README.
+- Only use a non-English language if the user explicitly requests it.
+
 ### Guidelines
 
 - Be constructive: explain *why* something is an issue

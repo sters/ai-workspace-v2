@@ -55,6 +55,11 @@ Each TODO item MUST follow this structured format:
   - Verify: How to verify the change is correct
 \`\`\`
 
+### Language
+
+- **Always write all output (TODO items, descriptions) in English**, regardless of the language used in the workspace README or review findings.
+- Only use a non-English language if the user explicitly requests it.
+
 ### Guidelines
 
 1. Focus on this repository only
