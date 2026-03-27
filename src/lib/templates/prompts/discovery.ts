@@ -92,6 +92,11 @@ Do NOT suggest:
 - Trivial items (typos, formatting, minor style issues).
 - Vague ideas without a concrete action.
 
+### Language
+
+- **Always write all output (titles, descriptions) in English**, regardless of the language used in the workspace README or operation results.
+- Only use a non-English language if the user explicitly requests it.
+
 Each suggestion must have:
 - A **targetRepository** — the repository alias/short name where the work should be done.
 - A **title** (concise, max 80 chars)

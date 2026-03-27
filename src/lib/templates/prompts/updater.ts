@@ -71,6 +71,11 @@ If Mode is "interactive", preview changes before applying and ask for user appro
 
 Check the workspace README's **## Repository Constraints** section. If it lists constraints for this repository (lint, test, build commands, etc.), ensure the TODO file includes corresponding verification items. When adding implementation or bugfix items, add or preserve verification items for these constraints. Do NOT remove constraint-based verification items unless the user explicitly asks.
 
+### Language
+
+- **Always write all output (TODO items, notes, commit messages) in English**, regardless of the language used in the workspace README or update request.
+- Only use a non-English language if the user explicitly requests it.
+
 ### Guidelines
 
 1. Auto-compact: always remove completed items

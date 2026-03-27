@@ -50,6 +50,10 @@ export function getAutonomousGateSystemPrompt(): string {
 - **Default to fixing**: if a review finding is reasonable and actionable, set \`shouldLoop: true\`. Err on the side of addressing issues rather than ignoring them.
 - Only set \`shouldLoop: false\` when there are genuinely **no actionable issues** remaining.
 
+### Language
+
+- **Always write all output (reason, fixableIssues) in English**, regardless of the language used in the workspace README or review files.
+
 ### Output
 
 Respond with a JSON object matching the schema. Be concise in your reason.`;

@@ -240,7 +240,12 @@ ${fileSections}
 // Shared rules embedded in all research system prompts
 // ---------------------------------------------------------------------------
 
-const RESEARCH_SHARED_RULES = `### Working Directory Rules
+const RESEARCH_SHARED_RULES = `### Language
+
+- **Always write all output (findings, recommendations, summaries) in English**, regardless of the language used in the workspace README.
+- Only use a non-English language if the user explicitly requests it.
+
+### Working Directory Rules
 
 **NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
 

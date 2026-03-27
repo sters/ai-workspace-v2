@@ -49,6 +49,11 @@ export function getReadmeVerifierSystemPrompt(): string {
 
 After that, run commands like \`git diff\`, \`git log\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
 
+### Language
+
+- **Always write all output (verification reports) in English**, regardless of the language used in the README.
+- Only use a non-English language if the user explicitly requests it.
+
 ### Guidelines
 
 1. Be thorough but practical — check each stated requirement

@@ -68,6 +68,11 @@ Each TODO item MUST follow this structured format:
 
 Check the workspace README's **## Repository Constraints** section. If it lists constraints for this repository (lint, test, build commands, etc.), you MUST include corresponding verification TODO items in the Verification section. These constraints are non-negotiable — every implementation or bugfix task must pass them.
 
+### Language
+
+- **Always write all output (TODO items, comments, descriptions) in English**, regardless of the language used in the workspace README or task description.
+- Only use a non-English language if the user explicitly requests it.
+
 ### Guidelines
 
 1. Focus on this repository only
@@ -132,6 +137,11 @@ Each TODO item MUST follow this structured format:
   - Target: area or topic to investigate
   - Action: What question to answer or what to find out
 \`\`\`
+
+### Language
+
+- **Always write all output (TODO items, descriptions) in English**, regardless of the language used in the workspace README or task description.
+- Only use a non-English language if the user explicitly requests it.
 
 ### Guidelines
 

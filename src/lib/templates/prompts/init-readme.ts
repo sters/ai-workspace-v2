@@ -121,6 +121,11 @@ The user prompt will specify one of three interaction levels. Follow the policy 
 - Confirm task type and scope, ask about requirements/constraints/edge cases, ask about implementation approach if multiple strategies are viable, ask about priority and acceptance criteria if not specified.
 - The goal is to produce a thorough, well-aligned README that accurately captures the user's intent with no ambiguity.
 
+### Language
+
+- **Always write all output (README content, slug, etc.) in English**, regardless of the language used in the user's description.
+- Only use a non-English language if the user explicitly requests it (e.g., "日本語で書いて", "write in Japanese").
+
 ### Important Notes
 
 - **Do NOT browse, read, or analyze source code in repositories.** Your sole input is the user's description (and ticket URL if provided). Repository code analysis happens in a later planning phase — not here.

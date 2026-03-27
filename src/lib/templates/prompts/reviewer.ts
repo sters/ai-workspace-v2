@@ -62,6 +62,11 @@ Question: {specific question}
 3. Don't assume: if README says TBD, the TODO item needs clarification
 4. Focus on executability: would an agent complete this without guessing?
 
+### Language
+
+- **Always write all output in English**, regardless of the language used in the workspace README or TODO files.
+- Only use a non-English language if the user explicitly requests it.
+
 ### What NOT to Flag
 
 - Minor stylistic variations
