@@ -10,6 +10,7 @@ import {
 } from "@/lib/workspace";
 import { getWorkspaceDir } from "@/lib/config";
 import { buildPRCreatorPrompt } from "@/lib/templates";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
@@ -55,11 +56,13 @@ export async function buildCreatePrPipeline(input: {
         : undefined,
     });
 
+    const wsPath = path.join(getWorkspaceDir(), workspace);
     return {
       label: repo.repoName,
       prompt,
       stepType: STEP_TYPES.CREATE_PR,
-      addDirs: [path.join(getWorkspaceDir(), workspace)],
+      addDirs: [wsPath],
+      appendSystemPromptFile: ensureSystemPrompt(wsPath, "pr-creator"),
     };
   });
 

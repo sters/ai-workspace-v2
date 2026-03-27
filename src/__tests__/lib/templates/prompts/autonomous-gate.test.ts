@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAutonomousGatePrompt,
+  getAutonomousGateSystemPrompt,
   AUTONOMOUS_GATE_SCHEMA,
 } from "@/lib/templates/prompts/autonomous-gate";
 
@@ -91,23 +92,23 @@ describe("buildAutonomousGatePrompt", () => {
   });
 
   it("instructs to evaluate all severity levels including warnings and suggestions", () => {
-    const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).toContain("warnings");
-    expect(prompt).toContain("suggestions");
-    expect(prompt).toContain("every severity level");
+    const systemPrompt = getAutonomousGateSystemPrompt();
+    expect(systemPrompt).toContain("warnings");
+    expect(systemPrompt).toContain("suggestions");
+    expect(systemPrompt).toContain("every severity level");
   });
 
   it("defaults to fixing actionable issues", () => {
-    const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).toContain("Default to fixing");
-    expect(prompt).toContain("Err on the side of addressing issues");
+    const systemPrompt = getAutonomousGateSystemPrompt();
+    expect(systemPrompt).toContain("Default to fixing");
+    expect(systemPrompt).toContain("Err on the side of addressing issues");
   });
 
   it("lists concrete examples of fixable issues including struct layouts", () => {
-    const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).toContain("Typos");
-    expect(prompt).toContain("stale references");
-    expect(prompt).toContain("struct/type layouts");
-    expect(prompt).toContain("suboptimal data structures");
+    const systemPrompt = getAutonomousGateSystemPrompt();
+    expect(systemPrompt).toContain("Typos");
+    expect(systemPrompt).toContain("stale references");
+    expect(systemPrompt).toContain("struct/type layouts");
+    expect(systemPrompt).toContain("suboptimal data structures");
   });
 });

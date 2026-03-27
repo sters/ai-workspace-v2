@@ -5,27 +5,7 @@
 
 import type { ReviewerInput } from "@/types/prompts";
 
-export function buildReviewerPrompt(input: ReviewerInput): string {
-  return `# Task: Review TODO items for ${input.repoName}
-
-## Workspace: ${input.workspaceName}
-## Repository Worktree: ${input.worktreePath}
-
-## Workspace README
-
-${input.readmeContent}
-
-## TODO File (TODO-${input.repoName}.md)
-
-${input.todoContent}
-
-## Instructions
-
-${reviewerInstructions(input.worktreePath)}
-`;
-}
-
-function reviewerInstructions(worktreePath: string): string {
+export function getReviewerSystemPrompt(): string {
   return `You are a specialized agent for reviewing and validating TODO items. Your role is to ensure TODO items are specific, actionable, and verifiable before execution begins.
 
 **Your mission: Review the TODO file and identify items that need clarification.**
@@ -51,10 +31,8 @@ function reviewerInstructions(worktreePath: string): string {
 
 ### Working Directory
 
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-\`\`\`bash
-cd ${worktreePath}
-\`\`\`
+**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
+
 After that, run commands like \`git status\`, \`git diff\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
 
 ### Output Format
@@ -90,5 +68,27 @@ Question: {specific question}
 - Items reasonably inferred from context
 - Implementation details the executor can decide
 - Standard patterns that don't need specification
+`;
+}
+
+export function buildReviewerPrompt(input: ReviewerInput): string {
+  return `# Task: Review TODO items for ${input.repoName}
+
+## Workspace: ${input.workspaceName}
+## Repository Worktree: ${input.worktreePath}
+
+## Workspace README
+
+${input.readmeContent}
+
+## TODO File (TODO-${input.repoName}.md)
+
+${input.todoContent}
+
+### Working Directory
+
+\`\`\`bash
+cd ${input.worktreePath}
+\`\`\`
 `;
 }

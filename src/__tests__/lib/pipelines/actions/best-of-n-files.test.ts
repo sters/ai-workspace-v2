@@ -13,6 +13,11 @@ vi.mock("@/lib/templates", () => ({
   BEST_OF_N_REVIEW_SCHEMA: {},
 }));
 
+vi.mock("@/lib/workspace/prompts", () => ({
+  ensureSystemPrompt: vi.fn(() => "/mock/prompts/file.md"),
+  ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),
+}));
+
 vi.mock("node:fs", () => ({
   default: {
     mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),

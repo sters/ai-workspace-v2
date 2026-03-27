@@ -6,7 +6,7 @@
 
 import type { InitAnalyzeAndReadmeInput, InteractionLevel } from "@/types/prompts";
 
-function buildInteractionGuidance(level?: InteractionLevel): string {
+export function buildInteractionGuidance(level?: InteractionLevel): string {
   const repositoryRule = `**MANDATORY**: If no repositories can be determined from the description, you MUST use AskUserQuestion to ask the user which repositories to work on. This rule applies regardless of the interaction level — never proceed without repositories unless the user explicitly confirms none are needed.`;
 
   switch (level) {
@@ -70,20 +70,14 @@ export const INIT_ANALYSIS_SCHEMA: Record<string, unknown> = {
   additionalProperties: false,
 };
 
-export function buildInitAnalyzeAndReadmePrompt(input: InitAnalyzeAndReadmeInput): string {
-  return `# Task: Analyze description and draft workspace README
-
-## User's Description
-
-${input.description}
-
-## Instructions
+export function getInitReadmeSystemPrompt(): string {
+  return `You are a specialized agent for analyzing task descriptions and drafting workspace README files.
 
 You have two jobs:
 
 ### 1. Analyze the description
 
-Analyze the task description above. Your final text response will be constrained to a JSON schema automatically — just focus on determining the correct values:
+Analyze the task description provided in the user prompt. Your final text response will be constrained to a JSON schema automatically — just focus on determining the correct values:
 
 - **taskType**: classify based on the **end goal**, not the process:
   - **"bugfix"**: the goal is to fix a bug, resolve an error, or correct wrong behavior. This includes tasks that require investigation/diagnosis as a step toward fixing. "Investigate and fix X" → bugfix.
@@ -96,13 +90,7 @@ Analyze the task description above. Your final text response will be constrained
 
 ### 2. Edit the README template
 
-Here is the README template to fill in:
-
-\`\`\`markdown
-${input.readmeTemplate}
-\`\`\`
-
-Edit this template and return the full edited content in the \`readmeContent\` field of your JSON response:
+Edit the README template provided in the user prompt and return the full edited content in the \`readmeContent\` field of your JSON response:
 
 1. **Rewrite the \`# Task:\` heading** to a concise, descriptive title (not the raw URL or description). Under 80 characters, natural language. For example: \`# Task: Add pagination to user search API\`
 2. **Update \`**Task Type**\` and \`**Ticket ID**\`** fields based on your analysis
@@ -112,7 +100,26 @@ Edit this template and return the full edited content in the \`readmeContent\` f
    \`- **repoName**: \\\`repoPath\\\` (base: \\\`main\\\`)\`
    (Use \`main\` as default base branch since repos aren't set up yet)
 
-${buildInteractionGuidance(input.interactionLevel)}
+### User Interaction Policy
+
+The user prompt will specify one of three interaction levels. Follow the policy for the specified level:
+
+**LOW (autonomous)**:
+- Mandatory: If no repositories can be determined from the description, you MUST use AskUserQuestion to ask the user which repositories to work on.
+- For all other decisions, make your best judgment. Do NOT use AskUserQuestion unless absolutely critical information is missing.
+- If the description is ambiguous, choose the most reasonable interpretation and proceed.
+- Prefer to fill in reasonable defaults rather than asking.
+
+**MID (balanced)** (default):
+- Mandatory: If no repositories can be determined from the description, you MUST use AskUserQuestion to ask the user which repositories to work on.
+- Use AskUserQuestion when important information is missing or ambiguous.
+- Do NOT ask about minor details — use your best judgment for those.
+
+**HIGH (collaborative)**:
+- Mandatory: If no repositories can be determined from the description, you MUST use AskUserQuestion to ask the user which repositories to work on.
+- Use AskUserQuestion proactively to confirm and refine details before finalizing.
+- Confirm task type and scope, ask about requirements/constraints/edge cases, ask about implementation approach if multiple strategies are viable, ask about priority and acceptance criteria if not specified.
+- The goal is to produce a thorough, well-aligned README that accurately captures the user's intent with no ambiguity.
 
 ### Important Notes
 
@@ -134,5 +141,22 @@ ${buildInteractionGuidance(input.interactionLevel)}
     - Use the PR description, linked tickets, and commit messages to extract the PR's original intent and acceptance criteria
     - Review scope / what to check can go in the Context section instead
   - **If the PR is just a reference** for new implementation work, treat it as a normal feature/bugfix task — Requirements should describe the new work to be done, and the PR is just a reference resource
+`;
+}
+
+export function buildInitAnalyzeAndReadmePrompt(input: InitAnalyzeAndReadmeInput): string {
+  return `# Task: Analyze description and draft workspace README
+
+## User's Description
+
+${input.description}
+
+## README Template
+
+\`\`\`markdown
+${input.readmeTemplate}
+\`\`\`
+
+## Interaction Level: ${input.interactionLevel ?? "mid"}
 `;
 }

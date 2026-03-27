@@ -3,18 +3,8 @@
  * Uses Claude to explore workspace directories and find relevant information.
  */
 
-export function buildSearchPrompt(query: string, workspacePath: string): string {
-  return `# Task: Search across workspaces
-
-## Workspace Directory
-${workspacePath}
-
-## Search Query
-${query}
-
-## Instructions
-
-Search through all workspace directories in the workspace directory above. Each workspace contains:
+export function getSearchSystemPrompt(): string {
+  return `Search through all workspace directories in the workspace directory specified in the user prompt. Each workspace contains:
 - README.md — workspace overview, goals, and status
 - TODO-*.md — task lists with progress
 - artifacts/reviews/ — review session summaries
@@ -29,6 +19,17 @@ Return results as JSON matching the schema provided. For each matching workspace
 
 Only include workspaces that are relevant to the search query. Be thorough but precise.
 Write the excerpts in the same language as the search query. For example, if the query is in Japanese, write excerpts in Japanese.`;
+}
+
+export function buildSearchPrompt(query: string, workspacePath: string): string {
+  return `# Task: Search across workspaces
+
+## Workspace Directory
+${workspacePath}
+
+## Search Query
+${query}
+`;
 }
 
 export const DEEP_SEARCH_SCHEMA = {

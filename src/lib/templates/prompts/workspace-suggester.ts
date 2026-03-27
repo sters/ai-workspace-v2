@@ -37,22 +37,8 @@ export const WORKSPACE_SUGGESTION_SCHEMA = {
   additionalProperties: false,
 };
 
-export function buildWorkspaceSuggesterPrompt(input: WorkspaceSuggesterInput): string {
-  return `# Workspace Suggester: Identify Out-of-Scope Items
-
-## Workspace: ${input.workspaceName}
-
-## Workspace README (defines the current scope)
-
-${input.readmeContent}
-
-## Operation Output
-
-${input.operationOutput}
-
-## Instructions
-
-You are a workspace suggester agent. Your job is to compare the operation output against the README scope and identify items that are **out of scope** for the current workspace but would be valuable as separate workspaces.
+export function getWorkspaceSuggesterSystemPrompt(): string {
+  return `You are a workspace suggester agent. Your job is to compare the operation output against the README scope and identify items that are **out of scope** for the current workspace but would be valuable as separate workspaces.
 
 ### What to look for
 
@@ -70,6 +56,20 @@ You are a workspace suggester agent. Your job is to compare the operation output
 
 Respond with a JSON object matching the schema. Return an empty suggestions array if no out-of-scope items are found. Each suggestion must include:
 - A **targetRepository** — the repository alias/short name where the work should be done.
-- A clear, actionable **description** that could be used to initialize a new workspace.
+- A clear, actionable **description** that could be used to initialize a new workspace.`;
+}
+
+export function buildWorkspaceSuggesterPrompt(input: WorkspaceSuggesterInput): string {
+  return `# Workspace Suggester: Identify Out-of-Scope Items
+
+## Workspace: ${input.workspaceName}
+
+## Workspace README (defines the current scope)
+
+${input.readmeContent}
+
+## Operation Output
+
+${input.operationOutput}
 `;
 }

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { buildRepoConstraintsPrompt } from "@/lib/templates";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhaseFunction } from "@/types/pipeline";
 
@@ -29,6 +30,7 @@ export function buildDiscoverConstraintsPhase(input: {
           readmePath,
         }),
         addDirs: [input.wsPath],
+        appendSystemPromptFile: ensureSystemPrompt(input.wsPath, "repo-constraints"),
       }));
 
       ctx.emitStatus(`Discovering constraints for ${children.length} repositories`);

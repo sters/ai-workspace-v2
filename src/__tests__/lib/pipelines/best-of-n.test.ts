@@ -28,6 +28,11 @@ vi.mock("@/lib/templates", () => ({
   BEST_OF_N_REVIEW_SCHEMA: { type: "object" },
 }));
 
+vi.mock("@/lib/workspace/prompts", () => ({
+  ensureSystemPrompt: vi.fn(() => "/mock/prompts/file.md"),
+  ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),
+}));
+
 import { buildBestOfNPipeline } from "@/lib/pipelines/best-of-n";
 import type { PhaseFunctionContext } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";

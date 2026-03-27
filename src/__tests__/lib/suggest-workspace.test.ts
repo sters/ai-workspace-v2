@@ -27,6 +27,11 @@ vi.mock("@/lib/workspace/reader", () => ({
   getReviewDetail: vi.fn().mockResolvedValue(null),
 }));
 
+vi.mock("@/lib/workspace/prompts", () => ({
+  ensureSystemPrompt: vi.fn(() => "/mock/prompts/file.md"),
+  ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),
+}));
+
 describe("triggerWorkspaceSuggestion", () => {
   beforeEach(() => {
     _resetDb();

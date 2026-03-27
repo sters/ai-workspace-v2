@@ -5,6 +5,10 @@
 
 import type { CoordinatorInput } from "@/types/prompts";
 
+export function getCoordinatorSystemPrompt(): string {
+  return COORDINATOR_INSTRUCTIONS;
+}
+
 export function buildCoordinatorPrompt(input: CoordinatorInput): string {
   const todoSections = input.todoFiles
     .map((f) => `### TODO-${f.repoName}.md\n\n${f.content}`)
@@ -22,10 +26,6 @@ ${input.readmeContent}
 ## TODO Files
 
 ${todoSections}
-
-## Instructions
-
-${COORDINATOR_INSTRUCTIONS}
 `;
 }
 

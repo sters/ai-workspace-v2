@@ -2,6 +2,7 @@ import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildUpdaterPrompt } from "@/lib/templates";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { runBestOfNFiles } from "./actions/best-of-n-files";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
@@ -72,11 +73,12 @@ export async function buildUpdateTodoPipeline(input: {
             prompt: buildPromptForDir(candidateDir),
             stepType: STEP_TYPES.UPDATE_TODO,
             addDirs: [candidateDir, ...repos.map((r) => r.worktreePath)],
+            appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater"),
           }],
           confirm: bestOfNConfirm,
           interactionLevel,
           runNormal: async (innerCtx) => {
-            return innerCtx.runChild("Update TODOs", prompt, { addDirs: [workspacePath], stepType: STEP_TYPES.UPDATE_TODO });
+            return innerCtx.runChild("Update TODOs", prompt, { addDirs: [workspacePath], stepType: STEP_TYPES.UPDATE_TODO, appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater") });
           },
         });
       },
@@ -84,6 +86,6 @@ export async function buildUpdateTodoPipeline(input: {
   }
 
   return [
-    { kind: "single", label: "Update TODOs", prompt, stepType: STEP_TYPES.UPDATE_TODO, addDirs: [workspacePath] },
+    { kind: "single", label: "Update TODOs", prompt, stepType: STEP_TYPES.UPDATE_TODO, addDirs: [workspacePath], appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater") },
   ];
 }

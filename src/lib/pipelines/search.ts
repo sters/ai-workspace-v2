@@ -2,6 +2,7 @@ import { statSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "@/lib/templates/prompts/search";
+import { ensureGlobalSystemPrompt } from "@/lib/workspace/prompts";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { DeepSearchResult } from "@/types/search";
@@ -23,6 +24,7 @@ export function buildSearchPipeline(query: string): PipelinePhase[] {
             cwd: getWorkspaceDir(),
             jsonSchema: DEEP_SEARCH_SCHEMA as Record<string, unknown>,
             stepType: STEP_TYPES.DEEP_SEARCH,
+            appendSystemPromptFile: ensureGlobalSystemPrompt("search"),
             onResultText: (text) => {
               resultText = text;
             },

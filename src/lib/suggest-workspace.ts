@@ -6,6 +6,7 @@
 import { runClaude } from "@/lib/claude";
 import { getReadme, getTodos, getReviewSessions, getReviewDetail } from "@/lib/workspace/reader";
 import { buildWorkspaceSuggesterPrompt, WORKSPACE_SUGGESTION_SCHEMA } from "@/lib/templates";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { insertSuggestion } from "@/lib/db";
 import { getWorkspaceDir } from "@/lib/config";
 import path from "node:path";
@@ -60,9 +61,11 @@ async function runSuggester(
   // Use a unique pseudo-operation ID (not tracked in pipeline)
   const suggestOpId = `suggest-${operationId}`;
 
+  const wsPath = path.join(getWorkspaceDir(), workspace);
   const proc = runClaude(suggestOpId, prompt, {
     jsonSchema: WORKSPACE_SUGGESTION_SCHEMA,
     skipAskUserQuestion: true,
+    appendSystemPromptFile: ensureSystemPrompt(wsPath, "workspace-suggester"),
   });
 
   // Wait for completion with timeout

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "@/lib/templates/prompts/search";
+import { getSearchSystemPrompt, buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "@/lib/templates/prompts/search";
 
 describe("buildSearchPrompt", () => {
   it("includes the query in the prompt", () => {
@@ -13,13 +13,13 @@ describe("buildSearchPrompt", () => {
   });
 
   it("mentions README.md files", () => {
-    const prompt = buildSearchPrompt("test", "/workspace");
-    expect(prompt).toContain("README.md");
+    const systemPrompt = getSearchSystemPrompt();
+    expect(systemPrompt).toContain("README.md");
   });
 
   it("mentions TODO files", () => {
-    const prompt = buildSearchPrompt("test", "/workspace");
-    expect(prompt).toContain("TODO");
+    const systemPrompt = getSearchSystemPrompt();
+    expect(systemPrompt).toContain("TODO");
   });
 
   it("returns a non-empty string", () => {
@@ -28,8 +28,8 @@ describe("buildSearchPrompt", () => {
   });
 
   it("asks for JSON output", () => {
-    const prompt = buildSearchPrompt("test", "/workspace");
-    expect(prompt).toContain("JSON");
+    const systemPrompt = getSearchSystemPrompt();
+    expect(systemPrompt).toContain("JSON");
   });
 });
 

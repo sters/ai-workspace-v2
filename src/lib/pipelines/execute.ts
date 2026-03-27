@@ -15,6 +15,7 @@ import {
   buildResearcherPrompt,
 } from "@/lib/templates";
 import { writeReportTemplates } from "@/lib/workspace";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
@@ -62,7 +63,7 @@ export async function buildExecutePipeline(input: {
     });
 
     return [
-      { kind: "single", label: "Research", prompt, stepType: STEP_TYPES.RESEARCH },
+      { kind: "single", label: "Research", prompt, stepType: STEP_TYPES.RESEARCH, appendSystemPromptFile: ensureSystemPrompt(wsPath, "researcher") },
     ];
   }
 
@@ -180,6 +181,7 @@ async function executeRepoLane(
     return ctx.runChild(repo.repoName, prompt, {
       addDirs: [wsPath],
       stepType: STEP_TYPES.EXECUTE,
+      appendSystemPromptFile: ensureSystemPrompt(wsPath, "executor"),
     });
   }
 
@@ -236,7 +238,7 @@ async function executeRepoLane(
     const success = await ctx.runChild(
       `${repo.repoName} [batch ${i + 1}/${totalBatches}]`,
       prompt,
-      { addDirs: [wsPath], stepType: STEP_TYPES.EXECUTE },
+      { addDirs: [wsPath], stepType: STEP_TYPES.EXECUTE, appendSystemPromptFile: ensureSystemPrompt(wsPath, "executor") },
     );
 
     if (!success) {

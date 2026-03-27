@@ -15,6 +15,7 @@ import {
   buildBestOfNFileSynthesizerPrompt,
   BEST_OF_N_REVIEW_SCHEMA,
 } from "@/lib/templates";
+import { ensureGlobalSystemPrompt } from "@/lib/workspace/prompts";
 
 export interface BestOfNFilesInput {
   ctx: PhaseFunctionContext;
@@ -183,6 +184,7 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
     const reviewOk = await ctx.runChild("Best-of-N File Reviewer", reviewPrompt, {
       jsonSchema: BEST_OF_N_REVIEW_SCHEMA as unknown as Record<string, unknown>,
       stepType: STEP_TYPES.BEST_OF_N_REVIEWER,
+      appendSystemPromptFile: ensureGlobalSystemPrompt("best-of-n-file-reviewer"),
       onResultText: (text) => { reviewResultText = text; },
     });
 
@@ -259,6 +261,7 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
     const synthOk = await ctx.runChild("Best-of-N Synthesizer", synthPrompt, {
       addDirs: [commonParent, ...successful.map((c) => c.dir)],
       stepType: STEP_TYPES.BEST_OF_N_SYNTHESIZER,
+      appendSystemPromptFile: ensureGlobalSystemPrompt("best-of-n-synthesizer"),
     });
 
     if (!synthOk) {

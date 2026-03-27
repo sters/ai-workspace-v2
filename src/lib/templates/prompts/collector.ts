@@ -5,6 +5,10 @@
 
 import type { CollectorInput } from "@/types/prompts";
 
+export function getCollectorSystemPrompt(): string {
+  return COLLECTOR_INSTRUCTIONS;
+}
+
 export function buildCollectorPrompt(input: CollectorInput): string {
   return `# Task: Collect review results and create summary
 
@@ -29,10 +33,6 @@ Write the summary to: ${input.reviewDir}/SUMMARY.md
 
 Read the summary report template file at: workspace/${input.workspaceName}/summary-report-template.md
 Use it as the base structure for the report.
-
-## Instructions
-
-${COLLECTOR_INSTRUCTIONS}
 `;
 }
 
