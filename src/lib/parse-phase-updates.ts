@@ -44,6 +44,7 @@ const VALID_PHASE_STATUSES = new Set<OperationPhaseInfo["status"]>([
   "completed",
   "failed",
   "skipped",
+  "retrying",
 ]);
 
 function isValidPhaseStatus(value: unknown): value is OperationPhaseInfo["status"] {
@@ -62,11 +63,15 @@ function parseAndUpsert(
     const existing = phaseMap.get(idx);
     if (existing) {
       existing.status = data.phaseStatus;
+      if (typeof data.retryAttempt === "number") existing.retryAttempt = data.retryAttempt;
+      if (typeof data.maxRetries === "number") existing.maxRetries = data.maxRetries;
     } else {
       phaseMap.set(idx, {
         index: idx,
         label: data.phaseLabel ?? `Phase ${idx + 1}`,
         status: data.phaseStatus,
+        ...(typeof data.retryAttempt === "number" && { retryAttempt: data.retryAttempt }),
+        ...(typeof data.maxRetries === "number" && { maxRetries: data.maxRetries }),
       });
     }
   } catch {
