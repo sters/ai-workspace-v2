@@ -12,7 +12,11 @@ import { listWorkspaceRepos, commitWorkspaceSnapshot } from "@/lib/workspace";
 import {
   buildExecutorPrompt,
   buildBatchedExecutorPrompt,
-  buildResearcherPrompt,
+  buildResearchFindingsRepoPrompt,
+  buildResearchFindingsCrossRepoPrompt,
+  buildResearchRecommendationsRepoPrompt,
+  buildResearchRecommendationsCrossRepoPrompt,
+  buildResearchIntegrationPrompt,
 } from "@/lib/templates";
 import { writeReportTemplates, writeResearchTemplates } from "@/lib/workspace";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
@@ -50,21 +54,25 @@ export async function buildExecutePipeline(input: {
     await writeReportTemplates(wsPath);
     const reportDir = await writeResearchTemplates(wsPath);
 
-    const prompt = buildResearcherPrompt({
-      workspaceName: workspace,
-      readmeContent,
-      repos: repos.map((r) => ({
-        repoPath: r.repoPath,
-        repoName: r.repoName,
-        worktreePath: r.worktreePath,
-      })),
-      workspacePath: wsPath,
-      reportDir,
-    });
+    const repoInputs = repos.map((r) => ({
+      repoPath: r.repoPath,
+      repoName: r.repoName,
+      worktreePath: r.worktreePath,
+    }));
 
-    return [
-      { kind: "single", label: "Research", prompt, stepType: STEP_TYPES.RESEARCH, appendSystemPromptFile: ensureSystemPrompt(wsPath, "researcher") },
-    ];
+    return buildResearchPipeline({
+      workspace,
+      readmeContent,
+      repos: repoInputs,
+      wsPath,
+      reportDir,
+      sysPromptFiles: {
+        findingsRepo: ensureSystemPrompt(wsPath, "research-findings-repo"),
+        findingsCrossRepo: ensureSystemPrompt(wsPath, "research-findings-cross-repo"),
+        recommendations: ensureSystemPrompt(wsPath, "research-recommendations"),
+        integration: ensureSystemPrompt(wsPath, "research-integration"),
+      },
+    });
   }
 
   // Estimate max batches for timeout calculation
@@ -92,6 +100,151 @@ export async function buildExecutePipeline(input: {
       },
     },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// Research pipeline — 3-phase parallel execution
+// ---------------------------------------------------------------------------
+
+interface ResearchPipelineInput {
+  workspace: string;
+  readmeContent: string;
+  repos: WorkspaceRepo[];
+  wsPath: string;
+  reportDir: string;
+  sysPromptFiles: {
+    findingsRepo: string;
+    findingsCrossRepo: string;
+    recommendations: string;
+    integration: string;
+  };
+}
+
+function buildResearchPipeline(input: ResearchPipelineInput): PipelinePhase[] {
+  const { workspace, readmeContent, repos, wsPath, reportDir, sysPromptFiles } = input;
+
+  // Phase 1 — Findings: N+1 parallel children (pre-computed prompts)
+  const findingsPhase: PipelinePhase = {
+    kind: "group",
+    children: [
+      ...repos.map((repo) => ({
+        label: `Findings: ${repo.repoName}`,
+        prompt: buildResearchFindingsRepoPrompt({
+          workspaceName: workspace,
+          readmeContent,
+          repo,
+          workspacePath: wsPath,
+          reportDir,
+        }),
+        stepType: STEP_TYPES.RESEARCH,
+        appendSystemPromptFile: sysPromptFiles.findingsRepo,
+      })),
+      {
+        label: "Findings: Cross-Repository",
+        prompt: buildResearchFindingsCrossRepoPrompt({
+          workspaceName: workspace,
+          readmeContent,
+          repos,
+          workspacePath: wsPath,
+          reportDir,
+        }),
+        stepType: STEP_TYPES.RESEARCH,
+        appendSystemPromptFile: sysPromptFiles.findingsCrossRepo,
+      },
+    ],
+  };
+
+  // Phase 2 — Recommendations & Next Steps: reads findings, runs N+1 parallel
+  const recommendationsPhase: PipelinePhase = {
+    kind: "function",
+    label: "Recommendations & Next Steps",
+    fn: async (ctx: PhaseFunctionContext) => {
+      // Read findings produced by Phase 1
+      const crossRepoFindings = await Bun.file(
+        path.join(reportDir, "findings-cross-repository.md"),
+      ).text().catch(() => "");
+
+      const perRepoFindings = await Promise.all(
+        repos.map(async (repo) => ({
+          repoName: repo.repoName,
+          content: await Bun.file(
+            path.join(reportDir, `findings-${repo.repoName}.md`),
+          ).text().catch(() => ""),
+        })),
+      );
+
+      const allFindings = [
+        ...perRepoFindings.map((f) => ({ name: `findings-${f.repoName}.md`, content: f.content })),
+        { name: "findings-cross-repository.md", content: crossRepoFindings },
+      ];
+
+      const children = [
+        ...repos.map((repo, i) => ({
+          label: `Recommendations: ${repo.repoName}`,
+          prompt: buildResearchRecommendationsRepoPrompt({
+            workspaceName: workspace,
+            readmeContent,
+            repo,
+            workspacePath: wsPath,
+            reportDir,
+            findingsContent: perRepoFindings[i].content,
+            crossRepoFindingsContent: crossRepoFindings,
+          }),
+          stepType: STEP_TYPES.RESEARCH,
+          appendSystemPromptFile: sysPromptFiles.recommendations,
+        })),
+        {
+          label: "Recommendations: Cross-Repository",
+          prompt: buildResearchRecommendationsCrossRepoPrompt({
+            workspaceName: workspace,
+            readmeContent,
+            repos,
+            workspacePath: wsPath,
+            reportDir,
+            allFindings,
+          }),
+          stepType: STEP_TYPES.RESEARCH,
+          appendSystemPromptFile: sysPromptFiles.recommendations,
+        },
+      ];
+
+      const results = await ctx.runChildGroup(children);
+      return results.every(Boolean);
+    },
+  };
+
+  // Phase 3 — Integration: reads everything, produces summary + others
+  const integrationPhase: PipelinePhase = {
+    kind: "function",
+    label: "Integration",
+    fn: async (ctx: PhaseFunctionContext) => {
+      // Read all .md files from the report directory
+      const glob = new Bun.Glob("*.md");
+      const mdFiles = [...glob.scanSync({ cwd: reportDir })].sort();
+      const allFiles = await Promise.all(
+        mdFiles.map(async (f) => ({
+          name: f,
+          content: await Bun.file(path.join(reportDir, f)).text().catch(() => ""),
+        })),
+      );
+
+      const prompt = buildResearchIntegrationPrompt({
+        workspaceName: workspace,
+        readmeContent,
+        workspacePath: wsPath,
+        reportDir,
+        allFiles,
+      });
+
+      return ctx.runChild("Integration", prompt, {
+        addDirs: [wsPath],
+        stepType: STEP_TYPES.RESEARCH,
+        appendSystemPromptFile: sysPromptFiles.integration,
+      });
+    },
+  };
+
+  return [findingsPhase, recommendationsPhase, integrationPhase];
 }
 
 async function estimateMaxBatches(

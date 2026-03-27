@@ -136,9 +136,27 @@ export const RESEARCH_RECOMMENDATIONS_TEMPLATE = `# Recommendations
 {Actionable recommendations based on findings}
 `;
 
+export const RESEARCH_RECOMMENDATIONS_REPO_TEMPLATE = `# Recommendations: {Repository Name}
+
+**Based on**: findings-{repository}.md, findings-cross-repository.md
+
+## High Priority
+## Medium Priority
+## Low Priority
+`;
+
 export const RESEARCH_NEXT_STEPS_TEMPLATE = `# Next Steps
 
 {Concrete next steps to take}
+`;
+
+export const RESEARCH_NEXT_STEPS_REPO_TEMPLATE = `# Next Steps: {Repository Name}
+
+**Based on**: findings-{repository}.md, findings-cross-repository.md
+
+## Immediate Actions
+## Short-term
+## Long-term
 `;
 
 export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
@@ -237,5 +255,7 @@ export const RESEARCH_REPORT_TEMPLATES = {
   "findings-cross-repository.md": RESEARCH_FINDINGS_CROSS_REPO_TEMPLATE,
   "findings-others.md": RESEARCH_FINDINGS_OTHERS_TEMPLATE,
   "recommendations.md": RESEARCH_RECOMMENDATIONS_TEMPLATE,
+  "recommendations-repository.md": RESEARCH_RECOMMENDATIONS_REPO_TEMPLATE,
   "next-steps.md": RESEARCH_NEXT_STEPS_TEMPLATE,
+  "next-steps-repository.md": RESEARCH_NEXT_STEPS_REPO_TEMPLATE,
 } as const;
