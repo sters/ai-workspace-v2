@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  getBestOfNReviewerSystemPrompt,
   buildBestOfNReviewerPrompt,
+  getBestOfNFileReviewerSystemPrompt,
   buildBestOfNFileReviewerPrompt,
   buildBestOfNFileSynthesizerPrompt,
   BEST_OF_N_REVIEW_SCHEMA,
@@ -59,9 +61,9 @@ describe("buildBestOfNReviewerPrompt", () => {
   });
 
   it("instructs select vs synthesize decision", () => {
-    const prompt = buildBestOfNReviewerPrompt(baseInput);
-    expect(prompt).toContain("select");
-    expect(prompt).toContain("synthesize");
+    const systemPrompt = getBestOfNReviewerSystemPrompt();
+    expect(systemPrompt).toContain("select");
+    expect(systemPrompt).toContain("synthesize");
   });
 
   it("handles 3+ candidates", () => {
@@ -105,15 +107,9 @@ describe("buildBestOfNFileReviewerPrompt", () => {
   });
 
   it("includes select and synthesize instructions", () => {
-    const prompt = buildBestOfNFileReviewerPrompt({
-      operationType: "test",
-      candidates: [
-        { label: "c1", files: [{ name: "f.md", content: "a" }] },
-        { label: "c2", files: [{ name: "f.md", content: "b" }] },
-      ],
-    });
-    expect(prompt).toContain("select");
-    expect(prompt).toContain("synthesize");
+    const systemPrompt = getBestOfNFileReviewerSystemPrompt();
+    expect(systemPrompt).toContain("select");
+    expect(systemPrompt).toContain("synthesize");
   });
 });
 

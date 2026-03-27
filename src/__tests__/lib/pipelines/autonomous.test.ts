@@ -41,6 +41,10 @@ vi.mock("@/lib/pipelines/update-todo", () => ({
 vi.mock("@/lib/suggest-workspace", () => ({
   triggerWorkspaceSuggestion: vi.fn(),
 }));
+vi.mock("@/lib/workspace/prompts", () => ({
+  ensureSystemPrompt: vi.fn(() => "/mock/prompts/file.md"),
+  ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),
+}));
 
 import { buildAutonomousPipeline } from "@/lib/pipelines/autonomous";
 import { buildInitPipeline } from "@/lib/pipelines/init";

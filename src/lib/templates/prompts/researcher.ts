@@ -5,6 +5,10 @@
 
 import type { ResearcherInput } from "@/types/prompts";
 
+export function getResearcherSystemPrompt(): string {
+  return RESEARCHER_INSTRUCTIONS;
+}
+
 export function buildResearcherPrompt(input: ResearcherInput): string {
   const repoList = input.repos
     .map((r) => `- **${r.repoName}**: \`${r.repoPath}\` (worktree: \`${r.worktreePath}\`)`)
@@ -31,10 +35,6 @@ Write the research report to: ${input.reportPath}
 
 Read the research report template file at: workspace/${input.workspaceName}/research-report-template.md
 Use it as the base structure for the report.
-
-## Instructions
-
-${RESEARCHER_INSTRUCTIONS}
 `;
 }
 

@@ -13,6 +13,11 @@ vi.mock("@/lib/templates", () => ({
   buildUpdaterPrompt: vi.fn(() => "updater-prompt"),
 }));
 
+vi.mock("@/lib/workspace/prompts", () => ({
+  ensureSystemPrompt: vi.fn(() => "/mock/prompts/updater.md"),
+  ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),
+}));
+
 const mockFileExists = vi.fn();
 const mockFileText = vi.fn();
 const originalBunFile = Bun.file;

@@ -1,5 +1,6 @@
 import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import { buildReviewerPrompt } from "@/lib/templates";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { GroupChild, PipelinePhaseFunction } from "@/types/pipeline";
 
@@ -37,6 +38,7 @@ export function buildReviewTodosPhase(input: {
             todoContent,
             worktreePath: repo.worktreePath,
           }),
+          appendSystemPromptFile: ensureSystemPrompt(input.wsPath, "reviewer"),
         });
       }
 

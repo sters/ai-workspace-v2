@@ -5,53 +5,19 @@
 
 import type { PlannerInput } from "@/types/prompts";
 
-export function buildPlannerPrompt(input: PlannerInput): string {
-  const isResearch = input.taskType === "research";
-  const todoDir = input.todoOutputDir ?? `workspace/${input.workspaceName}`;
-  const instructions = isResearch
-    ? researchPlannerInstructions(input.worktreePath, todoDir)
-    : plannerInstructions(input.worktreePath, todoDir);
-
-  const templatePath = input.todoOutputDir
-    ? `${input.todoOutputDir}/TODO-template.md`
-    : `workspace/${input.workspaceName}/TODO-template.md`;
-
-  return `# Task: Plan TODO items for ${input.repoName}
-
-## Workspace: ${input.workspaceName}
-## Repository: ${input.repoPath}
-## Worktree: ${input.worktreePath}
-## Task Type: ${input.taskType}
-${input.interactive ? "## Mode: interactive" : ""}
-
-## Workspace README
-
-${input.readmeContent}
-
-## TODO Template
-
-Read the TODO template file at: ${templatePath}
-Use it as the base structure for the TODO file. Replace \`{{REPOSITORY_NAME}}\` with the actual repository name.
-
-## Instructions
-
-${instructions}
-`;
-}
-
-function plannerInstructions(worktreePath: string, todoDir: string): string {
+export function getPlannerSystemPrompt(): string {
   return `You are a specialized agent for creating TODO items. Your role is to understand the workspace objectives, assess how much repository analysis is needed, and create actionable TODO items that guide the executor.
 
 **Your mission is simple and unwavering: Create a TODO file that tells the executor what to do.**
 
 ### Execution Steps
 
-1. **Read Workspace Context** (provided above):
+1. **Read Workspace Context** (provided in the user prompt):
    - Understand what task needs to be accomplished
    - Identify task type, requirements, and acceptance criteria
 
 2. **Use the TODO Template**:
-   - Read the TODO template file specified above
+   - Read the TODO template file specified in the user prompt
    - Write the template to the workspace as the TODO file
    - Replace \`{{REPOSITORY_NAME}}\` with the actual repository name
 
@@ -78,14 +44,12 @@ function plannerInstructions(worktreePath: string, todoDir: string): string {
 
 ### Output
 
-Write the TODO file to: ${todoDir}/TODO-{repository-name}.md
+Write the TODO file to the output directory specified in the user prompt: \`<todo-dir>/TODO-{repository-name}.md\`
 
 ### Working Directory
 
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-\`\`\`bash
-cd ${worktreePath}
-\`\`\`
+**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
+
 After that, run commands like \`git status\`, \`git diff\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
 
 ### TODO Item Format
@@ -122,19 +86,19 @@ If Mode is "interactive", pause at two checkpoints:
 `;
 }
 
-function researchPlannerInstructions(worktreePath: string, todoDir: string): string {
+export function getResearchPlannerSystemPrompt(): string {
   return `You are a specialized agent for creating TODO items for a **research/investigation task**. Your role is to outline what needs to be investigated — NOT to perform the investigation itself.
 
 **CRITICAL: Do NOT analyze source code, read implementation files, or investigate the codebase. The executor will do that. Your job is only to create a TODO list of what to look into.**
 
 ### Execution Steps
 
-1. **Read Workspace Context** (provided above):
+1. **Read Workspace Context** (provided in the user prompt):
    - Understand what needs to be researched or investigated
    - Identify the key questions to answer
 
 2. **Use the TODO Template**:
-   - Read the TODO template file specified above
+   - Read the TODO template file specified in the user prompt
    - Write the template to the workspace as the TODO file
    - Replace \`{{REPOSITORY_NAME}}\` with the actual repository name
 
@@ -151,14 +115,12 @@ function researchPlannerInstructions(worktreePath: string, todoDir: string): str
 
 ### Output
 
-Write the TODO file to: ${todoDir}/TODO-{repository-name}.md
+Write the TODO file to the output directory specified in the user prompt: \`<todo-dir>/TODO-{repository-name}.md\`
 
 ### Working Directory
 
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-\`\`\`bash
-cd ${worktreePath}
-\`\`\`
+**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
+
 After that, run commands like \`git status\`, \`git diff\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
 
 ### TODO Item Format
@@ -177,5 +139,41 @@ Each TODO item MUST follow this structured format:
 2. Keep TODOs at the "what to investigate" level — do NOT perform the investigation
 3. Order by priority: most important research questions first
 4. Include a final TODO to document findings in the workspace README
+`;
+}
+
+export function buildPlannerPrompt(input: PlannerInput): string {
+  const todoDir = input.todoOutputDir ?? `workspace/${input.workspaceName}`;
+
+  const templatePath = input.todoOutputDir
+    ? `${input.todoOutputDir}/TODO-template.md`
+    : `workspace/${input.workspaceName}/TODO-template.md`;
+
+  return `# Task: Plan TODO items for ${input.repoName}
+
+## Workspace: ${input.workspaceName}
+## Repository: ${input.repoPath}
+## Worktree: ${input.worktreePath}
+## Task Type: ${input.taskType}
+${input.interactive ? "## Mode: interactive" : ""}
+
+## Workspace README
+
+${input.readmeContent}
+
+## TODO Template
+
+Read the TODO template file at: ${templatePath}
+Use it as the base structure for the TODO file. Replace \`{{REPOSITORY_NAME}}\` with the actual repository name.
+
+### Output
+
+Write the TODO file to: ${todoDir}/TODO-{repository-name}.md
+
+### Working Directory
+
+\`\`\`bash
+cd ${input.worktreePath}
+\`\`\`
 `;
 }

@@ -9,6 +9,7 @@ import { runSubPhases } from "./actions/run-sub-phases";
 import { resolveWorkspace } from "./actions/resolve-workspace";
 import { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "@/lib/templates/prompts/autonomous-gate";
 import { getWorkspaceDir } from "@/lib/config";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import path from "node:path";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
@@ -78,10 +79,12 @@ async function runAutonomousGate(
   });
 
   // Run AI gate
+  const wsPath = path.join(getWorkspaceDir(), workspace);
   let resultText = "";
   const ok = await ctx.runChild("Autonomous Gate", prompt, {
     jsonSchema: AUTONOMOUS_GATE_SCHEMA,
     stepType: STEP_TYPES.AUTONOMOUS_GATE,
+    appendSystemPromptFile: ensureSystemPrompt(wsPath, "autonomous-gate"),
     onResultText: (text) => { resultText = text; },
     skipAskUserQuestion: true,
   });

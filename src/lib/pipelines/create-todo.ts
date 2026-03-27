@@ -3,6 +3,7 @@ import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildCreateTodoFromReviewPrompt } from "@/lib/templates";
 import { getWorkspaceDir } from "@/lib/config";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import { getTimeoutDefaults } from "@/lib/pipeline-manager";
@@ -47,6 +48,7 @@ export function buildCreateTodoPipeline(
             instruction,
           }),
           addDirs: [wsPath],
+          appendSystemPromptFile: ensureSystemPrompt(wsPath, "create-todo-planner"),
         }));
 
         ctx.emitStatus(`Creating TODOs from review for ${children.length} repositories`);

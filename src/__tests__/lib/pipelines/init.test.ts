@@ -25,6 +25,11 @@ vi.mock("@/lib/templates", () => ({
   BEST_OF_N_REVIEW_SCHEMA: {},
 }));
 
+vi.mock("@/lib/workspace/prompts", () => ({
+  ensureSystemPrompt: vi.fn(() => "/mock/prompts/file.md"),
+  ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),
+}));
+
 describe("buildInitPipeline", () => {
   it("returns 7 phases", () => {
     const phases = buildInitPipeline("test description");

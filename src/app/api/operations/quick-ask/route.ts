@@ -4,6 +4,7 @@ import { runClaude } from "@/lib/claude";
 import { quickAskSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 import { buildQuickAskPrompt } from "@/lib/templates/prompts/quick-ask";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
   const workspacePath = path.join(getWorkspaceDir(), workspace);
   const prompt = buildQuickAskPrompt(workspace, workspacePath, question);
 
-  const proc = runClaude("quick-ask", prompt, { cwd: getResolvedWorkspaceRoot() });
+  const proc = runClaude("quick-ask", prompt, { cwd: getResolvedWorkspaceRoot(), appendSystemPromptFile: ensureSystemPrompt(workspacePath, "quick-ask") });
 
   const stream = new ReadableStream({
     start(controller) {

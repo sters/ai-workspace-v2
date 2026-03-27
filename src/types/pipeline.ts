@@ -42,6 +42,8 @@ export interface GroupChild {
   model?: ClaudeModel;
   /** Step type identifier for config-based model resolution. */
   stepType?: StepType;
+  /** Path to a file whose content is appended to Claude's system prompt via --append-system-prompt-file. */
+  appendSystemPromptFile?: string;
 }
 
 export interface PipelinePhaseSingle {
@@ -57,6 +59,8 @@ export interface PipelinePhaseSingle {
   model?: ClaudeModel;
   /** Step type identifier for config-based model resolution. */
   stepType?: StepType;
+  /** Path to a file whose content is appended to Claude's system prompt via --append-system-prompt-file. */
+  appendSystemPromptFile?: string;
 }
 
 export interface PipelinePhaseGroup {
@@ -80,6 +84,8 @@ export interface RunChildOptions {
   model?: ClaudeModel;
   /** Step type identifier for config-based model resolution. */
   stepType?: StepType;
+  /** Path to a file whose content is appended to Claude's system prompt via --append-system-prompt-file. */
+  appendSystemPromptFile?: string;
 }
 
 export interface PhaseFunctionContext {

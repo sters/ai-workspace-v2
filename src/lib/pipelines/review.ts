@@ -15,6 +15,7 @@ import {
   buildReadmeVerifierPrompt,
   buildCollectorPrompt,
 } from "@/lib/templates";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
@@ -72,6 +73,7 @@ export async function buildReviewPipeline(input: {
         reviewFilePath: path.join(reviewDir, reviewFileName),
       }),
       addDirs: [reviewDir],
+      appendSystemPromptFile: ensureSystemPrompt(wsPath, "code-reviewer"),
     });
 
     // TODO verifier
@@ -95,6 +97,7 @@ export async function buildReviewPipeline(input: {
         verifyFilePath: path.join(reviewDir, verifyFileName),
       }),
       addDirs: [reviewDir],
+      appendSystemPromptFile: ensureSystemPrompt(wsPath, "todo-verifier"),
     });
 
     // README verifier
@@ -114,6 +117,7 @@ export async function buildReviewPipeline(input: {
         verifyFilePath: path.join(reviewDir, readmeVerifyFileName),
       }),
       addDirs: [reviewDir],
+      appendSystemPromptFile: ensureSystemPrompt(wsPath, "readme-verifier"),
     });
   }
 
@@ -146,7 +150,7 @@ export async function buildReviewPipeline(input: {
           readmeVerifyFiles: [...actualReadmeVerifyFiles].map((f) => path.join(reviewDir, f)),
         });
 
-        const ok = await ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir], stepType: STEP_TYPES.COLLECT_REVIEWS });
+        const ok = await ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir], stepType: STEP_TYPES.COLLECT_REVIEWS, appendSystemPromptFile: ensureSystemPrompt(wsPath, "collector") });
         if (ok) {
           triggerWorkspaceSuggestion(workspace, ctx.operationId, "review");
         }

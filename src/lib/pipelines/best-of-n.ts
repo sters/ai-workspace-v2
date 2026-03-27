@@ -19,6 +19,7 @@ import {
   buildBestOfNReviewerPrompt,
   BEST_OF_N_REVIEW_SCHEMA,
 } from "@/lib/templates";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { runSubPhases } from "./actions/run-sub-phases";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
@@ -251,6 +252,7 @@ export async function buildBestOfNPipeline(
           addDirs,
           jsonSchema: BEST_OF_N_REVIEW_SCHEMA as unknown as Record<string, unknown>,
           stepType: STEP_TYPES.BEST_OF_N_REVIEWER,
+          appendSystemPromptFile: ensureSystemPrompt(wsPath, "best-of-n-reviewer"),
           onResultText: (text) => { reviewResultText = text; },
         });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getWorkspaceSuggesterSystemPrompt,
   buildWorkspaceSuggesterPrompt,
   WORKSPACE_SUGGESTION_SCHEMA,
 } from "@/lib/templates/prompts/workspace-suggester";
@@ -15,7 +16,8 @@ describe("workspace-suggester prompt", () => {
     expect(prompt).toContain("test-ws");
     expect(prompt).toContain("fix auth module");
     expect(prompt).toContain("Found issue in logging module");
-    expect(prompt).toContain("out of scope");
+    const systemPrompt = getWorkspaceSuggesterSystemPrompt();
+    expect(systemPrompt).toContain("out of scope");
   });
 
   it("schema has required suggestions array", () => {

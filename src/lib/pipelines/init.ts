@@ -8,6 +8,7 @@ import {
   writeTodoTemplate,
   writeReportTemplates,
 } from "@/lib/workspace";
+import { ensureGlobalSystemPrompt, ensureSystemPrompt } from "@/lib/workspace/prompts";
 import type { TaskAnalysis } from "@/types/workspace";
 import { setupRepository } from "./actions/setup-repository";
 import type { SetupRepositoryResult } from "@/types/pipeline";
@@ -139,6 +140,7 @@ export function buildInitPipeline(
           ctx.runChild(label ?? "Analyze & draft README", prompt, {
             jsonSchema: INIT_ANALYSIS_SCHEMA,
             stepType: STEP_TYPES.ANALYZE_README,
+            appendSystemPromptFile: ensureGlobalSystemPrompt("init-readme"),
             onResultText: (text) => {
               analysis = parseAnalysis(text, description);
             },
@@ -174,6 +176,7 @@ export function buildInitPipeline(
               prompt,
               jsonSchema: INIT_ANALYSIS_SCHEMA as Record<string, unknown>,
               stepType: STEP_TYPES.ANALYZE_README,
+              appendSystemPromptFile: ensureGlobalSystemPrompt("init-readme"),
               onResultText: (text: string) => {
                 candidateAnalyses.set(label, parseAnalysis(text, description));
               },
@@ -216,6 +219,7 @@ export function buildInitPipeline(
           let reviewResultText: string | undefined;
           const reviewOk = await ctx.runChild("Best-of-N README Reviewer", reviewPrompt, {
             jsonSchema: INIT_REVIEW_SCHEMA as Record<string, unknown>,
+            appendSystemPromptFile: ensureGlobalSystemPrompt("best-of-n-file-reviewer"),
             onResultText: (text) => { reviewResultText = text; },
           });
 
@@ -284,6 +288,7 @@ export function buildInitPipeline(
           let synthResultText: string | undefined;
           const synthOk = await ctx.runChild("Best-of-N README Synthesizer", synthPrompt, {
             jsonSchema: INIT_SYNTH_SCHEMA as Record<string, unknown>,
+            appendSystemPromptFile: ensureGlobalSystemPrompt("best-of-n-synthesizer"),
             onResultText: (text) => { synthResultText = text; },
           });
 
@@ -462,6 +467,7 @@ export function buildInitPipeline(
           return true;
         }
 
+        const plannerAgent = meta.taskType === "research" ? "research-planner" : "planner";
         const buildPlannerChildren = (todoOutputDir?: string, addDirsOverride?: string[]) =>
           repoResults.map((repo) => ({
             label: `plan-${repo.repoName}`,
@@ -477,6 +483,7 @@ export function buildInitPipeline(
               todoOutputDir,
             }),
             addDirs: addDirsOverride ?? [wsPath],
+            appendSystemPromptFile: ensureSystemPrompt(wsPath, plannerAgent),
           }));
 
         const cleanup = () => {

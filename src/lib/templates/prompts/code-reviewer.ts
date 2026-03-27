@@ -5,37 +5,7 @@
 
 import type { CodeReviewerInput } from "@/types/prompts";
 
-export function buildCodeReviewerPrompt(input: CodeReviewerInput): string {
-  return `# Task: Review code changes for ${input.repoName}
-
-## Workspace: ${input.workspaceName}
-## Repository: ${input.repoPath}
-## Base Branch: ${input.baseBranch}
-## Review Timestamp: ${input.reviewTimestamp}
-## Worktree: ${input.worktreePath}
-
-## Workspace README
-
-${input.readmeContent}
-
-## Repository Changes
-
-${input.repoChanges}
-
-## Review Report Template
-
-Write the review report to: ${input.reviewFilePath}
-
-Read the review report template file at: workspace/${input.workspaceName}/review-report-template.md
-Use it as the base structure for the report.
-
-## Instructions
-
-${codeReviewerInstructions(input.worktreePath)}
-`;
-}
-
-function codeReviewerInstructions(worktreePath: string): string {
+export function getCodeReviewerSystemPrompt(): string {
   return `You are a specialized agent for reviewing code changes in a repository. Your role is to analyze differences between the current branch and the base branch, then provide a thorough code review.
 
 **Your mission: Review all code changes and write a comprehensive review report.**
@@ -61,10 +31,8 @@ function codeReviewerInstructions(worktreePath: string): string {
 
 ### Working Directory
 
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-\`\`\`bash
-cd ${worktreePath}
-\`\`\`
+**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
+
 After that, run commands like \`git status\`, \`git diff\`, \`git log\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
 
 ### Technical Checks
@@ -80,5 +48,37 @@ After that, run commands like \`git status\`, \`git diff\`, \`git log\`, etc. as
 - Be thorough: read full context
 - Be specific: reference exact line numbers
 - Consider context: understand task requirements
+`;
+}
+
+export function buildCodeReviewerPrompt(input: CodeReviewerInput): string {
+  return `# Task: Review code changes for ${input.repoName}
+
+## Workspace: ${input.workspaceName}
+## Repository: ${input.repoPath}
+## Base Branch: ${input.baseBranch}
+## Review Timestamp: ${input.reviewTimestamp}
+## Worktree: ${input.worktreePath}
+
+## Workspace README
+
+${input.readmeContent}
+
+## Repository Changes
+
+${input.repoChanges}
+
+## Review Report Template
+
+Write the review report to: ${input.reviewFilePath}
+
+Read the review report template file at: workspace/${input.workspaceName}/review-report-template.md
+Use it as the base structure for the report.
+
+### Working Directory
+
+\`\`\`bash
+cd ${input.worktreePath}
+\`\`\`
 `;
 }

@@ -8,6 +8,7 @@ import { listOperations } from "@/lib/db/operations";
 import { listWorkspaces } from "@/lib/workspace/reader";
 import { getReadme } from "@/lib/workspace/reader";
 import { buildDiscoveryPrompt, DISCOVERY_SCHEMA } from "@/lib/templates";
+import { ensureGlobalSystemPrompt } from "@/lib/workspace/prompts";
 import { insertSuggestion } from "@/lib/db";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
 import type { DiscoveryInput } from "@/types/prompts";
@@ -80,6 +81,7 @@ export function buildDiscoveryPipeline(): PipelinePhase[] {
             prompt,
             jsonSchema: DISCOVERY_SCHEMA as Record<string, unknown>,
             skipAskUserQuestion: true,
+            appendSystemPromptFile: ensureGlobalSystemPrompt("discovery"),
             onResultText: (text) => {
               resultTexts.set(ws.name, text);
             },

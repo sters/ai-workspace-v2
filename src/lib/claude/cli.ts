@@ -217,6 +217,7 @@ export function runClaude(
       "--output-format", "stream-json",
       "--verbose",
       ...(options?.model ? ["--model", options.model] : []),
+      ...(options?.appendSystemPromptFile ? ["--append-system-prompt-file", options.appendSystemPromptFile] : []),
       ...(options?.jsonSchema ? ["--json-schema", JSON.stringify(options.jsonSchema)] : []),
       ...(options?.addDirs?.flatMap((dir) => ["--add-dir", dir]) ?? []),
       ...addDirAllowedTools,

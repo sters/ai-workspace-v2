@@ -5,35 +5,7 @@
 
 import type { UpdaterInput } from "@/types/prompts";
 
-export function buildUpdaterPrompt(input: UpdaterInput): string {
-  const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
-
-  return `# Task: Update TODO items for ${input.repoName}
-
-## Workspace: ${input.workspaceName}
-## TODO File: ${todoFilePath}
-${input.interactive ? "## Mode: interactive" : ""}
-
-## Update Request
-
-${input.instruction}
-
-## Workspace README
-
-${input.readmeContent}
-
-## Current TODO File (TODO-${input.repoName}.md)
-
-${input.todoContent}
-
-## Instructions
-
-${updaterInstructions(todoFilePath, input.workspacePath, input.worktreePath)}
-`;
-}
-
-function updaterInstructions(todoFilePath: string, workspacePath: string, worktreePath: string): string {
-  const todoFileName = todoFilePath.split("/").pop()!;
+export function getUpdaterSystemPrompt(): string {
   return `You are a specialized TODO file writer. Your ONLY job is to create and edit TODO items in the TODO file.
 
 **Your mission: Write TODO items that describe what needs to be done. A separate executor agent will carry out the actual work later.**
@@ -60,8 +32,8 @@ You may run any command (including \`make\`, \`go\`, \`npm\`, etc.) to **underst
    - Preserve overall structure and formatting style
    - New items MUST follow the structured format below
 4. **Commit the TODO file only**:
-   - \`cd ${workspacePath}\`
-   - \`git add ${todoFileName}\`
+   - \`cd\` to the workspace directory specified in the user prompt
+   - \`git add <TODO-filename>\`
    - \`git commit -m "message"\`
 
 ### TODO Item Format (Required)
@@ -76,21 +48,16 @@ You may run any command (including \`make\`, \`go\`, \`npm\`, etc.) to **underst
 
 ### Working Directory
 
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-\`\`\`bash
-cd ${worktreePath}
-\`\`\`
-The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path.
+**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
+
+Use Read/Edit with the absolute TODO file path specified in the user prompt.
 
 ### Bash Usage
 
 Bash may be used for:
 - \`cd\` to change directory
 - Any command to analyze the repository and gather information for writing TODO items
-- \`git\` commands to commit the TODO file:
-  1. \`cd ${workspacePath}\`
-  2. \`git add ${todoFileName}\`
-  3. \`git commit -m "..."\`
+- \`git\` commands to commit the TODO file (cd to workspace directory first, then git add/commit)
 
 Do NOT use \`git -C\` — always \`cd\` first.
 Do NOT use \`$(...)\` command substitution in arguments.
@@ -111,5 +78,42 @@ Check the workspace README's **## Repository Constraints** section. If it lists 
 3. Be precise: only make requested changes
 4. Validate: ensure valid markdown after updates
 5. Honour Repository Constraints: if the workspace README lists constraints, ensure they appear as verification items
+`;
+}
+
+export function buildUpdaterPrompt(input: UpdaterInput): string {
+  const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
+  const todoFileName = todoFilePath.split("/").pop()!;
+
+  return `# Task: Update TODO items for ${input.repoName}
+
+## Workspace: ${input.workspaceName}
+## TODO File: ${todoFilePath}
+${input.interactive ? "## Mode: interactive" : ""}
+
+## Update Request
+
+${input.instruction}
+
+## Workspace README
+
+${input.readmeContent}
+
+## Current TODO File (TODO-${input.repoName}.md)
+
+${input.todoContent}
+
+### Working Directory
+
+\`\`\`bash
+cd ${input.worktreePath}
+\`\`\`
+
+The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path.
+
+To commit the TODO file:
+1. \`cd ${input.workspacePath}\`
+2. \`git add ${todoFileName}\`
+3. \`git commit -m "message"\`
 `;
 }

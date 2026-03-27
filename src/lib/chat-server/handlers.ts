@@ -2,6 +2,7 @@ import path from "node:path";
 import { spawnClaudeTerminal } from "../claude/cli";
 import type { DataListener } from "@/types/pty";
 import { buildInitPrompt, buildReviewChatPrompt } from "@/lib/templates";
+import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import type { ChatSession, ClientMessage, ServerMessage, WsData } from "@/types/chat-server";
 import { getResolvedWorkspaceRoot } from "@/lib/config";
 
@@ -38,14 +39,20 @@ export function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" 
   const root = getResolvedWorkspaceRoot();
   const workspacePath = path.join(root, "workspace", msg.workspaceId);
 
+  const isReviewChat = !msg.initialPrompt && !!msg.reviewTimestamp;
   const initPrompt = msg.initialPrompt
     || (msg.reviewTimestamp
       ? buildReviewChatPrompt(msg.workspaceId, workspacePath, msg.reviewTimestamp)
       : buildInitPrompt(msg.workspaceId, workspacePath));
 
+  const systemPromptFile = ensureSystemPrompt(
+    workspacePath,
+    isReviewChat ? "review-chat" : "chat",
+  );
+
   let proc;
   try {
-    proc = spawnClaudeTerminal({ args: [initPrompt], cwd: root, listeners });
+    proc = spawnClaudeTerminal({ args: ["--append-system-prompt-file", systemPromptFile, initPrompt], cwd: root, listeners });
   } catch (err) {
     send(ws, {
       type: "error",

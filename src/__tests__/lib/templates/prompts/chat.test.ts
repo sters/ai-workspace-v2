@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildInitPrompt, buildReviewChatPrompt } from "@/lib/templates";
+import { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildReviewChatPrompt } from "@/lib/templates";
 
 describe("buildInitPrompt", () => {
   it("includes the workspace ID", () => {
@@ -13,14 +13,14 @@ describe("buildInitPrompt", () => {
   });
 
   it("instructs to read README.md", () => {
-    const prompt = buildInitPrompt("my-project", "/root/workspace/my-project");
-    expect(prompt).toContain("README.md");
+    const systemPrompt = getChatSystemPrompt();
+    expect(systemPrompt).toContain("README.md");
   });
 
   it("mentions TODO files and review artifacts", () => {
-    const prompt = buildInitPrompt("my-project", "/root/workspace/my-project");
-    expect(prompt).toContain("TODO");
-    expect(prompt).toContain("review");
+    const systemPrompt = getChatSystemPrompt();
+    expect(systemPrompt).toContain("TODO");
+    expect(systemPrompt).toContain("review");
   });
 
   it("does not include the ai-workspace root path as a separate instruction", () => {
@@ -51,7 +51,7 @@ describe("buildReviewChatPrompt", () => {
   });
 
   it("instructs to read the summary file", () => {
-    const prompt = buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp);
-    expect(prompt).toContain("SUMMARY.md");
+    const systemPrompt = getReviewChatSystemPrompt();
+    expect(systemPrompt).toContain("SUMMARY.md");
   });
 });

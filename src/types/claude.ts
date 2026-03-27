@@ -30,6 +30,8 @@ export interface RunClaudeOptions {
   skipAskUserQuestion?: boolean;
   /** Claude model to use (e.g. "opus", "sonnet", "haiku"). Passed as --model to CLI. */
   model?: ClaudeModel;
+  /** Path to a file whose content is appended to Claude's system prompt via --append-system-prompt-file. */
+  appendSystemPromptFile?: string;
 }
 
 // TODO: Replace with Record<string, unknown> or a discriminated union once

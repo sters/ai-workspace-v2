@@ -41,38 +41,8 @@ export const BEST_OF_N_REVIEW_SCHEMA = {
   additionalProperties: false,
 } as const;
 
-export function buildBestOfNReviewerPrompt(
-  input: BestOfNReviewerInput,
-): string {
-  const candidateSections = input.candidates
-    .map(
-      (c, i) => `### Candidate ${i + 1}: ${c.label}
-
-#### Diff
-\`\`\`diff
-${c.diff || "(no changes)"}
-\`\`\`
-${c.resultText ? `\n#### Result Summary\n${c.resultText}` : ""}`,
-    )
-    .join("\n\n---\n\n");
-
-  return `# Task: Best-of-N Review for ${input.operationType}
-
-## Workspace: ${input.workspaceName}
-## Operation Type: ${input.operationType}
-## Number of Candidates: ${input.candidates.length}
-
-## Workspace README
-
-${input.readmeContent}
-
-## Candidates
-
-${candidateSections}
-
-## Instructions
-
-You are a specialized reviewer comparing ${input.candidates.length} independent implementations of the same task. Each candidate received the identical prompt and worked on identical codebases in parallel.
+export function getBestOfNReviewerSystemPrompt(): string {
+  return `You are a specialized reviewer comparing independent implementations of the same task. Each candidate received the identical prompt and worked on identical codebases in parallel.
 
 ### Your Mission
 
@@ -107,7 +77,37 @@ Include brief \`reasoning\` explaining your decision — highlight what each sou
 - If only one candidate succeeded, select it.
 - **Default to synthesize.** Each candidate likely has unique strengths — different edge-case handling, better naming, more thorough comments, additional test cases, etc. Actively look for these and combine them.
 - Only use **select** when one candidate is clearly a superset of all others and nothing would be gained by merging.
-- When synthesizing, you will be given access to all candidate worktrees to reference their implementations.
+- When synthesizing, you will be given access to all candidate worktrees to reference their implementations.`;
+}
+
+export function buildBestOfNReviewerPrompt(
+  input: BestOfNReviewerInput,
+): string {
+  const candidateSections = input.candidates
+    .map(
+      (c, i) => `### Candidate ${i + 1}: ${c.label}
+
+#### Diff
+\`\`\`diff
+${c.diff || "(no changes)"}
+\`\`\`
+${c.resultText ? `\n#### Result Summary\n${c.resultText}` : ""}`,
+    )
+    .join("\n\n---\n\n");
+
+  return `# Task: Best-of-N Review for ${input.operationType}
+
+## Workspace: ${input.workspaceName}
+## Operation Type: ${input.operationType}
+## Number of Candidates: ${input.candidates.length}
+
+## Workspace README
+
+${input.readmeContent}
+
+## Candidates
+
+${candidateSections}
 `;
 }
 
@@ -115,30 +115,8 @@ Include brief \`reasoning\` explaining your decision — highlight what each sou
  * Prompt for reviewing file-based Best-of-N candidates (README, TODO files).
  * Shows file contents instead of diffs.
  */
-export function buildBestOfNFileReviewerPrompt(
-  input: BestOfNFileReviewerInput,
-): string {
-  const candidateSections = input.candidates
-    .map((c, i) => {
-      const fileSections = c.files
-        .map((f) => `#### ${f.name}\n\`\`\`markdown\n${f.content}\n\`\`\``)
-        .join("\n\n");
-      return `### Candidate ${i + 1}: ${c.label}\n\n${fileSections || "(no files)"}`;
-    })
-    .join("\n\n---\n\n");
-
-  return `# Task: Best-of-N File Review for ${input.operationType}
-
-## Operation Type: ${input.operationType}
-## Number of Candidates: ${input.candidates.length}
-
-## Candidates
-
-${candidateSections}
-
-## Instructions
-
-You are a specialized reviewer comparing ${input.candidates.length} independently generated versions of the same file(s). Each candidate received the identical prompt.
+export function getBestOfNFileReviewerSystemPrompt(): string {
+  return `You are a specialized reviewer comparing independently generated versions of the same file(s). Each candidate received the identical prompt.
 
 ### Your Mission
 
@@ -171,7 +149,29 @@ Include brief \`reasoning\` explaining your decision — highlight what each sou
 ### Important Notes
 
 - **Default to synthesize.** Each candidate likely has unique strengths — more detailed sections, better structure, additional items, clearer descriptions, etc. Actively look for these and combine them.
-- Only use **select** when one candidate is clearly a superset of all others and nothing would be gained by merging.
+- Only use **select** when one candidate is clearly a superset of all others and nothing would be gained by merging.`;
+}
+
+export function buildBestOfNFileReviewerPrompt(
+  input: BestOfNFileReviewerInput,
+): string {
+  const candidateSections = input.candidates
+    .map((c, i) => {
+      const fileSections = c.files
+        .map((f) => `#### ${f.name}\n\`\`\`markdown\n${f.content}\n\`\`\``)
+        .join("\n\n");
+      return `### Candidate ${i + 1}: ${c.label}\n\n${fileSections || "(no files)"}`;
+    })
+    .join("\n\n---\n\n");
+
+  return `# Task: Best-of-N File Review for ${input.operationType}
+
+## Operation Type: ${input.operationType}
+## Number of Candidates: ${input.candidates.length}
+
+## Candidates
+
+${candidateSections}
 `;
 }
 
@@ -179,6 +179,17 @@ Include brief \`reasoning\` explaining your decision — highlight what each sou
  * Prompt for synthesizing file content from multiple Best-of-N candidates.
  * The synthesizer reads all candidates and writes a merged result.
  */
+export function getBestOfNSynthesizerSystemPrompt(): string {
+  return `You are a synthesizer agent. The reviewer has determined that multiple candidates have complementary strengths. Your job is to create a merged version that combines the best parts from each source candidate.
+
+### Guidelines
+
+- Maintain consistency in structure and formatting
+- Do not simply concatenate — integrate thoughtfully
+- Resolve any contradictions by choosing the more accurate or complete version
+- The result should be better than any individual candidate`;
+}
+
 export function buildBestOfNFileSynthesizerPrompt(
   input: BestOfNFileSynthesizerInput,
 ): string {
@@ -202,11 +213,7 @@ export function buildBestOfNFileSynthesizerPrompt(
 
 ${candidateSections}
 
-## Instructions
-
-You are a synthesizer agent. The reviewer has determined that multiple candidates have complementary strengths. Your job is to create a merged version that combines the best parts from each source candidate.
-
-### Steps
+## Steps
 
 1. Start with candidate-${input.baseCandidate} as the base
 2. Identify superior sections, details, or approaches from the other source candidates (${input.sources.filter((s) => s !== input.baseCandidate).map((s) => `candidate-${s}`).join(", ")})
@@ -214,12 +221,5 @@ You are a synthesizer agent. The reviewer has determined that multiple candidate
 4. Write the final synthesized file(s) to:
 
 ${fileList}
-
-### Guidelines
-
-- Maintain consistency in structure and formatting
-- Do not simply concatenate — integrate thoughtfully
-- Resolve any contradictions by choosing the more accurate or complete version
-- The result should be better than any individual candidate
 `;
 }

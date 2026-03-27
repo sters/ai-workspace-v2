@@ -7,6 +7,7 @@ import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { buildReadmeContent } from "../templates";
 import { exec, sanitizeSlug } from "./helpers";
+import { writeSystemPrompts } from "./prompts";
 import type { TaskAnalysis } from "@/types/workspace";
 import type { SetupWorkspaceResult } from "@/types/operation";
 
@@ -51,6 +52,9 @@ bitbucket.org/
 tmp/
 *.tmp
 *.log
+
+# Exclude auto-generated prompt files
+prompts/
 `;
 
 // ---------------------------------------------------------------------------
@@ -101,6 +105,9 @@ export async function setupWorkspace(
   mkdirSync(path.join(wsPath, "tmp"), { recursive: true });
   mkdirSync(path.join(wsPath, "artifacts"), { recursive: true });
   await Bun.write(path.join(wsPath, "artifacts", ".gitkeep"), "");
+
+  // Write system prompt files
+  await writeSystemPrompts(wsPath);
 
   // Initialize git
   exec(`git init --quiet "${wsPath}"`);

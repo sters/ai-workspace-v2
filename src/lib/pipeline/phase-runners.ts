@@ -50,8 +50,8 @@ export async function runSinglePhase(
   const childId = `${operationId}-phase-${phaseIndex}`;
   (managed.operation.children ??= []).push({ id: childId, label: phase.label, status: "running" });
   const model = resolveModel(managed.operation.type, phase.stepType, phase.model);
-  const singleOpts: RunClaudeOptions | undefined = (phase.cwd || phase.addDirs || model)
-    ? { cwd: phase.cwd, addDirs: phase.addDirs, model }
+  const singleOpts: RunClaudeOptions | undefined = (phase.cwd || phase.addDirs || phase.appendSystemPromptFile || model)
+    ? { cwd: phase.cwd, addDirs: phase.addDirs, appendSystemPromptFile: phase.appendSystemPromptFile, model }
     : undefined;
   const process = runClaude(childId, phase.prompt, singleOpts);
   const result = await wireChild(managed, childId, phase.label, process, phaseExtra);
@@ -77,8 +77,8 @@ export async function runGroupPhase(
       (managed.operation.children ??= []).push({ id: childId, label: child.label, status: "running" });
       const model = resolveModel(managed.operation.type, child.stepType, child.model);
       const claudeOpts: RunClaudeOptions | undefined =
-        (child.cwd || child.addDirs || child.jsonSchema || child.skipAskUserQuestion || model)
-          ? { cwd: child.cwd, addDirs: child.addDirs, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion, model }
+        (child.cwd || child.addDirs || child.jsonSchema || child.skipAskUserQuestion || child.appendSystemPromptFile || model)
+          ? { cwd: child.cwd, addDirs: child.addDirs, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion, appendSystemPromptFile: child.appendSystemPromptFile, model }
           : undefined;
       const process = runClaude(childId, child.prompt, claudeOpts);
       const result = await wireChild(managed, childId, child.label, process, phaseExtra);

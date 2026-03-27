@@ -5,62 +5,10 @@
 
 import type { ExecutorInput, BatchedExecutorInput } from "@/types/prompts";
 
-export function buildExecutorPrompt(input: ExecutorInput): string {
-  const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
+export function getExecutorSystemPrompt(): string {
+  return `You are a specialized agent for executing TODO items for a specific repository within a workspace directory. Your role is to autonomously consume and complete TODO tasks defined in the TODO file provided in the user prompt.
 
-  return `# Task: Execute TODO items for ${input.repoName}
-
-## Workspace: ${input.workspaceName}
-## Repository: ${input.repoPath}
-## TODO File: ${todoFilePath}
-
-## Workspace README
-
-${input.readmeContent}
-
-## TODO File (TODO-${input.repoName}.md)
-
-${input.todoContent}
-
-## Instructions
-
-${executorInstructions(todoFilePath, input.worktreePath, input.workspacePath)}
-`;
-}
-
-export function buildBatchedExecutorPrompt(input: BatchedExecutorInput): string {
-  const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
-
-  const completedSection = input.completedSummary
-    ? `\n## Previously Completed Items\n\n${input.completedSummary}\n`
-    : "";
-
-  return `# Task: Execute TODO items for ${input.repoName} — Batch ${input.batchIndex + 1}/${input.totalBatches}
-
-## Workspace: ${input.workspaceName}
-## Repository: ${input.repoPath}
-## TODO File: ${todoFilePath}
-
-## Workspace README
-
-${input.readmeContent}
-
-## Current Batch (${input.batchIndex + 1} of ${input.totalBatches})
-
-${input.batchTodoContent}
-${completedSection}
-## Instructions
-
-${executorInstructions(todoFilePath, input.worktreePath, input.workspacePath)}
-
-**IMPORTANT: Focus only on the items listed in the "Current Batch" section above. Do not work on items outside this batch.**
-`;
-}
-
-function executorInstructions(todoFilePath: string, worktreePath?: string, workspacePath?: string): string {
-  return `You are a specialized agent for executing TODO items for a specific repository within a workspace directory. Your role is to autonomously consume and complete TODO tasks defined in the TODO file above.
-
-**Your mission is simple and unwavering: Complete all uncompleted items in the TODO file above.**
+**Your mission is simple and unwavering: Complete all uncompleted items in the TODO file.**
 
 ### TODO Item Status Markers
 
@@ -128,13 +76,11 @@ function executorInstructions(todoFilePath: string, worktreePath?: string, works
 
 ### Working Directory
 
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-\`\`\`bash
-cd ${worktreePath}
-\`\`\`
+**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
+
 After that, run commands like \`git status\`, \`git commit\`, \`make lint\`, etc. as separate Bash calls. Do NOT use \`git -C\` or \`make -C\` — you are already in the repo directory.
 
-The TODO file is at \`${todoFilePath}\`. Use Read/Edit with this absolute path to access it.
+Use Read/Edit with the absolute TODO file path specified in the user prompt to access it.
 
 ### Bash Sandbox Restrictions
 
@@ -143,11 +89,11 @@ The following patterns are blocked by the security sandbox:
 - \`cd <dir> && git ...\` compound commands
 - File I/O redirects (\`>\`, \`>>\`) to paths outside the working directory
 
-To commit changes to the workspace (TODO file updates), \`cd\` to the workspace directory first, then run git commands:
-1. \`cd ${workspacePath}\`
+To commit changes to the workspace (TODO file updates), \`cd\` to the workspace directory specified in the user prompt first, then run git commands:
+1. \`cd <workspace-path>\`
 2. \`git add <file>\`
 3. \`git commit -m "message"\`
-4. \`cd ${worktreePath}\` (return to the repo directory)
+4. \`cd <worktree-path>\` (return to the repo directory)
 
 ### Scope Boundaries
 
@@ -182,5 +128,77 @@ To commit changes to the workspace (TODO file updates), \`cd\` to the workspace 
 - Always read the TODO file before updating it
 - Update the TODO file frequently to show progress
 - Add notes to the Notes section for important findings
+`;
+}
+
+export function buildExecutorPrompt(input: ExecutorInput): string {
+  const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
+
+  return `# Task: Execute TODO items for ${input.repoName}
+
+## Workspace: ${input.workspaceName}
+## Repository: ${input.repoPath}
+## TODO File: ${todoFilePath}
+
+## Workspace README
+
+${input.readmeContent}
+
+## TODO File (TODO-${input.repoName}.md)
+
+${input.todoContent}
+
+### Working Directory
+
+\`\`\`bash
+cd ${input.worktreePath}
+\`\`\`
+
+The TODO file is at \`${todoFilePath}\`.
+
+To commit workspace changes:
+1. \`cd ${input.workspacePath}\`
+2. \`git add <file>\`
+3. \`git commit -m "message"\`
+4. \`cd ${input.worktreePath}\`
+`;
+}
+
+export function buildBatchedExecutorPrompt(input: BatchedExecutorInput): string {
+  const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
+
+  const completedSection = input.completedSummary
+    ? `\n## Previously Completed Items\n\n${input.completedSummary}\n`
+    : "";
+
+  return `# Task: Execute TODO items for ${input.repoName} — Batch ${input.batchIndex + 1}/${input.totalBatches}
+
+## Workspace: ${input.workspaceName}
+## Repository: ${input.repoPath}
+## TODO File: ${todoFilePath}
+
+## Workspace README
+
+${input.readmeContent}
+
+## Current Batch (${input.batchIndex + 1} of ${input.totalBatches})
+
+${input.batchTodoContent}
+${completedSection}
+### Working Directory
+
+\`\`\`bash
+cd ${input.worktreePath}
+\`\`\`
+
+The TODO file is at \`${todoFilePath}\`.
+
+To commit workspace changes:
+1. \`cd ${input.workspacePath}\`
+2. \`git add <file>\`
+3. \`git commit -m "message"\`
+4. \`cd ${input.worktreePath}\`
+
+**IMPORTANT: Focus only on the items listed in the "Current Batch" section above. Do not work on items outside this batch.**
 `;
 }
