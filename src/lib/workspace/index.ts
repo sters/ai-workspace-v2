@@ -17,4 +17,4 @@ export { writeTodoTemplate, writeReportTemplates, prepareReviewDir } from "./tem
 export { checkExistingPR, getRepoChanges, readPRTemplate } from "./pr";
 
 // System prompt files
-export { writeSystemPrompts, ensureSystemPrompt, ensureGlobalSystemPrompt } from "./prompts";
+export { writeSystemPrompts, ensureSystemPrompt, ensureGlobalSystemPrompt, _resetVerifiedDirs } from "./prompts";
