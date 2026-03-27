@@ -6,6 +6,7 @@ const UTILITY_ITEMS = [
   { label: "Operation Log Prune", href: "/utilities/operation-prune" },
   { label: "MCP Servers", href: "/utilities/mcp-servers" },
   { label: "Claude Version", href: "/utilities/claude-version" },
+  { label: "Claude Usage", href: "/utilities/claude-usage" },
   { label: "AIW Settings", href: "/utilities/aiw-settings" },
   { label: "Claude Settings", href: "/utilities/claude-settings" },
   { label: "Claude Auth", href: "/utilities/claude-auth" },
