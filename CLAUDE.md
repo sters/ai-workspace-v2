@@ -39,13 +39,17 @@ Per-workspace config stored in `~/.config/ai-workspace/{basename}-{hash}/config.
 
 ### Key architectural patterns
 
-- **SQLite persistence** — Per-workspace database in `~/.config/ai-workspace/{basename}-{hash}/db.sqlite` via `bun:sqlite`. DB singleton on `globalThis` (`src/lib/db/connection.ts`). Events are buffered in memory and flushed every 5s or 50 events (`src/lib/db/event-buffer.ts`).
+- **SQLite persistence** — Per-workspace database in `~/.config/ai-workspace/{basename}-{hash}/db.sqlite` via `bun:sqlite`. DB singleton on `globalThis` (`src/lib/db/connection.ts`). Events are buffered in memory and flushed every 500ms or 50 events (`src/lib/db/event-buffer.ts`).
 - **Pipeline orchestration** — Operations are sequences of `PipelinePhase`s (single child, parallel group, or TypeScript function). Entry point: `startOperationPipeline()` in `src/lib/pipeline/orchestrator.ts`. Max 3 concurrent operations. Pipeline definitions per operation type in `src/lib/pipelines/`. Recovers interrupted operations on restart (`src/lib/pipeline/resume.ts`).
 - **Claude CLI execution** — `src/lib/claude/cli.ts` spawns `claude -p --output-format stream-json`. Handles `AskUserQuestion` via `--resume {session_id}`. Facade in `src/lib/claude/index.ts` delegates to CLI or SDK.
 - **SSE streaming** — Clients connect to `/api/events?operationId=` for real-time operation output. Replays existing events on connection.
 - **Instrumentation split** — `src/instrumentation.ts` delegates to `src/instrumentation-node.ts` at runtime to avoid bundling Node.js-only imports (SQLite, pipeline resume) into Edge Runtime.
 - **Two-server setup** — `bin/start.ts` spawns both Next.js (`bin/next-server.ts`) and WebSocket chat (`bin/chat-server.ts`) as separate processes.
 - **Zod validation** — `src/lib/schemas.ts` for HTTP request bodies, `src/lib/runtime-schemas.ts` for untrusted runtime data (JSONL, WebSocket messages, SSE events, CLI stream fragments). Intentionally separate files.
+- **Best-of-N pattern** — Operations like review, execute, create-pr, update-todo support parallel "candidate" runs. `buildBestOfNPipeline()` in `src/lib/pipelines/best-of-n.ts` runs N candidates, then a synthesizer phase reviews all results. Controlled by `bestOfN` in config (per-operation-type overrides supported).
+- **Batch & autonomous chaining** — Batch pipelines chain operation types (init → execute → review → create-pr) with configurable gating. Autonomous mode loops execute → review → create-pr up to `maxLoops` times with autonomous gate logic. Both use `startWith` to indicate the first phase.
+- **Phase update markers** — Phase lifecycle is communicated via special JSON prefixes in status events: `"__phaseUpdate:"` and `"__setWorkspace:"`. These are parsed by `parsePhaseUpdatesFromEvents()` / `parsePhaseUpdatesFromEntries()` to rebuild phase arrays from the event stream without needing a separate phases table.
+- **Function phase context** — TypeScript function phases receive a `PhaseFunctionContext` with `emitStatus()`, `emitResult()`, `emitAsk()` (blocks until user answers), `runChild()` / `runChildGroup()` (spawn Claude sub-processes), `emitTerminal()` (raw PTY output), and `signal` (AbortSignal for kills). Defined in `src/lib/pipeline/phase-function-context.ts`.
 
 ### Server-side key directories
 
@@ -57,6 +61,8 @@ Per-workspace config stored in `~/.config/ai-workspace/{basename}-{hash}/config.
 - `src/lib/parsers/` — Markdown parsing (TODO: `[x]`/`[ ]`/`[!]`/`[~]` syntax, README, reviews, stream-json)
 - `src/lib/templates/prompts/` — `build*Prompt()` functions for each agent type
 - `src/lib/chat-server/` — WebSocket session management with message buffering
+- `src/lib/operation-store/` — Reads completed operations from disk (JSONL/JSON files)
+- `src/lib/web-push/` — Browser push notification subscriptions for operation completion
 
 ### Client-side
 
@@ -81,3 +87,11 @@ Per-workspace config stored in `~/.config/ai-workspace/{basename}-{hash}/config.
 ## Testing
 
 Vitest with jsdom, `@testing-library/react`, `@testing-library/jest-dom`. Globals enabled (no need to import `describe`/`it`/`expect`). `tsconfig.json` excludes test files — Vitest handles type-checking separately from `tsc --noEmit`.
+
+## Gotchas
+
+- **Config is cached on first access** — `getConfig()` stores on globalThis. Changes to `config.yml` require `_resetConfig()` to take effect. Tests must call reset functions in order: `_resetDb()` → `_resetConfig()` → `_resetWorkspaceRoot()`.
+- **Event buffering is async** — Events aren't persisted immediately (500ms flush interval). Don't query events from the DB immediately after emitting them. SSE streaming replays from the in-memory buffer so clients see events before flush.
+- **Workspace root must be set before config/DB** — The entire config directory and DB path depend on workspace root being known first. `bin/start.ts` calls `setWorkspaceRoot()` before `getConfig()`.
+- **Function phase timeouts use separate AbortControllers** — Per-phase timeouts don't permanently abort the shared `managed.abortController` (which is for user-initiated kills). This is intentional to prevent timeout from killing the whole operation.
+- **Running vs completed operations live in different stores** — Running operations are in-memory (`src/lib/pipeline/store.ts`). Completed ones are on disk. `/api/operations` merges both, with running taking precedence on dedup.
