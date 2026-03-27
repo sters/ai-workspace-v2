@@ -348,7 +348,7 @@ export function buildInitPipeline(
         }
 
         // Write template files for agents to reference
-        if (analysis.taskType !== "review") {
+        if (analysis.taskType !== "review" && analysis.taskType !== "research") {
           await writeTodoTemplate(wsPath, analysis.taskType);
         }
         await writeReportTemplates(wsPath);
@@ -455,8 +455,8 @@ export function buildInitPipeline(
       label: "Plan TODO items",
       timeoutMs: 60 * 60 * 1000, // 1 hour — may wait for human when Best-of-N
       fn: async (ctx) => {
-        if (analysis?.taskType === "review") {
-          ctx.emitStatus("Review workspace — skipping TODO planning");
+        if (analysis?.taskType === "review" || analysis?.taskType === "research") {
+          ctx.emitStatus(`${analysis?.taskType === "review" ? "Review" : "Research"} workspace — skipping TODO planning`);
           return true;
         }
 
@@ -538,8 +538,8 @@ export function buildInitPipeline(
       label: "Coordinate TODOs",
       timeoutMs: getTimeoutDefaults("init").claudeMs,
       fn: (ctx) => {
-        if (analysis?.taskType === "review") {
-          ctx.emitStatus("Review workspace — skipping TODO coordination");
+        if (analysis?.taskType === "review" || analysis?.taskType === "research") {
+          ctx.emitStatus(`${analysis?.taskType === "review" ? "Review" : "Research"} workspace — skipping TODO coordination`);
           return Promise.resolve(true);
         }
         return buildCoordinateTodosPhase({
@@ -555,8 +555,8 @@ export function buildInitPipeline(
       label: "Review TODOs",
       timeoutMs: getTimeoutDefaults("init").claudeMs,
       fn: (ctx) => {
-        if (analysis?.taskType === "review") {
-          ctx.emitStatus("Review workspace — skipping TODO review");
+        if (analysis?.taskType === "review" || analysis?.taskType === "research") {
+          ctx.emitStatus(`${analysis?.taskType === "review" ? "Review" : "Research"} workspace — skipping TODO review`);
           return Promise.resolve(true);
         }
         return buildReviewTodosPhase({
