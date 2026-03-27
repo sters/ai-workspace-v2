@@ -28,6 +28,12 @@ const tools = [
       "Display the currently installed Claude Code CLI version.",
   },
   {
+    href: "/utilities/claude-usage",
+    name: "Claude Usage",
+    description:
+      "Display current billing period usage from Claude Code CLI.",
+  },
+  {
     href: "/utilities/aiw-settings",
     name: "AIW Settings",
     description:
