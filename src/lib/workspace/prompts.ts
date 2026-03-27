@@ -1,11 +1,18 @@
 /**
  * System prompt file management.
  * Writes static system prompt files to workspace/prompts/ directories
- * and ensures they exist at runtime.
+ * and ensures they exist and stay up-to-date at runtime.
+ *
+ * Auto-update mechanism: a content hash of all prompt templates is written
+ * to prompts/.hash. When ensureSystemPrompt is called, the hash is compared
+ * with the current templates. If they differ (e.g., after an app update),
+ * all prompt files in that directory are regenerated. Each directory is
+ * checked at most once per process to avoid redundant I/O.
  */
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { getResolvedWorkspaceRoot } from "@/lib/config";
 
 import {
@@ -65,48 +72,111 @@ const SYSTEM_PROMPTS: Record<string, () => string> = {
   "quick-ask.md": getQuickAskSystemPrompt,
 };
 
+// ---------------------------------------------------------------------------
+// Content hash for auto-update detection
+// ---------------------------------------------------------------------------
+
+let _cachedHash: string | null = null;
+
+/** Compute a SHA-256 hash of all system prompt contents combined. */
+function computePromptsHash(): string {
+  if (_cachedHash) return _cachedHash;
+  const hasher = createHash("sha256");
+  for (const [filename, getContent] of Object.entries(SYSTEM_PROMPTS)) {
+    hasher.update(filename);
+    hasher.update(getContent());
+  }
+  _cachedHash = hasher.digest("hex");
+  return _cachedHash;
+}
+
+const HASH_FILENAME = ".hash";
+
+/** Directories already verified in this process. */
+const _verifiedDirs = new Set<string>();
+
+/**
+ * Check whether the prompts in a directory are up-to-date.
+ * If not (or if the directory/hash file is missing), regenerate all files.
+ * Each directory is checked at most once per process.
+ */
+function ensureUpToDate(dir: string): void {
+  const promptsDir = path.join(dir, "prompts");
+  if (_verifiedDirs.has(promptsDir)) return;
+
+  const hashFile = path.join(promptsDir, HASH_FILENAME);
+  const currentHash = computePromptsHash();
+
+  let needsUpdate = true;
+  if (existsSync(hashFile)) {
+    try {
+      const storedHash = readFileSync(hashFile, "utf-8").trim();
+      if (storedHash === currentHash) {
+        needsUpdate = false;
+      }
+    } catch {
+      // Corrupted hash file — regenerate
+    }
+  }
+
+  if (needsUpdate) {
+    mkdirSync(promptsDir, { recursive: true });
+    for (const [filename, getContent] of Object.entries(SYSTEM_PROMPTS)) {
+      writeFileSync(path.join(promptsDir, filename), getContent(), "utf-8");
+    }
+    writeFileSync(hashFile, currentHash, "utf-8");
+  }
+
+  _verifiedDirs.add(promptsDir);
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
 /** Write all system prompt files to {dir}/prompts/. */
 export async function writeSystemPrompts(dir: string): Promise<void> {
   const promptsDir = path.join(dir, "prompts");
   mkdirSync(promptsDir, { recursive: true });
-  await Promise.all(
-    Object.entries(SYSTEM_PROMPTS).map(([filename, getContent]) =>
+  const currentHash = computePromptsHash();
+  await Promise.all([
+    ...Object.entries(SYSTEM_PROMPTS).map(([filename, getContent]) =>
       Bun.write(path.join(promptsDir, filename), getContent()),
     ),
-  );
+    Bun.write(path.join(promptsDir, HASH_FILENAME), currentHash),
+  ]);
+  _verifiedDirs.add(promptsDir);
 }
 
 /**
- * Ensure a system prompt file exists in a workspace and return its absolute path.
- * If the file is missing, regenerate it on the fly.
+ * Ensure system prompt files are up-to-date in a workspace and return
+ * the absolute path for the requested agent.
+ * Auto-regenerates all files when the app's prompt templates have changed.
  */
 export function ensureSystemPrompt(wsPath: string, agentName: string): string {
-  const filePath = path.join(wsPath, "prompts", `${agentName}.md`);
-  if (!existsSync(filePath)) {
-    const getContent = SYSTEM_PROMPTS[`${agentName}.md`];
-    if (!getContent) {
-      throw new Error(`Unknown system prompt agent: ${agentName}`);
-    }
-    mkdirSync(path.join(wsPath, "prompts"), { recursive: true });
-    writeFileSync(filePath, getContent(), "utf-8");
+  if (!SYSTEM_PROMPTS[`${agentName}.md`]) {
+    throw new Error(`Unknown system prompt agent: ${agentName}`);
   }
-  return filePath;
+  ensureUpToDate(wsPath);
+  return path.join(wsPath, "prompts", `${agentName}.md`);
 }
 
 /**
- * Ensure a system prompt file exists at the global workspace root ({workspaceRoot}/prompts/).
+ * Ensure system prompt files are up-to-date at the global workspace root
+ * ({workspaceRoot}/prompts/) and return the absolute path for the requested agent.
  * Used for agents that run outside a specific workspace (init-readme, search, discovery).
  */
 export function ensureGlobalSystemPrompt(agentName: string): string {
-  const rootPath = getResolvedWorkspaceRoot();
-  const filePath = path.join(rootPath, "prompts", `${agentName}.md`);
-  if (!existsSync(filePath)) {
-    const getContent = SYSTEM_PROMPTS[`${agentName}.md`];
-    if (!getContent) {
-      throw new Error(`Unknown system prompt agent: ${agentName}`);
-    }
-    mkdirSync(path.join(rootPath, "prompts"), { recursive: true });
-    writeFileSync(filePath, getContent(), "utf-8");
+  if (!SYSTEM_PROMPTS[`${agentName}.md`]) {
+    throw new Error(`Unknown system prompt agent: ${agentName}`);
   }
-  return filePath;
+  const rootPath = getResolvedWorkspaceRoot();
+  ensureUpToDate(rootPath);
+  return path.join(rootPath, "prompts", `${agentName}.md`);
+}
+
+/** Reset verified dirs cache (for testing). */
+export function _resetVerifiedDirs(): void {
+  _verifiedDirs.clear();
+  _cachedHash = null;
 }
