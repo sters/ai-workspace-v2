@@ -116,6 +116,11 @@ async function listReviewSessions(wsPath: string): Promise<ReviewSession[]> {
   return sessions;
 }
 
+export async function getResearchReport(name: string): Promise<string | null> {
+  const file = Bun.file(path.join(getWorkspaceDir(), name, "artifacts", "research-report.md"));
+  return (await file.exists()) ? file.text() : null;
+}
+
 export async function getReadme(name: string): Promise<string | null> {
   const file = Bun.file(path.join(getWorkspaceDir(), name, "README.md"));
   return (await file.exists()) ? file.text() : null;

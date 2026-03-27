@@ -12,10 +12,11 @@ import { cn } from "@/lib/utils";
 import { VALID_AUTO_ACTIONS } from "@/lib/constants";
 import { extractBatchParams, extractAutonomousParams } from "@/lib/batch-modes";
 
-const TABS = [
+const BASE_TABS = [
   { label: "Overview", segment: "", href: "" },
   { label: "TODOs", segment: "todo", href: "todo" },
   { label: "Reviews", segment: "review", href: "review" },
+  { label: "Research", segment: "research", href: "research", taskType: "research" },
   { label: "History", segment: "history", href: "history" },
   { label: "Operations", segment: "operations", href: "operations" },
   { label: "Chat", segment: "chat", href: "chat/quick" },
@@ -85,6 +86,10 @@ export function WorkspaceLayoutContent({
   const segments = pathname.replace(basePath, "").replace(/^\//, "");
   const activeSegment = segments.split("/")[0] || "";
 
+  const tabs = BASE_TABS.filter(
+    (tab) => !("taskType" in tab) || tab.taskType === workspace.meta.taskType
+  );
+
   return (
     <div>
       {/* Header */}
@@ -136,7 +141,7 @@ export function WorkspaceLayoutContent({
 
       {/* Tabs */}
       <div className="mb-4 flex border-b">
-        {TABS.map((tab) => {
+        {tabs.map((tab) => {
           const href =
             tab.href === "" ? basePath : `${basePath}/${tab.href}`;
           const isActive = tab.segment === ""
