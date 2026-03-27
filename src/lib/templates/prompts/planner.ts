@@ -146,8 +146,8 @@ export function buildPlannerPrompt(input: PlannerInput): string {
   const todoDir = input.todoOutputDir ?? `workspace/${input.workspaceName}`;
 
   const templatePath = input.todoOutputDir
-    ? `${input.todoOutputDir}/TODO-template.md`
-    : `workspace/${input.workspaceName}/TODO-template.md`;
+    ? `${input.todoOutputDir}/templates/TODO-template.md`
+    : `workspace/${input.workspaceName}/templates/TODO-template.md`;
 
   return `# Task: Plan TODO items for ${input.repoName}
 

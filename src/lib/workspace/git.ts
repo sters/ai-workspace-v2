@@ -75,12 +75,7 @@ export async function commitWorkspaceSnapshot(
   for (const f of todoFiles) {
     try { exec(`git -C "${wsPath}" add "${f}"`); } catch { /* ignore */ }
   }
-  // Stage template files
-  const templateGlob = new Bun.Glob("*-template.md");
-  const templateFiles = [...templateGlob.scanSync({ cwd: wsPath })];
-  for (const f of templateFiles) {
-    try { exec(`git -C "${wsPath}" add "${f}"`); } catch { /* ignore */ }
-  }
+  // Note: template files are in templates/ which is gitignored
   try { exec(`git -C "${wsPath}" add artifacts/`); } catch { /* no artifacts */ }
 
   // Check if there are staged changes

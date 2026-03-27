@@ -31,7 +31,7 @@ ${input.readmeVerifyFiles.map((f) => `- ${f}`).join("\n") || "(none)"}
 
 Write the summary to: ${input.reviewDir}/SUMMARY.md
 
-Read the summary report template file at: workspace/${input.workspaceName}/summary-report-template.md
+Read the summary report template file at: workspace/${input.workspaceName}/templates/summary-report-template.md
 Use it as the base structure for the report.
 `;
 }

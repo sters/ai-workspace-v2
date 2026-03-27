@@ -79,7 +79,7 @@ ${input.repoChanges}
 
 Write the verification report to: ${input.verifyFilePath}
 
-Read the verification report template file at: workspace/${input.workspaceName}/readme-verification-report-template.md
+Read the verification report template file at: workspace/${input.workspaceName}/templates/readme-verification-report-template.md
 Use it as the base structure for the report.
 
 ### Working Directory
