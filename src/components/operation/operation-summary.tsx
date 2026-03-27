@@ -76,6 +76,9 @@ export function OperationSummary({
   return (
     <div className="min-w-0 flex-1">
       <div className="flex items-center gap-2">
+        {operation.workspace && (
+          <span className="font-semibold text-muted-foreground">{operation.workspace}</span>
+        )}
         <span className="font-semibold">{operation.type}</span>
         <StatusBadge
           label={displayStatus}
