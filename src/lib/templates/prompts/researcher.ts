@@ -47,7 +47,7 @@ ${fileList}
 
 ## Report Templates
 
-Read the template files in workspace/${input.workspaceName}/ for reference structure:
+Read the template files in workspace/${input.workspaceName}/templates/ for reference structure:
 - research-summary.md
 - research-findings-repository.md
 - research-findings-cross-repository.md

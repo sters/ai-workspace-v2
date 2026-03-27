@@ -487,7 +487,7 @@ export function buildInitPipeline(
           }));
 
         const cleanup = () => {
-          const templatePath = path.join(wsPath, "TODO-template.md");
+          const templatePath = path.join(wsPath, "templates", "TODO-template.md");
           if (existsSync(templatePath)) {
             unlinkSync(templatePath);
           }
@@ -497,7 +497,7 @@ export function buildInitPipeline(
         if (useBestOfN && bestOfN && bestOfN >= 2) {
           const todoFiles = repoResults.map((r) => path.join(wsPath, `TODO-${r.repoName}.md`));
           // Include template so each candidate dir has it for the planner to read
-          const templatePath = path.join(wsPath, "TODO-template.md");
+          const templatePath = path.join(wsPath, "templates", "TODO-template.md");
           const filesToCapture = existsSync(templatePath)
             ? [...todoFiles, templatePath]
             : todoFiles;

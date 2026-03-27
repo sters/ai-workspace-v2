@@ -72,7 +72,7 @@ ${input.repoChanges}
 
 Write the review report to: ${input.reviewFilePath}
 
-Read the review report template file at: workspace/${input.workspaceName}/review-report-template.md
+Read the review report template file at: workspace/${input.workspaceName}/templates/review-report-template.md
 Use it as the base structure for the report.
 
 ### Working Directory

@@ -53,8 +53,9 @@ tmp/
 *.tmp
 *.log
 
-# Exclude auto-generated prompt files
+# Exclude auto-generated prompt and template files
 prompts/
+templates/
 `;
 
 // ---------------------------------------------------------------------------
