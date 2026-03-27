@@ -6,7 +6,19 @@ export { getCodeReviewerSystemPrompt, buildCodeReviewerPrompt } from "./code-rev
 export { getTodoVerifierSystemPrompt, buildTodoVerifierPrompt } from "./todo-verifier";
 export { getReadmeVerifierSystemPrompt, buildReadmeVerifierPrompt } from "./readme-verifier";
 export { getPRCreatorSystemPrompt, buildPRCreatorPrompt } from "./pr-creator";
-export { getResearcherSystemPrompt, buildResearcherPrompt } from "./researcher";
+export {
+  getResearcherSystemPrompt,
+  getResearchFindingsRepoSystemPrompt,
+  getResearchFindingsCrossRepoSystemPrompt,
+  getResearchRecommendationsSystemPrompt,
+  getResearchIntegrationSystemPrompt,
+  buildResearcherPrompt,
+  buildResearchFindingsRepoPrompt,
+  buildResearchFindingsCrossRepoPrompt,
+  buildResearchRecommendationsRepoPrompt,
+  buildResearchRecommendationsCrossRepoPrompt,
+  buildResearchIntegrationPrompt,
+} from "./researcher";
 export { getUpdaterSystemPrompt, buildUpdaterPrompt } from "./updater";
 export { getCollectorSystemPrompt, buildCollectorPrompt } from "./collector";
 export { getInitReadmeSystemPrompt, buildInitAnalyzeAndReadmePrompt, buildInteractionGuidance, INIT_ANALYSIS_SCHEMA } from "./init-readme";

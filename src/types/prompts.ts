@@ -92,6 +92,47 @@ export interface ResearcherInput {
   reportDir: string;
 }
 
+/** Per-repo findings agent input. */
+export interface ResearchFindingsRepoInput {
+  workspaceName: string;
+  readmeContent: string;
+  repo: WorkspaceRepo;
+  workspacePath: string;
+  reportDir: string;
+}
+
+/** Per-repo recommendations & next-steps agent input. */
+export interface ResearchRecommendationsRepoInput {
+  workspaceName: string;
+  readmeContent: string;
+  repo: WorkspaceRepo;
+  workspacePath: string;
+  reportDir: string;
+  /** Content of findings-{repoName}.md */
+  findingsContent: string;
+  /** Content of findings-cross-repository.md */
+  crossRepoFindingsContent: string;
+}
+
+/** Cross-repo recommendations & next-steps agent input. */
+export interface ResearchRecommendationsCrossInput {
+  workspaceName: string;
+  readmeContent: string;
+  repos: WorkspaceRepo[];
+  workspacePath: string;
+  reportDir: string;
+  allFindings: { name: string; content: string }[];
+}
+
+/** Integration / summary agent input. */
+export interface ResearchIntegrationInput {
+  workspaceName: string;
+  readmeContent: string;
+  workspacePath: string;
+  reportDir: string;
+  allFiles: { name: string; content: string }[];
+}
+
 export interface UpdaterInput {
   workspaceName: string;
   repoName: string;
