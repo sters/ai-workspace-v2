@@ -123,35 +123,36 @@ interface ResearchPipelineInput {
 function buildResearchPipeline(input: ResearchPipelineInput): PipelinePhase[] {
   const { workspace, readmeContent, repos, wsPath, reportDir, sysPromptFiles } = input;
 
-  // Phase 1 — Findings: N+1 parallel children (pre-computed prompts)
+  // Phase 1 — Findings: N parallel children per repo (+ cross-repo when N>1)
+  const findingsChildren = repos.map((repo) => ({
+    label: `Findings: ${repo.repoName}`,
+    prompt: buildResearchFindingsRepoPrompt({
+      workspaceName: workspace,
+      readmeContent,
+      repo,
+      workspacePath: wsPath,
+      reportDir,
+    }),
+    stepType: STEP_TYPES.RESEARCH,
+    appendSystemPromptFile: sysPromptFiles.findingsRepo,
+  }));
+  if (repos.length > 1) {
+    findingsChildren.push({
+      label: "Findings: Cross-Repository",
+      prompt: buildResearchFindingsCrossRepoPrompt({
+        workspaceName: workspace,
+        readmeContent,
+        repos,
+        workspacePath: wsPath,
+        reportDir,
+      }),
+      stepType: STEP_TYPES.RESEARCH,
+      appendSystemPromptFile: sysPromptFiles.findingsCrossRepo,
+    });
+  }
   const findingsPhase: PipelinePhase = {
     kind: "group",
-    children: [
-      ...repos.map((repo) => ({
-        label: `Findings: ${repo.repoName}`,
-        prompt: buildResearchFindingsRepoPrompt({
-          workspaceName: workspace,
-          readmeContent,
-          repo,
-          workspacePath: wsPath,
-          reportDir,
-        }),
-        stepType: STEP_TYPES.RESEARCH,
-        appendSystemPromptFile: sysPromptFiles.findingsRepo,
-      })),
-      {
-        label: "Findings: Cross-Repository",
-        prompt: buildResearchFindingsCrossRepoPrompt({
-          workspaceName: workspace,
-          readmeContent,
-          repos,
-          workspacePath: wsPath,
-          reportDir,
-        }),
-        stepType: STEP_TYPES.RESEARCH,
-        appendSystemPromptFile: sysPromptFiles.findingsCrossRepo,
-      },
-    ],
+    children: findingsChildren,
   };
 
   // Phase 2 — Recommendations & Next Steps: reads findings, runs N+1 parallel
@@ -175,25 +176,25 @@ function buildResearchPipeline(input: ResearchPipelineInput): PipelinePhase[] {
 
       const allFindings = [
         ...perRepoFindings.map((f) => ({ name: `findings-${f.repoName}.md`, content: f.content })),
-        { name: "findings-cross-repository.md", content: crossRepoFindings },
+        ...(crossRepoFindings ? [{ name: "findings-cross-repository.md", content: crossRepoFindings }] : []),
       ];
 
-      const children = [
-        ...repos.map((repo, i) => ({
-          label: `Recommendations: ${repo.repoName}`,
-          prompt: buildResearchRecommendationsRepoPrompt({
-            workspaceName: workspace,
-            readmeContent,
-            repo,
-            workspacePath: wsPath,
-            reportDir,
-            findingsContent: perRepoFindings[i].content,
-            crossRepoFindingsContent: crossRepoFindings,
-          }),
-          stepType: STEP_TYPES.RESEARCH,
-          appendSystemPromptFile: sysPromptFiles.recommendations,
-        })),
-        {
+      const children = repos.map((repo, i) => ({
+        label: `Recommendations: ${repo.repoName}`,
+        prompt: buildResearchRecommendationsRepoPrompt({
+          workspaceName: workspace,
+          readmeContent,
+          repo,
+          workspacePath: wsPath,
+          reportDir,
+          findingsContent: perRepoFindings[i].content,
+          crossRepoFindingsContent: crossRepoFindings,
+        }),
+        stepType: STEP_TYPES.RESEARCH,
+        appendSystemPromptFile: sysPromptFiles.recommendations,
+      }));
+      if (repos.length > 1) {
+        children.push({
           label: "Recommendations: Cross-Repository",
           prompt: buildResearchRecommendationsCrossRepoPrompt({
             workspaceName: workspace,
@@ -205,8 +206,8 @@ function buildResearchPipeline(input: ResearchPipelineInput): PipelinePhase[] {
           }),
           stepType: STEP_TYPES.RESEARCH,
           appendSystemPromptFile: sysPromptFiles.recommendations,
-        },
-      ];
+        });
+      }
 
       const results = await ctx.runChildGroup(children);
       return results.every(Boolean);
