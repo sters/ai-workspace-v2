@@ -7,29 +7,32 @@
 import type { InitAnalyzeAndReadmeInput, InteractionLevel } from "@/types/prompts";
 
 function buildInteractionGuidance(level?: InteractionLevel): string {
+  const repositoryRule = `**MANDATORY**: If no repositories can be determined from the description, you MUST use AskUserQuestion to ask the user which repositories to work on. This rule applies regardless of the interaction level — never proceed without repositories unless the user explicitly confirms none are needed.`;
+
   switch (level) {
     case "low":
       return `### User Interaction Policy: LOW (autonomous)
 
-- Make your best judgment for all decisions. Do NOT use AskUserQuestion unless absolutely critical information is missing (e.g., no repositories can be determined at all and the description gives zero hints).
+- ${repositoryRule}
+- For all other decisions, make your best judgment. Do NOT use AskUserQuestion unless absolutely critical information is missing.
 - If the description is ambiguous, choose the most reasonable interpretation and proceed.
 - Prefer to fill in reasonable defaults rather than asking.`;
     case "high":
       return `### User Interaction Policy: HIGH (collaborative)
 
+- ${repositoryRule}
 - Use AskUserQuestion proactively to confirm and refine details before finalizing:
-  1. If repositories are not explicitly mentioned, ask which repositories to work on.
-  2. Confirm the task type and scope with the user (e.g., "I'm interpreting this as a feature task targeting X and Y — is that correct?").
-  3. Ask about requirements, constraints, or edge cases that aren't specified but could affect the approach.
-  4. Ask about the desired implementation approach if multiple strategies are viable.
-  5. Ask about priority and acceptance criteria if not specified.
+  1. Confirm the task type and scope with the user (e.g., "I'm interpreting this as a feature task targeting X and Y — is that correct?").
+  2. Ask about requirements, constraints, or edge cases that aren't specified but could affect the approach.
+  3. Ask about the desired implementation approach if multiple strategies are viable.
+  4. Ask about priority and acceptance criteria if not specified.
 - The goal is to produce a thorough, well-aligned README that accurately captures the user's intent with no ambiguity.`;
     default: // "mid"
       return `### User Interaction Policy: MID (balanced)
 
+- ${repositoryRule}
 - Use AskUserQuestion when important information is missing or ambiguous:
-  1. If no repositories can be determined from the description, ask the user which repositories to work on.
-  2. If anything else is unclear that would significantly affect the workspace setup, ask the user.
+  1. If anything else is unclear that would significantly affect the workspace setup, ask the user.
 - Do NOT ask about minor details — use your best judgment for those.`;
   }
 }
