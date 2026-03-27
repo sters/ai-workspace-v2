@@ -58,17 +58,18 @@ export function useHistory(name: string) {
 }
 
 export function useResearchReport(name: string) {
-  const { data, error, isLoading } = useSWR<string>(
+  const { data, error, isLoading } = useSWR<{ summary: string; files: { name: string; content: string }[] }>(
     name ? `/api/workspaces/${encodeURIComponent(name)}/research` : null,
-    async (url: string) => {
-      const r = await fetch(url);
-      if (!r.ok) throw new Error(`${r.status}`);
-      return r.text();
-    },
+    fetcher,
     { refreshInterval: SWR_REFRESH_INTERVAL }
   );
 
-  return { report: data ?? "", isLoading, error };
+  return {
+    summary: data?.summary ?? "",
+    files: data?.files ?? [],
+    isLoading,
+    error,
+  };
 }
 
 export function useReviewDetail(name: string, timestamp: string | null) {

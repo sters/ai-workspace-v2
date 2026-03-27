@@ -14,11 +14,7 @@ export async function GET(
   }
   const report = await getResearchReport(name);
   if (report === null) {
-    return new NextResponse("", {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
+    return NextResponse.json({ summary: "", files: [] });
   }
-  return new NextResponse(report, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
+  return NextResponse.json(report);
 }

@@ -11,7 +11,7 @@ export default function WorkspaceResearchPage({
 }) {
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
-  const { report } = useResearchReport(decodedName);
+  const { summary, files } = useResearchReport(decodedName);
 
-  return <ResearchViewer content={report} />;
+  return <ResearchViewer summary={summary} files={files} />;
 }

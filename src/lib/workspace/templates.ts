@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
-import { selectTodoTemplate, REPORT_TEMPLATES } from "../templates";
+import { selectTodoTemplate, REPORT_TEMPLATES, RESEARCH_REPORT_TEMPLATES } from "../templates";
 
 /**
  * Write the appropriate TODO template to {wsPath}/TODO-template.md
@@ -27,6 +27,21 @@ export async function writeReportTemplates(wsPath: string): Promise<void> {
       Bun.write(path.join(wsPath, filename), content),
     ),
   );
+}
+
+/**
+ * Write research report templates to the workspace directory.
+ * Also ensures the artifacts/research/ output directory exists.
+ */
+export async function writeResearchTemplates(wsPath: string): Promise<string> {
+  const researchDir = path.join(wsPath, "artifacts", "research");
+  mkdirSync(researchDir, { recursive: true });
+  await Promise.all(
+    Object.entries(RESEARCH_REPORT_TEMPLATES).map(([filename, content]) =>
+      Bun.write(path.join(wsPath, `research-${filename}`), content),
+    ),
+  );
+  return researchDir;
 }
 
 // ---------------------------------------------------------------------------

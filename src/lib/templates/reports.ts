@@ -90,7 +90,7 @@ export const VERIFICATION_REPORT_TEMPLATE = `# TODO Verification: {repository_na
 ## Recommendations
 `;
 
-export const RESEARCH_REPORT_TEMPLATE = `# Research Report
+export const RESEARCH_SUMMARY_TEMPLATE = `# Research Report
 
 - **Workspace**: {workspace_name}
 - **Date**: {date}
@@ -104,26 +104,41 @@ export const RESEARCH_REPORT_TEMPLATE = `# Research Report
 | Repository | Path | Description |
 |------------|------|-------------|
 
-## Findings
+## Key Findings
 
-### {Repository Name}
+{Brief summary of findings across all repositories}
+`;
+
+export const RESEARCH_FINDINGS_REPO_TEMPLATE = `# Findings: {Repository Name}
 
 **Overview**: {Brief description}
 
-#### Structure
-#### Relevant Code
-#### Issues / Observations
+## Structure
+## Relevant Code
+## Issues / Observations
+`;
 
-## Cross-Repository Analysis
+export const RESEARCH_FINDINGS_CROSS_REPO_TEMPLATE = `# Cross-Repository Analysis
 
-### Dependencies
-### Integration Points
-### Common Patterns
-### Gaps
+## Dependencies
+## Integration Points
+## Common Patterns
+## Gaps
+`;
 
-## Recommendations
+export const RESEARCH_FINDINGS_OTHERS_TEMPLATE = `# Other Findings
 
-## Next Steps
+{Findings that do not belong to a specific repository or cross-repository analysis}
+`;
+
+export const RESEARCH_RECOMMENDATIONS_TEMPLATE = `# Recommendations
+
+{Actionable recommendations based on findings}
+`;
+
+export const RESEARCH_NEXT_STEPS_TEMPLATE = `# Next Steps
+
+{Concrete next steps to take}
 `;
 
 export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
@@ -213,6 +228,14 @@ export const REPORT_TEMPLATES = {
   "review-report-template.md": REVIEW_REPORT_TEMPLATE,
   "verification-report-template.md": VERIFICATION_REPORT_TEMPLATE,
   "readme-verification-report-template.md": README_VERIFICATION_REPORT_TEMPLATE,
-  "research-report-template.md": RESEARCH_REPORT_TEMPLATE,
   "summary-report-template.md": SUMMARY_REPORT_TEMPLATE,
+} as const;
+
+export const RESEARCH_REPORT_TEMPLATES = {
+  "summary.md": RESEARCH_SUMMARY_TEMPLATE,
+  "findings-repository.md": RESEARCH_FINDINGS_REPO_TEMPLATE,
+  "findings-cross-repository.md": RESEARCH_FINDINGS_CROSS_REPO_TEMPLATE,
+  "findings-others.md": RESEARCH_FINDINGS_OTHERS_TEMPLATE,
+  "recommendations.md": RESEARCH_RECOMMENDATIONS_TEMPLATE,
+  "next-steps.md": RESEARCH_NEXT_STEPS_TEMPLATE,
 } as const;
