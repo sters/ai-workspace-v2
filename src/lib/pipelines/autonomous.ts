@@ -218,7 +218,7 @@ export function buildAutonomousPipeline(input: {
       ctx.emitStatus(`Creating PR for workspace: ${ws}`);
       const prPhases = await buildCreatePrPipeline({
         workspace: ws,
-        draft: draft ?? false,
+        draft: draft !== false,
         repository: repo,
       });
       return runSubPhases(ctx, prPhases, skip);
