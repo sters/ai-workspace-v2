@@ -36,6 +36,11 @@ export function generateDefaultConfigContent(): string {
     "#   defaultInteractionLevel: mid   # low / mid / high",
     "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates",
     "#   model: null                    # null = CLI default (opus / sonnet / haiku)",
+    "#   # Built-in step defaults (override via steps.<step-type>.model):",
+    "#   #   sonnet: create-pr, coordinate-todos, review-todos, best-of-n-reviewer,",
+    "#   #           plan-todo-from-review, discover-constraints",
+    "#   #   haiku:  collect-reviews, verify-todo, deep-search",
+    "#   #   (all others: CLI default)",
     "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
     "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
     "#   #   claudeTimeoutMinutes: 20",
@@ -152,10 +157,16 @@ export function migrateConfigContent(content: string): string {
   return lines.join("\n");
 }
 
-/** Per-type override hint comment marker (used to detect if hint is already present). */
-const TYPE_OVERRIDE_HINT_MARKER = "Per-operation-type overrides";
+/** Per-type override hint comment markers (current + legacy, used to detect existing hint blocks). */
+const TYPE_OVERRIDE_HINT_MARKER = "Built-in step defaults";
+const TYPE_OVERRIDE_HINT_MARKER_LEGACY = "Per-operation-type overrides";
 
 const TYPE_OVERRIDE_HINT_LINES = [
+  "#   # Built-in step defaults (override via steps.<step-type>.model):",
+  "#   #   sonnet: create-pr, coordinate-todos, review-todos, best-of-n-reviewer,",
+  "#   #           plan-todo-from-review, discover-constraints",
+  "#   #   haiku:  collect-reviews, verify-todo, deep-search",
+  "#   #   (all others: CLI default)",
   "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
   "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
   "#   #   claudeTimeoutMinutes: 20",
@@ -182,22 +193,26 @@ function addTypeOverrideHint(lines: string[]): string[] {
 
   const result = [...lines];
 
-  // Find and remove any existing hint block (marker line + consecutive `#   #` lines after it)
-  const markerIdx = result.findIndex((line) => line.includes(TYPE_OVERRIDE_HINT_MARKER));
-  if (markerIdx >= 0) {
-    let end = markerIdx + 1;
-    while (end < result.length && result[end].startsWith("#   #")) {
-      end++;
+  // Find and remove any existing hint block (marker line + consecutive `#   #` lines after it).
+  // Check both current and legacy markers to handle config files from older versions.
+  for (const marker of [TYPE_OVERRIDE_HINT_MARKER, TYPE_OVERRIDE_HINT_MARKER_LEGACY]) {
+    const markerIdx = result.findIndex((line) => line.includes(marker));
+    if (markerIdx >= 0) {
+      let end = markerIdx + 1;
+      while (end < result.length && result[end].startsWith("#   #")) {
+        end++;
+      }
+      // Check if the existing block already matches the desired content
+      const existing = result.slice(markerIdx, end);
+      if (
+        existing.length === TYPE_OVERRIDE_HINT_LINES.length &&
+        existing.every((line, i) => line === TYPE_OVERRIDE_HINT_LINES[i])
+      ) {
+        return lines; // Already up to date
+      }
+      result.splice(markerIdx, end - markerIdx);
+      break; // Only remove one block
     }
-    // Check if the existing block already matches the desired content
-    const existing = result.slice(markerIdx, end);
-    if (
-      existing.length === TYPE_OVERRIDE_HINT_LINES.length &&
-      existing.every((line, i) => line === TYPE_OVERRIDE_HINT_LINES[i])
-    ) {
-      return lines; // Already up to date
-    }
-    result.splice(markerIdx, end - markerIdx);
   }
 
   // Find the end of the operations section and insert the hint
