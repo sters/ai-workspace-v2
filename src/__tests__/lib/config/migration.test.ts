@@ -104,7 +104,7 @@ describe("migration: old config upgrade", () => {
     expect(result).toContain("#   model:");
   });
 
-  it("replaces old 6-line hint block with new 10-line hint block", () => {
+  it("replaces old 6-line hint block with new 15-line hint block", () => {
     const oldHint = [
       "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
       "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
@@ -123,19 +123,20 @@ describe("migration: old config upgrade", () => {
     ].join("\n");
     const result = migrateConfigContent(input);
     // New hint lines should be present
+    expect(result).toContain("#   # Built-in step defaults");
     expect(result).toContain("#   #   model: sonnet");
     expect(result).toContain("#   #   steps:");
     expect(result).toContain("#   #     <step-type>:");
     expect(result).toContain("#   #       model: haiku");
-    // Old-only block should not be the entire hint (new lines were appended)
+    // Block starts with "Built-in step defaults" marker
     const lines = result.split("\n");
-    const markerIdx = lines.findIndex((l) => l.includes("Per-operation-type overrides"));
+    const markerIdx = lines.findIndex((l) => l.includes("Built-in step defaults"));
     expect(markerIdx).toBeGreaterThan(-1);
     // Count consecutive #   # lines after marker
     let end = markerIdx + 1;
     while (end < lines.length && lines[end].startsWith("#   #")) end++;
     const hintBlockLength = end - markerIdx;
-    expect(hintBlockLength).toBe(10); // 1 marker + 9 hint lines
+    expect(hintBlockLength).toBe(15); // 1 marker + 14 hint lines
   });
 
   it("is idempotent: migrating generated default content is a no-op", () => {
