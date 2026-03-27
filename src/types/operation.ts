@@ -26,11 +26,15 @@ export interface OperationChild {
 export interface OperationPhaseInfo {
   index: number;
   label: string;
-  status: OperationStatus | "pending" | "skipped";
+  status: OperationStatus | "pending" | "skipped" | "retrying";
   /** Timeout in milliseconds for this phase. */
   timeoutMs?: number;
   /** ISO timestamp when this phase started running. */
   startedAt?: string;
+  /** Maximum number of retries configured for this phase. */
+  maxRetries?: number;
+  /** Current retry attempt (0 = first run, 1 = first retry, etc.). */
+  retryAttempt?: number;
 }
 
 export interface Operation {

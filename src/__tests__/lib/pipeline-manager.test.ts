@@ -177,6 +177,7 @@ describe("pipeline-manager killOperation", () => {
       {
         kind: "function",
         label: "test-ask",
+        maxRetries: 0,
         fn: async (ctx) => {
           askCalled = true;
           // This emitAsk will block until answered or cancelled
@@ -236,6 +237,7 @@ describe("pipeline-manager phase timeout", () => {
         kind: "function",
         label: "slow-fn",
         timeoutMs: 50, // very short timeout
+        maxRetries: 0,
         fn: async (ctx) => {
           // Block on emitAsk which respects the abort signal
           await ctx.emitAsk([

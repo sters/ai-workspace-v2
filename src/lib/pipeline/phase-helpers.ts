@@ -15,12 +15,22 @@ export function emitPhaseUpdate(
   phaseIndex: number,
   phaseLabel: string,
   phaseStatus: OperationPhaseInfo["status"],
+  retryInfo?: { retryAttempt: number; maxRetries: number },
 ) {
   const phases = managed.operation.phases;
   if (phases && phases[phaseIndex]) {
     phases[phaseIndex].status = phaseStatus;
+    if (retryInfo) {
+      phases[phaseIndex].retryAttempt = retryInfo.retryAttempt;
+      phases[phaseIndex].maxRetries = retryInfo.maxRetries;
+    }
   }
-  emitStatus(managed, `__phaseUpdate:${JSON.stringify({ phaseIndex, phaseLabel, phaseStatus })}`, {
+  emitStatus(managed, `__phaseUpdate:${JSON.stringify({
+    phaseIndex,
+    phaseLabel,
+    phaseStatus,
+    ...(retryInfo && { retryAttempt: retryInfo.retryAttempt, maxRetries: retryInfo.maxRetries }),
+  })}`, {
     phaseIndex,
     phaseLabel,
   });

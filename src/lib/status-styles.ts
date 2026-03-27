@@ -3,7 +3,7 @@
  *
  * Text colors for inline status indicators (icons, labels).
  */
-export type StatusKey = "pending" | "running" | "completed" | "failed" | "stopped" | "skipped";
+export type StatusKey = "pending" | "running" | "completed" | "failed" | "stopped" | "skipped" | "retrying";
 
 export const statusTextColors: Record<StatusKey, string> = {
   pending: "text-muted-foreground",
@@ -12,6 +12,7 @@ export const statusTextColors: Record<StatusKey, string> = {
   failed: "text-red-500",
   stopped: "text-yellow-600",
   skipped: "text-muted-foreground/50",
+  retrying: "text-orange-500",
 };
 
 /** Unicode status icons. */
@@ -22,5 +23,6 @@ export const statusIcons: Record<StatusKey, string> = {
   failed: "\u2717",    // ✗
   stopped: "\u25A0",   // ■
   skipped: "\u2014",   // —
+  retrying: "\u21BA",  // ↺
 };
 

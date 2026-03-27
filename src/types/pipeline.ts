@@ -55,6 +55,10 @@ export interface PipelinePhaseSingle {
   /** Additional directories to expose via --add-dir. */
   addDirs?: string[];
   timeoutMs?: number;
+  /** Maximum number of retry attempts on failure (default: 2). Set to 0 to disable. */
+  maxRetries?: number;
+  /** Delay in ms between retry attempts (default: 3000). */
+  retryDelayMs?: number;
   /** Claude model override for this phase. */
   model?: ClaudeModel;
   /** Step type identifier for config-based model resolution. */
@@ -67,6 +71,10 @@ export interface PipelinePhaseGroup {
   kind: "group";
   children: GroupChild[];
   timeoutMs?: number;
+  /** Maximum number of retry attempts on failure (default: 2). Set to 0 to disable. */
+  maxRetries?: number;
+  /** Delay in ms between retry attempts (default: 3000). */
+  retryDelayMs?: number;
 }
 
 export interface RunChildOptions {
@@ -112,6 +120,10 @@ export interface PipelinePhaseFunction {
   label: string;
   fn: (ctx: PhaseFunctionContext) => Promise<boolean>;
   timeoutMs?: number;
+  /** Maximum number of retry attempts on failure (default: 2). Set to 0 to disable. */
+  maxRetries?: number;
+  /** Delay in ms between retry attempts (default: 3000). */
+  retryDelayMs?: number;
 }
 
 export type PipelinePhase =
