@@ -211,10 +211,10 @@ export function buildBatchPipeline(input: {
             n: prBon,
             operationType: "create-pr",
             buildCandidatePhases: (candidateRepos) =>
-              buildCreatePrPipeline({ workspace: ws, draft: draft ?? false, repos: candidateRepos }),
+              buildCreatePrPipeline({ workspace: ws, draft: draft !== false, repos: candidateRepos }),
             repos,
             confirm: bestOfNFromConfig,
-            buildNormalPhases: () => buildCreatePrPipeline({ workspace: ws, draft: draft ?? false, repository: repo }),
+            buildNormalPhases: () => buildCreatePrPipeline({ workspace: ws, draft: draft !== false, repository: repo }),
             interactionLevel,
           });
           return runSubPhases(ctx, bonPhases);
@@ -222,7 +222,7 @@ export function buildBatchPipeline(input: {
 
         const subPhases = await buildCreatePrPipeline({
           workspace: ws,
-          draft: draft ?? false,
+          draft: draft !== false,
           repository: repo,
         });
         return runSubPhases(ctx, subPhases);
