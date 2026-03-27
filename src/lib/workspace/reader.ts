@@ -116,9 +116,33 @@ async function listReviewSessions(wsPath: string): Promise<ReviewSession[]> {
   return sessions;
 }
 
-export async function getResearchReport(name: string): Promise<string | null> {
-  const file = Bun.file(path.join(getWorkspaceDir(), name, "artifacts", "research-report.md"));
-  return (await file.exists()) ? file.text() : null;
+export async function getResearchReport(
+  name: string
+): Promise<{ summary: string; files: { name: string; content: string }[] } | null> {
+  const researchDir = path.join(getWorkspaceDir(), name, "artifacts", "research");
+
+  if (existsSync(researchDir)) {
+    const summaryFile = Bun.file(path.join(researchDir, "summary.md"));
+    const summary = (await summaryFile.exists()) ? await summaryFile.text() : "";
+
+    const glob = new Bun.Glob("*.md");
+    const mdFiles = [...glob.scanSync({ cwd: researchDir })].filter((f) => f !== "summary.md").sort();
+    const files: { name: string; content: string }[] = [];
+    for (const f of mdFiles) {
+      const content = await Bun.file(path.join(researchDir, f)).text();
+      files.push({ name: f, content });
+    }
+
+    return { summary, files };
+  }
+
+  // Backward compat: single-file format
+  const legacyFile = Bun.file(path.join(getWorkspaceDir(), name, "artifacts", "research-report.md"));
+  if (await legacyFile.exists()) {
+    return { summary: await legacyFile.text(), files: [] };
+  }
+
+  return null;
 }
 
 export async function getReadme(name: string): Promise<string | null> {

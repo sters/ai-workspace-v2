@@ -14,6 +14,16 @@ export function buildResearcherPrompt(input: ResearcherInput): string {
     .map((r) => `- **${r.repoName}**: \`${r.repoPath}\` (worktree: \`${r.worktreePath}\`)`)
     .join("\n");
 
+  const repoNames = input.repos.map((r) => r.repoName);
+  const fileList = [
+    `- \`summary.md\` — Overview, research objectives, repositories analyzed, key findings`,
+    ...repoNames.map((name) => `- \`findings-${name}.md\` — Detailed findings for **${name}**`),
+    `- \`findings-cross-repository.md\` — Cross-repository analysis (dependencies, integration points, patterns, gaps)`,
+    `- \`findings-others.md\` — Other findings that don't belong to a specific repository (optional, skip if nothing to report)`,
+    `- \`recommendations.md\` — Actionable recommendations`,
+    `- \`next-steps.md\` — Concrete next steps`,
+  ].join("\n");
+
   return `# Task: Research across repositories
 
 ## Workspace: ${input.workspaceName}
@@ -27,14 +37,25 @@ ${input.readmeContent}
 
 ${repoList}
 
-## Report File
+## Report Directory
 
-Write the research report to: ${input.reportPath}
+Write the research report as **separate files** in: ${input.reportDir}
 
-## Report Template
+### Files to create
 
-Read the research report template file at: workspace/${input.workspaceName}/research-report-template.md
-Use it as the base structure for the report.
+${fileList}
+
+## Report Templates
+
+Read the template files in workspace/${input.workspaceName}/ for reference structure:
+- research-summary.md
+- research-findings-repository.md
+- research-findings-cross-repository.md
+- research-findings-others.md
+- research-recommendations.md
+- research-next-steps.md
+
+Adapt each template's structure to fit the actual research findings.
 `;
 }
 
@@ -60,9 +81,14 @@ const RESEARCHER_INSTRUCTIONS = `You are a specialized agent for performing cros
    - Common patterns or inconsistencies
    - Gaps spanning repositories
 
-4. **Write Research Report** to the specified file path
-   - Adapt the template structure to fit the research
-   - Add, merge, or remove sections as needed
+4. **Write Research Report** as separate files in the specified directory
+   - summary.md — overview and key findings
+   - findings-{repoName}.md — one file per repository
+   - findings-cross-repository.md — cross-repo analysis
+   - findings-others.md — anything else (optional)
+   - recommendations.md — actionable recommendations
+   - next-steps.md — concrete next steps
+   - Adapt each template's structure to fit the research
 
 5. **Update README.md** with a brief summary of findings
 

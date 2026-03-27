@@ -14,7 +14,7 @@ import {
   buildBatchedExecutorPrompt,
   buildResearcherPrompt,
 } from "@/lib/templates";
-import { writeReportTemplates } from "@/lib/workspace";
+import { writeReportTemplates, writeResearchTemplates } from "@/lib/workspace";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { STEP_TYPES } from "@/types/pipeline";
@@ -48,8 +48,8 @@ export async function buildExecutePipeline(input: {
   if (isResearch) {
     // Write report templates (idempotent — ensures templates exist for older workspaces)
     await writeReportTemplates(wsPath);
+    const reportDir = await writeResearchTemplates(wsPath);
 
-    const reportPath = path.join(wsPath, "artifacts", "research-report.md");
     const prompt = buildResearcherPrompt({
       workspaceName: workspace,
       readmeContent,
@@ -59,7 +59,7 @@ export async function buildExecutePipeline(input: {
         worktreePath: r.worktreePath,
       })),
       workspacePath: wsPath,
-      reportPath,
+      reportDir,
     });
 
     return [

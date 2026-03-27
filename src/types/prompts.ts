@@ -89,7 +89,7 @@ export interface ResearcherInput {
   readmeContent: string;
   repos: WorkspaceRepo[];
   workspacePath: string;
-  reportPath: string;
+  reportDir: string;
 }
 
 export interface UpdaterInput {
