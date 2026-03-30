@@ -54,6 +54,7 @@ export function wireChild(
     const onAbort = () => {
       if (resolved) return;
       resolved = true;
+      process.kill();
       const child = managed.operation.children?.find((c) => c.id === childId);
       if (child) child.status = "failed";
       managed.childProcesses.delete(childId);

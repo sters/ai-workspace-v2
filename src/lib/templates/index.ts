@@ -72,4 +72,6 @@ export {
   getDiscoverySystemPrompt,
   buildDiscoveryPrompt,
   DISCOVERY_SCHEMA,
+  buildSuggestionAggregatorPrompt,
+  SUGGESTION_AGGREGATION_SCHEMA,
 } from "./prompts";

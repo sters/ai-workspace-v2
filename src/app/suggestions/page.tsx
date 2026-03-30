@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useOperation } from "@/hooks/use-operation";
 import { useSuggestions } from "@/hooks/use-suggestions";
@@ -8,9 +8,11 @@ import { postJson } from "@/lib/api";
 import { INIT_STORAGE_KEY, InitSplitButton } from "@/components/operation/init-operation";
 import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import { CollapsibleSection } from "@/components/shared/containers/collapsible-section";
-import { X, Search, Trash2 } from "lucide-react";
+import { X, Search, Trash2, Layers } from "lucide-react";
 import type { InteractionLevel } from "@/types/prompts";
 import type { OperationType } from "@/types/operation";
+
+const AGGREGATE_STORAGE_KEY = "aggregate-suggestions";
 
 function formatRelativeTime(dateStr: string): string {
   const now = Date.now();
@@ -28,11 +30,18 @@ function formatRelativeTime(dateStr: string): string {
 export default function SuggestionsPage() {
   const { suggestions, isLoading, refresh } = useSuggestions();
   const { start } = useOperation(INIT_STORAGE_KEY);
+  const { start: startAggregate } = useOperation(AGGREGATE_STORAGE_KEY);
   const router = useRouter();
   const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
   const [starting, setStarting] = useState(false);
   const [query, setQuery] = useState("");
   const [pruning, setPruning] = useState(false);
+
+  const handleAggregate = useCallback(() => {
+    startAggregate("aggregate-suggestions", {}).then(() =>
+      router.push("/suggestions/aggregate"),
+    );
+  }, [startAggregate, router]);
 
   async function handleDismiss(id: string) {
     await postJson("/api/suggestions/dismiss", { id });
@@ -84,6 +93,16 @@ export default function SuggestionsPage() {
               disabled={starting}
             />
           </div>
+
+          <button
+            onClick={handleAggregate}
+            disabled={starting || suggestions.length < 2}
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+            title="Merge similar suggestions using AI"
+          >
+            <Layers className="h-3.5 w-3.5" />
+            Aggregate
+          </button>
 
           <div className="flex items-end gap-2">
             <button

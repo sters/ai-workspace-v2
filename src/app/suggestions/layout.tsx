@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { label: "List", segment: "", href: "/suggestions" },
   { label: "Discover", segment: "discover", href: "/suggestions/discover" },
+  { label: "Aggregate", segment: "aggregate", href: "/suggestions/aggregate" },
 ] as const;
 
 export default function SuggestionsLayout({
