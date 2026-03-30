@@ -49,8 +49,20 @@ export function UpdateForm({
         disabled={disabled}
         rows={2}
       />
-      <div className="flex items-center justify-end gap-4">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-4">
+        <button
+          type="button"
+          className="rounded border border-border bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+          disabled={disabled}
+          onClick={() =>
+            setInstruction(
+              "Check the PR opened on the current branch using `gh pr list` and `gh pr view`, then review all review comments with `gh pr view --comments` and `gh api` for review threads. Identify any unresolved review comments and actionable feedback, and convert them into TODO items in the TODO file.",
+            )
+          }
+        >
+          Address PR Reviews
+        </button>
+        <div className="ml-auto flex items-center gap-1.5">
           <span className="text-xs text-muted-foreground">Interaction:</span>
           <InteractionLevelSelector
             value={interactionLevel}
