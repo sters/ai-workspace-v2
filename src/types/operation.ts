@@ -13,7 +13,8 @@ export type OperationType =
   | "batch"
   | "autonomous"
   | "search"
-  | "discovery";
+  | "discovery"
+  | "aggregate-suggestions";
 
 export type OperationStatus = "running" | "completed" | "failed";
 

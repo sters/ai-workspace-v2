@@ -21,6 +21,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.COLLECT_REVIEWS]: "haiku",
   [STEP_TYPES.VERIFY_TODO]: "haiku",
   [STEP_TYPES.DEEP_SEARCH]: "haiku",
+  [STEP_TYPES.AGGREGATE_SUGGESTIONS]: "haiku",
 };
 
 /**

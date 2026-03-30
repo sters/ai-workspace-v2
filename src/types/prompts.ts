@@ -216,6 +216,15 @@ export interface DiscoveryInput {
   otherWorkspaceNames: string[];
 }
 
+export interface SuggestionAggregatorInput {
+  suggestions: {
+    id: string;
+    targetRepository: string;
+    title: string;
+    description: string;
+  }[];
+}
+
 export interface BestOfNFileSynthesizerInput {
   operationType: string;
   candidates: { label: string; files: { name: string; content: string }[] }[];

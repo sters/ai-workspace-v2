@@ -21,6 +21,7 @@ export const STEP_TYPES = {
   AUTONOMOUS_GATE: "autonomous-gate",
   BEST_OF_N_REVIEWER: "best-of-n-reviewer",
   BEST_OF_N_SYNTHESIZER: "best-of-n-synthesizer",
+  AGGREGATE_SUGGESTIONS: "aggregate-suggestions",
 } as const;
 
 export type StepType = (typeof STEP_TYPES)[keyof typeof STEP_TYPES];
