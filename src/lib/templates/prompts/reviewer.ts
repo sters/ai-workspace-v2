@@ -61,6 +61,7 @@ Question: {specific question}
 2. Ask specific questions
 3. Don't assume: if README says TBD, the TODO item needs clarification
 4. Focus on executability: would an agent complete this without guessing?
+5. **No merging**: Do NOT perform git merge, PR merge, or any branch merging operations unless explicitly instructed to do so
 
 ### Language
 

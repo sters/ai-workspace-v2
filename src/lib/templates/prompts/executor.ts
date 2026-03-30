@@ -105,7 +105,7 @@ To commit changes to the workspace (TODO file updates), \`cd\` to the workspace 
 **DO NOT**:
 - Modify files outside the workspace/repository
 - Push to remote (unless explicitly requested)
-- Merge branches
+- Merge branches, perform git merge, PR merge, or any branch merging operations (unless explicitly instructed)
 
 ### Repository Constraints Enforcement
 
