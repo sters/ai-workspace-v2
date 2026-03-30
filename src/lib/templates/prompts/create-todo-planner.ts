@@ -69,6 +69,7 @@ Each TODO item MUST follow this structured format:
 5. Include commands: specify exact build/test/lint commands from repository docs
 6. Order logically: critical fixes first, then warnings, then suggestions
 7. Do not duplicate items that already exist in the TODO file
+8. **No merging**: Do NOT perform git merge, PR merge, or any branch merging operations unless explicitly instructed to do so
 `;
 }
 

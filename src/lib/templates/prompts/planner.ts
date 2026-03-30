@@ -82,6 +82,7 @@ Check the workspace README's **## Repository Constraints** section. If it lists 
 5. Prefer task runner commands: use \`make lint\` / \`npm run test\` etc. over direct tool invocation. Only fall back to direct commands (e.g. \`golangci-lint\`, \`tsc\`) if no task runner target exists
 6. Order logically: dependencies first, then implementation, then tests
 7. Honour Repository Constraints: if the workspace README lists constraints, they MUST appear as verification items
+8. **No merging**: Do NOT perform git merge, PR merge, or any branch merging operations unless explicitly instructed to do so
 
 ### Interactive Mode
 

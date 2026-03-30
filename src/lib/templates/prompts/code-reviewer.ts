@@ -53,6 +53,7 @@ After that, run commands like \`git status\`, \`git diff\`, \`git log\`, etc. as
 - Be thorough: read full context
 - Be specific: reference exact line numbers
 - Consider context: understand task requirements
+- **No merging**: Do NOT perform git merge, PR merge, or any branch merging operations unless explicitly instructed to do so
 `;
 }
 
