@@ -31,6 +31,7 @@ interface NotificationPayload {
 
 function broadcastNotification(payload: NotificationPayload): void {
   const subs = getAllPushSubscriptions();
+  console.log(`[web-push] broadcastNotification: ${subs.length} subscriber(s), tag=${payload.tag}`);
   if (subs.length === 0) return;
 
   const vapid = getVapidDetails();
@@ -39,7 +40,11 @@ function broadcastNotification(payload: NotificationPayload): void {
   for (const sub of subs) {
     webPush
       .sendNotification(sub, json, { vapidDetails: vapid, TTL: 60 })
+      .then(() => {
+        console.log(`[web-push] sent OK to ${sub.endpoint.slice(0, 60)}…`);
+      })
       .catch((err) => {
+        console.error(`[web-push] send failed: status=${err.statusCode}, message=${err.message}`);
         if (err.statusCode === 404 || err.statusCode === 410) {
           removePushSubscription(sub.endpoint);
         }

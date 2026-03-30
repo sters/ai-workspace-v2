@@ -1,6 +1,20 @@
 // Service Worker for Web Push Notifications
+
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener("push", (event) => {
-  const data = event.data ? event.data.json() : {};
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    // invalid JSON — use defaults
+  }
   const title = data.title || "ai-workspace";
   const options = {
     body: data.body || "An operation needs your attention",
