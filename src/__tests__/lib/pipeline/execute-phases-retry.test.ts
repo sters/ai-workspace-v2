@@ -18,6 +18,7 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/web-push", () => ({
   sendAskNotification: vi.fn(),
+  sendCompletionNotification: vi.fn(),
 }));
 
 vi.mock("@/lib/operation-store", () => ({

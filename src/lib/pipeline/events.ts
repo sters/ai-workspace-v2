@@ -1,6 +1,6 @@
 import type { OperationEvent } from "@/types/operation";
 import type { ManagedOperation } from "./types";
-import { sendAskNotification } from "@/lib/web-push";
+import { sendAskNotification, sendCompletionNotification } from "@/lib/web-push";
 import { bufferEvent, stopAutoFlush } from "@/lib/db";
 
 export function emitEvent(managed: ManagedOperation, event: OperationEvent) {
@@ -56,6 +56,8 @@ export function markComplete(managed: ManagedOperation, success: boolean) {
   managed.operation.status = success ? "completed" : "failed";
   managed.operation.completedAt = new Date().toISOString();
   managed.completedAt = Date.now();
+
+  sendCompletionNotification(managed.operation.id, success, managed.operation.workspace ?? undefined);
 
   // Emit the complete event BEFORE clearing listeners so SSE clients receive it
   emitEvent(managed, {
