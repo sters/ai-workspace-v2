@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     const operation = startOperationPipeline("update-todo", workspace, phases, undefined, {
       instruction,
       interactionLevel,
+      ...(repo && { repo }),
       ...(bestOfN >= 2 && { bestOfN: String(bestOfN) }),
     });
     return NextResponse.json(operation);

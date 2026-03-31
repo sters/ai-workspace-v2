@@ -32,8 +32,8 @@ export function TodoUpdater({
   workspaceName: string;
   repositories?: { alias: string; path: string }[];
 }) {
-  const { isWorkspaceTypeRunning } = useRunningOperations();
-  const isRunning = isWorkspaceTypeRunning(workspaceName, "update-todo");
+  const { isWorkspaceTypeRunning, isRepoTypeRunning } = useRunningOperations();
+  const isAnyRunning = isWorkspaceTypeRunning(workspaceName, "update-todo");
   const startAndNavigate = useStartAndNavigate(workspaceName);
 
   if (todos.length === 0) {
@@ -48,7 +48,7 @@ export function TodoUpdater({
         <UpdateForm
           label="Update"
           placeholder="Describe TODO changes to apply across all repositories..."
-          disabled={isRunning}
+          disabled={isAnyRunning}
           onSubmit={(instruction, interactionLevel) => {
             startAndNavigate("update-todo", {
               workspace: workspacePath,
@@ -76,7 +76,7 @@ export function TodoUpdater({
           key={todo.filename}
           todo={todo}
           workspacePath={workspacePath}
-          disabled={isRunning}
+          disabled={isRepoTypeRunning(workspaceName, "update-todo", todo.repoName)}
           repoPath={findRepoPath(todo.repoName, repositories ?? [])}
           onStartAndNavigate={startAndNavigate}
         />
