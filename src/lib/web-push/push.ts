@@ -64,7 +64,9 @@ export function sendCompletionNotification(
       ? `Operation in "${workspace}" ${status}`
       : `An operation ${status}`,
     tag: `complete-${operationId}`,
-    url: workspace ? `/workspace/${workspace}` : "/",
+    url: workspace
+      ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`
+      : "/",
   });
 }
 
@@ -75,6 +77,8 @@ export function sendAskNotification(operationId: string, workspace?: string): vo
       ? `Operation in "${workspace}" needs your input`
       : "An operation needs your input",
     tag: `ask-${operationId}`,
-    url: workspace ? `/workspace/${workspace}` : "/",
+    url: workspace
+      ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`
+      : "/",
   });
 }
