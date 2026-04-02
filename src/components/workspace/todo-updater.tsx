@@ -7,7 +7,7 @@ import { UpdateForm } from "./update-form";
 import { RepoTodoCard } from "./repo-todo-card";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
-import { buildBatchItems } from "@/lib/batch-modes";
+import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
 
 function findRepoPath(
   repoName: string,
@@ -56,17 +56,17 @@ export function TodoUpdater({
               interactionLevel,
             });
           }}
-          batchItems={(instruction, interactionLevel) =>
-            buildBatchItems(
-              "update-todo",
-              {
-                workspace: workspacePath,
-                interactionLevel,
-                ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-              },
-              (body) => startAndNavigate("batch", body),
-            )
-          }
+          batchItems={(instruction, interactionLevel) => {
+            const base = {
+              workspace: workspacePath,
+              interactionLevel,
+              ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+            };
+            return [
+              ...buildBatchItems("update-todo", base, (body) => startAndNavigate("batch", body)),
+              ...buildAutonomousItems("update-todo", base, (body) => startAndNavigate("autonomous", body)),
+            ];
+          }}
         />
       </Card>
 

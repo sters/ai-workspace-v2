@@ -9,7 +9,7 @@ import { Card } from "../shared/containers/card";
 import { ProgressBar } from "../shared/feedback/progress-bar";
 import { Button } from "../shared/buttons/button";
 import { openInEditor, openInTerminal } from "@/lib/api";
-import { buildBatchItems } from "@/lib/batch-modes";
+import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
 import {
   Play,
   ClipboardCheck,
@@ -140,18 +140,18 @@ export function RepoTodoCard({
               interactionLevel,
             });
           }}
-          batchItems={(instruction, interactionLevel) =>
-            buildBatchItems(
-              "update-todo",
-              {
-                ...baseBody,
-                workspace: workspacePath,
-                interactionLevel,
-                ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-              },
-              (body) => onStartAndNavigate("batch", body),
-            )
-          }
+          batchItems={(instruction, interactionLevel) => {
+            const base = {
+              ...baseBody,
+              workspace: workspacePath,
+              interactionLevel,
+              ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
+            };
+            return [
+              ...buildBatchItems("update-todo", base, (body) => onStartAndNavigate("batch", body)),
+              ...buildAutonomousItems("update-todo", base, (body) => onStartAndNavigate("autonomous", body)),
+            ];
+          }}
         />
       </div>
 
