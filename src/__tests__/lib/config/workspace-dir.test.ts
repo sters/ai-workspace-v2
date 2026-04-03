@@ -1,25 +1,15 @@
 import { describe, expect, it } from "vitest";
 import path from "node:path";
-import os from "node:os";
 import {
   getWorkspaceConfigDir,
   getWorkspaceDbPath,
   getWorkspaceConfigFilePath,
-  CONFIG_BASE_DIR,
 } from "@/lib/config/workspace-dir";
 
-describe("CONFIG_BASE_DIR", () => {
-  it("points to ~/.config/ai-workspace", () => {
-    expect(CONFIG_BASE_DIR).toBe(
-      path.join(os.homedir(), ".config", "ai-workspace"),
-    );
-  });
-});
-
 describe("getWorkspaceConfigDir", () => {
-  it("returns {basename}-{hash} under CONFIG_BASE_DIR", () => {
+  it("returns .ai-workspace under workspace root", () => {
     const dir = getWorkspaceConfigDir("/home/user/my-workspace");
-    expect(dir).toMatch(/^.*\/\.config\/ai-workspace\/my-workspace-[a-f0-9]{8}$/);
+    expect(dir).toBe("/home/user/my-workspace/.ai-workspace");
   });
 
   it("is deterministic for the same path", () => {
@@ -28,21 +18,10 @@ describe("getWorkspaceConfigDir", () => {
     expect(a).toBe(b);
   });
 
-  it("produces different hashes for different paths", () => {
-    const a = getWorkspaceConfigDir("/path/a");
-    const b = getWorkspaceConfigDir("/path/b");
-    expect(a).not.toBe(b);
-  });
-
   it("normalizes trailing slash via path.resolve", () => {
     const a = getWorkspaceConfigDir("/home/user/my-workspace");
     const b = getWorkspaceConfigDir("/home/user/my-workspace/");
     expect(a).toBe(b);
-  });
-
-  it("uses basename of the path", () => {
-    const dir = getWorkspaceConfigDir("/deeply/nested/workspace-name");
-    expect(path.basename(dir)).toMatch(/^workspace-name-[a-f0-9]{8}$/);
   });
 });
 

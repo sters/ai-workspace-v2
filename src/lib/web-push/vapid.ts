@@ -1,9 +1,12 @@
 import path from "node:path";
-import os from "node:os";
 import fs from "node:fs";
 import webPush from "web-push";
+import { getWorkspaceConfigDir } from "@/lib/config/workspace-dir";
+import { getResolvedWorkspaceRoot } from "@/lib/config/resolver";
 
-const VAPID_FILE = path.join(os.homedir(), ".config", "ai-workspace", "vapid-keys.json");
+function getVapidFilePath(): string {
+  return path.join(getWorkspaceConfigDir(getResolvedWorkspaceRoot()), "vapid-keys.json");
+}
 
 interface VapidKeys {
   publicKey: string;
@@ -15,8 +18,10 @@ let cachedKeys: VapidKeys | null = null;
 function loadOrCreateKeys(): VapidKeys {
   if (cachedKeys) return cachedKeys;
 
+  const vapidFile = getVapidFilePath();
+
   try {
-    const raw = fs.readFileSync(VAPID_FILE, "utf-8");
+    const raw = fs.readFileSync(vapidFile, "utf-8");
     cachedKeys = JSON.parse(raw) as VapidKeys;
     return cachedKeys;
   } catch {
@@ -26,9 +31,9 @@ function loadOrCreateKeys(): VapidKeys {
   const keys = webPush.generateVAPIDKeys();
   cachedKeys = { publicKey: keys.publicKey, privateKey: keys.privateKey };
 
-  const dir = path.dirname(VAPID_FILE);
+  const dir = path.dirname(vapidFile);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(VAPID_FILE, JSON.stringify(cachedKeys, null, 2));
+  fs.writeFileSync(vapidFile, JSON.stringify(cachedKeys, null, 2));
 
   return cachedKeys;
 }

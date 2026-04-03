@@ -37,7 +37,7 @@ const tools = [
     href: "/utilities/aiw-settings",
     name: "AIW Settings",
     description:
-      "Edit ~/.config/ai-workspace/config.yml. Changes take effect immediately.",
+      "Edit .ai-workspace/config.yml. Changes take effect immediately.",
   },
   {
     href: "/utilities/claude-settings",
