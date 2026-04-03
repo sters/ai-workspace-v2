@@ -8,7 +8,6 @@ export type { ConfigKeyDef } from "./defaults";
 
 // Workspace config directory
 export {
-  CONFIG_BASE_DIR,
   getWorkspaceConfigDir,
   getWorkspaceDbPath,
   getWorkspaceConfigFilePath,

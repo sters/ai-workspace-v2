@@ -22,7 +22,7 @@ vi.mock("node:fs", () => ({
 const mockResetConfig = vi.fn();
 
 vi.mock("@/lib/config", () => ({
-  getConfigFilePath: () => "/mock-home/.config/ai-workspace/config.yml",
+  getConfigFilePath: () => "/mock-workspace/.ai-workspace/config.yml",
   _resetConfig: () => mockResetConfig(),
 }));
 
@@ -60,7 +60,7 @@ describe("GET /api/aiw-settings", () => {
 
     const { status, data } = await callGET();
     expect(status).toBe(200);
-    expect(data.filePath).toBe("/mock-home/.config/ai-workspace/config.yml");
+    expect(data.filePath).toBe("/mock-workspace/.ai-workspace/config.yml");
     expect(data.exists).toBe(true);
     expect(data.content).toBe("workspaceRoot: /path/to/workspace\n");
   });
@@ -82,11 +82,11 @@ describe("POST /api/aiw-settings", () => {
     expect(status).toBe(200);
     expect(data.ok).toBe(true);
     expect(mockMkdirSync).toHaveBeenCalledWith(
-      expect.stringContaining(".config/ai-workspace"),
+      expect.stringContaining(".ai-workspace"),
       { recursive: true },
     );
     expect(mockWriteFileSync).toHaveBeenCalledWith(
-      "/mock-home/.config/ai-workspace/config.yml",
+      "/mock-workspace/.ai-workspace/config.yml",
       content,
       "utf-8",
     );

@@ -25,7 +25,7 @@ export default function AiwSettingsPage() {
         description={
           <>
             Edit{" "}
-            <code className="text-xs">~/.config/ai-workspace/config.yml</code>.
+            <code className="text-xs">.ai-workspace/config.yml</code>.
             Changes take effect immediately (cached config is invalidated on
             save).
           </>
