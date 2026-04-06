@@ -75,9 +75,26 @@ Check the workspace README's **## Repository Constraints** section. If it lists 
 - **Always write all output (TODO items, comments, descriptions) in English**, regardless of the language used in the workspace README or task description.
 - Only use a non-English language if the user explicitly requests it.
 
+### Cross-Repository Dependencies
+
+**CRITICAL: Do NOT read, browse, or analyze code from other repositories.** You only have access to one repository — focus exclusively on it. If this repository's task depends on another repository (e.g., needs API endpoints, GraphQL queries, shared types, or interfaces from another repo):
+
+1. Create a TODO item describing what this repo needs from the other repo
+2. Mark it with \`[CROSS-REPO]\` tag so the coordinator can identify it
+3. Use a placeholder or note like "query/endpoint/type TBD — depends on {other-repo}" instead of guessing the exact API shape
+4. The **coordinator agent** will run after all repos are planned and will resolve these dependencies by reading the relevant code across repos
+
+Example:
+\`\`\`markdown
+- [ ] **[CROSS-REPO]** Integrate with {other-repo}'s GraphQL query for user profile
+  - Target: src/pages/profile/index.tsx
+  - Action: Call the user profile query (exact query name TBD — depends on {other-repo})
+  - Note: Coordinator will fill in the specific query/endpoint details after reviewing {other-repo}'s TODO and code
+\`\`\`
+
 ### Guidelines
 
-1. Focus on this repository only
+1. Focus on this repository only — do NOT read other repositories' source code
 2. Be actionable: each TODO should be something the executor can act on
 3. Match the depth of analysis to the task — simple tasks need less investigation, complex implementation tasks need more
 4. Include commands: specify exact build/test/lint commands from repository docs (only for tasks that change code)
@@ -85,6 +102,7 @@ Check the workspace README's **## Repository Constraints** section. If it lists 
 6. Order logically: dependencies first, then implementation, then tests
 7. Honour Repository Constraints: if the workspace README lists constraints AND the task modifies code, they MUST appear as verification items. Skip verification for non-code-change tasks
 8. **No merging**: Do NOT perform git merge, PR merge, or any branch merging operations unless explicitly instructed to do so
+9. **Cross-repo deps**: Mark items that depend on other repos with \`[CROSS-REPO]\` — never attempt to read other repos to resolve them
 
 ### Interactive Mode
 

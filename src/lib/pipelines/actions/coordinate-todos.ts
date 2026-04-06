@@ -9,6 +9,7 @@ export function buildCoordinateTodosPhase(input: {
   workspace: string;
   wsPath: string;
   repoNames: string[];
+  repoWorktrees?: { repoName: string; worktreePath: string }[];
 }): PipelinePhaseFunction {
   return {
     kind: "function",
@@ -42,6 +43,7 @@ export function buildCoordinateTodosPhase(input: {
         readmeContent,
         todoFiles,
         workspacePath: input.wsPath,
+        repoWorktrees: input.repoWorktrees,
       });
 
       ctx.emitStatus("Coordinating TODOs across repositories");
