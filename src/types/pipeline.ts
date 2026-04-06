@@ -115,6 +115,8 @@ export interface PhaseFunctionContext {
   emitTerminal: (data: string) => void;
   /** Abort signal that fires when the operation is killed. Use to clean up external processes. */
   signal: AbortSignal;
+  /** Dynamically append new phases to the running pipeline. Appended phases execute after the current phase completes. */
+  appendPhases: (phases: PipelinePhase[]) => void;
 }
 
 export interface PipelinePhaseFunction {

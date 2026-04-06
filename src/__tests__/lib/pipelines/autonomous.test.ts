@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
-import type { PhaseFunctionContext } from "@/types/pipeline";
+import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 
 vi.mock("@/lib/pipeline-manager", () => ({
   getOperation: vi.fn(),
@@ -75,6 +75,7 @@ function createMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunction
     runChildGroup: vi.fn(async () => [true]),
     emitTerminal: vi.fn(),
     signal: new AbortController().signal,
+    appendPhases: vi.fn(),
     ...overrides,
   };
 }
@@ -104,7 +105,7 @@ describe("buildAutonomousPipeline", () => {
         description: "Test description",
       });
       expect(mockBuildInit).toHaveBeenCalledWith("Test description", undefined);
-      // init phases + autonomous cycle phase
+      // init phases + Cycle 1 phase
       expect(phases.length).toBeGreaterThanOrEqual(1);
     });
 
@@ -114,7 +115,7 @@ describe("buildAutonomousPipeline", () => {
         workspace: "test-ws",
         instruction: "fix things",
       });
-      // update-todo function phase + autonomous cycle phase
+      // update-todo function phase + Cycle 1 phase
       expect(phases).toHaveLength(2);
       expect(phases[0].kind).toBe("function");
       if (phases[0].kind === "function") {
@@ -122,7 +123,7 @@ describe("buildAutonomousPipeline", () => {
       }
     });
 
-    it("only has autonomous cycle when startWith is execute", () => {
+    it("only has Cycle 1 when startWith is execute", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
@@ -130,13 +131,13 @@ describe("buildAutonomousPipeline", () => {
       expect(phases).toHaveLength(1);
       expect(phases[0].kind).toBe("function");
       if (phases[0].kind === "function") {
-        expect(phases[0].label).toBe("Autonomous cycle");
+        expect(phases[0].label).toBe("Cycle 1");
       }
     });
   });
 
   describe("autonomous cycle", () => {
-    it("runs execute, review, and create-pr when no critical issues", async () => {
+    it("runs execute, review, and appends create-pr when no critical issues", async () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
@@ -145,32 +146,41 @@ describe("buildAutonomousPipeline", () => {
       expect(cycleFn.kind).toBe("function");
       if (cycleFn.kind !== "function") return;
 
-      const ctx = createMockCtx();
+      const appendedPhases: PipelinePhase[] = [];
+      const ctx = createMockCtx({
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
+      });
       await cycleFn.fn(ctx);
 
       expect(mockBuildExecute).toHaveBeenCalled();
       expect(mockBuildReview).toHaveBeenCalled();
-      expect(mockBuildCreatePr).toHaveBeenCalled();
+      // Create PR is appended as a dynamic phase, not called inline
+      expect(appendedPhases).toHaveLength(1);
+      expect(appendedPhases[0].kind).toBe("function");
+      if (appendedPhases[0].kind === "function") {
+        expect(appendedPhases[0].label).toBe("Create PR");
+      }
     });
 
-    it("sets timeout based on maxLoops", () => {
+    it("sets per-cycle timeout", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
         maxLoops: 5,
       });
       const cycleFn = phases[0];
-      // 5 * 50 * 60 * 1000 = 15_000_000
-      expect(cycleFn.kind === "function" && cycleFn.timeoutMs).toBe(5 * 50 * 60 * 1000);
+      // Per-cycle timeout: 50 * 60 * 1000 = 3_000_000
+      expect(cycleFn.kind === "function" && cycleFn.timeoutMs).toBe(50 * 60 * 1000);
     });
 
-    it("uses default maxLoops of 3", () => {
+    it("uses per-cycle timeout regardless of maxLoops", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
       });
       const cycleFn = phases[0];
-      expect(cycleFn.kind === "function" && cycleFn.timeoutMs).toBe(3 * 50 * 60 * 1000);
+      // Same per-cycle timeout: 50 * 60 * 1000 = 3_000_000
+      expect(cycleFn.kind === "function" && cycleFn.timeoutMs).toBe(50 * 60 * 1000);
     });
 
     it("returns false when no workspace is found", async () => {
@@ -212,6 +222,7 @@ describe("buildAutonomousPipeline", () => {
       if (cycleFn.kind !== "function") return;
 
       const runChildCalls: string[] = [];
+      const appendedPhases: PipelinePhase[] = [];
       const ctx = createMockCtx({
         runChild: vi.fn(async (label, _prompt, opts) => {
           runChildCalls.push(label);
@@ -224,19 +235,24 @@ describe("buildAutonomousPipeline", () => {
           }
           return true;
         }),
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
       });
 
       await cycleFn.fn(ctx);
 
       expect(runChildCalls).toContain("Autonomous Gate");
       expect(ctx.emitResult).toHaveBeenCalledWith(
-        expect.stringContaining("Loop"),
+        expect.stringContaining("Continue"),
       );
+      // Should append next cycle phase
+      expect(appendedPhases).toHaveLength(1);
+      if (appendedPhases[0].kind === "function") {
+        expect(appendedPhases[0].label).toBe("Cycle 2");
+      }
     });
 
-    it("loops when gate returns shouldLoop: true", async () => {
+    it("appends next cycle when gate returns shouldLoop: true, then Create PR on stop", async () => {
       // First review: has critical issues, gate says loop
-      // Second review: no critical issues, proceeds to PR
       mockGetReviewSessions
         .mockResolvedValueOnce([{
           timestamp: "2024-01-01",
@@ -255,11 +271,10 @@ describe("buildAutonomousPipeline", () => {
       const cycleFn = phases[0];
       if (cycleFn.kind !== "function") return;
 
-      // The gate AI call returns shouldLoop: true on first call
+      const appendedPhases: PipelinePhase[] = [];
       const ctx = createMockCtx({
         runChild: vi.fn(async (_label, _prompt, opts) => {
           if (opts?.onResultText && _label === "Autonomous Gate") {
-            // Gate says no issues are fixable (no review detail available)
             opts.onResultText(JSON.stringify({
               shouldLoop: false,
               reason: "No review detail",
@@ -268,15 +283,45 @@ describe("buildAutonomousPipeline", () => {
           }
           return true;
         }),
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
       });
 
       await cycleFn.fn(ctx);
 
-      // Should have called execute, review (first loop)
-      // Gate returns shouldLoop: false so goes to PR
+      // Gate returned shouldLoop: false → appends Create PR
       expect(mockBuildExecute).toHaveBeenCalled();
       expect(mockBuildReview).toHaveBeenCalled();
-      expect(mockBuildCreatePr).toHaveBeenCalled();
+      expect(appendedPhases).toHaveLength(1);
+      if (appendedPhases[0].kind === "function") {
+        expect(appendedPhases[0].label).toBe("Create PR");
+      }
+    });
+  });
+
+  describe("resume support", () => {
+    it("pre-generates cycle phases for resume", () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+        resumeCycleCount: 3,
+      });
+      expect(phases).toHaveLength(3);
+      expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
+        "Cycle 1", "Cycle 2", "Cycle 3",
+      ]);
+    });
+
+    it("includes Create PR phase for resume when requested", () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+        resumeCycleCount: 2,
+        resumeWithCreatePr: true,
+      });
+      expect(phases).toHaveLength(3);
+      if (phases[2].kind === "function") {
+        expect(phases[2].label).toBe("Create PR");
+      }
     });
   });
 });

@@ -58,6 +58,7 @@ function createMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunction
     runChildGroup: vi.fn(async () => [true]),
     emitTerminal: vi.fn(),
     signal: new AbortController().signal,
+    appendPhases: vi.fn(),
     ...overrides,
   };
 }
