@@ -548,6 +548,10 @@ export function buildInitPipeline(
           workspace: wsName,
           wsPath,
           repoNames: repoResults.map((r) => r.repoName),
+          repoWorktrees: repoResults.map((r) => ({
+            repoName: r.repoName,
+            worktreePath: r.worktreePath,
+          })),
         }).fn(ctx);
       },
     },

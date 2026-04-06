@@ -72,6 +72,10 @@ export function buildCreateTodoPipeline(
           workspace,
           wsPath,
           repoNames: repos.map((r) => r.repoName),
+          repoWorktrees: repos.map((r) => ({
+            repoName: r.repoName,
+            worktreePath: r.worktreePath,
+          })),
         }).fn(ctx);
       },
     },

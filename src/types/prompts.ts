@@ -38,6 +38,7 @@ export interface CoordinatorInput {
   readmeContent: string;
   todoFiles: { repoName: string; content: string }[];
   workspacePath: string;
+  repoWorktrees?: { repoName: string; worktreePath: string }[];
 }
 
 export interface ReviewerInput {
