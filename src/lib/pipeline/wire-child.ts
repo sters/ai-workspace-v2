@@ -4,6 +4,66 @@ import type { ManagedOperation, WireChildResult } from "./types";
 import { emitEvent, emitStatus } from "./events";
 
 /**
+ * Emit synthetic tool_result events for any unanswered AskUserQuestion from a
+ * specific childLabel. This ensures findPendingAsk() on the client won't keep
+ * showing stale ask inputs after the child process has finished.
+ */
+function dismissPendingAsksForChild(
+  managed: ManagedOperation,
+  childLabel: string,
+  phaseExtra?: { phaseIndex?: number; phaseLabel?: string },
+): void {
+  const answeredIds = new Set<string>();
+  const pendingAskIds: string[] = [];
+
+  for (const evt of managed.events) {
+    if (evt.childLabel !== childLabel) continue;
+    try {
+      const data = JSON.parse(evt.data);
+      if (data.type === "user") {
+        for (const block of data.message?.content ?? []) {
+          if (block.type === "tool_result") answeredIds.add(block.tool_use_id);
+        }
+      } else if (data.type === "assistant") {
+        for (const block of data.message?.content ?? []) {
+          if (block.type === "tool_use" && block.name === "AskUserQuestion") {
+            pendingAskIds.push(block.id);
+          }
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+
+  for (const toolId of pendingAskIds) {
+    if (answeredIds.has(toolId)) continue;
+    emitEvent(managed, {
+      type: "output",
+      operationId: managed.operation.id,
+      data: JSON.stringify({
+        type: "user",
+        message: {
+          content: [{
+            type: "tool_result",
+            tool_use_id: toolId,
+            content: "(dismissed — child process ended)",
+          }],
+        },
+      }),
+      timestamp: new Date().toISOString(),
+      childLabel,
+      ...(phaseExtra?.phaseIndex !== undefined && { phaseIndex: phaseExtra.phaseIndex }),
+      ...(phaseExtra?.phaseLabel && { phaseLabel: phaseExtra.phaseLabel }),
+    });
+  }
+
+  if (pendingAskIds.some((id) => !answeredIds.has(id))) {
+    managed.hasPendingAsk = false;
+  }
+}
+
+/**
  * Wire a child ClaudeProcess to the parent ManagedOperation.
  * Tags every event with childLabel (and optional phaseExtra) and updates child status on completion.
  */
@@ -55,6 +115,7 @@ export function wireChild(
       if (resolved) return;
       resolved = true;
       process.kill();
+      dismissPendingAsksForChild(managed, childLabel, phaseExtra);
       const child = managed.operation.children?.find((c) => c.id === childId);
       if (child) child.status = "failed";
       managed.childProcesses.delete(childId);
@@ -85,6 +146,7 @@ export function wireChild(
           console.warn(`[wire-child] Failed to parse complete event data for ${childId}:`, err);
           success = false;
         }
+        dismissPendingAsksForChild(managed, childLabel, phaseExtra);
         const child = managed.operation.children?.find((c) => c.id === childId);
         if (child) child.status = success ? "completed" : "failed";
         managed.childProcesses.delete(childId);

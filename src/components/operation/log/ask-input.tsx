@@ -20,6 +20,7 @@ export function AskInput({
 }) {
   const {
     submitting,
+    dismissed,
     freeTexts,
     singleSelected,
     multiSelected,
@@ -29,6 +30,8 @@ export function AskInput({
     handleSubmit,
     canSubmit,
   } = useAskInput({ operationId, toolUseId, questions });
+
+  if (dismissed) return null;
 
   return (
     <Callout variant="warning">

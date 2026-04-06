@@ -20,7 +20,28 @@ export function submitAnswer(
   answers: Record<string, string>,
 ): boolean {
   const managed = operations.get(id);
-  if (!managed || managed.operation.status !== "running") return false;
+  if (!managed) return false;
+  if (managed.operation.status !== "running") {
+    // Operation finished — ask is moot, clear the stale flag and inject
+    // a synthetic tool_result so it doesn't reappear after reload.
+    managed.hasPendingAsk = false;
+    emitEvent(managed, {
+      type: "output",
+      operationId: managed.operation.id,
+      data: JSON.stringify({
+        type: "user",
+        message: {
+          content: [{
+            type: "tool_result",
+            tool_use_id: toolUseId,
+            content: "(dismissed — operation no longer running)",
+          }],
+        },
+      }),
+      timestamp: new Date().toISOString(),
+    });
+    return false;
+  }
   // Check function-phase pending asks first
   const pendingResolver = managed.pendingAsks.get(toolUseId);
   if (pendingResolver) {
@@ -60,5 +81,24 @@ export function submitAnswer(
       return true;
     }
   }
+  // Ask not found in any process — it's stale (e.g. the child process
+  // that emitted it has already finished). Emit a synthetic tool_result
+  // so findPendingAsk() won't show it again, even after page reload.
+  managed.hasPendingAsk = false;
+  emitEvent(managed, {
+    type: "output",
+    operationId: managed.operation.id,
+    data: JSON.stringify({
+      type: "user",
+      message: {
+        content: [{
+          type: "tool_result",
+          tool_use_id: toolUseId,
+          content: "(dismissed — process no longer accepting answers)",
+        }],
+      },
+    }),
+    timestamp: new Date().toISOString(),
+  });
   return false;
 }
