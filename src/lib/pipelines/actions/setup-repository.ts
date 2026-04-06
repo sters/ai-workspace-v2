@@ -66,7 +66,6 @@ export function setupRepository(
 
   if (checkoutBranch) {
     // --- Checkout existing remote branch (PR-based setup) ---
-    branchName = checkoutBranch;
 
     // If the target directory already exists, remove it
     if (existsSync(worktreePath)) {
@@ -75,13 +74,35 @@ export function setupRepository(
       try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
     }
 
+    // Check if the local branch is already used by another worktree.
+    // If so, create a worktree with a suffixed local branch name that tracks the same remote.
+    let localBranchName = checkoutBranch;
+    try {
+      const worktreeList = exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
+      const isInUse = worktreeList
+        .split("\n")
+        .some((line) => line === `branch refs/heads/${checkoutBranch}`);
+      if (isInUse) {
+        let suffix = 2;
+        while (
+          worktreeList.split("\n").some((line) => line === `branch refs/heads/${checkoutBranch}-${suffix}`)
+        ) {
+          suffix++;
+        }
+        localBranchName = `${checkoutBranch}-${suffix}`;
+        emitStatus(`Branch ${checkoutBranch} in use by another worktree, using local name ${localBranchName}`);
+      }
+    } catch { /* worktree list failed — proceed and let git error if needed */ }
+
     emitStatus(`Creating worktree: checking out existing branch ${checkoutBranch}`);
     exec(
-      `git -C "${repoAbsPath}" worktree add "${worktreePath}" "origin/${checkoutBranch}"`,
+      `git -C "${repoAbsPath}" worktree add -b "${localBranchName}" "${worktreePath}" "origin/${checkoutBranch}"`,
     );
+    // Set up tracking so push/pull work against the original remote branch
     exec(
-      `git -C "${worktreePath}" checkout -B "${checkoutBranch}" --track "origin/${checkoutBranch}"`,
+      `git -C "${worktreePath}" branch --set-upstream-to="origin/${checkoutBranch}"`,
     );
+    branchName = localBranchName;
   } else {
     // --- Create new branch (default behavior) ---
 
