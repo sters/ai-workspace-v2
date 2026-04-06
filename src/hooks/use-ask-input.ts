@@ -11,6 +11,7 @@ export function useAskInput({
   questions: AskQuestion[];
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
   // Free text per question
   const [freeTexts, setFreeTexts] = useState<Record<string, string>>({});
   // Single-select: question → selected label
@@ -22,13 +23,17 @@ export function useAskInput({
     async (answers: Record<string, string>) => {
       setSubmitting(true);
       try {
-        await fetch("/api/operations/answer", {
+        const res = await fetch("/api/operations/answer", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ operationId, toolUseId, answers }),
         });
+        if (res.status === 404) {
+          // Operation no longer running or ask already answered — dismiss
+          setDismissed(true);
+        }
       } catch {
-        // ignore
+        // ignore network errors
       } finally {
         setSubmitting(false);
       }
@@ -115,6 +120,7 @@ export function useAskInput({
 
   return {
     submitting,
+    dismissed,
     freeTexts,
     singleSelected,
     multiSelected,

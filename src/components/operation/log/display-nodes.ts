@@ -337,9 +337,14 @@ export function findPendingAsk(
   entries: LogEntry[]
 ): { toolId: string; questions: AskQuestion[]; allowFreeText: boolean } | null {
   const answeredIds = new Set<string>();
+  // Collect childLabels whose process has finished (complete/result event).
+  const finishedChildren = new Set<string>();
   for (const e of entries) {
     if (e.kind === "tool_result") {
       answeredIds.add(e.toolId);
+    }
+    if ((e.kind === "complete" || e.kind === "result") && e.childLabel) {
+      finishedChildren.add(e.childLabel);
     }
   }
 
@@ -347,6 +352,8 @@ export function findPendingAsk(
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i];
     if (e.kind === "ask" && !answeredIds.has(e.toolId)) {
+      // Skip asks from child processes that have already finished
+      if (e.childLabel && finishedChildren.has(e.childLabel)) continue;
       return { toolId: e.toolId, questions: e.questions, allowFreeText: e.allowFreeText ?? true };
     }
   }
