@@ -376,9 +376,9 @@ export function buildInitPipeline(
             ctx.emitStatus(`Setting up repository: ${repoPath}`);
             const prInfo = prUrlMap.get(repoPath);
             try {
-              const repoResult = prInfo
-                ? setupRepository(wsName, repoPath, prInfo.baseBranch, ctx.emitStatus, prInfo.headBranch)
-                : setupRepository(wsName, repoPath, undefined, ctx.emitStatus);
+              // Only use PR info for baseBranch — init always creates a new branch.
+              // Checking out the PR's headBranch would conflict with existing worktrees.
+              const repoResult = setupRepository(wsName, repoPath, prInfo?.baseBranch, ctx.emitStatus);
               repoResults.push(repoResult);
             } catch (err) {
               ctx.emitResult(`Failed to setup repository ${repoPath}: ${err}`);
