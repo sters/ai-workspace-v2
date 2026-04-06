@@ -14,7 +14,8 @@ export type OperationType =
   | "autonomous"
   | "search"
   | "discovery"
-  | "aggregate-suggestions";
+  | "aggregate-suggestions"
+  | "prune-suggestions";
 
 export type OperationStatus = "running" | "completed" | "failed";
 

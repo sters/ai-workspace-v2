@@ -14,3 +14,4 @@ export { buildBestOfNPipeline } from "./best-of-n";
 export { buildAutonomousPipeline } from "./autonomous";
 export { buildDiscoveryPipeline } from "./discovery";
 export { buildAggregateSuggestionsPipeline } from "./aggregate-suggestions";
+export { buildPruneSuggestionsPipeline } from "./prune-suggestions";

@@ -145,10 +145,6 @@ export const suggestionDismissSchema = z.object({
   id: z.string().min(1, "id is required"),
 });
 
-export const suggestionPruneSchema = z.object({
-  days: z.coerce.number().positive().optional(),
-});
-
 export const suggestionAcceptSchema = z.object({
   id: z.string().min(1, "id is required"),
 });

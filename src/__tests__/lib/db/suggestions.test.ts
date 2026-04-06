@@ -6,7 +6,6 @@ import {
   listActiveSuggestions,
   dismissSuggestion,
   getSuggestion,
-  pruneSuggestions,
   _resetSuggestionStatements,
 } from "@/lib/db/suggestions";
 
@@ -93,50 +92,4 @@ describe("db/suggestions", () => {
     expect(s).toBeNull();
   });
 
-  it("prunes suggestions older than N days", () => {
-    // Insert a suggestion, then manually backdate it
-    insertSuggestion({
-      id: "old",
-      sourceWorkspace: "ws-1",
-      sourceOperationId: "op-1",
-      targetRepository: "repo-a",
-      title: "Old suggestion",
-      description: "Stale",
-    });
-    insertSuggestion({
-      id: "new",
-      sourceWorkspace: "ws-1",
-      sourceOperationId: "op-2",
-      targetRepository: "repo-a",
-      title: "New suggestion",
-      description: "Fresh",
-    });
-
-    // Backdate "old" to 10 days ago
-    const db = getDb();
-    db.run(
-      "UPDATE workspace_suggestions SET created_at = datetime('now', '-10 days') WHERE id = 'old'",
-    );
-
-    const pruned = pruneSuggestions(7);
-    expect(pruned).toBe(1);
-
-    const active = listActiveSuggestions();
-    expect(active).toHaveLength(1);
-    expect(active[0].id).toBe("new");
-  });
-
-  it("prune returns 0 when nothing to prune", () => {
-    insertSuggestion({
-      id: "s1",
-      sourceWorkspace: "ws-1",
-      sourceOperationId: "op-1",
-      targetRepository: "repo-a",
-      title: "Recent",
-      description: "Fresh",
-    });
-
-    const pruned = pruneSuggestions(7);
-    expect(pruned).toBe(0);
-  });
 });

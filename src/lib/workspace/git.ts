@@ -48,6 +48,49 @@ export function listWorkspaceRepos(workspaceName: string): WorkspaceRepo[] {
 }
 
 // ---------------------------------------------------------------------------
+// listAllRepositories
+// ---------------------------------------------------------------------------
+
+/**
+ * List all git repositories under the top-level `repositories/` directory.
+ * Unlike `listWorkspaceRepos`, which walks a specific workspace's directory,
+ * this walks the shared `repositories/` directory to find the source repos.
+ */
+export function listAllRepositories(): WorkspaceRepo[] {
+  const base = repoDir();
+  if (!existsSync(base)) return [];
+
+  const repos: WorkspaceRepo[] = [];
+
+  function walk(dir: string, depth: number) {
+    if (depth > 4) return;
+    let entries;
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      if (entry.name === "artifacts" || entry.name === "tmp" || entry.name === ".git") continue;
+      const fullPath = path.join(dir, entry.name);
+      if (!entry.isDirectory()) continue;
+
+      const gitPath = path.join(fullPath, ".git");
+      if (existsSync(gitPath)) {
+        const relPath = path.relative(base, fullPath);
+        repos.push({
+          repoPath: relPath,
+          repoName: path.basename(relPath),
+          worktreePath: fullPath,
+        });
+      } else {
+        walk(fullPath, depth + 1);
+      }
+    }
+  }
+
+  walk(base, 1);
+  repos.sort((a, b) => a.repoPath.localeCompare(b.repoPath));
+  return repos;
+}
+
+// ---------------------------------------------------------------------------
 // commitWorkspaceSnapshot
 // ---------------------------------------------------------------------------
 

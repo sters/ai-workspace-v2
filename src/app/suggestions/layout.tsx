@@ -9,6 +9,7 @@ const TABS = [
   { label: "List", segment: "", href: "/suggestions" },
   { label: "Discover", segment: "discover", href: "/suggestions/discover" },
   { label: "Aggregate", segment: "aggregate", href: "/suggestions/aggregate" },
+  { label: "Prune", segment: "prune", href: "/suggestions/prune" },
 ] as const;
 
 export default function SuggestionsLayout({

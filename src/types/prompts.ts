@@ -216,6 +216,15 @@ export interface DiscoveryInput {
   otherWorkspaceNames: string[];
 }
 
+export interface SuggestionPrunerInput {
+  repoPath: string;
+  suggestions: {
+    id: string;
+    title: string;
+    description: string;
+  }[];
+}
+
 export interface SuggestionAggregatorInput {
   suggestions: {
     id: string;
