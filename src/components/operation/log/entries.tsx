@@ -138,6 +138,8 @@ export function ThinkingRow({ content }: { content: string }) {
   );
 }
 
+const TOOL_RESULT_MAX_LINES = 10;
+
 export function CollapsibleRow({
   content,
   className,
@@ -148,6 +150,10 @@ export function CollapsibleRow({
   const lines = content.split("\n");
   const [expanded, setExpanded] = useState(false);
   const preview = lines[0]?.slice(0, 80) || "";
+  const truncated =
+    lines.length > TOOL_RESULT_MAX_LINES
+      ? lines.slice(0, TOOL_RESULT_MAX_LINES).join("\n") + "\n\u2026"
+      : content;
 
   return (
     <div className={`font-mono text-xs ${className}`}>
@@ -167,7 +173,7 @@ export function CollapsibleRow({
       </Button>
       {expanded && (
         <div className="mt-1 max-h-96 overflow-auto whitespace-pre rounded border bg-muted/30 p-2">
-          {content}
+          {truncated}
         </div>
       )}
     </div>
