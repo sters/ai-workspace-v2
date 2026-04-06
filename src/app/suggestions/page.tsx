@@ -9,6 +9,7 @@ import { INIT_STORAGE_KEY, InitSplitButton } from "@/components/operation/init-o
 import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import { CollapsibleSection } from "@/components/shared/containers/collapsible-section";
 import { X, Search, Trash2, Layers } from "lucide-react";
+import Link from "next/link";
 import type { InteractionLevel } from "@/types/prompts";
 import type { OperationType } from "@/types/operation";
 
@@ -35,8 +36,6 @@ export default function SuggestionsPage() {
   const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
   const [starting, setStarting] = useState(false);
   const [query, setQuery] = useState("");
-  const [pruning, setPruning] = useState(false);
-
   const handleAggregate = useCallback(() => {
     startAggregate("aggregate-suggestions", {}).then(() =>
       router.push("/suggestions/aggregate"),
@@ -46,16 +45,6 @@ export default function SuggestionsPage() {
   async function handleDismiss(id: string) {
     await postJson("/api/suggestions/dismiss", { id });
     refresh();
-  }
-
-  async function handlePrune(days: number) {
-    setPruning(true);
-    try {
-      await postJson("/api/suggestions/prune", { days });
-      refresh();
-    } finally {
-      setPruning(false);
-    }
   }
 
   function handleStart(suggestionId: string, type: OperationType, body: Record<string, string>) {
@@ -104,26 +93,14 @@ export default function SuggestionsPage() {
             Aggregate
           </button>
 
-          <div className="flex items-end gap-2">
-            <button
-              onClick={() => handlePrune(7)}
-              disabled={pruning || suggestions.length === 0}
-              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-              title="Delete suggestions older than 7 days"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Prune 7d
-            </button>
-            <button
-              onClick={() => handlePrune(30)}
-              disabled={pruning || suggestions.length === 0}
-              className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
-              title="Delete suggestions older than 30 days"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-              Prune 30d
-            </button>
-          </div>
+          <Link
+            href="/suggestions/prune"
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            title="Check if suggestions have been resolved in their repos"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            Prune
+          </Link>
         </div>
 
         {/* Search */}

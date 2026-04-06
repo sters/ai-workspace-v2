@@ -74,4 +74,6 @@ export {
   DISCOVERY_SCHEMA,
   buildSuggestionAggregatorPrompt,
   SUGGESTION_AGGREGATION_SCHEMA,
+  buildSuggestionPrunerPrompt,
+  SUGGESTION_PRUNE_SCHEMA,
 } from "./prompts";

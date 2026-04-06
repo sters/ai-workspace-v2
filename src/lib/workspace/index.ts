@@ -8,7 +8,7 @@ export { listStaleWorkspaces, listAllWorkspacesWithAge } from "./helpers";
 export { parseAnalysisResultText, setupWorkspace } from "./setup";
 
 // Git operations
-export { listWorkspaceRepos, commitWorkspaceSnapshot, deleteWorkspace } from "./git";
+export { listWorkspaceRepos, listAllRepositories, commitWorkspaceSnapshot, deleteWorkspace } from "./git";
 
 // Templates
 export { writeTodoTemplate, writeReportTemplates, writeResearchTemplates, prepareReviewDir } from "./templates";
