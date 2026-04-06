@@ -313,9 +313,11 @@ export function buildInitPipeline(
       },
     },
     // Phase B: Read analysis result, create workspace, copy README, setup repos
+    // No retries: retrying would create duplicate workspaces since Phase B is not idempotent
     {
       kind: "function",
       label: "Setup workspace",
+      maxRetries: 0,
       fn: async (ctx) => {
         // Use structured output analysis; fall back to defaults if unavailable
         if (!analysis) {

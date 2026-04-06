@@ -116,37 +116,25 @@ export function setupRepository(
         : `${taskType}/${description}-${date}`;
     }
 
-    // If the branch already exists, resolve the conflict
-    try {
-      exec(`git -C "${repoAbsPath}" rev-parse --verify "${branchName}"`);
-      emitStatus(`Branch ${branchName} already exists, resolving...`);
-      try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+    // If the branch already exists (locally or on remote), always use a new name
+    // to avoid inheriting commits from the existing branch.
+    {
+      const branchExists = (name: string): boolean => {
+        try { exec(`git -C "${repoAbsPath}" rev-parse --verify "${name}"`); return true; } catch { /* noop */ }
+        try { exec(`git -C "${repoAbsPath}" rev-parse --verify "origin/${name}"`); return true; } catch { /* noop */ }
+        return false;
+      };
 
-      const worktreeList = exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
-      const isInUse = worktreeList
-        .split("\n")
-        .some((line) => line === `branch refs/heads/${branchName}`);
-
-      if (isInUse) {
+      if (branchExists(branchName)) {
         const origName = branchName;
         let suffix = 2;
-        while (true) {
-          const candidate = `${branchName}-${suffix}`;
-          try {
-            exec(`git -C "${repoAbsPath}" rev-parse --verify "${candidate}"`);
-            suffix++;
-          } catch {
-            branchName = candidate;
-            break;
-          }
+        while (branchExists(`${origName}-${suffix}`)) {
+          suffix++;
         }
-        emitStatus(`Branch ${origName} in use by another worktree, using ${branchName} instead.`);
-      } else {
-        emitStatus(`Branch is stale, deleting and recreating.`);
-        exec(`git -C "${repoAbsPath}" branch -D "${branchName}"`);
+        branchName = `${origName}-${suffix}`;
+        emitStatus(`Branch ${origName} already exists, using ${branchName} instead.`);
+        try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
       }
-    } catch {
-      // Branch doesn't exist — good
     }
 
     // If the target directory already exists (e.g. from a previous failed attempt),
