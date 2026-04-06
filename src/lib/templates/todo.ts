@@ -26,6 +26,8 @@ Before starting implementation, read the following documentation:
 
 ## Verification
 
+<!-- Remove this section if the task does not involve code changes -->
+
 - [ ] **[Repository]** Run test suite
   - Target: Repository root
   - Action: Execute test command from CLAUDE.md/README.md or \`make test\`
@@ -79,6 +81,8 @@ Before starting investigation, read the following documentation:
   - Verify: Test fails without fix, passes with fix
 
 ## Verification
+
+<!-- Remove this section if the task does not involve code changes -->
 
 - [ ] **[Repository]** Run test suite
   - Target: Repository root
@@ -143,6 +147,8 @@ Before starting, read the following documentation:
   - Action: (Describe exactly what to do)
 
 ## Verification
+
+<!-- Remove this section if the task does not involve code changes -->
 
 - [ ] **[Repository]** Run test suite (if applicable)
   - Target: Repository root

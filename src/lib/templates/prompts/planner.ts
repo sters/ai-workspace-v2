@@ -66,7 +66,9 @@ Each TODO item MUST follow this structured format:
 
 ### Repository Constraints
 
-Check the workspace README's **## Repository Constraints** section. If it lists constraints for this repository (lint, test, build commands, etc.), you MUST include corresponding verification TODO items in the Verification section. These constraints are non-negotiable — every implementation or bugfix task must pass them.
+Check the workspace README's **## Repository Constraints** section. If it lists constraints for this repository (lint, test, build commands, etc.) **AND the task requires code changes**, you MUST include corresponding verification TODO items in the Verification section. These constraints are non-negotiable for tasks that modify source code.
+
+**However, if the task does NOT require code changes** (e.g., documentation-only updates, config changes that don't affect build output, research tasks, or when this repository simply has no work to do), **omit the Verification section entirely**. Running build/lint/test adds no value when no code is changed.
 
 ### Language
 
@@ -78,10 +80,10 @@ Check the workspace README's **## Repository Constraints** section. If it lists 
 1. Focus on this repository only
 2. Be actionable: each TODO should be something the executor can act on
 3. Match the depth of analysis to the task — simple tasks need less investigation, complex implementation tasks need more
-4. Include commands: specify exact build/test/lint commands from repository docs
+4. Include commands: specify exact build/test/lint commands from repository docs (only for tasks that change code)
 5. Prefer task runner commands: use \`make lint\` / \`npm run test\` etc. over direct tool invocation. Only fall back to direct commands (e.g. \`golangci-lint\`, \`tsc\`) if no task runner target exists
 6. Order logically: dependencies first, then implementation, then tests
-7. Honour Repository Constraints: if the workspace README lists constraints, they MUST appear as verification items
+7. Honour Repository Constraints: if the workspace README lists constraints AND the task modifies code, they MUST appear as verification items. Skip verification for non-code-change tasks
 8. **No merging**: Do NOT perform git merge, PR merge, or any branch merging operations unless explicitly instructed to do so
 
 ### Interactive Mode
