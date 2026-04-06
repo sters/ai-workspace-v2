@@ -1,4 +1,4 @@
-import type { PhaseFunctionContext } from "@/types/pipeline";
+import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { RunClaudeOptions } from "@/types/claude";
 import type { ManagedOperation } from "./types";
 import { emitEvent, emitStatus } from "./events";
@@ -13,6 +13,7 @@ export function buildPhaseFunctionContext(
   operationId: string,
   phaseIndex: number,
   phaseExtra: { phaseIndex: number; phaseLabel: string },
+  appendPhasesFn?: (phases: PipelinePhase[]) => void,
 ): PhaseFunctionContext {
   const operation = managed.operation;
   let childCounter = 0;
@@ -123,6 +124,9 @@ export function buildPhaseFunctionContext(
       });
     },
     signal: managed.abortController.signal,
+    appendPhases: (phases) => {
+      if (appendPhasesFn) appendPhasesFn(phases);
+    },
     runChildGroup: (children) => {
       const sem = new Semaphore(5);
       const promises = children.map(async (child) => {

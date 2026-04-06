@@ -3,8 +3,9 @@ import type { PipelinePhase, PipelineOptions } from "@/types/pipeline";
 import type { ManagedOperation } from "./types";
 import { getTimeoutDefaults } from "./constants";
 import { emitStatus, markComplete } from "./events";
-import { emitPhaseUpdate } from "./phase-helpers";
+import { emitPhaseUpdate, getPhaseLabel } from "./phase-helpers";
 import { runFunctionPhase, runSinglePhase, runGroupPhase } from "./phase-runners";
+import { updateOperationMeta } from "@/lib/db";
 
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 3000;
@@ -45,6 +46,25 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
 
   const operationId = managed.operation.id;
   let pipelineSuccess = true;
+
+  // Callback for function phases to dynamically append new phases to the pipeline.
+  // The for-loop evaluates phases.length each iteration, so appended phases are
+  // picked up automatically.
+  const appendPhases = (newPhases: PipelinePhase[]) => {
+    for (const p of newPhases) {
+      const idx = phases.length;
+      phases.push(p);
+      const info: OperationPhaseInfo = {
+        index: idx,
+        label: getPhaseLabel(p, idx),
+        status: "pending",
+      };
+      phaseInfos.push(info);
+      (managed.operation.phases ??= []).push(info);
+      emitPhaseUpdate(managed, idx, info.label, "pending");
+    }
+    updateOperationMeta(operationId, { phases: managed.operation.phases });
+  };
 
   try {
     for (let i = startFromPhase; i < phases.length; i++) {
@@ -154,7 +174,7 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
         }
 
         if (phase.kind === "function") {
-          phaseSuccess = await runFunctionPhase(managed, phase, operationId, i, phases.length, phaseExtra);
+          phaseSuccess = await runFunctionPhase(managed, phase, operationId, i, phases.length, phaseExtra, appendPhases);
         } else if (phase.kind === "single") {
           phaseSuccess = await runSinglePhase(managed, phase, operationId, i, phases.length, phaseExtra);
         } else {

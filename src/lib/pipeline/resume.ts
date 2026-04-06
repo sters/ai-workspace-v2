@@ -115,6 +115,11 @@ async function rebuildPipeline(op: Operation): Promise<PipelinePhase[] | null> {
 
       case "autonomous": {
         const { buildAutonomousPipeline } = await import("@/lib/pipelines/autonomous");
+        // Count how many cycle phases existed so we pre-generate enough for resume.
+        // Cycle phases are those with labels matching "Cycle N".
+        const savedPhases = op.phases ?? [];
+        const cyclePhaseCount = savedPhases.filter((p) => /^Cycle \d+$/.test(p.label)).length;
+        const hasCreatePr = savedPhases.some((p) => p.label === "Create PR");
         return buildAutonomousPipeline({
           startWith: inputs.startWith as "init" | "update-todo" | "execute",
           description: inputs.description,
@@ -124,6 +129,8 @@ async function rebuildPipeline(op: Operation): Promise<PipelinePhase[] | null> {
           interactionLevel: inputs.interactionLevel as InteractionLevel | undefined,
           repo: inputs.repo,
           maxLoops: inputs.maxLoops ? Number(inputs.maxLoops) : undefined,
+          resumeCycleCount: cyclePhaseCount > 0 ? cyclePhaseCount : undefined,
+          resumeWithCreatePr: hasCreatePr,
         });
       }
 

@@ -1,4 +1,4 @@
-import type { PipelinePhaseFunction, PipelinePhaseSingle, PipelinePhaseGroup } from "@/types/pipeline";
+import type { PipelinePhase, PipelinePhaseFunction, PipelinePhaseSingle, PipelinePhaseGroup } from "@/types/pipeline";
 import type { RunClaudeOptions } from "@/types/claude";
 import type { ManagedOperation } from "./types";
 import { emitStatus } from "./events";
@@ -15,6 +15,7 @@ export async function runFunctionPhase(
   phaseIndex: number,
   totalPhases: number,
   phaseExtra: { phaseIndex: number; phaseLabel: string },
+  appendPhases?: (phases: PipelinePhase[]) => void,
 ): Promise<boolean> {
   const phaseNum = phaseIndex + 1;
   emitStatus(managed, `Phase ${phaseNum}/${totalPhases}: ${phase.label}`, phaseExtra);
@@ -23,7 +24,7 @@ export async function runFunctionPhase(
 
   let phaseSuccess: boolean;
   try {
-    const ctx = buildPhaseFunctionContext(managed, operationId, phaseIndex, phaseExtra);
+    const ctx = buildPhaseFunctionContext(managed, operationId, phaseIndex, phaseExtra, appendPhases);
     phaseSuccess = await phase.fn(ctx);
   } catch (err) {
     if (!managed.abortController.signal.aborted) {

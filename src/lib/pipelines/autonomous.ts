@@ -15,7 +15,7 @@ import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 
-const DEFAULT_MAX_LOOPS = 3;
+const DEFAULT_MAX_LOOPS = 10;
 
 const DEFAULT_UPDATE_TODO_INSTRUCTION =
   "Update TODO item statuses to reflect current implementation progress.";
@@ -118,6 +118,10 @@ export function buildAutonomousPipeline(input: {
   interactionLevel?: InteractionLevel;
   repo?: string;
   maxLoops?: number;
+  /** For resume: pre-generate this many cycle phases so resumeFrom index is valid. */
+  resumeCycleCount?: number;
+  /** For resume: append a Create PR phase to match the saved phase structure. */
+  resumeWithCreatePr?: boolean;
 }): PipelinePhase[] {
   const { startWith, description, workspace, instruction, draft, interactionLevel, repo } = input;
   const maxLoops = input.maxLoops ?? DEFAULT_MAX_LOOPS;
@@ -150,19 +154,17 @@ export function buildAutonomousPipeline(input: {
   }
 
   // ------------------------------------------------------------------
-  // Autonomous cycle: Execute → Review → Gate → (loop or CreatePR)
+  // Autonomous cycle: each iteration is its own dynamic phase
   // ------------------------------------------------------------------
 
-  phases.push({
-    kind: "function",
-    label: "Autonomous cycle",
-    timeoutMs: maxLoops * 50 * 60 * 1000,
-    fn: async (ctx) => {
-      let loopCount = 0;
-
-      while (loopCount < maxLoops) {
+  // Helper to build a single cycle phase (Execute → Review → Gate → UpdateTODO)
+  function buildCyclePhase(loopNumber: number): PipelinePhase {
+    return {
+      kind: "function",
+      label: `Cycle ${loopNumber}`,
+      timeoutMs: 50 * 60 * 1000,
+      fn: async (ctx) => {
         if (ctx.signal.aborted) return false;
-        loopCount++;
 
         // Execute
         const ws = resolveWorkspace(ctx.operationId, workspace);
@@ -170,23 +172,23 @@ export function buildAutonomousPipeline(input: {
           ctx.emitStatus("No workspace found — cannot execute");
           return false;
         }
-        ctx.emitStatus(`Autonomous cycle ${loopCount}/${maxLoops}: Executing workspace: ${ws}`);
+        ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Executing workspace: ${ws}`);
 
         const execPhases = await buildExecutePipeline({ workspace: ws, repository: repo });
         const execOk = await runSubPhases(ctx, execPhases, skip);
         if (!execOk) return false;
 
         // Review
-        ctx.emitStatus(`Autonomous cycle ${loopCount}/${maxLoops}: Reviewing workspace: ${ws}`);
+        ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Reviewing workspace: ${ws}`);
         const reviewPhases = await buildReviewPipeline({ workspace: ws, repository: repo });
         const reviewOk = await runSubPhases(ctx, reviewPhases, skip);
         if (!reviewOk) return false;
 
         // AI Gate
-        ctx.emitStatus(`Autonomous cycle ${loopCount}/${maxLoops}: Evaluating review results`);
-        const gateResult = await runAutonomousGate(ctx, ws, loopCount, maxLoops);
+        ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Evaluating review results`);
+        const gateResult = await runAutonomousGate(ctx, ws, loopNumber, maxLoops);
         ctx.emitResult(
-          `**Gate decision (loop ${loopCount}/${maxLoops})**: ${gateResult.shouldLoop ? "Loop" : "Proceed to PR"} — ${gateResult.reason}` +
+          `**Gate decision (cycle ${loopNumber}/${maxLoops})**: ${gateResult.shouldLoop ? "Continue" : "Proceed to PR"} — ${gateResult.reason}` +
             (gateResult.fixableIssues.length > 0
               ? `\n- ${gateResult.fixableIssues.join("\n- ")}`
               : ""),
@@ -194,11 +196,13 @@ export function buildAutonomousPipeline(input: {
 
         if (!gateResult.shouldLoop) {
           triggerWorkspaceSuggestion(ws, ctx.operationId, "autonomous-gate");
-          break;
+          // Append Create PR as the next phase
+          ctx.appendPhases([buildCreatePrPhase()]);
+          return true;
         }
 
-        // Loop: UpdateTODO with specific issues
-        ctx.emitStatus(`Autonomous cycle ${loopCount}/${maxLoops}: Updating TODOs for next iteration`);
+        // Update TODOs with specific issues
+        ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Updating TODOs for next iteration`);
         const updateInstruction =
           gateResult.fixableIssues.length > 0
             ? `Fix the following issues found in review:\n${gateResult.fixableIssues.map((i) => `- ${i}`).join("\n")}`
@@ -211,19 +215,44 @@ export function buildAutonomousPipeline(input: {
         });
         const updateOk = await runSubPhases(ctx, updatePhases, skip);
         if (!updateOk) return false;
-      }
 
-      // Create PR
-      const ws = resolveWorkspace(ctx.operationId, workspace);
-      ctx.emitStatus(`Creating PR for workspace: ${ws}`);
-      const prPhases = await buildCreatePrPipeline({
-        workspace: ws,
-        draft: draft !== false,
-        repository: repo,
-      });
-      return runSubPhases(ctx, prPhases, skip);
-    },
-  });
+        // Append next cycle phase
+        ctx.appendPhases([buildCyclePhase(loopNumber + 1)]);
+        return true;
+      },
+    };
+  }
+
+  // Helper to build the Create PR phase
+  function buildCreatePrPhase(): PipelinePhase {
+    return {
+      kind: "function",
+      label: "Create PR",
+      timeoutMs: 15 * 60 * 1000,
+      fn: async (ctx) => {
+        const ws = resolveWorkspace(ctx.operationId, workspace);
+        ctx.emitStatus(`Creating PR for workspace: ${ws}`);
+        const prPhases = await buildCreatePrPipeline({
+          workspace: ws,
+          draft: draft !== false,
+          repository: repo,
+        });
+        return runSubPhases(ctx, prPhases, skip);
+      },
+    };
+  }
+
+  // Start with cycle 1 — subsequent cycles are appended dynamically by gate logic.
+  // For resume, pre-generate enough cycle phases so the resumeFrom index is valid.
+  const cycleCount = input.resumeCycleCount ?? 1;
+  for (let i = 1; i <= cycleCount; i++) {
+    phases.push(buildCyclePhase(i));
+  }
+
+  // For resume: if "Create PR" was dynamically appended before crash, include it
+  if (input.resumeWithCreatePr) {
+    phases.push(buildCreatePrPhase());
+  }
 
   return phases;
 }
