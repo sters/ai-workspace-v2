@@ -5,6 +5,7 @@
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
+import { listOperations } from "../db/operations";
 import { buildReadmeContent } from "../templates";
 import { exec, sanitizeSlug } from "./helpers";
 import { writeSystemPrompts } from "./prompts";
@@ -90,11 +91,22 @@ export async function setupWorkspace(
     ? `${taskType}-${ticketId}-${slug}-${date}`
     : `${taskType}-${slug}-${date}`;
 
-  // If the directory already exists, append a numeric suffix
+  // If the directory already exists OR the name is already used in SQLite
+  // (e.g. a previous workspace was deleted from disk but DB records remain),
+  // append a numeric suffix to avoid inheriting old operation records.
+  const nameInUse = (name: string): boolean => {
+    if (existsSync(path.join(getWorkspaceDir(), name))) return true;
+    try {
+      const ops = listOperations(name);
+      if (ops.length > 0) return true;
+    } catch { /* DB not ready yet — skip check */ }
+    return false;
+  };
+
   let wsPath = path.join(getWorkspaceDir(), dirName);
-  if (existsSync(wsPath)) {
+  if (nameInUse(dirName)) {
     let suffix = 2;
-    while (existsSync(path.join(getWorkspaceDir(), `${dirName}-${suffix}`))) {
+    while (nameInUse(`${dirName}-${suffix}`)) {
       suffix++;
     }
     dirName = `${dirName}-${suffix}`;
