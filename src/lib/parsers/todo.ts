@@ -82,6 +82,54 @@ export function renderTodoGroupsAsMarkdown(groups: TodoItemGroup[]): string {
   return lines.join("\n");
 }
 
+/**
+ * Remove completed (`- [x]`) TODO items from raw markdown content, including
+ * any indented child lines (sub-items or continuation notes) that belong to
+ * them. Used to keep TODO files compact before the updater agent rewrites them.
+ */
+export function stripCompletedTodoItems(content: string): string {
+  const lines = content.split("\n");
+  const result: string[] = [];
+  let skipIndent = -1; // -1 means "not currently skipping"
+
+  for (const line of lines) {
+    const checkboxMatch = line.match(/^(\s*)- \[([ x!~])\]/);
+
+    if (skipIndent >= 0) {
+      if (checkboxMatch) {
+        const indent = checkboxMatch[1].length;
+        if (indent > skipIndent) {
+          // Nested checkbox under a completed parent — skip
+          continue;
+        }
+        // Back at or above the skipped parent's indent — stop skipping
+        skipIndent = -1;
+      } else if (line.trim() === "") {
+        // Blank line terminates the skipped item's continuation block
+        skipIndent = -1;
+        result.push(line);
+        continue;
+      } else {
+        const leadingWs = line.match(/^(\s*)/)![1].length;
+        if (leadingWs > skipIndent) {
+          // Indented continuation (child note) of the skipped item
+          continue;
+        }
+        skipIndent = -1;
+      }
+    }
+
+    if (checkboxMatch && checkboxMatch[2] === "x") {
+      skipIndent = checkboxMatch[1].length;
+      continue;
+    }
+
+    result.push(line);
+  }
+
+  return result.join("\n");
+}
+
 const STATUS_PATTERNS: [RegExp, TodoItem["status"]][] = [
   [/^(\s*)- \[x\]\s+(.*)/, "completed"],
   [/^(\s*)- \[ \]\s+(.*)/, "pending"],

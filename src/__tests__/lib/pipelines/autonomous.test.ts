@@ -45,6 +45,9 @@ vi.mock("@/lib/workspace/prompts", () => ({
   ensureSystemPrompt: vi.fn(() => "/mock/prompts/file.md"),
   ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),
 }));
+vi.mock("@/lib/workspace/todo-cleanup", () => ({
+  stripCompletedTodosFromWorkspace: vi.fn(async () => []),
+}));
 
 import { buildAutonomousPipeline } from "@/lib/pipelines/autonomous";
 import { buildInitPipeline } from "@/lib/pipelines/init";
@@ -54,6 +57,7 @@ import { buildReviewPipeline } from "@/lib/pipelines/review";
 import { buildCreatePrPipeline } from "@/lib/pipelines/create-pr";
 import { getOperation } from "@/lib/pipeline-manager";
 import { getReviewSessions, getReviewDetail } from "@/lib/workspace/reader";
+import { stripCompletedTodosFromWorkspace } from "@/lib/workspace/todo-cleanup";
 
 const mockGetOperation = vi.mocked(getOperation);
 const mockGetReviewDetail = vi.mocked(getReviewDetail);
@@ -63,6 +67,7 @@ const mockBuildExecute = vi.mocked(buildExecutePipeline);
 const mockBuildReview = vi.mocked(buildReviewPipeline);
 const mockBuildCreatePr = vi.mocked(buildCreatePrPipeline);
 const mockGetReviewSessions = vi.mocked(getReviewSessions);
+const mockStripCompletedTodos = vi.mocked(stripCompletedTodosFromWorkspace);
 
 function createMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunctionContext {
   return {
@@ -121,6 +126,22 @@ describe("buildAutonomousPipeline", () => {
       if (phases[0].kind === "function") {
         expect(phases[0].label).toBe("Update TODOs");
       }
+    });
+
+    it("strips completed TODOs before the leading Update TODOs phase", async () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "update-todo",
+        workspace: "test-ws",
+        instruction: "fix things",
+      });
+      const updatePhase = phases[0];
+      if (updatePhase.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      await updatePhase.fn(ctx);
+
+      expect(mockStripCompletedTodos).toHaveBeenCalledWith("test-ws", undefined);
+      expect(mockBuildUpdateTodo).toHaveBeenCalled();
     });
 
     it("only has Cycle 1 when startWith is execute", () => {
@@ -199,6 +220,63 @@ describe("buildAutonomousPipeline", () => {
       expect(ctx.emitStatus).toHaveBeenCalledWith(
         expect.stringContaining("No workspace found"),
       );
+    });
+
+    it("strips completed TODOs before update-todo when gate says shouldLoop", async () => {
+      mockGetReviewSessions.mockResolvedValue([{
+        timestamp: "2024-01-01",
+        critical: 1,
+        major: 0,
+        minor: 0,
+        total: 1,
+      }]);
+      mockGetReviewDetail.mockResolvedValue({
+        summary: "critical issue",
+        files: [{ name: "REVIEW-repo.md", content: "Critical bug" }],
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+        repo: "my-repo",
+      });
+      const cycleFn = phases[0];
+      if (cycleFn.kind !== "function") return;
+
+      const ctx = createMockCtx({
+        runChild: vi.fn(async (_label, _prompt, opts) => {
+          if (opts?.onResultText && _label === "Autonomous Gate") {
+            opts.onResultText(JSON.stringify({
+              shouldLoop: true,
+              reason: "Fix critical bug",
+              fixableIssues: ["Fix the bug"],
+            }));
+          }
+          return true;
+        }),
+      });
+
+      await cycleFn.fn(ctx);
+
+      expect(mockStripCompletedTodos).toHaveBeenCalledWith("test-ws", "my-repo");
+      expect(mockBuildUpdateTodo).toHaveBeenCalled();
+    });
+
+    it("does not strip TODOs when gate says stop", async () => {
+      mockGetReviewSessions.mockResolvedValue([]);
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const cycleFn = phases[0];
+      if (cycleFn.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      await cycleFn.fn(ctx);
+
+      // Gate returned shouldLoop: false (no review sessions), strip should not be called for cycle
+      expect(mockStripCompletedTodos).not.toHaveBeenCalled();
     });
 
     it("calls AI gate even when critical=0 but warnings exist", async () => {

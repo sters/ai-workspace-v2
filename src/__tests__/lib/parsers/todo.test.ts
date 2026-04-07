@@ -7,6 +7,7 @@ import {
   batchTodoGroups,
   renderTodoGroupsAsMarkdown,
   statusToMarker,
+  stripCompletedTodoItems,
 } from "@/lib/parsers/todo";
 
 describe("parseTodoItems", () => {
@@ -365,6 +366,108 @@ describe("renderTodoGroupsAsMarkdown", () => {
 
   it("returns empty string for empty groups", () => {
     expect(renderTodoGroupsAsMarkdown([])).toBe("");
+  });
+});
+
+describe("stripCompletedTodoItems", () => {
+  it("removes top-level completed items", () => {
+    const content = `- [x] Done task
+- [ ] Pending task
+- [~] In progress task`;
+    const result = stripCompletedTodoItems(content);
+    expect(result).not.toContain("Done task");
+    expect(result).toContain("- [ ] Pending task");
+    expect(result).toContain("- [~] In progress task");
+  });
+
+  it("removes indented child lines of a completed item", () => {
+    const content = `- [x] Done task
+  - Target: path/to/file
+  - Action: Did something
+  - Verify: ran tests
+- [ ] Pending task
+  - Target: other/file`;
+    const result = stripCompletedTodoItems(content);
+    expect(result).not.toContain("Done task");
+    expect(result).not.toContain("Target: path/to/file");
+    expect(result).not.toContain("Action: Did something");
+    expect(result).not.toContain("Verify: ran tests");
+    expect(result).toContain("- [ ] Pending task");
+    expect(result).toContain("Target: other/file");
+  });
+
+  it("removes completed sub-items nested under a pending parent", () => {
+    const content = `- [ ] Parent task
+  - [x] Done sub-item
+  - [ ] Pending sub-item`;
+    const result = stripCompletedTodoItems(content);
+    expect(result).toContain("- [ ] Parent task");
+    expect(result).not.toContain("Done sub-item");
+    expect(result).toContain("- [ ] Pending sub-item");
+  });
+
+  it("keeps blocked and in-progress items", () => {
+    const content = `- [x] Done
+- [!] Blocked
+- [~] In progress
+- [ ] Pending`;
+    const result = stripCompletedTodoItems(content);
+    expect(result).not.toContain("Done");
+    expect(result).toContain("- [!] Blocked");
+    expect(result).toContain("- [~] In progress");
+    expect(result).toContain("- [ ] Pending");
+  });
+
+  it("preserves section headings and non-item content", () => {
+    const content = `# TODO: Repo
+## Phase 1
+- [x] Done task
+  - Target: file.ts
+- [ ] Pending task
+
+## Phase 2
+- [ ] Another task`;
+    const result = stripCompletedTodoItems(content);
+    expect(result).toContain("# TODO: Repo");
+    expect(result).toContain("## Phase 1");
+    expect(result).toContain("## Phase 2");
+    expect(result).toContain("- [ ] Pending task");
+    expect(result).toContain("- [ ] Another task");
+    expect(result).not.toContain("Done task");
+    expect(result).not.toContain("Target: file.ts");
+  });
+
+  it("returns unchanged content when there are no completed items", () => {
+    const content = `- [ ] Pending
+- [~] In progress
+- [!] Blocked`;
+    expect(stripCompletedTodoItems(content)).toBe(content);
+  });
+
+  it("handles empty input", () => {
+    expect(stripCompletedTodoItems("")).toBe("");
+  });
+
+  it("removes multiple consecutive completed items", () => {
+    const content = `- [x] Done 1
+- [x] Done 2
+- [x] Done 3
+- [ ] Pending`;
+    const result = stripCompletedTodoItems(content);
+    expect(result).not.toContain("Done 1");
+    expect(result).not.toContain("Done 2");
+    expect(result).not.toContain("Done 3");
+    expect(result).toContain("- [ ] Pending");
+  });
+
+  it("removes entire file content when every item is completed", () => {
+    const content = `- [x] Done 1
+  - Target: a
+- [x] Done 2
+  - Target: b`;
+    const result = stripCompletedTodoItems(content);
+    expect(result).not.toContain("Done");
+    expect(result).not.toContain("Target");
   });
 });
 

@@ -1,4 +1,5 @@
 import { getReviewSessions, getReviewDetail, getTodos, getReadme } from "@/lib/workspace/reader";
+import { stripCompletedTodosFromWorkspace } from "@/lib/workspace/todo-cleanup";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { buildInitPipeline } from "./init";
 import { buildExecutePipeline } from "./execute";
@@ -142,6 +143,10 @@ export function buildAutonomousPipeline(input: {
       timeoutMs: 25 * 60 * 1000,
       fn: async (ctx) => {
         const ws = workspace!;
+        const stripped = await stripCompletedTodosFromWorkspace(ws, repo);
+        if (stripped.length > 0) {
+          ctx.emitStatus(`Removed completed TODO items from: ${stripped.join(", ")}`);
+        }
         const subPhases = await buildUpdateTodoPipeline({
           workspace: ws,
           instruction: instruction || DEFAULT_UPDATE_TODO_INSTRUCTION,
@@ -203,6 +208,10 @@ export function buildAutonomousPipeline(input: {
 
         // Update TODOs with specific issues
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Updating TODOs for next iteration`);
+        const stripped = await stripCompletedTodosFromWorkspace(ws, repo);
+        if (stripped.length > 0) {
+          ctx.emitStatus(`Removed completed TODO items from: ${stripped.join(", ")}`);
+        }
         const updateInstruction =
           gateResult.fixableIssues.length > 0
             ? `Fix the following issues found in review:\n${gateResult.fixableIssues.map((i) => `- ${i}`).join("\n")}`
