@@ -18,3 +18,6 @@ export { checkExistingPR, getRepoChanges, readPRTemplate } from "./pr";
 
 // System prompt files
 export { writeSystemPrompts, ensureSystemPrompt, ensureGlobalSystemPrompt, _resetVerifiedDirs } from "./prompts";
+
+// TODO file cleanup
+export { stripCompletedTodosFromWorkspace } from "./todo-cleanup";
