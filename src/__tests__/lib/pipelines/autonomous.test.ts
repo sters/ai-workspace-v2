@@ -38,9 +38,6 @@ vi.mock("@/lib/pipelines/create-pr", () => ({
 vi.mock("@/lib/pipelines/update-todo", () => ({
   buildUpdateTodoPipeline: vi.fn(async () => []),
 }));
-vi.mock("@/lib/suggest-workspace", () => ({
-  triggerWorkspaceSuggestion: vi.fn(),
-}));
 vi.mock("@/lib/workspace/prompts", () => ({
   ensureSystemPrompt: vi.fn(() => "/mock/prompts/file.md"),
   ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),

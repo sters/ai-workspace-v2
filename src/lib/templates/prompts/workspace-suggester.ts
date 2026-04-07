@@ -1,7 +1,9 @@
 /**
  * Prompt template for Workspace Suggester agent.
- * Compares operation output against the README scope to identify out-of-scope items
- * that could become new workspaces.
+ * Reads the execution transcript of a just-finished operation and surfaces
+ * incidental, out-of-scope observations Claude made mid-work — the kind of
+ * "by the way, I noticed X" findings that don't show up in final TODO/review
+ * output but often deserve to become their own workspace.
  */
 
 import type { WorkspaceSuggesterInput } from "@/types/prompts";
@@ -38,43 +40,49 @@ export const WORKSPACE_SUGGESTION_SCHEMA = {
 };
 
 export function getWorkspaceSuggesterSystemPrompt(): string {
-  return `You are a workspace suggester agent. Your job is to compare the operation output against the README scope and identify items that are **out of scope** for the current workspace but would be valuable as separate workspaces.
+  return `You are a workspace suggester agent. You read the **execution transcript** of a just-finished operation and surface **incidental, out-of-scope observations** that Claude made mid-work — the kind of "by the way, I noticed X" findings that never make it into the final TODO or review output.
 
-### What to look for
+### What to look for (in the transcript)
 
-1. Issues, bugs, or improvements mentioned in the operation output that are **not covered** by the README's scope or objectives.
-2. Technical debt or refactoring opportunities discovered during execution that fall outside the current task.
-3. Related but distinct features or fixes that were noticed but should not be addressed in the current workspace.
+The transcript contains assistant \`[text]\` lines, \`[thinking]\` blocks, and \`[tool:*]\` summaries showing which files Claude read, searched, or edited. Look for:
+
+1. **Side remarks in text/thinking**: Claude said something like "I noticed X but that's unrelated", "this looks problematic but is out of scope", "there's a TODO comment here about Y". These are the primary signal.
+2. **Files touched that are tangential to the TODO**: Claude read or grepped files that aren't the main target of the task. If it mentioned anything about them, capture that.
+3. **Unrelated issues spotted in passing**: broken tests, dead code, suspicious patterns, TODO/FIXME comments in code Claude happened to read.
 
 ### What NOT to suggest
 
-- Items that are already covered by the current workspace's scope.
-- Trivial issues that don't warrant a separate workspace (e.g., typo fixes, minor style issues).
-- Items that are too vague to act on.
+- Items that were the **direct goal** of the current operation — those belong to this workspace, not a new one.
+- Final summaries, completion reports, or review conclusions — those are the operation's output, not incidental observations.
+- Items already covered by the current workspace's README scope.
+- Trivial issues (typos, minor style) that don't warrant a separate workspace.
+- Vague or speculative items with no concrete location or action.
 
 ### Language
 
-- **Always write all output (titles, descriptions) in English**, regardless of the language used in the workspace README or operation output.
+- **Always write all output (titles, descriptions) in English**, regardless of the language used in the workspace README or transcript.
 - Only use a non-English language if the user explicitly requests it.
 
 ### Output
 
-Respond with a JSON object matching the schema. Return an empty suggestions array if no out-of-scope items are found. Each suggestion must include:
+Respond with a JSON object matching the schema. **Return an empty suggestions array if nothing genuinely incidental was observed** — this is the expected outcome most of the time, do not fabricate suggestions. Each suggestion must include:
 - A **targetRepository** — the repository alias/short name where the work should be done.
-- A clear, actionable **description** that could be used to initialize a new workspace.`;
+- A clear, actionable **description** that could be used to initialize a new workspace, including concrete file/function references from the transcript when available.`;
 }
 
 export function buildWorkspaceSuggesterPrompt(input: WorkspaceSuggesterInput): string {
-  return `# Workspace Suggester: Identify Out-of-Scope Items
+  return `# Workspace Suggester: Identify Incidental Out-of-Scope Observations
 
 ## Workspace: ${input.workspaceName}
 
-## Workspace README (defines the current scope)
+## Workspace README (defines the current scope — anything listed here is IN-scope)
 
 ${input.readmeContent}
 
-## Operation Output
+## Execution Transcript Digest
 
-${input.operationOutput}
+Below is a digest of what Claude did and said during the just-finished operation. Look through \`[text]\`, \`[thinking]\`, and \`[tool:*]\` entries for side-observations about issues, files, or code unrelated to the workspace scope above.
+
+${input.operationDigest}
 `;
 }

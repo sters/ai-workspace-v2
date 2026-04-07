@@ -16,7 +16,6 @@ import {
   buildCollectorPrompt,
 } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
-import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
@@ -151,9 +150,6 @@ export async function buildReviewPipeline(input: {
         });
 
         const ok = await ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir], stepType: STEP_TYPES.COLLECT_REVIEWS, appendSystemPromptFile: ensureSystemPrompt(wsPath, "collector") });
-        if (ok) {
-          triggerWorkspaceSuggestion(workspace, ctx.operationId, "review");
-        }
         return ok;
       },
     },

@@ -1,6 +1,5 @@
 import { getReviewSessions, getReviewDetail, getTodos, getReadme } from "@/lib/workspace/reader";
 import { stripCompletedTodosFromWorkspace } from "@/lib/workspace/todo-cleanup";
-import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { buildInitPipeline } from "./init";
 import { buildExecutePipeline } from "./execute";
 import { buildReviewPipeline } from "./review";
@@ -200,7 +199,6 @@ export function buildAutonomousPipeline(input: {
         );
 
         if (!gateResult.shouldLoop) {
-          triggerWorkspaceSuggestion(ws, ctx.operationId, "autonomous-gate");
           // Append Create PR as the next phase
           ctx.appendPhases([buildCreatePrPhase()]);
           return true;

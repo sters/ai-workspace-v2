@@ -6,18 +6,19 @@ import {
 } from "@/lib/templates/prompts/workspace-suggester";
 
 describe("workspace-suggester prompt", () => {
-  it("builds a prompt containing workspace name, README, and operation output", () => {
+  it("builds a prompt containing workspace name, README, and transcript digest", () => {
     const prompt = buildWorkspaceSuggesterPrompt({
       workspaceName: "test-ws",
       readmeContent: "# My Project\n\nScope: fix auth module",
-      operationOutput: "Found issue in logging module that is unrelated",
+      operationDigest: "[text] I noticed the logging module has a flaky test",
     });
 
     expect(prompt).toContain("test-ws");
     expect(prompt).toContain("fix auth module");
-    expect(prompt).toContain("Found issue in logging module");
+    expect(prompt).toContain("flaky test");
     const systemPrompt = getWorkspaceSuggesterSystemPrompt();
     expect(systemPrompt).toContain("out of scope");
+    expect(systemPrompt).toContain("incidental");
   });
 
   it("schema has required suggestions array", () => {

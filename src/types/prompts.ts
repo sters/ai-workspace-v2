@@ -192,7 +192,12 @@ export interface AutonomousGateInput {
 export interface WorkspaceSuggesterInput {
   workspaceName: string;
   readmeContent: string;
-  operationOutput: string;
+  /**
+   * Digest of the parent operation's execution transcript (assistant text,
+   * thinking, tool-call summaries). Used to surface incidental out-of-scope
+   * observations Claude made mid-work rather than final TODO/review output.
+   */
+  operationDigest: string;
 }
 
 export interface DiscoveryInput {
