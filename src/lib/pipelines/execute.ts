@@ -320,8 +320,16 @@ async function executeRepoLane(
   const groups = groupTodoItemsWithParents(items);
   const batches = batchTodoGroups(groups, batchSize);
 
+  // Skip this repo entirely if there are no actionable (pending/in_progress) items
+  if (batches.length === 0) {
+    ctx.emitStatus(
+      `[${repo.repoName}] No actionable TODO items — skipping execute`,
+    );
+    return true;
+  }
+
   // If 3 or fewer actionable top-level items → no batching, single call
-  if (batches.length <= 1) {
+  if (batches.length === 1) {
     ctx.emitStatus(`[${repo.repoName}] Executing (no batching needed)`);
     const prompt = buildExecutorPrompt({
       workspaceName: workspace,
