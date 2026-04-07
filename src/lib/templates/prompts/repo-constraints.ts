@@ -75,23 +75,12 @@ export function buildRepoConstraintsPrompt(input: RepoConstraintsInput): string 
 ## Worktree: ${input.worktreePath}
 ## Workspace README: ${input.readmePath}
 
+Use \`### ${input.repoName}\` as the section heading when appending to the README's \`## Repository Constraints\` section. Follow the output format described in the system prompt.
+
 ### Working Directory
 
 \`\`\`bash
 cd ${input.worktreePath}
-\`\`\`
-
-### Output Format
-
-Add to the \`## Repository Constraints\` section:
-
-\`\`\`markdown
-### ${input.repoName}
-
-- All changes MUST pass the following checks before completion:
-  - Lint: \`<command>\`
-  - Test: \`<command>\`
-  - Build: \`<command>\` (if applicable)
 \`\`\`
 `;
 }

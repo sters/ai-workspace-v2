@@ -96,7 +96,6 @@ ${userInstruction}
 ## Workspace README
 
 ${input.readmeContent}
-${input.instruction ? "\nPay special attention to the user instruction above and prioritize items that match it." : ""}
 
 ### Output
 

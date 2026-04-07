@@ -34,7 +34,7 @@ export function getTodoVerifierSystemPrompt(): string {
 
 **IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
 
-After that, run commands like \`git diff\`, \`git log\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
+After that, run commands like \`git diff\` as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
 
 ### Language
 
