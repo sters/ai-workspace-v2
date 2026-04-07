@@ -114,6 +114,29 @@ describe("resolveModel", () => {
     expect(resolveModel("review", "collect-reviews")).toBe("sonnet");
   });
 
+  it("uses sonnet as the code-level default for suggest-workspace step", () => {
+    setConfig({});
+    // No config, no operation/type model — sonnet should come from STEP_DEFAULT_MODELS
+    expect(resolveModel("execute", "suggest-workspace")).toBe("sonnet");
+    expect(resolveModel("review", "suggest-workspace")).toBe("sonnet");
+    expect(resolveModel("autonomous", "suggest-workspace")).toBe("sonnet");
+  });
+
+  it("allows overriding suggest-workspace model via config.yml", () => {
+    setConfig({
+      operations: {
+        execute: {
+          steps: {
+            "suggest-workspace": { model: "haiku" },
+          },
+        },
+      },
+    });
+    expect(resolveModel("execute", "suggest-workspace")).toBe("haiku");
+    // Unconfigured parent types still fall back to the sonnet default
+    expect(resolveModel("review", "suggest-workspace")).toBe("sonnet");
+  });
+
   it("falls back to global when operation type has no model", () => {
     setConfig({
       operations: {
