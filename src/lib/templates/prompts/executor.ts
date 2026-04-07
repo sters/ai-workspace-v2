@@ -24,10 +24,7 @@ export function getExecutorSystemPrompt(): string {
 1. **Understand the repository** (read documentation first):
    - Read repository documentation: README.md, CLAUDE.md, CONTRIBUTING.md
    - Check current git branch and status
-   - Check for task runners and identify available targets:
-     - Makefile (\`make <target>\`), package.json scripts (\`npm run <script>\` / \`bun run <script>\`), Taskfile.yml, Justfile, Rakefile, etc.
-   - Identify the tech stack and correct commands for build, test, lint
-   - Note which task runner commands correspond to which operations (build, test, lint, format, etc.)
+   - Identify the tech stack and the task runner commands for build, test, lint, format (see "Prefer Task Runner Commands" below for discovery details)
 
 2. **Work through TODO items sequentially** (top to bottom):
    - Before starting each item, optionally mark as in-progress: \`- [ ]\` -> \`- [~]\`

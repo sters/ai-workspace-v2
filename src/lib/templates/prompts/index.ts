@@ -7,12 +7,10 @@ export { getTodoVerifierSystemPrompt, buildTodoVerifierPrompt } from "./todo-ver
 export { getReadmeVerifierSystemPrompt, buildReadmeVerifierPrompt } from "./readme-verifier";
 export { getPRCreatorSystemPrompt, buildPRCreatorPrompt } from "./pr-creator";
 export {
-  getResearcherSystemPrompt,
   getResearchFindingsRepoSystemPrompt,
   getResearchFindingsCrossRepoSystemPrompt,
   getResearchRecommendationsSystemPrompt,
   getResearchIntegrationSystemPrompt,
-  buildResearcherPrompt,
   buildResearchFindingsRepoPrompt,
   buildResearchFindingsCrossRepoPrompt,
   buildResearchRecommendationsRepoPrompt,
@@ -21,7 +19,7 @@ export {
 } from "./researcher";
 export { getUpdaterSystemPrompt, buildUpdaterPrompt } from "./updater";
 export { getCollectorSystemPrompt, buildCollectorPrompt } from "./collector";
-export { getInitReadmeSystemPrompt, buildInitAnalyzeAndReadmePrompt, buildInteractionGuidance, INIT_ANALYSIS_SCHEMA } from "./init-readme";
+export { getInitReadmeSystemPrompt, buildInitAnalyzeAndReadmePrompt, INIT_ANALYSIS_SCHEMA } from "./init-readme";
 export { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildReviewChatPrompt } from "./chat";
 export { getCreateTodoPlannerSystemPrompt, buildCreateTodoFromReviewPrompt } from "./create-todo-planner";
 export { getSearchSystemPrompt, buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "./search";

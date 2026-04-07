@@ -10,7 +10,7 @@
  * checked at most once per process to avoid redundant I/O.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { getResolvedWorkspaceRoot } from "@/lib/config";
@@ -20,7 +20,6 @@ import {
   getUpdaterSystemPrompt,
   getCodeReviewerSystemPrompt,
   getReviewerSystemPrompt,
-  getResearcherSystemPrompt,
   getResearchFindingsRepoSystemPrompt,
   getResearchFindingsCrossRepoSystemPrompt,
   getResearchRecommendationsSystemPrompt,
@@ -53,7 +52,6 @@ const SYSTEM_PROMPTS: Record<string, () => string> = {
   "updater.md": getUpdaterSystemPrompt,
   "code-reviewer.md": getCodeReviewerSystemPrompt,
   "reviewer.md": getReviewerSystemPrompt,
-  "researcher.md": getResearcherSystemPrompt,
   "research-findings-repo.md": getResearchFindingsRepoSystemPrompt,
   "research-findings-cross-repo.md": getResearchFindingsCrossRepoSystemPrompt,
   "research-recommendations.md": getResearchRecommendationsSystemPrompt,
@@ -104,8 +102,31 @@ const HASH_FILENAME = ".hash";
 const _verifiedDirs = new Set<string>();
 
 /**
+ * Remove stale .md files in promptsDir that are no longer in SYSTEM_PROMPTS.
+ * Leaves the .hash file and any non-.md files alone.
+ */
+function removeStalePromptFiles(promptsDir: string): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(promptsDir);
+  } catch {
+    return; // Directory doesn't exist yet — nothing to clean up.
+  }
+  for (const entry of entries) {
+    if (!entry.endsWith(".md")) continue;
+    if (entry in SYSTEM_PROMPTS) continue;
+    try {
+      unlinkSync(path.join(promptsDir, entry));
+    } catch {
+      // Best-effort cleanup; ignore failures.
+    }
+  }
+}
+
+/**
  * Check whether the prompts in a directory are up-to-date.
- * If not (or if the directory/hash file is missing), regenerate all files.
+ * If not (or if the directory/hash file is missing), regenerate all files
+ * and remove any stale .md files no longer in SYSTEM_PROMPTS.
  * Each directory is checked at most once per process.
  */
 function ensureUpToDate(dir: string): void {
@@ -132,6 +153,7 @@ function ensureUpToDate(dir: string): void {
     for (const [filename, getContent] of Object.entries(SYSTEM_PROMPTS)) {
       writeFileSync(path.join(promptsDir, filename), getContent(), "utf-8");
     }
+    removeStalePromptFiles(promptsDir);
     writeFileSync(hashFile, currentHash, "utf-8");
   }
 
@@ -153,6 +175,7 @@ export async function writeSystemPrompts(dir: string): Promise<void> {
     ),
     Bun.write(path.join(promptsDir, HASH_FILENAME), currentHash),
   ]);
+  removeStalePromptFiles(promptsDir);
   _verifiedDirs.add(promptsDir);
 }
 

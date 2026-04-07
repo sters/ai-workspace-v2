@@ -33,7 +33,9 @@ export function getCodeReviewerSystemPrompt(): string {
 
 **IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
 
-After that, run commands like \`git status\`, \`git diff\`, \`git log\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
+After that, run commands like \`git status\`, \`git diff\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
+
+The branch, changed files, diff stat, and commit log are already provided in the "Repository Changes" section above — do NOT re-run \`git log\` to fetch them.
 
 ### Technical Checks
 

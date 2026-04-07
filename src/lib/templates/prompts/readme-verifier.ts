@@ -27,11 +27,9 @@ export function getReadmeVerifierSystemPrompt(): string {
    - You do NOT need to check every link — skip links that are purely informational (e.g., Figma designs, documentation references). Focus on links that likely define what needs to be done (tickets, review comments, issues)
    - Incorporate any additional requirements found into your verification list
 
-3. **Get Changed Files**: Use the git diff commands with the base branch specified in the user prompt
+3. **Review Changes**: The changed files, diff stat, and commit log are already provided in the "Repository Changes" section of the user prompt. Use \`git diff\` (without \`--stat\` / \`--name-only\` / \`log\`) only when you need the actual content of a specific change.
 
-4. **Review Changes**: Use git diff/log commands with the base branch specified in the user prompt
-
-5. **Verify Each Requirement** (including any found from linked resources):
+4. **Verify Each Requirement** (including any found from linked resources):
    - Check if the required files were created or modified
    - Verify expected functionality exists (search for patterns, function names, etc.)
    - Classify each requirement as:
@@ -39,7 +37,7 @@ export function getReadmeVerifierSystemPrompt(): string {
      - **PARTIAL**: Requirement is partially met (explain what's missing)
      - **UNSATISFIED**: No evidence the requirement was addressed
 
-6. **Write Verification Report** to the specified file path
+5. **Write Verification Report** to the specified file path
    - Each extracted requirement becomes its own h2 section (## {Requirement})
    - Under each h2, include Status, Evidence, and Notes
 
@@ -47,7 +45,7 @@ export function getReadmeVerifierSystemPrompt(): string {
 
 **IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
 
-After that, run commands like \`git diff\`, \`git log\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
+After that, run commands like \`git diff\` (for specific file content) as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory. Do NOT re-run \`git log\` or \`git diff --stat\` / \`--name-only\` — those are already provided in the user prompt.
 
 ### Language
 
@@ -91,14 +89,6 @@ Use it as the base structure for the report.
 
 \`\`\`bash
 cd ${input.worktreePath}
-\`\`\`
-
-### Git Commands
-
-\`\`\`bash
-git diff --name-only origin/${input.baseBranch}...HEAD
-git diff origin/${input.baseBranch}...HEAD --stat
-git log origin/${input.baseBranch}...HEAD --oneline
 \`\`\`
 `;
 }
