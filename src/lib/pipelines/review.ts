@@ -75,29 +75,32 @@ export async function buildReviewPipeline(input: {
       appendSystemPromptFile: ensureSystemPrompt(wsPath, "code-reviewer"),
     });
 
-    // TODO verifier
+    // TODO verifier — skipped when the repo has no TODO file (or it's empty),
+    // since there is nothing for the verifier to check against.
     const todoFileName = `TODO-${repo.repoName}.md`;
     const todoFile = Bun.file(path.join(wsPath, todoFileName));
     const todoContent = (await todoFile.exists())
       ? await todoFile.text()
       : "";
 
-    reviewChildren.push({
-      label: `verify-todo-${repo.repoName}`,
-      stepType: STEP_TYPES.VERIFY_TODO,
-      prompt: buildTodoVerifierPrompt({
-        workspaceName: workspace,
-        repoPath: repo.repoPath,
-        repoName: repo.repoName,
-        baseBranch,
-        reviewTimestamp,
-        todoContent,
-        worktreePath: repo.worktreePath,
-        verifyFilePath: path.join(reviewDir, verifyFileName),
-      }),
-      addDirs: [reviewDir],
-      appendSystemPromptFile: ensureSystemPrompt(wsPath, "todo-verifier"),
-    });
+    if (todoContent.trim() !== "") {
+      reviewChildren.push({
+        label: `verify-todo-${repo.repoName}`,
+        stepType: STEP_TYPES.VERIFY_TODO,
+        prompt: buildTodoVerifierPrompt({
+          workspaceName: workspace,
+          repoPath: repo.repoPath,
+          repoName: repo.repoName,
+          baseBranch,
+          reviewTimestamp,
+          todoContent,
+          worktreePath: repo.worktreePath,
+          verifyFilePath: path.join(reviewDir, verifyFileName),
+        }),
+        addDirs: [reviewDir],
+        appendSystemPromptFile: ensureSystemPrompt(wsPath, "todo-verifier"),
+      });
+    }
 
     // README verifier
     const readmeVerifyFileName = `VERIFY-README-${orgName}_${repo.repoName}.md`;
