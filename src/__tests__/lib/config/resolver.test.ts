@@ -44,6 +44,29 @@ describe("mergeConfig", () => {
     expect(result.operations.model).toBeUndefined();
   });
 
+  it("default disableAccessLog is false", () => {
+    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
+    expect(result.server.disableAccessLog).toBe(false);
+  });
+
+  it("merges disableAccessLog from file config", () => {
+    const result = mergeConfig(
+      CONFIG_DEFAULTS,
+      { server: { disableAccessLog: true } } as Partial<AppConfig>,
+      {},
+    );
+    expect(result.server.disableAccessLog).toBe(true);
+  });
+
+  it("env disableAccessLog overrides file", () => {
+    const result = mergeConfig(
+      CONFIG_DEFAULTS,
+      { server: { disableAccessLog: false } } as Partial<AppConfig>,
+      { server: { disableAccessLog: true } } as Partial<AppConfig>,
+    );
+    expect(result.server.disableAccessLog).toBe(true);
+  });
+
   it("merges steps in typeOverrides", () => {
     const result = mergeConfig(
       CONFIG_DEFAULTS,

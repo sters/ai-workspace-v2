@@ -32,6 +32,7 @@ Per-workspace config stored in `~/.config/ai-workspace/{basename}-{hash}/config.
 | `AIW_CLAUDE_USE_CLI` | `true` | Use CLI (`true`) or legacy SDK (`false`) |
 | `AIW_EDITOR` | `code {path}` | Editor command template |
 | `AIW_TERMINAL` | `open -a Terminal {path}` | Terminal command template |
+| `AIW_DISABLE_ACCESS_LOG` | `false` | Silence Next.js dev access logs (also `server.disableAccessLog` in config.yml) |
 
 ## Architecture
 

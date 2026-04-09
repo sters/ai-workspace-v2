@@ -309,6 +309,7 @@ describe("getConfig", () => {
     "AIW_CLAUDE_USE_CLI",
     "AIW_EDITOR",
     "AIW_TERMINAL",
+    "AIW_DISABLE_ACCESS_LOG",
   ];
 
   beforeEach(() => {
@@ -384,6 +385,29 @@ describe("getConfig", () => {
   it("defaults terminal to open -a Terminal {path}", () => {
     const config = getConfig();
     expect(config.terminal).toBe("open -a Terminal {path}");
+  });
+
+  it("defaults disableAccessLog to false", () => {
+    const config = getConfig();
+    expect(config.server.disableAccessLog).toBe(false);
+  });
+
+  it("picks up AIW_DISABLE_ACCESS_LOG env var (true)", () => {
+    process.env.AIW_DISABLE_ACCESS_LOG = "true";
+    const config = getConfig();
+    expect(config.server.disableAccessLog).toBe(true);
+  });
+
+  it("AIW_DISABLE_ACCESS_LOG=false keeps it false", () => {
+    process.env.AIW_DISABLE_ACCESS_LOG = "false";
+    const config = getConfig();
+    expect(config.server.disableAccessLog).toBe(false);
+  });
+
+  it("AIW_DISABLE_ACCESS_LOG=1 enables it", () => {
+    process.env.AIW_DISABLE_ACCESS_LOG = "1";
+    const config = getConfig();
+    expect(config.server.disableAccessLog).toBe(true);
   });
 });
 
@@ -665,6 +689,7 @@ describe("migrateConfigContent", () => {
       "server:",
       "  port: 3741",
       "  chatPort: 3742",
+      "  disableAccessLog: false",
       "",
       "claude:",
       "  path: null",
@@ -765,6 +790,7 @@ describe("migrateConfigContent", () => {
       "server:",
       "  port: 3741",
       "  chatPort: 3742",
+      "  disableAccessLog: false",
       "",
       "claude:",
       "  path: null",
