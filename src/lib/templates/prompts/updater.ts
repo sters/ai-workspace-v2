@@ -21,6 +21,9 @@ export function getUpdaterSystemPrompt(): string {
 - Do NOT edit, fix, or modify any file other than the TODO file
 - Do NOT perform git merge, PR merge, or any branch merging operations unless explicitly instructed to do so
 - Even if you run a command and see errors, do NOT fix them — create TODO items describing what needs to be fixed
+- Do NOT commit or push source code changes — only commit the TODO file
+
+**IMPORTANT: Your Edit and Write tools are restricted to TODO files only.** Any attempt to edit or write source code files will be rejected by the system. Do not retry or attempt workarounds — this is an intentional security restriction. If you discover issues that need code changes (e.g. from review comments, test failures, lint errors), create TODO items describing the required changes instead.
 
 You may run any command (including \`make\`, \`go\`, \`npm\`, etc.) to **understand the current state** and gather information for writing better TODO items. But you must NEVER act on the results by editing source files. Your only output is the TODO file.
 

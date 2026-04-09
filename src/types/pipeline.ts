@@ -35,6 +35,8 @@ export interface GroupChild {
   cwd?: string;
   /** Additional directories to expose via --add-dir. */
   addDirs?: string[];
+  /** Explicit --allowedTools values. When set, overrides the auto-generated Edit/Write patterns from addDirs. */
+  allowedTools?: string[];
   /** JSON Schema for structured output via --json-schema. */
   jsonSchema?: Record<string, unknown>;
   /** Called with the model's final text response when the child process completes. */
@@ -57,6 +59,8 @@ export interface PipelinePhaseSingle {
   cwd?: string;
   /** Additional directories to expose via --add-dir. */
   addDirs?: string[];
+  /** Explicit --allowedTools values. When set, overrides the auto-generated Edit/Write patterns from addDirs. */
+  allowedTools?: string[];
   timeoutMs?: number;
   /** Maximum number of retry attempts on failure (default: 2). Set to 0 to disable. */
   maxRetries?: number;
@@ -89,6 +93,8 @@ export interface RunChildOptions {
   cwd?: string;
   /** Additional directories to expose via --add-dir. */
   addDirs?: string[];
+  /** Explicit --allowedTools values. When set, overrides the auto-generated Edit/Write patterns from addDirs. */
+  allowedTools?: string[];
   /** When true, skip AskUserQuestion instead of waiting for user input. */
   skipAskUserQuestion?: boolean;
   /** Claude model override for this child. */

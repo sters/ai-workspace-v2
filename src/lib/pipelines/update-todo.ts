@@ -56,6 +56,15 @@ export async function buildUpdateTodoPipeline(input: {
 
   const prompt = buildPromptForDir(workspacePath);
 
+  // Restrict Edit/Write to TODO files only — prevent the updater agent from
+  // modifying source code even though it has read access to the full workspace.
+  const absPrefix = workspacePath.startsWith("/") ? "/" : "//";
+  const todoAllowedTools = [
+    `Edit(${absPrefix}${workspacePath}/TODO-*.md)`,
+    `Write(${absPrefix}${workspacePath}/TODO-*.md)`,
+    "Bash(git:*)",
+  ];
+
   // Phase that normalizes checkbox format after the updater runs.
   // Fixes common LLM mistakes (missing checkboxes, wrong brackets, etc.)
   // and amends the updater's commit if any corrections were made.
@@ -111,17 +120,25 @@ export async function buildUpdateTodoPipeline(input: {
           n: bestOfN,
           operationType: "update-todo",
           filesToCapture: todoFiles,
-          buildChildren: (candidateDir) => [{
-            label: "Update TODOs",
-            prompt: buildPromptForDir(candidateDir),
-            stepType: STEP_TYPES.UPDATE_TODO,
-            addDirs: [candidateDir, ...repos.map((r) => r.worktreePath)],
-            appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater"),
-          }],
+          buildChildren: (candidateDir) => {
+            const candidatePrefix = candidateDir.startsWith("/") ? "/" : "//";
+            return [{
+              label: "Update TODOs",
+              prompt: buildPromptForDir(candidateDir),
+              stepType: STEP_TYPES.UPDATE_TODO,
+              addDirs: [candidateDir, ...repos.map((r) => r.worktreePath)],
+              allowedTools: [
+                `Edit(${candidatePrefix}${candidateDir}/TODO-*.md)`,
+                `Write(${candidatePrefix}${candidateDir}/TODO-*.md)`,
+                "Bash(git:*)",
+              ],
+              appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater"),
+            }];
+          },
           confirm: bestOfNConfirm,
           interactionLevel,
           runNormal: async (innerCtx) => {
-            return innerCtx.runChild("Update TODOs", prompt, { addDirs: [workspacePath], stepType: STEP_TYPES.UPDATE_TODO, appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater") });
+            return innerCtx.runChild("Update TODOs", prompt, { addDirs: [workspacePath], allowedTools: todoAllowedTools, stepType: STEP_TYPES.UPDATE_TODO, appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater") });
           },
         });
       },
@@ -129,7 +146,7 @@ export async function buildUpdateTodoPipeline(input: {
   }
 
   return [
-    { kind: "single", label: "Update TODOs", prompt, stepType: STEP_TYPES.UPDATE_TODO, addDirs: [workspacePath], appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater") },
+    { kind: "single", label: "Update TODOs", prompt, stepType: STEP_TYPES.UPDATE_TODO, addDirs: [workspacePath], allowedTools: todoAllowedTools, appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater") },
     normalizePhase,
   ];
 }

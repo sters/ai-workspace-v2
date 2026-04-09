@@ -194,23 +194,26 @@ export function runClaude(
   function spawnAndStream(promptOrAnswer: string, resumeSessionId?: string) {
     // Always pass prompts via stdin to avoid exposing them in the process list.
 
-    // When addDirs are specified, auto-allow Edit/Write scoped to those
-    // directories plus Bash(git:*) so Claude can modify files and run git
-    // commands there in non-interactive (-p) mode.
-    const addDirAllowedTools = options?.addDirs?.length
-      ? ["--allowedTools", [
-          ...options.addDirs.flatMap((dir) => {
-            // Claude CLI uses // prefix for absolute filesystem paths.
-            // /path means project-root-relative, //path means absolute.
-            const absPrefix = dir.startsWith("/") ? "/" : "//";
-            return [
-              `Edit(${absPrefix}${dir}/**)`,
-              `Write(${absPrefix}${dir}/**)`,
-            ];
-          }),
-          "Bash(git:*)",
-        ].join(",")]
-      : [];
+    // When explicit allowedTools are provided, use them directly.
+    // Otherwise, when addDirs are specified, auto-allow Edit/Write scoped to
+    // those directories plus Bash(git:*) so Claude can modify files and run
+    // git commands there in non-interactive (-p) mode.
+    const addDirAllowedTools = options?.allowedTools?.length
+      ? ["--allowedTools", options.allowedTools.join(",")]
+      : options?.addDirs?.length
+        ? ["--allowedTools", [
+            ...options.addDirs.flatMap((dir) => {
+              // Claude CLI uses // prefix for absolute filesystem paths.
+              // /path means project-root-relative, //path means absolute.
+              const absPrefix = dir.startsWith("/") ? "/" : "//";
+              return [
+                `Edit(${absPrefix}${dir}/**)`,
+                `Write(${absPrefix}${dir}/**)`,
+              ];
+            }),
+            "Bash(git:*)",
+          ].join(",")]
+        : [];
 
     const cliArgs = [
       "-p", "-",
