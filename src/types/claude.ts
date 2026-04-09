@@ -32,6 +32,8 @@ export interface RunClaudeOptions {
   model?: ClaudeModel;
   /** Path to a file whose content is appended to Claude's system prompt via --append-system-prompt-file. */
   appendSystemPromptFile?: string;
+  /** Explicit --allowedTools values. When set, overrides the auto-generated Edit/Write patterns from addDirs. */
+  allowedTools?: string[];
 }
 
 // TODO: Replace with Record<string, unknown> or a discriminated union once
