@@ -41,6 +41,18 @@ export interface AppConfig {
     typeOverrides: Partial<Record<OperationType, Partial<OperationTypeSettings>>>;
   };
 
+  /** Settings for the interactive WebSocket chat sessions. */
+  chat: {
+    /** Default Claude model. null = CLI default. */
+    model: ClaudeModel | null;
+  };
+
+  /** Settings for the one-shot quick-ask feature. */
+  quickAsk: {
+    /** Default Claude model. null = CLI default. */
+    model: ClaudeModel | null;
+  };
+
   /** Editor launch command. Use `{path}` as placeholder for the target path. */
   editor: string;
 

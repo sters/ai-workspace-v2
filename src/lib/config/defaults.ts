@@ -24,6 +24,12 @@ export const CONFIG_DEFAULTS: AppConfig = {
     bestOfN: 0,
     typeOverrides: {},
   },
+  chat: {
+    model: "sonnet",
+  },
+  quickAsk: {
+    model: "sonnet",
+  },
   editor: "code {path}",
   terminal: "open -a Terminal {path}",
 };
@@ -89,6 +95,10 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "defaultInteractionLevel", section: "operations", defaultLine: "#   defaultInteractionLevel: mid   # low / mid / high" },
   { key: "bestOfN", section: "operations", defaultLine: "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates" },
   { key: "model", section: "operations", defaultLine: "#   model: null                    # null = CLI default (opus / sonnet / haiku)" },
+  { key: "chat", section: null, defaultLine: "# chat:" },
+  { key: "model", section: "chat", defaultLine: "#   model: sonnet                  # default model for interactive chat (null = CLI default)" },
+  { key: "quickAsk", section: null, defaultLine: "# quickAsk:" },
+  { key: "model", section: "quickAsk", defaultLine: "#   model: sonnet                  # default model for quick-ask (null = CLI default)" },
   { key: "editor", section: null, defaultLine: "# editor: code {path}" },
   { key: "terminal", section: null, defaultLine: "# terminal: open -a Terminal {path}" },
 ];
