@@ -130,6 +130,73 @@ export function stripCompletedTodoItems(content: string): string {
   return result.join("\n");
 }
 
+/**
+ * Normalize TODO file content to ensure proper checkbox format.
+ * Fixes common LLM output mistakes:
+ * - Missing checkbox: `- Item` → `- [ ] Item`
+ * - Extra/missing space in brackets: `- [  ]`, `- []` → `- [ ]`
+ * - Asterisk bullet: `* [ ] Item` → `- [ ] Item`
+ * - Uppercase X: `- [X] Item` → `- [x] Item`
+ *
+ * Bullet items indented under a checkbox are treated as child descriptions
+ * and left untouched.
+ */
+export function normalizeTodoCheckboxes(content: string): string {
+  const lines = content.split("\n");
+  const result: string[] = [];
+  let lastCheckboxIndent = -1;
+
+  for (const line of lines) {
+    let fixed = line;
+
+    // Normalize bullet character: * → -
+    fixed = fixed.replace(/^(\s*)\* /, "$1- ");
+
+    // Fix bracket formatting: - [] or - [  ] → - [ ]
+    fixed = fixed.replace(
+      /^(\s*- )\[( {0}| {2,})\](\s)/,
+      "$1[ ]$3",
+    );
+
+    // Uppercase X → lowercase
+    fixed = fixed.replace(/^(\s*- )\[X\]/, "$1[x]");
+
+    // Already a valid checkbox — track indent and move on
+    const checkboxMatch = fixed.match(/^(\s*)- \[([ x!~])\]\s/);
+    if (checkboxMatch) {
+      lastCheckboxIndent = checkboxMatch[1].length;
+      result.push(fixed);
+      continue;
+    }
+
+    // Plain bullet that might need a checkbox
+    const bulletMatch = fixed.match(/^(\s*)- (.+)/);
+    if (bulletMatch) {
+      const indent = bulletMatch[1].length;
+
+      // Indented under a checkbox → child description, leave as-is
+      if (lastCheckboxIndent >= 0 && indent > lastCheckboxIndent) {
+        result.push(fixed);
+        continue;
+      }
+
+      // Convert to pending checkbox
+      result.push(`${bulletMatch[1]}- [ ] ${bulletMatch[2]}`);
+      lastCheckboxIndent = indent;
+      continue;
+    }
+
+    // Headings and blank lines reset the tracking
+    if (fixed.trim() === "" || /^#/.test(fixed)) {
+      lastCheckboxIndent = -1;
+    }
+
+    result.push(fixed);
+  }
+
+  return result.join("\n");
+}
+
 const STATUS_PATTERNS: [RegExp, TodoItem["status"]][] = [
   [/^(\s*)- \[x\]\s+(.*)/, "completed"],
   [/^(\s*)- \[ \]\s+(.*)/, "pending"],
