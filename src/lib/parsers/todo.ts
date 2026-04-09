@@ -244,7 +244,7 @@ export function parseTodoFile(
   const blocked = items.filter((i) => i.status === "blocked").length;
   const inProgress = items.filter((i) => i.status === "in_progress").length;
   const total = items.length;
-  const progress = total > 0 ? Math.round((completed * 100) / total) : 0;
+  const progress = total > 0 ? Math.round((completed * 100) / total) : 100;
 
   // Extract repo name from filename: TODO-{repo}.md -> {repo}
   const repoName = filename.replace(/^TODO-/, "").replace(/\.md$/, "");

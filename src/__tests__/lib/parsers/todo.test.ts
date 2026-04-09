@@ -224,10 +224,10 @@ describe("parseTodoFile", () => {
     expect(file.progress).toBe(0);
   });
 
-  it("returns 0 progress for empty content", () => {
+  it("returns 100 progress for empty content (no items = complete)", () => {
     const file = parseTodoFile("TODO-empty.md", "");
     expect(file.total).toBe(0);
-    expect(file.progress).toBe(0);
+    expect(file.progress).toBe(100);
   });
 
   it("extracts repo name from various filename formats", () => {

@@ -63,7 +63,7 @@ async function buildWorkspaceSummary(
   const totalCompleted = todos.reduce((s, t) => s + t.completed, 0);
   const totalItems = todos.reduce((s, t) => s + t.total, 0);
   const overallProgress =
-    totalItems > 0 ? Math.round((totalCompleted * 100) / totalItems) : 0;
+    totalItems > 0 ? Math.round((totalCompleted * 100) / totalItems) : 100;
 
   const stat = statSync(wsPath);
 
