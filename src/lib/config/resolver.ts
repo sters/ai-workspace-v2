@@ -211,6 +211,12 @@ export function mergeConfig(
       ),
       typeOverrides: mergedTypeOverrides,
     },
+    chat: {
+      model: pick(env.chat?.model, file.chat?.model, defaults.chat.model),
+    },
+    quickAsk: {
+      model: pick(env.quickAsk?.model, file.quickAsk?.model, defaults.quickAsk.model),
+    },
     editor: pick(env.editor, file.editor, defaults.editor),
     terminal: pick(env.terminal, file.terminal, defaults.terminal),
   };

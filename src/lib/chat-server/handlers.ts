@@ -4,7 +4,7 @@ import type { DataListener } from "@/types/pty";
 import { buildInitPrompt, buildReviewChatPrompt } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import type { ChatSession, ClientMessage, ServerMessage, WsData } from "@/types/chat-server";
-import { getResolvedWorkspaceRoot } from "@/lib/config";
+import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
 
 export function send(ws: { send(data: string): void }, msg: ServerMessage) {
   ws.send(JSON.stringify(msg));
@@ -50,9 +50,12 @@ export function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" 
     isReviewChat ? "review-chat" : "chat",
   );
 
+  const chatModel = getConfig().chat.model;
+  const modelArgs = chatModel ? ["--model", chatModel] : [];
+
   let proc;
   try {
-    proc = spawnClaudeTerminal({ args: ["--append-system-prompt-file", systemPromptFile, initPrompt], cwd: root, listeners });
+    proc = spawnClaudeTerminal({ args: ["--append-system-prompt-file", systemPromptFile, ...modelArgs, initPrompt], cwd: root, listeners });
   } catch (err) {
     send(ws, {
       type: "error",

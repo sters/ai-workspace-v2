@@ -67,6 +67,36 @@ describe("mergeConfig", () => {
     expect(result.server.disableAccessLog).toBe(true);
   });
 
+  it("defaults chat.model to sonnet", () => {
+    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
+    expect(result.chat.model).toBe("sonnet");
+  });
+
+  it("defaults quickAsk.model to sonnet", () => {
+    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
+    expect(result.quickAsk.model).toBe("sonnet");
+  });
+
+  it("file config overrides chat.model and quickAsk.model", () => {
+    const result = mergeConfig(
+      CONFIG_DEFAULTS,
+      { chat: { model: "opus" }, quickAsk: { model: "haiku" } } as Partial<AppConfig>,
+      {},
+    );
+    expect(result.chat.model).toBe("opus");
+    expect(result.quickAsk.model).toBe("haiku");
+  });
+
+  it("file config can null out chat.model and quickAsk.model", () => {
+    const result = mergeConfig(
+      CONFIG_DEFAULTS,
+      { chat: { model: null }, quickAsk: { model: null } } as Partial<AppConfig>,
+      {},
+    );
+    expect(result.chat.model).toBeNull();
+    expect(result.quickAsk.model).toBeNull();
+  });
+
   it("merges steps in typeOverrides", () => {
     const result = mergeConfig(
       CONFIG_DEFAULTS,

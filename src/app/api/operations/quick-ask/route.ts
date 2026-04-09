@@ -1,5 +1,5 @@
 import path from "node:path";
-import { getResolvedWorkspaceRoot, getWorkspaceDir, resolveWorkspaceName } from "@/lib/config";
+import { getConfig, getResolvedWorkspaceRoot, getWorkspaceDir, resolveWorkspaceName } from "@/lib/config";
 import { runClaude } from "@/lib/claude";
 import { quickAskSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
@@ -18,7 +18,8 @@ export async function POST(request: Request) {
   const workspacePath = path.join(getWorkspaceDir(), workspace);
   const prompt = buildQuickAskPrompt(workspace, workspacePath, question);
 
-  const proc = runClaude("quick-ask", prompt, { cwd: getResolvedWorkspaceRoot(), appendSystemPromptFile: ensureSystemPrompt(workspacePath, "quick-ask") });
+  const model = getConfig().quickAsk.model ?? undefined;
+  const proc = runClaude("quick-ask", prompt, { cwd: getResolvedWorkspaceRoot(), appendSystemPromptFile: ensureSystemPrompt(workspacePath, "quick-ask"), model });
 
   const stream = new ReadableStream({
     start(controller) {

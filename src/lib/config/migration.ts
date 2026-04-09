@@ -7,7 +7,7 @@ import {
   OVERRIDABLE_SETTINGS_KEYS,
 } from "./defaults";
 
-const SECTION_NAMES = new Set(["server", "claude", "operations"]);
+const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "quickAsk"]);
 
 // ---------------------------------------------------------------------------
 // Config file generation
@@ -52,6 +52,12 @@ export function generateDefaultConfigContent(): string {
     "#   #   steps:",
     "#   #     <step-type>:",
     "#   #       model: haiku",
+    "",
+    "# chat:",
+    "#   model: sonnet                  # default model for interactive chat (null = CLI default)",
+    "",
+    "# quickAsk:",
+    "#   model: sonnet                  # default model for quick-ask (null = CLI default)",
     "",
     "# editor: code {path}",
     "# terminal: open -a Terminal {path}",
