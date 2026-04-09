@@ -53,9 +53,12 @@ describe("buildUpdateTodoPipeline", () => {
       ]);
     });
 
-    it("returns a single phase", async () => {
+    it("returns updater phase plus normalize phase", async () => {
       const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-      expect(phases).toHaveLength(1);
+      expect(phases).toHaveLength(2);
+      expect(phases[0].kind).toBe("single");
+      expect(phases[1].kind).toBe("function");
+      expect(phases[1].label).toBe("Normalize TODO format");
     });
 
     it("phase has kind single", async () => {
@@ -96,14 +99,16 @@ describe("buildUpdateTodoPipeline", () => {
       ]);
     });
 
-    it("returns a function phase when bestOfN >= 2", async () => {
+    it("returns a function phase plus normalize phase when bestOfN >= 2", async () => {
       const phases = await buildUpdateTodoPipeline({
         workspace: "test-ws",
         instruction: "add tests",
         bestOfN: 3,
       });
-      expect(phases).toHaveLength(1);
+      expect(phases).toHaveLength(2);
       expect(phases[0].kind).toBe("function");
+      expect(phases[1].kind).toBe("function");
+      expect(phases[1].label).toBe("Normalize TODO format");
     });
 
     it("returns a single phase when bestOfN is undefined", async () => {
@@ -151,9 +156,11 @@ describe("buildUpdateTodoPipeline", () => {
       ]);
     });
 
-    it("returns a single phase", async () => {
+    it("returns updater phase plus normalize phase", async () => {
       const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-      expect(phases).toHaveLength(1);
+      expect(phases).toHaveLength(2);
+      expect(phases[0].kind).toBe("single");
+      expect(phases[1].label).toBe("Normalize TODO format");
     });
 
     it("phase does not set cwd but sets addDirs", async () => {

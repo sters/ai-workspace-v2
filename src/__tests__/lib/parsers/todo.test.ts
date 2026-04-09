@@ -8,6 +8,7 @@ import {
   renderTodoGroupsAsMarkdown,
   statusToMarker,
   stripCompletedTodoItems,
+  normalizeTodoCheckboxes,
 } from "@/lib/parsers/todo";
 
 describe("parseTodoItems", () => {
@@ -477,5 +478,106 @@ describe("statusToMarker", () => {
     expect(statusToMarker("pending")).toBe(" ");
     expect(statusToMarker("blocked")).toBe("!");
     expect(statusToMarker("in_progress")).toBe("~");
+  });
+});
+
+describe("normalizeTodoCheckboxes", () => {
+  it("adds checkbox to plain bullet items", () => {
+    const content = "- Fix the bug\n- Add the feature";
+    expect(normalizeTodoCheckboxes(content)).toBe(
+      "- [ ] Fix the bug\n- [ ] Add the feature",
+    );
+  });
+
+  it("preserves existing valid checkboxes", () => {
+    const content =
+      "- [x] Done\n- [ ] Pending\n- [!] Blocked\n- [~] In progress";
+    expect(normalizeTodoCheckboxes(content)).toBe(content);
+  });
+
+  it("does not add checkbox to child description lines", () => {
+    const content =
+      "- [ ] **[Target]** Fix the thing\n  - Target: path/to/file\n  - Action: Change X";
+    expect(normalizeTodoCheckboxes(content)).toBe(content);
+  });
+
+  it("does not add checkbox to children under a normalized parent", () => {
+    const content = "- Fix the bug\n  - Target: file.ts\n  - Action: fix it";
+    expect(normalizeTodoCheckboxes(content)).toBe(
+      "- [ ] Fix the bug\n  - Target: file.ts\n  - Action: fix it",
+    );
+  });
+
+  it("fixes extra spaces in brackets", () => {
+    expect(normalizeTodoCheckboxes("- [  ] Fix something")).toBe(
+      "- [ ] Fix something",
+    );
+  });
+
+  it("fixes empty brackets", () => {
+    expect(normalizeTodoCheckboxes("- [] Fix something")).toBe(
+      "- [ ] Fix something",
+    );
+  });
+
+  it("converts asterisk bullets", () => {
+    expect(normalizeTodoCheckboxes("* [ ] Fix something")).toBe(
+      "- [ ] Fix something",
+    );
+  });
+
+  it("converts asterisk bullets without checkboxes", () => {
+    expect(normalizeTodoCheckboxes("* Fix something")).toBe(
+      "- [ ] Fix something",
+    );
+  });
+
+  it("converts uppercase X marker", () => {
+    expect(normalizeTodoCheckboxes("- [X] Done task")).toBe(
+      "- [x] Done task",
+    );
+  });
+
+  it("preserves headings and non-bullet lines", () => {
+    const content = "# TODO: repo\n\n## Section\n\n- Fix the thing";
+    expect(normalizeTodoCheckboxes(content)).toBe(
+      "# TODO: repo\n\n## Section\n\n- [ ] Fix the thing",
+    );
+  });
+
+  it("handles mixed valid and invalid items", () => {
+    const content =
+      "- [ ] Valid item\n- Missing checkbox\n- [x] Completed";
+    expect(normalizeTodoCheckboxes(content)).toBe(
+      "- [ ] Valid item\n- [ ] Missing checkbox\n- [x] Completed",
+    );
+  });
+
+  it("resets tracking after blank lines for new sections", () => {
+    const content =
+      "- [ ] Parent\n  - Child note\n\n- New top-level item";
+    expect(normalizeTodoCheckboxes(content)).toBe(
+      "- [ ] Parent\n  - Child note\n\n- [ ] New top-level item",
+    );
+  });
+
+  it("handles sibling sub-items at same indent", () => {
+    const content =
+      "- [ ] Parent\n  - [ ] Sub with checkbox\n  - Sub without checkbox";
+    expect(normalizeTodoCheckboxes(content)).toBe(
+      "- [ ] Parent\n  - [ ] Sub with checkbox\n  - [ ] Sub without checkbox",
+    );
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(normalizeTodoCheckboxes("")).toBe("");
+  });
+
+  it("normalizes a fully non-checkbox file", () => {
+    const content =
+      "# TODO: repo\n\n## Phase 1\n\n- Task A\n- Task B\n\n## Phase 2\n\n- Task C";
+    expect(normalizeTodoCheckboxes(content)).toBe(
+      "# TODO: repo\n\n## Phase 1\n\n- [ ] Task A\n- [ ] Task B\n\n## Phase 2\n\n- [ ] Task C",
+    );
   });
 });

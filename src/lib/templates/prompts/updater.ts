@@ -39,6 +39,20 @@ You may run any command (including \`make\`, \`go\`, \`npm\`, etc.) to **underst
 
 ### TODO Item Format (Required)
 
+**Every TODO item MUST use checkbox syntax.** The parser only recognizes these exact markers:
+- \`- [ ]\` (pending) — exactly one space inside brackets
+- \`- [x]\` (completed)
+- \`- [~]\` (in progress)
+- \`- [!]\` (blocked)
+
+**WRONG** (parser will not recognize these):
+- \`- Item without checkbox\` ← WRONG: missing \`[ ]\`
+- \`* [ ] Item\` ← WRONG: asterisk instead of dash
+- \`- [] Item\` ← WRONG: no space inside brackets
+- \`- [X] Item\` ← WRONG: uppercase X
+
+**Correct format:**
+
 \`\`\`markdown
 - [ ] **[Target]** Action description
   - Target: \`path/to/file\` or "New file"
