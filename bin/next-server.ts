@@ -6,7 +6,7 @@
  * With --dev, builds first if needed then runs `next start`.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, rmSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -15,6 +15,12 @@ const projectDir = resolve(__dirname, "..");
 
 const isDev = process.argv.includes("--dev");
 const isHot = process.argv.includes("--hot");
+
+// Clear .next cache in dev modes to avoid stale route issues
+if ((isDev || isHot) && existsSync(resolve(projectDir, ".next"))) {
+  console.log("Clearing .next cache...");
+  rmSync(resolve(projectDir, ".next"), { recursive: true, force: true });
+}
 
 // For production mode, build first if needed
 if (!isDev && !isHot && !existsSync(resolve(projectDir, ".next"))) {
