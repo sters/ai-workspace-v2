@@ -83,10 +83,20 @@ function envOverrides(): Partial<AppConfig> {
   const chatPort = process.env.AIW_CHAT_PORT
     ? parseInt(process.env.AIW_CHAT_PORT, 10)
     : undefined;
-  if ((port !== undefined && !Number.isNaN(port)) || (chatPort !== undefined && !Number.isNaN(chatPort))) {
+  const disableAccessLogEnv = process.env.AIW_DISABLE_ACCESS_LOG;
+  const disableAccessLog =
+    disableAccessLogEnv !== undefined
+      ? disableAccessLogEnv === "true" || disableAccessLogEnv === "1"
+      : undefined;
+  if (
+    (port !== undefined && !Number.isNaN(port)) ||
+    (chatPort !== undefined && !Number.isNaN(chatPort)) ||
+    disableAccessLog !== undefined
+  ) {
     const serverOverride: Partial<AppConfig["server"]> = {};
     if (port !== undefined && !Number.isNaN(port)) serverOverride.port = port;
     if (chatPort !== undefined && !Number.isNaN(chatPort)) serverOverride.chatPort = chatPort;
+    if (disableAccessLog !== undefined) serverOverride.disableAccessLog = disableAccessLog;
     result.server = serverOverride as AppConfig["server"];
   }
 
@@ -158,6 +168,11 @@ export function mergeConfig(
     server: {
       port: pick(env.server?.port, file.server?.port, defaults.server.port),
       chatPort: pick(env.server?.chatPort, file.server?.chatPort, defaults.server.chatPort),
+      disableAccessLog: pick(
+        env.server?.disableAccessLog,
+        file.server?.disableAccessLog,
+        defaults.server.disableAccessLog,
+      ),
     },
     claude: {
       path: pick(env.claude?.path, file.claude?.path, defaults.claude.path),

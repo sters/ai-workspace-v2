@@ -26,6 +26,8 @@ export interface AppConfig {
   server: {
     port: number;
     chatPort: number;
+    /** Disable Next.js dev-mode incoming-request access logs. */
+    disableAccessLog: boolean;
   };
 
   claude: {

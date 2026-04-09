@@ -13,11 +13,16 @@ function getGitHash(): string {
   }
 }
 
+const disableAccessLog =
+  process.env.AIW_DISABLE_ACCESS_LOG === "true" ||
+  process.env.AIW_DISABLE_ACCESS_LOG === "1";
+
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@anthropic-ai/claude-agent-sdk", "bun:sqlite"],
   env: {
     NEXT_PUBLIC_GIT_HASH: getGitHash(),
   },
+  ...(disableAccessLog ? { logging: { incomingRequests: false } } : {}),
   async redirects() {
     return [
       {

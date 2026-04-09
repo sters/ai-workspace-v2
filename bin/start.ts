@@ -188,6 +188,7 @@ const sharedEnv = {
   AIW_WORKSPACE_ROOT: root,
   AIW_PORT: String(port),
   AIW_CHAT_PORT: String(chatPort),
+  ...(appConfig.server.disableAccessLog ? { AIW_DISABLE_ACCESS_LOG: "true" } : {}),
   ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
 };
 

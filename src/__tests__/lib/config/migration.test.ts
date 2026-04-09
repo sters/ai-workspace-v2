@@ -74,6 +74,22 @@ describe("migration: model support", () => {
     expect(content).toContain("#   model: null");
   });
 
+  it("disableAccessLog appears in generated default config", () => {
+    const content = generateDefaultConfigContent();
+    expect(content).toContain("#   disableAccessLog: false");
+  });
+
+  it("adds disableAccessLog to old server section missing it", () => {
+    const input = [
+      "server:",
+      "  port: 3741",
+      "  chatPort: 3742",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(input);
+    expect(result).toContain("#   disableAccessLog");
+  });
+
   it("type override hints include model and steps", () => {
     const input = [
       "operations:",
