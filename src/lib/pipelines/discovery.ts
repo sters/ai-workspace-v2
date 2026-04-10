@@ -24,7 +24,7 @@ export function buildDiscoveryPipeline(): PipelinePhase[] {
       fn: async (ctx) => {
         ctx.emitStatus("Listing workspaces...");
 
-        const workspaces = await listWorkspaces();
+        const { workspaces } = await listWorkspaces();
         if (workspaces.length === 0) {
           ctx.emitResult("No workspaces found.");
           return true;

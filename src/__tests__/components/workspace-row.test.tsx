@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceCard } from "@/components/dashboard/workspace-card";
-import type { WorkspaceSummary } from "@/types/workspace";
+import type { WorkspaceListItem } from "@/types/workspace";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -19,21 +19,14 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-function makeWorkspace(overrides: Partial<WorkspaceSummary> = {}): WorkspaceSummary {
+function makeWorkspace(overrides: Partial<WorkspaceListItem> = {}): WorkspaceListItem {
   return {
     name: "test-workspace",
-    path: "/tmp/test-workspace",
-    meta: {
-      title: "Test Title",
-      taskType: "feature",
-      ticketId: "TICK-123",
-      date: "2025-01-15",
-      repositories: [
-        { alias: "repo1", path: "/tmp/repo1", baseBranch: "main" },
-        { alias: "repo2", path: "/tmp/repo2", baseBranch: "main" },
-      ],
-    },
-    todos: [],
+    title: "Test Title",
+    taskType: "feature",
+    ticketId: "TICK-123",
+    date: "2025-01-15",
+    repoCount: 2,
     overallProgress: 60,
     totalCompleted: 3,
     totalItems: 5,
@@ -84,8 +77,7 @@ describe("WorkspaceCard", () => {
   });
 
   it("does not render ticket when missing", () => {
-    const ws = makeWorkspace({ meta: { ...makeWorkspace().meta, ticketId: "" } });
-    render(<WorkspaceCard workspace={ws} />);
+    render(<WorkspaceCard workspace={makeWorkspace({ ticketId: "" })} />);
     expect(screen.queryByText(/Ticket:/)).not.toBeInTheDocument();
   });
 

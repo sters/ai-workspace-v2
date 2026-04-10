@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Loader2, MessageCircleQuestion } from "lucide-react";
-import type { WorkspaceSummary } from "@/types/workspace";
+import type { WorkspaceListItem } from "@/types/workspace";
 import { cardVariants } from "../shared/containers/card";
 import { ProgressBar } from "../shared/feedback/progress-bar";
 import { StatusBadge } from "../shared/feedback/status-badge";
@@ -22,12 +22,12 @@ export function WorkspaceCard({
   isAsking,
   children,
 }: {
-  workspace: WorkspaceSummary;
+  workspace: WorkspaceListItem;
   isRunning?: boolean;
   isAsking?: boolean;
   children?: React.ReactNode;
 }) {
-  const { name, meta, overallProgress, totalCompleted, totalItems, lastModified } =
+  const { name, title, taskType, ticketId, date, repoCount, overallProgress, totalCompleted, totalItems, lastModified } =
     workspace;
 
   return (
@@ -44,16 +44,16 @@ export function WorkspaceCard({
           ) : isRunning ? (
             <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
           ) : null}
-          <h3 className="truncate font-semibold">{meta.title}</h3>
+          <h3 className="truncate font-semibold">{title}</h3>
           <span className="shrink-0 text-sm text-muted-foreground">{name}</span>
         </div>
-        <StatusBadge label={meta.taskType} />
+        <StatusBadge label={taskType} />
       </div>
 
       <div className="mt-2 flex items-center gap-6 text-sm text-muted-foreground">
-        {meta.ticketId && <span>Ticket: {meta.ticketId}</span>}
-        <span>{meta.repositories.length} repos</span>
-        <span>Created: {formatShortDate(meta.date)}</span>
+        {ticketId && <span>Ticket: {ticketId}</span>}
+        <span>{repoCount} repos</span>
+        <span>Created: {formatShortDate(date)}</span>
         <span>Updated: {formatShortDate(lastModified)}</span>
       </div>
 

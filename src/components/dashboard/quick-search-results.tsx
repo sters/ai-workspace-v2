@@ -1,7 +1,7 @@
 "use client";
 
 import type { QuickSearchResponse, QuickSearchResult, DeepSearchResponse } from "@/types/search";
-import type { WorkspaceSummary } from "@/types/workspace";
+import type { WorkspaceListItem } from "@/types/workspace";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { WorkspaceCard } from "./workspace-card";
@@ -51,7 +51,7 @@ function SearchExcerpts({ excerpts }: { excerpts: string[] }) {
 function useWorkspaceMap() {
   const { workspaces } = useWorkspaces();
   const { runningWorkspaces, operations } = useRunningOperations();
-  const wsMap = new Map<string, WorkspaceSummary>();
+  const wsMap = new Map<string, WorkspaceListItem>();
   for (const ws of workspaces) {
     wsMap.set(ws.name, ws);
   }
