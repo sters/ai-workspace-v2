@@ -6,23 +6,40 @@ import { parseReadmeMeta } from "../parsers/readme";
 import { parseReviewSummary } from "../parsers/review";
 import type {
   WorkspaceSummary,
+  WorkspaceListItem,
   TodoFile,
   ReviewSession,
   HistoryEntry,
 } from "@/types/workspace";
 import type { QuickSearchResult } from "@/types/search";
 
-export async function listWorkspaces(): Promise<WorkspaceSummary[]> {
-  if (!existsSync(getWorkspaceDir())) return [];
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+export async function listWorkspaces(
+  options?: { recentOnly?: boolean },
+): Promise<{ workspaces: WorkspaceSummary[]; olderCount: number }> {
+  if (!existsSync(getWorkspaceDir()))
+    return { workspaces: [], olderCount: 0 };
 
   const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
+  const cutoff = options?.recentOnly ? Date.now() - ONE_WEEK_MS : 0;
   const workspaces: WorkspaceSummary[] = [];
+  let olderCount = 0;
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const wsPath = path.join(getWorkspaceDir(), entry.name);
     const readmePath = path.join(wsPath, "README.md");
     if (!existsSync(readmePath)) continue;
+
+    // When recentOnly, skip expensive summary build for old workspaces
+    if (cutoff > 0) {
+      const mtime = statSync(wsPath).mtime.getTime();
+      if (mtime < cutoff) {
+        olderCount++;
+        continue;
+      }
+    }
 
     try {
       const summary = await buildWorkspaceSummary(entry.name, wsPath);
@@ -38,7 +55,49 @@ export async function listWorkspaces(): Promise<WorkspaceSummary[]> {
       new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
   );
 
-  return workspaces;
+  return { workspaces, olderCount };
+}
+
+/** Lightweight list for dashboard cards — skips full TODO parsing. */
+export async function listWorkspaceItems(
+  options?: { recentOnly?: boolean },
+): Promise<{ workspaces: WorkspaceListItem[]; olderCount: number }> {
+  if (!existsSync(getWorkspaceDir()))
+    return { workspaces: [], olderCount: 0 };
+
+  const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
+  const cutoff = options?.recentOnly ? Date.now() - ONE_WEEK_MS : 0;
+  const workspaces: WorkspaceListItem[] = [];
+  let olderCount = 0;
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const wsPath = path.join(getWorkspaceDir(), entry.name);
+    const readmePath = path.join(wsPath, "README.md");
+    if (!existsSync(readmePath)) continue;
+
+    if (cutoff > 0) {
+      const mtime = statSync(wsPath).mtime.getTime();
+      if (mtime < cutoff) {
+        olderCount++;
+        continue;
+      }
+    }
+
+    try {
+      const item = await buildWorkspaceListItem(entry.name, wsPath);
+      workspaces.push(item);
+    } catch {
+      // skip broken workspaces
+    }
+  }
+
+  workspaces.sort(
+    (a, b) =>
+      new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime(),
+  );
+
+  return { workspaces, olderCount };
 }
 
 export async function getWorkspaceSummary(name: string): Promise<WorkspaceSummary | null> {
@@ -77,6 +136,58 @@ async function buildWorkspaceSummary(
     totalItems,
     lastModified: stat.mtime.toISOString(),
   };
+}
+
+async function buildWorkspaceListItem(
+  name: string,
+  wsPath: string,
+): Promise<WorkspaceListItem> {
+  const readmeFile = Bun.file(path.join(wsPath, "README.md"));
+  const readmeContent = (await readmeFile.exists())
+    ? await readmeFile.text()
+    : "";
+
+  const meta = parseReadmeMeta(readmeContent);
+
+  // Count TODO progress without full parse
+  const { completed, total } = await countTodoProgress(wsPath);
+  const overallProgress =
+    total > 0 ? Math.round((completed * 100) / total) : 100;
+  const stat = statSync(wsPath);
+
+  return {
+    name,
+    title: meta.title,
+    taskType: meta.taskType,
+    ticketId: meta.ticketId,
+    date: meta.date,
+    repoCount: meta.repositories.length,
+    overallProgress,
+    totalCompleted: completed,
+    totalItems: total,
+    lastModified: stat.mtime.toISOString(),
+  };
+}
+
+const TODO_CHECKBOX_RE = /^[ \t]*- \[(.)\]/gm;
+
+async function countTodoProgress(wsPath: string): Promise<{ completed: number; total: number }> {
+  const glob = new Bun.Glob("TODO-*.md");
+  const files = [...glob.scanSync({ cwd: wsPath })].filter(
+    (f) => f !== "TODO-template.md",
+  );
+  let completed = 0;
+  let total = 0;
+  for (const f of files) {
+    const content = await Bun.file(path.join(wsPath, f)).text();
+    let match;
+    TODO_CHECKBOX_RE.lastIndex = 0;
+    while ((match = TODO_CHECKBOX_RE.exec(content)) !== null) {
+      total++;
+      if (match[1] === "x" || match[1] === "X") completed++;
+    }
+  }
+  return { completed, total };
 }
 
 async function listTodoFiles(wsPath: string): Promise<TodoFile[]> {

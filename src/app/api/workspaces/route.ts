@@ -1,12 +1,14 @@
-import { NextResponse } from "next/server";
-import { listWorkspaces } from "@/lib/workspace/reader";
+import { NextRequest, NextResponse } from "next/server";
+import { listWorkspaceItems } from "@/lib/workspace/reader";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const workspaces = await listWorkspaces();
-    return NextResponse.json(workspaces);
+    const recentOnly =
+      request.nextUrl.searchParams.get("recentOnly") === "true";
+    const result = await listWorkspaceItems({ recentOnly });
+    return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

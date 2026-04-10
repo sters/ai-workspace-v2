@@ -51,6 +51,20 @@ export interface WorkspaceSummary {
   lastModified: string;
 }
 
+/** Lightweight summary for workspace list / card rendering. */
+export interface WorkspaceListItem {
+  name: string;
+  title: string;
+  taskType: string;
+  ticketId: string;
+  date: string;
+  repoCount: number;
+  overallProgress: number;
+  totalCompleted: number;
+  totalItems: number;
+  lastModified: string;
+}
+
 export interface HistoryEntry {
   hash: string;
   date: string;

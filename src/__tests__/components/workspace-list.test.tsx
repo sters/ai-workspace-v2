@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import type { WorkspaceSummary } from "@/types/workspace";
+import type { WorkspaceListItem } from "@/types/workspace";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -19,7 +19,8 @@ vi.mock("next/link", () => ({
 }));
 
 const mockUseWorkspaces = vi.fn<() => {
-  workspaces: WorkspaceSummary[];
+  workspaces: WorkspaceListItem[];
+  olderCount: number;
   isLoading: boolean;
   error: Error | undefined;
 }>();
@@ -35,22 +36,18 @@ vi.mock("@/hooks/use-running-operations", () => ({
 // Import after mocks
 import { WorkspaceList } from "@/components/dashboard/workspace-list";
 
-function makeWorkspace(name: string, title: string): WorkspaceSummary {
+function makeWorkspace(name: string, title: string): WorkspaceListItem {
   return {
     name,
-    path: `/tmp/${name}`,
-    meta: {
-      title,
-      taskType: "feature",
-      ticketId: "TICK-1",
-      date: "2025-01-01",
-      repositories: [{ alias: "r", path: "/r", baseBranch: "main" }],
-    },
-    todos: [],
+    title,
+    taskType: "feature",
+    ticketId: "TICK-1",
+    date: "2025-01-01",
+    repoCount: 1,
     overallProgress: 50,
     totalCompleted: 1,
     totalItems: 2,
-    lastModified: "2025-01-02",
+    lastModified: new Date().toISOString(),
   };
 }
 
@@ -65,6 +62,7 @@ describe("WorkspaceList", () => {
   it("renders loading skeleton", () => {
     mockUseWorkspaces.mockReturnValue({
       workspaces: [],
+      olderCount: 0,
       isLoading: true,
       error: undefined,
     });
@@ -76,6 +74,7 @@ describe("WorkspaceList", () => {
   it("renders error state", () => {
     mockUseWorkspaces.mockReturnValue({
       workspaces: [],
+      olderCount: 0,
       isLoading: false,
       error: new Error("fail"),
     });
@@ -86,6 +85,7 @@ describe("WorkspaceList", () => {
   it("renders empty state", () => {
     mockUseWorkspaces.mockReturnValue({
       workspaces: [],
+      olderCount: 0,
       isLoading: false,
       error: undefined,
     });
@@ -99,6 +99,7 @@ describe("WorkspaceList", () => {
         makeWorkspace("ws-alpha", "Alpha Project"),
         makeWorkspace("ws-beta", "Beta Project"),
       ],
+      olderCount: 0,
       isLoading: false,
       error: undefined,
     });
@@ -110,6 +111,7 @@ describe("WorkspaceList", () => {
   it("renders each workspace as a link", () => {
     mockUseWorkspaces.mockReturnValue({
       workspaces: [makeWorkspace("ws-1", "WS One")],
+      olderCount: 0,
       isLoading: false,
       error: undefined,
     });
