@@ -35,3 +35,7 @@ export { upsertChatSession, markChatSessionExited, getChatSession, deleteChatSes
 
 // Workspace suggestions
 export { insertSuggestion, listActiveSuggestions, dismissSuggestion, getSuggestion, _resetSuggestionStatements } from "./suggestions";
+
+// Workspace archives
+export { archiveWorkspace, unarchiveWorkspace, isWorkspaceArchived, listArchivedWorkspaces, getArchivedNameSet, _resetArchiveStatements } from "./archives";
+export type { ArchivedWorkspace } from "./archives";

@@ -21,8 +21,10 @@ vi.mock("next/link", () => ({
 const mockUseWorkspaces = vi.fn<() => {
   workspaces: WorkspaceListItem[];
   olderCount: number;
+  archivedCount: number;
   isLoading: boolean;
   error: Error | undefined;
+  refresh: () => void;
 }>();
 vi.mock("@/hooks/use-workspaces", () => ({
   useWorkspaces: () => mockUseWorkspaces(),
@@ -63,8 +65,10 @@ describe("WorkspaceList", () => {
     mockUseWorkspaces.mockReturnValue({
       workspaces: [],
       olderCount: 0,
+      archivedCount: 0,
       isLoading: true,
       error: undefined,
+      refresh: vi.fn(),
     });
     const { container } = render(<WorkspaceList />);
     const skeletons = container.querySelectorAll(".animate-pulse");
@@ -75,8 +79,10 @@ describe("WorkspaceList", () => {
     mockUseWorkspaces.mockReturnValue({
       workspaces: [],
       olderCount: 0,
+      archivedCount: 0,
       isLoading: false,
       error: new Error("fail"),
+      refresh: vi.fn(),
     });
     render(<WorkspaceList />);
     expect(screen.getByText("Failed to load workspaces.")).toBeInTheDocument();
@@ -86,8 +92,10 @@ describe("WorkspaceList", () => {
     mockUseWorkspaces.mockReturnValue({
       workspaces: [],
       olderCount: 0,
+      archivedCount: 0,
       isLoading: false,
       error: undefined,
+      refresh: vi.fn(),
     });
     render(<WorkspaceList />);
     expect(screen.getByText(/No workspaces found/)).toBeInTheDocument();
@@ -100,8 +108,10 @@ describe("WorkspaceList", () => {
         makeWorkspace("ws-beta", "Beta Project"),
       ],
       olderCount: 0,
+      archivedCount: 0,
       isLoading: false,
       error: undefined,
+      refresh: vi.fn(),
     });
     render(<WorkspaceList />);
     expect(screen.getByText("Alpha Project")).toBeInTheDocument();
@@ -112,8 +122,10 @@ describe("WorkspaceList", () => {
     mockUseWorkspaces.mockReturnValue({
       workspaces: [makeWorkspace("ws-1", "WS One")],
       olderCount: 0,
+      archivedCount: 0,
       isLoading: false,
       error: undefined,
+      refresh: vi.fn(),
     });
     render(<WorkspaceList />);
     const link = screen.getByRole("link");

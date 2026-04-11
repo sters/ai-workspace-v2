@@ -5,6 +5,10 @@ vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/mock/workspace",
 }));
 
+vi.mock("@/lib/db/archives", () => ({
+  getArchivedNameSet: () => new Set<string>(),
+}));
+
 const mockExistsSync = vi.fn();
 const mockReaddirSync = vi.fn();
 const mockStatSync = vi.fn();
