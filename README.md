@@ -39,22 +39,22 @@ The root directory must contain `workspace/` and `repositories/` subdirectories.
 
 ## Per-workspace data isolation
 
-Config and database are stored per-workspace under `~/.config/ai-workspace/{basename}-{hash}/`:
+Config and database are stored per-workspace under `{workspaceRoot}/.ai-workspace/`:
 
 ```
-~/.config/ai-workspace/
-  my-workspace-a3f8b2c1/     # derived from workspace root path
+/path/to/ai-workspace/
+  .ai-workspace/
     config.yml                # per-workspace config
     db.sqlite                 # per-workspace database
 ```
 
-The `{hash}` is the first 8 characters of SHA-256 of the absolute workspace root path. This ensures each workspace has isolated settings and operation history.
+This ensures each workspace has isolated settings and operation history.
 
 ## Configuration
 
 Three-tier config system (priority: env vars > config file > defaults):
 
-- **Config file**: `~/.config/ai-workspace/{basename}-{hash}/config.yml` (auto-created on first run)
+- **Config file**: `{workspaceRoot}/.ai-workspace/config.yml` (auto-created on first run)
 
 **Environment variables** (all optional, override config file values):
 
@@ -70,14 +70,14 @@ Three-tier config system (priority: env vars > config file > defaults):
 
 ## Architecture
 
-**Next.js 16 App Router** with React 19, TypeScript strict mode, Tailwind CSS 3, and SWR for data fetching.
+**Next.js 16 App Router** with React 19, TypeScript strict mode, Tailwind CSS 4, and SWR for data fetching.
 
 ### Server-side
 
 - **Workspace state**: API routes under `src/app/api/` read workspace data directly from the filesystem (`workspace/` directory in `AIW_WORKSPACE_ROOT`). Core reading logic is in `src/lib/workspace/reader.ts`.
 - **Pipeline orchestration**: Operations (init, execute, review, create-pr, autonomous, batch, search, etc.) are sequences of `PipelinePhase`s. Entry point: `startOperationPipeline()` in `src/lib/pipeline/orchestrator.ts`. Pipeline definitions per operation type in `src/lib/pipelines/`. Max 3 concurrent operations, with automatic resume of interrupted operations on restart.
 - **Claude Code execution**: Spawns Claude Code processes via `Bun.spawn` with `claude -p --output-format stream-json` (`src/lib/claude/cli.ts`). Handles `AskUserQuestion` via `--resume {session_id}`. Legacy SDK fallback is available via `AIW_CLAUDE_USE_CLI=false`.
-- **SQLite persistence**: Per-workspace database in `~/.config/ai-workspace/{basename}-{hash}/db.sqlite` via `bun:sqlite`. Events are buffered in memory and flushed every 500ms or 50 events (`src/lib/db/event-buffer.ts`).
+- **SQLite persistence**: Per-workspace database in `{workspaceRoot}/.ai-workspace/db.sqlite` via `bun:sqlite`. Events are buffered in memory and flushed every 5000ms or 50 events (`src/lib/db/event-buffer.ts`).
 - **Configuration**: Per-workspace config resolution (env vars > config file > defaults) in `src/lib/config/resolver.ts`, cached on `globalThis`. Workspace root determines the config directory via `src/lib/config/workspace-dir.ts`.
 - **Parsers** (`src/lib/parsers/`): Extract structured data from markdown — TODO items, README metadata, review summaries, and stream-json log entries.
 - **Web Push notifications** (`src/lib/web-push/`): Browser push notifications for operation completion events.
@@ -171,7 +171,7 @@ bunx vitest run <file> # Single file
 
 - **Next.js 16** (App Router) with React 19
 - **TypeScript** (strict mode)
-- **Tailwind CSS 3** with shadcn/ui-style theme
+- **Tailwind CSS 4** with shadcn/ui-style theme
 - **SWR** for data fetching
 - **Monaco Editor** (`@monaco-editor/react`) for code/config editing
 - **xterm.js** (`@xterm/xterm`) for terminal UI

@@ -21,7 +21,7 @@ bunx vitest run src/__tests__/lib/parsers/todo.test.ts  # Single test file
 
 ## Configuration
 
-Per-workspace config stored in `~/.config/ai-workspace/{basename}-{hash}/config.yml` (hash = first 8 chars of SHA-256 of the absolute workspace root path). Three-tier priority: env vars > config.yml > defaults. Config resolution in `src/lib/config/resolver.ts`, cached on `globalThis`. Workspace root is resolved first (CLI arg > `AIW_WORKSPACE_ROOT` env > cwd), then the config directory is derived from it.
+Per-workspace config stored in `{workspaceRoot}/.ai-workspace/config.yml`. Three-tier priority: env vars > config.yml > defaults. Config resolution in `src/lib/config/resolver.ts`, cached on `globalThis`. Workspace root is resolved first (CLI arg > `AIW_WORKSPACE_ROOT` env > cwd), then the config directory is derived from it. Directory layout in `src/lib/config/workspace-dir.ts`.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -36,12 +36,12 @@ Per-workspace config stored in `~/.config/ai-workspace/{basename}-{hash}/config.
 
 ## Architecture
 
-**Next.js 16 App Router** with React 19, TypeScript strict mode, Tailwind CSS 3, SWR for data fetching. Bun runtime.
+**Next.js 16 App Router** with React 19, TypeScript strict mode, Tailwind CSS 4, SWR for data fetching. Bun runtime.
 
 ### Key architectural patterns
 
-- **SQLite persistence** — Per-workspace database in `~/.config/ai-workspace/{basename}-{hash}/db.sqlite` via `bun:sqlite`. DB singleton on `globalThis` (`src/lib/db/connection.ts`). Events are buffered in memory and flushed every 500ms or 50 events (`src/lib/db/event-buffer.ts`).
-- **Pipeline orchestration** — Operations are sequences of `PipelinePhase`s (single child, parallel group, or TypeScript function). Entry point: `startOperationPipeline()` in `src/lib/pipeline/orchestrator.ts`. Max 3 concurrent operations. Pipeline definitions per operation type in `src/lib/pipelines/`. Recovers interrupted operations on restart (`src/lib/pipeline/resume.ts`).
+- **SQLite persistence** — Per-workspace database in `{workspaceRoot}/.ai-workspace/db.sqlite` via `bun:sqlite`. DB singleton on `globalThis` (`src/lib/db/connection.ts`). Events are buffered in memory and flushed every 5000ms or 50 events (`src/lib/db/event-buffer.ts`).
+- **Pipeline orchestration** — Operations are sequences of `PipelinePhase`s (single child, parallel group, or TypeScript function). Entry point: `startOperationPipeline()` in `src/lib/pipeline/orchestrator.ts`. Max 3 concurrent operations. Pipeline definitions per operation type in `src/lib/pipelines/`. Recovers interrupted operations on restart (`src/lib/pipeline/resume.ts`). Function phases can dynamically add phases via `appendPhases()` — the execution loop re-evaluates `phases.length` each iteration. The `runSubPhases()` utility in `src/lib/pipelines/actions/run-sub-phases.ts` runs sub-pipeline phases within a function phase context, handling all three phase kinds uniformly.
 - **Claude CLI execution** — `src/lib/claude/cli.ts` spawns `claude -p --output-format stream-json`. Handles `AskUserQuestion` via `--resume {session_id}`. Facade in `src/lib/claude/index.ts` delegates to CLI or SDK.
 - **SSE streaming** — Clients connect to `/api/events?operationId=` for real-time operation output. Replays existing events on connection.
 - **Instrumentation split** — `src/instrumentation.ts` delegates to `src/instrumentation-node.ts` at runtime to avoid bundling Node.js-only imports (SQLite, pipeline resume) into Edge Runtime.
@@ -50,7 +50,11 @@ Per-workspace config stored in `~/.config/ai-workspace/{basename}-{hash}/config.
 - **Best-of-N pattern** — Operations like review, execute, create-pr, update-todo support parallel "candidate" runs. `buildBestOfNPipeline()` in `src/lib/pipelines/best-of-n.ts` runs N candidates, then a synthesizer phase reviews all results. Controlled by `bestOfN` in config (per-operation-type overrides supported).
 - **Batch & autonomous chaining** — Batch pipelines chain operation types (init → execute → review → create-pr) with configurable gating. Autonomous mode loops execute → review → create-pr up to `maxLoops` times with autonomous gate logic. Both use `startWith` to indicate the first phase.
 - **Phase update markers** — Phase lifecycle is communicated via special JSON prefixes in status events: `"__phaseUpdate:"` and `"__setWorkspace:"`. These are parsed by `parsePhaseUpdatesFromEvents()` / `parsePhaseUpdatesFromEntries()` to rebuild phase arrays from the event stream without needing a separate phases table.
-- **Function phase context** — TypeScript function phases receive a `PhaseFunctionContext` with `emitStatus()`, `emitResult()`, `emitAsk()` (blocks until user answers), `runChild()` / `runChildGroup()` (spawn Claude sub-processes), `emitTerminal()` (raw PTY output), and `signal` (AbortSignal for kills). Defined in `src/lib/pipeline/phase-function-context.ts`.
+- **Function phase context** — TypeScript function phases receive a `PhaseFunctionContext` with `emitStatus()`, `emitResult()`, `emitAsk()` (blocks until user answers), `runChild()` / `runChildGroup()` (spawn Claude sub-processes), `emitTerminal()` (raw PTY output), `appendPhases()` (dynamic phase injection), `setWorkspace()`, and `signal` (AbortSignal for kills). Child processes accept `allowedTools` (explicit tool restrictions — overrides auto-generated patterns from `addDirs`), `appendSystemPromptFile` (appended to Claude's system prompt), `stepType` (for config-based model resolution), and `skipAskUserQuestion`.
+- **Model resolution** — 6-tier priority in `src/lib/config/model.ts`: explicit model > per-operation per-step config > per-operation config > global operations model > code-level `STEP_DEFAULT_MODELS` > CLI default. Step types like `code-review`, `autonomous-gate` default to sonnet; `verify-todo`, `collect-reviews` default to haiku.
+- **Phase retries** — Phases support `maxRetries` (default 2) and `retryDelayMs` (default 3000). Per-phase timeouts use separate AbortControllers from the operation-level kill signal.
+- **Workspace archiving** — `workspace_archives` table (migration v4). `POST /api/workspaces/[name]/archive` toggles archive. Dashboard filters via `recentOnly` (skips workspaces older than 1 week) and `includeArchived` query params.
+- **TODO normalization** — `normalizeTodoCheckboxes()` fixes common LLM formatting errors (missing checkboxes, bracket spacing, asterisk bullets). `stripCompletedTodoItems()` removes `[x]` items before update-todo runs. Both prevent autonomous loops.
 
 ### Server-side key directories
 
@@ -64,6 +68,8 @@ Per-workspace config stored in `~/.config/ai-workspace/{basename}-{hash}/config.
 - `src/lib/chat-server/` — WebSocket session management with message buffering
 - `src/lib/operation-store/` — Reads completed operations from disk (JSONL/JSON files)
 - `src/lib/web-push/` — Browser push notification subscriptions for operation completion
+- `src/lib/config/model.ts` — 6-tier model resolution logic
+- `src/lib/pipelines/actions/` — Reusable pipeline building blocks (`run-sub-phases.ts`, TODO stripping/normalization)
 
 ### Client-side
 
@@ -96,3 +102,5 @@ Vitest with jsdom, `@testing-library/react`, `@testing-library/jest-dom`. Global
 - **Workspace root must be set before config/DB** — The entire config directory and DB path depend on workspace root being known first. `bin/start.ts` calls `setWorkspaceRoot()` before `getConfig()`.
 - **Function phase timeouts use separate AbortControllers** — Per-phase timeouts don't permanently abort the shared `managed.abortController` (which is for user-initiated kills). This is intentional to prevent timeout from killing the whole operation.
 - **Running vs completed operations live in different stores** — Running operations are in-memory (`src/lib/pipeline/store.ts`). Completed ones are on disk. `/api/operations` merges both, with running taking precedence on dedup.
+- **JSONL auto-migration** — On first startup, `getDb()` triggers `migrateJsonlToSqlite()` which imports legacy `.operations/` JSONL files if the SQLite table is empty.
+- **Dev mode clears `.next` cache** — `bin/next-server.ts` removes `.next` on dev/hot startup to avoid stale route issues.
