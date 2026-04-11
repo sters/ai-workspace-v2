@@ -8,6 +8,7 @@ export interface QuickSearchResult {
   title: string;
   lastModified: string;
   matches: QuickSearchMatch[];
+  archived?: boolean;
 }
 
 export interface QuickSearchResponse {

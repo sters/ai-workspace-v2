@@ -49,7 +49,7 @@ function SearchExcerpts({ excerpts }: { excerpts: string[] }) {
 }
 
 function useWorkspaceMap() {
-  const { workspaces } = useWorkspaces();
+  const { workspaces } = useWorkspaces({ includeArchived: true });
   const { runningWorkspaces, operations } = useRunningOperations();
   const wsMap = new Map<string, WorkspaceListItem>();
   for (const ws of workspaces) {
@@ -110,6 +110,7 @@ export function QuickSearchResults({
             workspace={ws}
             isRunning={runningWorkspaces.has(result.workspaceName)}
             isAsking={askingWorkspaces.has(result.workspaceName)}
+            archived={ws.archived}
           >
             <SearchMatchLines matches={result.matches} />
           </WorkspaceCard>
@@ -156,6 +157,7 @@ export function DeepSearchResults({
             workspace={ws}
             isRunning={runningWorkspaces.has(result.workspaceName)}
             isAsking={askingWorkspaces.has(result.workspaceName)}
+            archived={ws.archived}
           >
             <SearchExcerpts excerpts={result.excerpts} />
           </WorkspaceCard>

@@ -63,6 +63,7 @@ export interface WorkspaceListItem {
   totalCompleted: number;
   totalItems: number;
   lastModified: string;
+  archived?: boolean;
 }
 
 export interface HistoryEntry {

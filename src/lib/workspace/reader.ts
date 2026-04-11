@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
+import { getArchivedNameSet } from "../db/archives";
 import { parseTodoFile } from "../parsers/todo";
 import { parseReadmeMeta } from "../parsers/readme";
 import { parseReviewSummary } from "../parsers/review";
@@ -17,20 +18,27 @@ const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function listWorkspaces(
   options?: { recentOnly?: boolean },
-): Promise<{ workspaces: WorkspaceSummary[]; olderCount: number }> {
+): Promise<{ workspaces: WorkspaceSummary[]; olderCount: number; archivedCount: number }> {
   if (!existsSync(getWorkspaceDir()))
-    return { workspaces: [], olderCount: 0 };
+    return { workspaces: [], olderCount: 0, archivedCount: 0 };
 
   const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
   const cutoff = options?.recentOnly ? Date.now() - ONE_WEEK_MS : 0;
+  const archived = getArchivedNameSet();
   const workspaces: WorkspaceSummary[] = [];
   let olderCount = 0;
+  let archivedCount = 0;
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const wsPath = path.join(getWorkspaceDir(), entry.name);
     const readmePath = path.join(wsPath, "README.md");
     if (!existsSync(readmePath)) continue;
+
+    if (archived.has(entry.name)) {
+      archivedCount++;
+      continue;
+    }
 
     // When recentOnly, skip expensive summary build for old workspaces
     if (cutoff > 0) {
@@ -55,20 +63,23 @@ export async function listWorkspaces(
       new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
   );
 
-  return { workspaces, olderCount };
+  return { workspaces, olderCount, archivedCount };
 }
 
 /** Lightweight list for dashboard cards — skips full TODO parsing. */
 export async function listWorkspaceItems(
-  options?: { recentOnly?: boolean },
-): Promise<{ workspaces: WorkspaceListItem[]; olderCount: number }> {
+  options?: { recentOnly?: boolean; includeArchived?: boolean },
+): Promise<{ workspaces: WorkspaceListItem[]; olderCount: number; archivedCount: number }> {
   if (!existsSync(getWorkspaceDir()))
-    return { workspaces: [], olderCount: 0 };
+    return { workspaces: [], olderCount: 0, archivedCount: 0 };
 
   const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
   const cutoff = options?.recentOnly ? Date.now() - ONE_WEEK_MS : 0;
+  const archived = getArchivedNameSet();
+  const includeArchived = options?.includeArchived ?? false;
   const workspaces: WorkspaceListItem[] = [];
   let olderCount = 0;
+  let archivedCount = 0;
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
@@ -76,7 +87,13 @@ export async function listWorkspaceItems(
     const readmePath = path.join(wsPath, "README.md");
     if (!existsSync(readmePath)) continue;
 
-    if (cutoff > 0) {
+    const isArch = archived.has(entry.name);
+    if (isArch && !includeArchived) {
+      archivedCount++;
+      continue;
+    }
+
+    if (!isArch && cutoff > 0) {
       const mtime = statSync(wsPath).mtime.getTime();
       if (mtime < cutoff) {
         olderCount++;
@@ -86,6 +103,7 @@ export async function listWorkspaceItems(
 
     try {
       const item = await buildWorkspaceListItem(entry.name, wsPath);
+      if (isArch) item.archived = true;
       workspaces.push(item);
     } catch {
       // skip broken workspaces
@@ -97,7 +115,7 @@ export async function listWorkspaceItems(
       new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime(),
   );
 
-  return { workspaces, olderCount };
+  return { workspaces, olderCount, archivedCount };
 }
 
 export async function getWorkspaceSummary(name: string): Promise<WorkspaceSummary | null> {
@@ -325,6 +343,7 @@ export async function quickSearchWorkspaces(query: string): Promise<QuickSearchR
   if (!existsSync(getWorkspaceDir())) return [];
 
   const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
+  const archived = getArchivedNameSet();
   const results: QuickSearchResult[] = [];
   const lowerQuery = query.toLowerCase();
 
@@ -348,12 +367,14 @@ export async function quickSearchWorkspaces(query: string): Promise<QuickSearchR
         const meta = parseReadmeMeta(content);
         const wsPath = path.join(getWorkspaceDir(), entry.name);
         const stat = statSync(wsPath);
-        results.push({
+        const result: QuickSearchResult = {
           workspaceName: entry.name,
           title: meta.title || entry.name,
           lastModified: stat.mtime.toISOString(),
           matches,
-        });
+        };
+        if (archived.has(entry.name)) result.archived = true;
+        results.push(result);
       }
     } catch {
       // skip unreadable files
