@@ -21,8 +21,10 @@ export async function runSubPhases(
       const ok = await ctx.runChild(phase.label, phase.prompt, {
         cwd: phase.cwd,
         addDirs: phase.addDirs,
+        allowedTools: phase.allowedTools,
         stepType: phase.stepType,
         model: phase.model,
+        appendSystemPromptFile: phase.appendSystemPromptFile,
         ...extra,
       });
       if (!ok) return false;
