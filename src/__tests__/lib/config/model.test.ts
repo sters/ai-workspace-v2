@@ -137,6 +137,13 @@ describe("resolveModel", () => {
     expect(resolveModel("review", "suggest-workspace")).toBe("sonnet");
   });
 
+  it("uses sonnet as the code-level default for autonomous-gate, verify-readme, and code-review", () => {
+    setConfig({});
+    expect(resolveModel("autonomous", "autonomous-gate")).toBe("sonnet");
+    expect(resolveModel("review", "verify-readme")).toBe("sonnet");
+    expect(resolveModel("review", "code-review")).toBe("sonnet");
+  });
+
   it("falls back to global when operation type has no model", () => {
     setConfig({
       operations: {
