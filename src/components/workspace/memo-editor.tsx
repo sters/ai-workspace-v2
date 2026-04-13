@@ -22,7 +22,7 @@ export function MemoEditor({
 }) {
   const { content: initialContent, isLoading } = useMemoContent(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
-  const { events, isRunning, run, reset } = useStreamingFetch();
+  const { events, isRunning, run, cancel, reset } = useStreamingFetch();
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const isDirty = useRef(false);
@@ -213,12 +213,12 @@ export function MemoEditor({
         </Button>
         <Button
           variant="outline"
-          onClick={handleAskClaude}
-          disabled={!hasSelection || isRunning}
+          onClick={isRunning ? cancel : handleAskClaude}
+          disabled={!isRunning && !hasSelection}
         >
           {isRunning ? (
             <span className="flex items-center gap-1">
-              <Spinner /> Asking...
+              <Spinner /> Cancel
             </span>
           ) : (
             "Ask Claude"
