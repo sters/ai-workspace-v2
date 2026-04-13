@@ -22,6 +22,7 @@ export const CONFIG_DEFAULTS: AppConfig = {
     functionTimeoutMinutes: 3,
     defaultInteractionLevel: "mid",
     bestOfN: 0,
+    batchSize: 10,
     typeOverrides: {},
   },
   chat: {
@@ -62,6 +63,7 @@ export const OVERRIDABLE_SETTINGS_KEYS = new Set<keyof OperationTypeSettings>([
   "functionTimeoutMinutes",
   "defaultInteractionLevel",
   "bestOfN",
+  "batchSize",
   "model",
   "steps",
 ]);
@@ -94,6 +96,7 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "functionTimeoutMinutes", section: "operations", defaultLine: "#   functionTimeoutMinutes: 3" },
   { key: "defaultInteractionLevel", section: "operations", defaultLine: "#   defaultInteractionLevel: mid   # low / mid / high" },
   { key: "bestOfN", section: "operations", defaultLine: "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates" },
+  { key: "batchSize", section: "operations", defaultLine: "#   batchSize: 10                  # TODO groups per batch in execute operations" },
   { key: "model", section: "operations", defaultLine: "#   model: null                    # null = CLI default (opus / sonnet / haiku)" },
   { key: "chat", section: null, defaultLine: "# chat:" },
   { key: "model", section: "chat", defaultLine: "#   model: sonnet                  # default model for interactive chat (null = CLI default)" },

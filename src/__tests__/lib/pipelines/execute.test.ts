@@ -3,6 +3,7 @@ import type { PhaseFunctionContext } from "@/types/pipeline";
 
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/ws",
+  getOperationConfig: () => ({ batchSize: 10 }),
 }));
 
 vi.mock("@/lib/workspace/reader", () => ({

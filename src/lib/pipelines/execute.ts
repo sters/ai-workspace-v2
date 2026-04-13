@@ -1,5 +1,5 @@
 import path from "node:path";
-import { getWorkspaceDir } from "@/lib/config";
+import { getWorkspaceDir, getOperationConfig } from "@/lib/config";
 import { getReadme } from "@/lib/workspace/reader";
 import { parseReadmeMeta } from "@/lib/parsers/readme";
 import {
@@ -25,8 +25,6 @@ import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
 
-const DEFAULT_BATCH_SIZE = 3;
-
 export async function buildExecutePipeline(input: {
   workspace: string;
   batchSize?: number;
@@ -34,7 +32,8 @@ export async function buildExecutePipeline(input: {
   /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
   repos?: WorkspaceRepo[];
 }): Promise<PipelinePhase[]> {
-  const { workspace, batchSize = DEFAULT_BATCH_SIZE, repository } = input;
+  const { workspace, repository } = input;
+  const batchSize = input.batchSize ?? getOperationConfig("execute").batchSize;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
   const allRepos = input.repos ?? listWorkspaceRepos(workspace);
