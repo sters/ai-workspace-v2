@@ -27,12 +27,14 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || "/";
-  const absoluteUrl = new URL(url, self.location.origin).href;
+  const rawUrl = event.notification.data?.url || "/";
+  // Use absolute URL from payload directly if provided, otherwise fall back to SW origin
+  const absoluteUrl = rawUrl.startsWith("http") ? rawUrl : new URL(rawUrl, self.location.origin).href;
+  const targetOrigin = new URL(absoluteUrl).origin;
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && "focus" in client) {
+        if (client.url.includes(targetOrigin) && "focus" in client) {
           client.navigate(absoluteUrl);
           return client.focus();
         }
