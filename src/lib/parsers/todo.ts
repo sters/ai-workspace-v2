@@ -145,9 +145,20 @@ export function normalizeTodoCheckboxes(content: string): string {
   const lines = content.split("\n");
   const result: string[] = [];
   let lastCheckboxIndent = -1;
+  let inNotesSection = false;
 
   for (const line of lines) {
     let fixed = line;
+
+    // Track whether we're inside a Notes section (## Notes)
+    // Notes sections contain free-form text, not tasks
+    const sectionMatch = fixed.match(/^## (.+)/);
+    if (sectionMatch) {
+      inNotesSection = /^notes$/i.test(sectionMatch[1].trim());
+      lastCheckboxIndent = -1;
+      result.push(fixed);
+      continue;
+    }
 
     // Normalize bullet character: * → -
     fixed = fixed.replace(/^(\s*)\* /, "$1- ");
@@ -165,6 +176,12 @@ export function normalizeTodoCheckboxes(content: string): string {
     const checkboxMatch = fixed.match(/^(\s*)- \[([ x!~])\]\s/);
     if (checkboxMatch) {
       lastCheckboxIndent = checkboxMatch[1].length;
+      result.push(fixed);
+      continue;
+    }
+
+    // In Notes section — leave plain bullets as-is
+    if (inNotesSection) {
       result.push(fixed);
       continue;
     }
