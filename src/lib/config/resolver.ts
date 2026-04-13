@@ -204,6 +204,11 @@ export function mergeConfig(
         file.operations?.bestOfN,
         defaults.operations.bestOfN,
       ),
+      batchSize: pick(
+        env.operations?.batchSize,
+        file.operations?.batchSize,
+        defaults.operations.batchSize,
+      ),
       model: pick(
         env.operations?.model,
         file.operations?.model,
@@ -238,6 +243,7 @@ export function getOperationConfig(type: OperationType): OperationTypeSettings {
     functionTimeoutMinutes: overrides?.functionTimeoutMinutes ?? cfg.operations.functionTimeoutMinutes,
     defaultInteractionLevel: overrides?.defaultInteractionLevel ?? cfg.operations.defaultInteractionLevel,
     bestOfN: overrides?.bestOfN ?? cfg.operations.bestOfN,
+    batchSize: overrides?.batchSize ?? cfg.operations.batchSize,
     model: overrides?.model ?? cfg.operations.model,
     steps: overrides?.steps,
   };

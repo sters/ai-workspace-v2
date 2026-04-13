@@ -14,6 +14,8 @@ export interface OperationTypeSettings {
   defaultInteractionLevel: InteractionLevel;
   /** Best-of-N parallel execution count. 0 = disabled, 2-5 = parallel count. */
   bestOfN: number;
+  /** Number of TODO groups to process per batch in execute operations. */
+  batchSize: number;
   /** Default Claude model for this operation type. */
   model?: ClaudeModel;
   /** Per-step model overrides within this operation type. */
