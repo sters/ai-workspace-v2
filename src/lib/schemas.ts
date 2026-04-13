@@ -149,6 +149,10 @@ export const suggestionAcceptSchema = z.object({
   id: z.string().min(1, "id is required"),
 });
 
+export const memoSaveSchema = z.object({
+  content: z.string(),
+});
+
 export const aiwSettingsSchema = z.object({
   content: z.string({
     error: "content is required",
