@@ -181,10 +181,7 @@ export function runClaude(
     }
   };
 
-  log(operationId, "starting CLI query");
-  log(operationId, "cwd:", options?.cwd ?? getResolvedWorkspaceRoot());
-  log(operationId, "prompt:", prompt.slice(0, 200) + (prompt.length > 200 ? "..." : ""));
-  log(operationId, "getCliPath():", getCliPath());
+  log(operationId, `starting CLI query — cwd=${options?.cwd ?? getResolvedWorkspaceRoot()}, model=${options?.model ?? "default"}, prompt=${prompt.length}chars`);
 
   // Accumulated result text from StructuredOutput tool_use or the "result" event
   let resultText: string | undefined;
@@ -227,11 +224,8 @@ export function runClaude(
       ...(resumeSessionId ? ["--resume", resumeSessionId] : []),
     ];
 
-    const fullCmd = [getCliPath(), ...cliArgs].join(" ");
-    log(operationId, "spawning:", fullCmd.slice(0, 300));
     if (addDirAllowedTools.length) {
       const allowedToolsValue = addDirAllowedTools.join(" ");
-      log(operationId, "allowedTools:", allowedToolsValue);
       emit({
         type: "output",
         operationId,
@@ -239,7 +233,6 @@ export function runClaude(
         timestamp: new Date().toISOString(),
       });
     }
-    log(operationId, "using stdin for prompt (length:", promptOrAnswer.length, ")");
 
     const proc = spawnClaude({
       args: cliArgs,
@@ -292,7 +285,6 @@ export function runClaude(
             // Record session_id from system/init event
             if (parsed.type === "system" && parsed.session_id) {
               sessionId = parsed.session_id;
-              log(operationId, "session_id:", sessionId);
             }
 
             // Capture result text from the result event (unless StructuredOutput already set it)
@@ -305,13 +297,11 @@ export function runClaude(
               for (const block of parsed.message.content) {
                 if (block.type === "tool_use" && block.name === "AskUserQuestion") {
                   pendingAskToolUseId = block.id;
-                  log(operationId, "AskUserQuestion detected, toolUseId:", block.id);
                 }
                 // Capture structured output from --json-schema responses
                 if (block.type === "tool_use" && block.name === "StructuredOutput" && block.input) {
                   resultText = JSON.stringify(block.input);
                   hasStructuredOutput = true;
-                  log(operationId, "StructuredOutput captured:", resultText.slice(0, 200));
                 }
               }
             }
@@ -324,7 +314,7 @@ export function runClaude(
                 return r.success && r.data.tool_name === "AskUserQuestion";
               });
               if (hasAskDenial) {
-                log(operationId, "AskUserQuestion permission denied, will wait for answer");
+                // permission denied — will wait for answer via submitAnswer
               }
             }
 
@@ -345,10 +335,8 @@ export function runClaude(
               });
               if (isAskAutoError) {
                 if (options?.skipAskUserQuestion) {
-                  log(operationId, "skipAskUserQuestion: letting CLI auto-error flow through, continuing");
                   pendingAskToolUseId = null; // Clear so we don't wait for answer
                 } else {
-                  log(operationId, "suppressing CLI auto-error for AskUserQuestion, killing process");
                   askKilled = true;
                   proc.kill();
                   break; // Stop processing this chunk; outer loop checks askKilled
@@ -432,11 +420,8 @@ export function runClaude(
         try { proc.kill(9); } catch { /* already exited */ }
         return 1;
       });
-      log(operationId, "process exited with code:", exitCode);
-
       if (pendingAskToolUseId && !killed) {
         // AskUserQuestion is pending — don't emit complete, wait for submitAnswer
-        log(operationId, "waiting for AskUserQuestion answer...");
       } else {
         emit({
           type: "complete",
@@ -484,8 +469,6 @@ export function runClaude(
       const answerText = Object.entries(answers)
         .map(([q, a]) => `${q}: ${a}`)
         .join("\n");
-
-      log(operationId, "resuming with answer, sessionId:", sessionId);
 
       // Resume with --resume
       spawnAndStream(answerText, sessionId);
