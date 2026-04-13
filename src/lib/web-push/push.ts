@@ -5,6 +5,7 @@ import {
   removePushSubscription,
   getAllPushSubscriptions,
 } from "@/lib/db/push";
+import { getConfig } from "@/lib/config";
 
 interface PushSubscriptionData {
   endpoint: string;
@@ -52,33 +53,40 @@ function broadcastNotification(payload: NotificationPayload): void {
   }
 }
 
+function buildAbsoluteUrl(path: string): string {
+  const port = getConfig().server.port;
+  return `http://localhost:${port}${path}`;
+}
+
 export function sendCompletionNotification(
   operationId: string,
   success: boolean,
   workspace?: string,
 ): void {
   const status = success ? "completed" : "failed";
+  const path = workspace
+    ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`
+    : "/";
   broadcastNotification({
     title: `ai-workspace: Operation ${status}`,
     body: workspace
       ? `Operation in "${workspace}" ${status}`
       : `An operation ${status}`,
     tag: `complete-${operationId}`,
-    url: workspace
-      ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`
-      : "/",
+    url: buildAbsoluteUrl(path),
   });
 }
 
 export function sendAskNotification(operationId: string, workspace?: string): void {
+  const path = workspace
+    ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`
+    : "/";
   broadcastNotification({
     title: "ai-workspace: Input Required",
     body: workspace
       ? `Operation in "${workspace}" needs your input`
       : "An operation needs your input",
     tag: `ask-${operationId}`,
-    url: workspace
-      ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`
-      : "/",
+    url: buildAbsoluteUrl(path),
   });
 }
