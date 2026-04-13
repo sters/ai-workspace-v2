@@ -14,6 +14,7 @@ import { extractBatchParams, extractAutonomousParams } from "@/lib/batch-modes";
 
 const BASE_TABS = [
   { label: "Overview", segment: "", href: "" },
+  { label: "Memo", segment: "memo", href: "memo" },
   { label: "TODOs", segment: "todo", href: "todo" },
   { label: "Reviews", segment: "review", href: "review" },
   { label: "Research", segment: "research", href: "research", taskType: "research" },

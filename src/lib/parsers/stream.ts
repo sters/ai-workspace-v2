@@ -316,6 +316,20 @@ export function parseStreamEvent(raw: string): LogEntry[] {
 }
 
 /**
+ * Extract the first result content from a list of OperationEvents.
+ * Used by quick-ask and memo inline Claude to get the answer text.
+ */
+export function extractAnswer(events: OperationEvent[]): string | null {
+  for (const event of events) {
+    if (event.type !== "output") continue;
+    for (const entry of parseStreamEvent(event.data)) {
+      if (entry.kind === "result" && entry.content) return entry.content;
+    }
+  }
+  return null;
+}
+
+/**
  * Extract the last result (content, cost, duration) from a list of OperationEvents.
  * Scans events in reverse to find the last "result" entry efficiently.
  */

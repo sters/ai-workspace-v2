@@ -15,7 +15,7 @@ const variants: Record<ButtonVariant, string> = {
   "destructive-sm":
     "rounded-md border border-destructive/50 px-2 py-1 text-xs font-medium text-destructive hover:bg-destructive/10",
   outline:
-    "rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent",
+    "rounded-md border px-2 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50",
   "outline-muted":
     "rounded-md border px-2 py-1 text-xs font-medium hover:bg-muted",
   ghost:

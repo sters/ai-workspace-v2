@@ -15,6 +15,15 @@ export function useWorkspace(name: string) {
   return { workspace: data, isLoading, error, refresh: mutate };
 }
 
+export function useMemoContent(name: string) {
+  const { data, error, isLoading, mutate } = useSWR<{ content: string }>(
+    name ? `/api/workspaces/${encodeURIComponent(name)}/memo` : null,
+    fetcher,
+  );
+
+  return { content: data?.content ?? "", isLoading, error, refresh: mutate };
+}
+
 export function useReadme(name: string) {
   const { data, error, isLoading } = useSWR<string>(
     name ? `/api/workspaces/${encodeURIComponent(name)}/readme` : null,

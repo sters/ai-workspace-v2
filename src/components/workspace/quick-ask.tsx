@@ -6,19 +6,8 @@ import { Input } from "@/components/shared/forms/input";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { MarkdownRenderer } from "@/components/shared/content/markdown-renderer";
 import { useStreamingFetch } from "@/hooks/use-streaming-fetch";
-import { parseStreamEvent } from "@/lib/parsers/stream";
+import { extractAnswer } from "@/lib/parsers/stream";
 import { useState } from "react";
-import type { OperationEvent } from "@/types/operation";
-
-function extractAnswer(events: OperationEvent[]): string | null {
-  for (const event of events) {
-    if (event.type !== "output") continue;
-    for (const entry of parseStreamEvent(event.data)) {
-      if (entry.kind === "result" && entry.content) return entry.content;
-    }
-  }
-  return null;
-}
 
 export function QuickAsk({ workspaceName }: { workspaceName: string }) {
   const [question, setQuestion] = useState("");
