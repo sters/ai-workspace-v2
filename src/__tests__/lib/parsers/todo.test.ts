@@ -580,4 +580,23 @@ describe("normalizeTodoCheckboxes", () => {
       "# TODO: repo\n\n## Phase 1\n\n- [ ] Task A\n- [ ] Task B\n\n## Phase 2\n\n- [ ] Task C",
     );
   });
+
+  it("does not add checkboxes to items in Notes section", () => {
+    const content =
+      "## Phase 1\n\n- [ ] Task A\n\n## Notes\n\n- Some finding\n- Another note";
+    expect(normalizeTodoCheckboxes(content)).toBe(content);
+  });
+
+  it("resumes adding checkboxes after Notes section ends", () => {
+    const content =
+      "## Notes\n\n- Just a note\n\n## Phase 2\n\n- Task B";
+    expect(normalizeTodoCheckboxes(content)).toBe(
+      "## Notes\n\n- Just a note\n\n## Phase 2\n\n- [ ] Task B",
+    );
+  });
+
+  it("handles case-insensitive Notes heading", () => {
+    const content = "## notes\n\n- A note\n- Another note";
+    expect(normalizeTodoCheckboxes(content)).toBe(content);
+  });
 });
