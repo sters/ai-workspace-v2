@@ -78,7 +78,9 @@ export function startChatServer(port: number) {
 
         switch (msg.type) {
           case "start":
-            handleStart(ws, msg);
+            handleStart(ws, msg).catch((err) => {
+              send(ws, { type: "error", message: `Failed to start session: ${err}` });
+            });
             break;
           case "resume":
             handleResume(ws, msg);

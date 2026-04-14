@@ -14,8 +14,8 @@ vi.mock("@/lib/config", () => ({
 }));
 
 vi.mock("@/lib/templates", () => ({
-  buildInitPrompt: () => "init-prompt-body",
-  buildReviewChatPrompt: () => "review-prompt-body",
+  buildInitPrompt: () => Promise.resolve("init-prompt-body"),
+  buildReviewChatPrompt: () => Promise.resolve("review-prompt-body"),
 }));
 
 vi.mock("@/lib/workspace/prompts", () => ({
@@ -63,7 +63,7 @@ function makeWs() {
 async function startSession() {
   const { handleStart } = await import("@/lib/chat-server/handlers");
   const ws = makeWs();
-  handleStart(ws, { type: "start", workspaceId: "demo" });
+  await handleStart(ws, { type: "start", workspaceId: "demo" });
   return ws;
 }
 
