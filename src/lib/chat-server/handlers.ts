@@ -2,7 +2,7 @@ import path from "node:path";
 import { spawnClaudeTerminal } from "../claude/cli";
 import type { DataListener } from "@/types/pty";
 import { buildInitPrompt, buildReviewChatPrompt } from "@/lib/templates";
-import { ensureSystemPrompt } from "@/lib/workspace/prompts";
+import { ensureSessionSystemPrompt, cleanupSessionSystemPrompt } from "@/lib/workspace/prompts";
 import type { ChatSession, ClientMessage, ServerMessage, WsData } from "@/types/chat-server";
 import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
 
@@ -45,9 +45,11 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
       ? await buildReviewChatPrompt(msg.workspaceId, workspacePath, msg.reviewTimestamp)
       : await buildInitPrompt(msg.workspaceId, workspacePath));
 
-  const systemPromptFile = ensureSystemPrompt(
+  const systemPromptFile = ensureSessionSystemPrompt(
     workspacePath,
     isReviewChat ? "review-chat" : "chat",
+    sessionId,
+    { workspaceId: msg.workspaceId },
   );
 
   const chatModel = getConfig().chat.model;
@@ -89,7 +91,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
   };
   listeners.add(outputListener);
 
-  // Track process exit
+  // Track process exit and clean up per-session system prompt file
   proc.exited.then((code) => {
     session.exited = true;
     session.exitCode = code;
@@ -98,6 +100,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     if (session.activeWs) {
       send(session.activeWs, { type: "exited", code });
     }
+    cleanupSessionSystemPrompt(systemPromptFile);
   });
 
   send(ws, { type: "started", sessionId });

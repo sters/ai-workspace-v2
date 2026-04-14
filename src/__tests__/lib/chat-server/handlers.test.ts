@@ -3,6 +3,8 @@ import type { ClaudeModel } from "@/types/claude";
 
 const mockSpawnClaudeTerminal = vi.fn();
 const mockGetConfig = vi.fn();
+const mockEnsureSessionSystemPrompt = vi.fn();
+const mockCleanupSessionSystemPrompt = vi.fn();
 
 vi.mock("@/lib/claude/cli", () => ({
   spawnClaudeTerminal: (...args: unknown[]) => mockSpawnClaudeTerminal(...args),
@@ -19,7 +21,8 @@ vi.mock("@/lib/templates", () => ({
 }));
 
 vi.mock("@/lib/workspace/prompts", () => ({
-  ensureSystemPrompt: () => "/mock/system-prompt.md",
+  ensureSessionSystemPrompt: (...args: unknown[]) => mockEnsureSessionSystemPrompt(...args),
+  cleanupSessionSystemPrompt: (...args: unknown[]) => mockCleanupSessionSystemPrompt(...args),
 }));
 
 vi.mock("@/lib/db/chat-sessions", () => ({
@@ -40,6 +43,9 @@ beforeEach(() => {
     exited: Promise.resolve(0),
   });
   mockGetConfig.mockReset();
+  mockEnsureSessionSystemPrompt.mockReset();
+  mockEnsureSessionSystemPrompt.mockReturnValue("/mock/session-prompt.md");
+  mockCleanupSessionSystemPrompt.mockReset();
   setChatModel("sonnet");
 
   // Reset the chat-server store to avoid leakage between tests via globalThis.
@@ -100,5 +106,15 @@ describe("handleStart", () => {
 
     const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
     expect(opts.args).not.toContain("--model");
+  });
+
+  it("creates per-session system prompt with workspace context", async () => {
+    await startSession();
+
+    expect(mockEnsureSessionSystemPrompt).toHaveBeenCalledTimes(1);
+    const [wsPath, agentName, _sessionId, context] = mockEnsureSessionSystemPrompt.mock.calls[0];
+    expect(wsPath).toBe("/mock/workspace-root/workspace/demo");
+    expect(agentName).toBe("chat");
+    expect(context).toEqual({ workspaceId: "demo" });
   });
 });
