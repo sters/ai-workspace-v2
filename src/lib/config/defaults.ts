@@ -29,7 +29,8 @@ export const CONFIG_DEFAULTS: AppConfig = {
     model: "sonnet",
   },
   quickAsk: {
-    model: "sonnet",
+    model: "haiku",
+    allowedTools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
   },
   editor: "code {path}",
   terminal: "open -a Terminal {path}",
@@ -101,7 +102,8 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "chat", section: null, defaultLine: "# chat:" },
   { key: "model", section: "chat", defaultLine: "#   model: sonnet                  # default model for interactive chat (null = CLI default)" },
   { key: "quickAsk", section: null, defaultLine: "# quickAsk:" },
-  { key: "model", section: "quickAsk", defaultLine: "#   model: sonnet                  # default model for quick-ask (null = CLI default)" },
+  { key: "model", section: "quickAsk", defaultLine: "#   model: haiku                   # default model for quick-ask (null = CLI default)" },
+  { key: "allowedTools", section: "quickAsk", defaultLine: "#   allowedTools: [Read, Glob, Grep, WebFetch, WebSearch]  # null = no restriction" },
   { key: "editor", section: null, defaultLine: "# editor: code {path}" },
   { key: "terminal", section: null, defaultLine: "# terminal: open -a Terminal {path}" },
 ];
