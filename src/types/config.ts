@@ -1,4 +1,4 @@
-import type { ClaudeModel } from "./claude";
+import type { ClaudeEffort, ClaudeModel } from "./claude";
 import type { OperationType } from "./operation";
 import type { InteractionLevel } from "./prompts";
 
@@ -53,6 +53,8 @@ export interface AppConfig {
   quickAsk: {
     /** Default Claude model. null = CLI default. */
     model: ClaudeModel | null;
+    /** Claude CLI --effort level. null = CLI default. */
+    effort: ClaudeEffort | null;
     /** Restrict Claude to these tools. null = no restriction. */
     allowedTools: string[] | null;
   };

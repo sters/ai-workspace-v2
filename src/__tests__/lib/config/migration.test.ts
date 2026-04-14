@@ -74,6 +74,11 @@ describe("migration: model support", () => {
     expect(content).toContain("#   model: null");
   });
 
+  it("quickAsk effort appears in generated default config", () => {
+    const content = generateDefaultConfigContent();
+    expect(content).toContain("#   effort: medium");
+  });
+
   it("disableAccessLog appears in generated default config", () => {
     const content = generateDefaultConfigContent();
     expect(content).toContain("#   disableAccessLog: false");
