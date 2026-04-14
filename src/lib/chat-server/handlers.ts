@@ -15,7 +15,7 @@ import { runGc } from "./gc";
 
 type Ws = { send(data: string): void; data: WsData };
 
-export function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" }>): void {
+export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" }>): Promise<void> {
   const store = getStore();
   const wsData = ws.data;
 
@@ -42,8 +42,8 @@ export function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" 
   const isReviewChat = !msg.initialPrompt && !!msg.reviewTimestamp;
   const initPrompt = msg.initialPrompt
     || (msg.reviewTimestamp
-      ? buildReviewChatPrompt(msg.workspaceId, workspacePath, msg.reviewTimestamp)
-      : buildInitPrompt(msg.workspaceId, workspacePath));
+      ? await buildReviewChatPrompt(msg.workspaceId, workspacePath, msg.reviewTimestamp)
+      : await buildInitPrompt(msg.workspaceId, workspacePath));
 
   const systemPromptFile = ensureSystemPrompt(
     workspacePath,
