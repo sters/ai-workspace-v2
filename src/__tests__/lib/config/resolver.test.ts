@@ -72,9 +72,9 @@ describe("mergeConfig", () => {
     expect(result.chat.model).toBe("sonnet");
   });
 
-  it("defaults quickAsk.model to sonnet", () => {
+  it("defaults quickAsk.model to haiku", () => {
     const result = mergeConfig(CONFIG_DEFAULTS, null, {});
-    expect(result.quickAsk.model).toBe("sonnet");
+    expect(result.quickAsk.model).toBe("haiku");
   });
 
   it("file config overrides chat.model and quickAsk.model", () => {
