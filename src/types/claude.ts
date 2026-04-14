@@ -10,6 +10,16 @@ export const CLAUDE_MODELS = {
 
 export type ClaudeModel = (typeof CLAUDE_MODELS)[keyof typeof CLAUDE_MODELS];
 
+/** Known Claude CLI --effort levels. */
+export const CLAUDE_EFFORTS = {
+  LOW: "low",
+  MEDIUM: "medium",
+  HIGH: "high",
+  MAX: "max",
+} as const;
+
+export type ClaudeEffort = (typeof CLAUDE_EFFORTS)[keyof typeof CLAUDE_EFFORTS];
+
 export interface ClaudeProcess {
   id: string;
   onEvent: (handler: (event: OperationEvent) => void) => void;
@@ -30,6 +40,8 @@ export interface RunClaudeOptions {
   skipAskUserQuestion?: boolean;
   /** Claude model to use (e.g. "opus", "sonnet", "haiku"). Passed as --model to CLI. */
   model?: ClaudeModel;
+  /** Effort level for the session (e.g. "low", "medium", "high", "max"). Passed as --effort to CLI. */
+  effort?: ClaudeEffort;
   /** Path to a file whose content is appended to Claude's system prompt via --append-system-prompt-file. */
   appendSystemPromptFile?: string;
   /** Explicit --allowedTools values. When set, overrides the auto-generated Edit/Write patterns from addDirs. */

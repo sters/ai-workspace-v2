@@ -221,6 +221,7 @@ export function mergeConfig(
     },
     quickAsk: {
       model: pick(env.quickAsk?.model, file.quickAsk?.model, defaults.quickAsk.model),
+      effort: pick(env.quickAsk?.effort, file.quickAsk?.effort, defaults.quickAsk.effort),
       allowedTools: (env.quickAsk?.allowedTools ?? file.quickAsk?.allowedTools ?? defaults.quickAsk.allowedTools),
     },
     editor: pick(env.editor, file.editor, defaults.editor),

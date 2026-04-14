@@ -18,10 +18,11 @@ export async function POST(request: Request) {
   const workspacePath = path.join(getWorkspaceDir(), workspace);
   const prompt = buildQuickAskPrompt(workspace, workspacePath, question);
 
-  const { model: quickAskModel, allowedTools: configAllowedTools } = getConfig().quickAsk;
+  const { model: quickAskModel, effort: quickAskEffort, allowedTools: configAllowedTools } = getConfig().quickAsk;
   const model = quickAskModel ?? undefined;
+  const effort = quickAskEffort ?? undefined;
   const allowedTools = configAllowedTools ?? undefined;
-  const proc = runClaude("quick-ask", prompt, { cwd: getResolvedWorkspaceRoot(), appendSystemPromptFile: ensureSystemPrompt(workspacePath, "quick-ask"), model, allowedTools });
+  const proc = runClaude("quick-ask", prompt, { cwd: getResolvedWorkspaceRoot(), appendSystemPromptFile: ensureSystemPrompt(workspacePath, "quick-ask"), model, effort, allowedTools });
 
   const stream = new ReadableStream({
     start(controller) {
