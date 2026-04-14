@@ -55,6 +55,8 @@ Per-workspace config stored in `{workspaceRoot}/.ai-workspace/config.yml`. Three
 - **Phase retries** — Phases support `maxRetries` (default 2) and `retryDelayMs` (default 3000). Per-phase timeouts use separate AbortControllers from the operation-level kill signal.
 - **Workspace archiving** — `workspace_archives` table (migration v4). `POST /api/workspaces/[name]/archive` toggles archive. Dashboard filters via `recentOnly` (skips workspaces older than 1 week) and `includeArchived` query params.
 - **TODO normalization** — `normalizeTodoCheckboxes()` fixes common LLM formatting errors (missing checkboxes, bracket spacing, asterisk bullets). `stripCompletedTodoItems()` removes `[x]` items before update-todo runs. Both prevent autonomous loops.
+- **Memo tab** — Per-workspace `artifacts/memo.md` file with Monaco editor (`src/components/workspace/memo-editor.tsx`). Auto-saves every 60s + on navigation/beforeunload. Module-level content cache prevents stale content on tab switches. Toolbar actions on selected text: "Update TODO" (starts update-todo operation) and "Ask Claude" (inline streamed response via quick-ask). API: `GET/POST /api/workspaces/[name]/memo`.
+- **Quick Ask** — Lightweight Claude queries for inline features (memo "Ask Claude", etc.). Configurable in `config.yml` under `quickAsk`: `model` (default haiku), `allowedTools` (default read-only tools: Read, Glob, Grep, WebFetch, WebSearch; set to `null` for no restriction). API: `POST /api/operations/quick-ask`.
 
 ### Server-side key directories
 
