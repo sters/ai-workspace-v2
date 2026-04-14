@@ -206,6 +206,33 @@ export function ensureGlobalSystemPrompt(agentName: string): string {
   return path.join(rootPath, "prompts", `${agentName}.md`);
 }
 
+/**
+ * Create a per-session system prompt file that includes the base agent prompt
+ * plus dynamic workspace context. Returns the absolute path to the session file.
+ * Used for chat sessions where workspace-specific info must be in the system prompt.
+ */
+export function ensureSessionSystemPrompt(
+  wsPath: string,
+  agentName: string,
+  sessionId: string,
+  context: { workspaceId: string },
+): string {
+  const baseFile = ensureSystemPrompt(wsPath, agentName);
+  const baseContent = readFileSync(baseFile, "utf-8");
+  const contextBlock = `\n\nWorkspace: "${context.workspaceId}"\nWorkspace directory: ${wsPath}`;
+
+  const sessionDir = path.join(wsPath, "prompts", "sessions");
+  mkdirSync(sessionDir, { recursive: true });
+  const sessionFile = path.join(sessionDir, `${agentName}-${sessionId}.md`);
+  writeFileSync(sessionFile, baseContent + contextBlock, "utf-8");
+  return sessionFile;
+}
+
+/** Best-effort cleanup of a per-session system prompt file. */
+export function cleanupSessionSystemPrompt(sessionFile: string): void {
+  try { unlinkSync(sessionFile); } catch { /* best-effort */ }
+}
+
 /** Reset verified dirs cache (for testing). */
 export function _resetVerifiedDirs(): void {
   _verifiedDirs.clear();

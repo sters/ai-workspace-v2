@@ -40,9 +40,6 @@ export async function buildInitPrompt(
   const todos = options?.todos ?? await listTodoFilesRaw(workspacePath);
 
   const parts = [
-    `Workspace: "${workspaceId}"`,
-    `Workspace directory: ${workspacePath}`,
-    "",
     "## README.md",
     readme || "(no README.md)",
     "",
@@ -79,9 +76,6 @@ export async function buildReviewChatPrompt(
   );
 
   const parts = [
-    `Workspace: "${workspaceId}"`,
-    `Workspace directory: ${workspacePath}`,
-    "",
     `I want to discuss the review session from timestamp "${reviewTimestamp}".`,
     `The review artifacts are located at: ${workspacePath}/artifacts/reviews/${reviewTimestamp}/`,
     "",

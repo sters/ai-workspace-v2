@@ -18,22 +18,6 @@ describe("buildInitPrompt", () => {
   const workspaceId = "my-project";
   const workspacePath = "/root/workspace/my-project";
 
-  it("includes the workspace ID", async () => {
-    const prompt = await buildInitPrompt(workspaceId, workspacePath, {
-      readme: "# Test",
-      todos: [],
-    });
-    expect(prompt).toContain('"my-project"');
-  });
-
-  it("includes the workspace directory path", async () => {
-    const prompt = await buildInitPrompt(workspaceId, workspacePath, {
-      readme: "# Test",
-      todos: [],
-    });
-    expect(prompt).toContain(workspacePath);
-  });
-
   it("embeds README content", async () => {
     const prompt = await buildInitPrompt(workspaceId, workspacePath, {
       readme: "# My Project\nSome description",
@@ -96,16 +80,6 @@ describe("buildReviewChatPrompt", () => {
   const workspaceId = "my-project";
   const workspacePath = "/root/workspace/my-project";
   const reviewTimestamp = "20260214-235920";
-
-  it("includes the workspace ID and path", async () => {
-    const prompt = await buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp, {
-      readme: "# Test",
-      todos: [],
-      reviewSummary: "All good",
-    });
-    expect(prompt).toContain('"my-project"');
-    expect(prompt).toContain(workspacePath);
-  });
 
   it("includes the review timestamp and artifacts path", async () => {
     const prompt = await buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp, {
