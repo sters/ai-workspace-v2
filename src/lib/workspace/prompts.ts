@@ -223,6 +223,16 @@ export function ensureSessionSystemPrompt(
 
   const sessionDir = path.join(wsPath, "prompts", "sessions");
   mkdirSync(sessionDir, { recursive: true });
+
+  // Clean up stale session prompt files left over from previous runs
+  try {
+    for (const entry of readdirSync(sessionDir)) {
+      if (entry.endsWith(".md")) {
+        try { unlinkSync(path.join(sessionDir, entry)); } catch { /* best-effort */ }
+      }
+    }
+  } catch { /* directory read failed — ignore */ }
+
   const sessionFile = path.join(sessionDir, `${agentName}-${sessionId}.md`);
   writeFileSync(sessionFile, baseContent + contextBlock, "utf-8");
   return sessionFile;
