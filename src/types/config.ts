@@ -53,6 +53,8 @@ export interface AppConfig {
   quickAsk: {
     /** Default Claude model. null = CLI default. */
     model: ClaudeModel | null;
+    /** Restrict Claude to these tools. null = no restriction. */
+    allowedTools: string[] | null;
   };
 
   /** Editor launch command. Use `{path}` as placeholder for the target path. */

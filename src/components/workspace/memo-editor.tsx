@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { editor } from "monaco-editor";
 import { MonacoEditorLazy } from "@/components/shared/content/monaco-editor-lazy";
 import { Button } from "@/components/shared/buttons/button";
+import { Input } from "@/components/shared/forms/input";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { useMemoContent } from "@/hooks/use-workspace";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
@@ -12,6 +13,9 @@ import { extractAnswer } from "@/lib/parsers/stream";
 import { postJson } from "@/lib/api";
 
 const AUTO_SAVE_INTERVAL_MS = 60_000;
+
+/** Module-level cache to survive tab switches (component remount). */
+const contentCache = new Map<string, string>();
 
 export function MemoEditor({
   workspaceName,
@@ -33,6 +37,7 @@ export function MemoEditor({
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [hasSelection, setHasSelection] = useState(false);
+  const [askInstruction, setAskInstruction] = useState("");
 
   // Save function
   const saveMemo = useCallback(async () => {
@@ -53,13 +58,17 @@ export function MemoEditor({
     }
   }, [workspaceName]);
 
-  // Set initial content once loaded
+  // Set initial content: prefer module cache (survives tab switch), fall back to API
   useEffect(() => {
     if (!initializedRef.current && !isLoading) {
-      contentRef.current = initialContent;
+      const cached = contentCache.get(workspaceName);
+      contentRef.current = cached ?? initialContent;
+      if (cached != null && editorRef.current) {
+        editorRef.current.setValue(cached);
+      }
       initializedRef.current = true;
     }
-  }, [initialContent, isLoading]);
+  }, [initialContent, isLoading, workspaceName]);
 
   // Auto-save interval + cleanup save on unmount/navigation
   useEffect(() => {
@@ -114,18 +123,20 @@ export function MemoEditor({
             { range, text: answer },
           ]);
           contentRef.current = model.getValue();
+          contentCache.set(workspaceName, contentRef.current);
           isDirty.current = true;
         }
       }
       pendingPlaceholderRef.current = null;
       reset();
     }
-  }, [isRunning, events, reset]);
+  }, [isRunning, events, reset, workspaceName]);
 
   const handleEditorChange = useCallback((value: string | undefined) => {
     contentRef.current = value ?? "";
+    contentCache.set(workspaceName, contentRef.current);
     isDirty.current = true;
-  }, []);
+  }, [workspaceName]);
 
   const handleEditorReady = useCallback((ed: editor.IStandaloneCodeEditor) => {
     editorRef.current = ed;
@@ -143,17 +154,29 @@ export function MemoEditor({
     return editor.getModel()?.getValueInRange(selection) ?? null;
   }, []);
 
+  const buildPrompt = useCallback((selectedText: string): string => {
+    const extra = askInstruction.trim();
+    return extra ? `${extra}\n\n---\n${selectedText}` : selectedText;
+  }, [askInstruction]);
+
+  const clearInputs = useCallback(() => {
+    setAskInstruction("");
+    editorRef.current?.setSelection({ startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 });
+  }, []);
+
   // Update TODO button handler
   const handleUpdateTodo = useCallback(async () => {
     const text = getSelectedText();
     if (!text) return;
+    const instruction = buildPrompt(text);
+    clearInputs();
     await saveMemo();
     startAndNavigate("update-todo", {
       workspace: workspacePath,
-      instruction: text,
+      instruction,
       interactionLevel: "mid",
     });
-  }, [getSelectedText, saveMemo, startAndNavigate, workspacePath]);
+  }, [getSelectedText, buildPrompt, clearInputs, saveMemo, startAndNavigate, workspacePath]);
 
   // Ask Claude button handler
   const handleAskClaude = useCallback(() => {
@@ -161,6 +184,8 @@ export function MemoEditor({
     const editor = editorRef.current;
     const model = editor?.getModel();
     if (!text || !editor || !model) return;
+
+    const question = buildPrompt(text);
 
     const uuid = crypto.randomUUID();
     const placeholder = `{TO_BE_REPLACED:${uuid}}`;
@@ -185,11 +210,12 @@ export function MemoEditor({
     isDirty.current = true;
 
     pendingPlaceholderRef.current = uuid;
+    clearInputs();
     run("/api/operations/quick-ask", {
       workspace: workspaceName,
-      question: text,
+      question,
     });
-  }, [getSelectedText, workspaceName, run]);
+  }, [getSelectedText, buildPrompt, clearInputs, workspaceName, run]);
 
   if (isLoading) {
     return (
@@ -204,6 +230,20 @@ export function MemoEditor({
       {/* Toolbar */}
       <div className="mb-2 flex items-center gap-2">
         <span className="text-xs text-muted-foreground">For selected text:</span>
+        <Input
+          type="text"
+          value={askInstruction}
+          onChange={(e) => setAskInstruction(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing && hasSelection && !isRunning) {
+              e.preventDefault();
+              handleAskClaude();
+            }
+          }}
+          disabled={!hasSelection || isRunning}
+          placeholder="Additional instruction (optional)"
+          className="w-64 px-2 py-1 text-xs"
+        />
         <Button
           variant="outline"
           onClick={handleUpdateTodo}
@@ -234,7 +274,7 @@ export function MemoEditor({
       <div className="flex-1 rounded-md border">
         <MonacoEditorLazy
           language="markdown"
-          defaultValue={initialContent}
+          defaultValue={contentCache.get(workspaceName) ?? initialContent}
           onChange={handleEditorChange}
           onEditorReady={handleEditorReady}
           options={{
