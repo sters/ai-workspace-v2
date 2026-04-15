@@ -4,7 +4,7 @@ import { getHistory } from "@/lib/workspace/reader";
 export const dynamic = "force-dynamic";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ name: string }> }
 ) {
   try {
@@ -13,8 +13,10 @@ export async function GET(
     if (name.includes('..') || name.includes('/') || name.includes('\\')) {
       return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
     }
-    const history = getHistory(name);
-    return NextResponse.json(history);
+    const url = new URL(request.url);
+    const skip = Math.max(0, parseInt(url.searchParams.get("skip") ?? "0", 10) || 0);
+    const { entries, hasMore } = getHistory(name, skip);
+    return NextResponse.json({ entries, hasMore });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
