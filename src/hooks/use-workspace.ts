@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from "react";
 import useSWR from "swr";
 import type { WorkspaceSummary, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";
@@ -58,12 +59,32 @@ export function useReviews(name: string) {
 }
 
 export function useHistory(name: string) {
-  const { data, error, isLoading } = useSWR<HistoryEntry[]>(
+  const { data, error, isLoading, mutate } = useSWR<{ entries: HistoryEntry[]; hasMore: boolean }>(
     name ? `/api/workspaces/${encodeURIComponent(name)}/history` : null,
     fetcher
   );
 
-  return { history: data ?? [], isLoading, error };
+  const loadMore = useCallback(async () => {
+    if (!data || !data.hasMore) return;
+    const skip = data.entries.length;
+    const res = await fetch(
+      `/api/workspaces/${encodeURIComponent(name)}/history?skip=${skip}`
+    );
+    if (!res.ok) return;
+    const page: { entries: HistoryEntry[]; hasMore: boolean } = await res.json();
+    await mutate(
+      { entries: [...data.entries, ...page.entries], hasMore: page.hasMore },
+      { revalidate: false }
+    );
+  }, [data, name, mutate]);
+
+  return {
+    history: data?.entries ?? [],
+    hasMore: data?.hasMore ?? false,
+    isLoading,
+    error,
+    loadMore,
+  };
 }
 
 export function useResearchReport(name: string) {

@@ -389,17 +389,19 @@ export async function quickSearchWorkspaces(query: string): Promise<QuickSearchR
   return results;
 }
 
-export function getHistory(name: string): HistoryEntry[] {
+const HISTORY_PAGE_SIZE = 30;
+
+export function getHistory(name: string, skip = 0): { entries: HistoryEntry[]; hasMore: boolean } {
   const wsPath = path.join(getWorkspaceDir(), name);
-  if (!existsSync(path.join(wsPath, ".git"))) return [];
+  if (!existsSync(path.join(wsPath, ".git"))) return { entries: [], hasMore: false };
 
   try {
-    const result = Bun.spawnSync(
-      ["git", "-C", wsPath, "log", "--format=%H|%aI|%s|%an", "-30"],
-      { stdout: "pipe", stderr: "pipe" }
-    );
-    if (!result.success) return [];
-    return result.stdout
+    // Fetch one extra to detect if there are more commits beyond this page
+    const args = ["git", "-C", wsPath, "log", "--format=%H|%aI|%s|%an", `-${HISTORY_PAGE_SIZE + 1}`];
+    if (skip > 0) args.push(`--skip=${skip}`);
+    const result = Bun.spawnSync(args, { stdout: "pipe", stderr: "pipe" });
+    if (!result.success) return { entries: [], hasMore: false };
+    const all = result.stdout
       .toString()
       .trim()
       .split("\n")
@@ -408,7 +410,9 @@ export function getHistory(name: string): HistoryEntry[] {
         const [hash, date, message, author] = line.split("|");
         return { hash, date, message, author };
       });
+    const hasMore = all.length > HISTORY_PAGE_SIZE;
+    return { entries: all.slice(0, HISTORY_PAGE_SIZE), hasMore };
   } catch {
-    return [];
+    return { entries: [], hasMore: false };
   }
 }
