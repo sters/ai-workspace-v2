@@ -82,6 +82,6 @@ describe("db/connection", () => {
     const row = db
       .query("SELECT MAX(version) as v FROM schema_migrations")
       .get() as { v: number };
-    expect(row.v).toBe(4);
+    expect(row.v).toBe(5);
   });
 });

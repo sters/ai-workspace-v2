@@ -99,6 +99,25 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 5,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE notification_logs (
+          id            INTEGER PRIMARY KEY AUTOINCREMENT,
+          title         TEXT NOT NULL,
+          body          TEXT NOT NULL,
+          tag           TEXT NOT NULL,
+          url           TEXT NOT NULL,
+          endpoint      TEXT NOT NULL,
+          success       INTEGER NOT NULL,
+          error_message TEXT,
+          created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE INDEX idx_notif_logs_created_at ON notification_logs(created_at DESC);
+      `);
+    },
+  },
 ];
 
 /**
