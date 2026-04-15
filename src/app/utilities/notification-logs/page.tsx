@@ -50,40 +50,42 @@ export default function NotificationLogsPage() {
           </div>
           <div className="grid gap-2">
             {logs.map((log) => (
-              <Card key={log.id} className="text-sm">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={
-                          log.success
-                            ? "font-semibold text-green-600 dark:text-green-400"
-                            : "font-semibold text-destructive"
-                        }
-                      >
-                        {log.success ? "OK" : "FAIL"}
-                      </span>
-                      <span className="font-medium">{log.title}</span>
+              <a key={log.id} href={log.url} className="block no-underline">
+                <Card className="text-sm transition-colors hover:bg-accent">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={
+                            log.success
+                              ? "font-semibold text-green-600 dark:text-green-400"
+                              : "font-semibold text-destructive"
+                          }
+                        >
+                          {log.success ? "OK" : "FAIL"}
+                        </span>
+                        <span className="font-medium">{log.title}</span>
+                      </div>
+                      <p className="mt-1 text-muted-foreground">{log.body}</p>
+                      {log.errorMessage && (
+                        <p className="mt-1 text-xs text-destructive">{log.errorMessage}</p>
+                      )}
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        <span>tag: {log.tag}</span>
+                        <span className="truncate max-w-64" title={log.endpoint}>
+                          endpoint: {log.endpoint.slice(0, 60)}...
+                        </span>
+                      </div>
                     </div>
-                    <p className="mt-1 text-muted-foreground">{log.body}</p>
-                    {log.errorMessage && (
-                      <p className="mt-1 text-xs text-destructive">{log.errorMessage}</p>
-                    )}
-                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                      <span>tag: {log.tag}</span>
-                      <span className="truncate max-w-64" title={log.endpoint}>
-                        endpoint: {log.endpoint.slice(0, 60)}...
-                      </span>
-                    </div>
+                    <time
+                      className="shrink-0 text-xs text-muted-foreground"
+                      dateTime={log.createdAt}
+                    >
+                      {new Date(log.createdAt).toLocaleString()}
+                    </time>
                   </div>
-                  <time
-                    className="shrink-0 text-xs text-muted-foreground"
-                    dateTime={log.createdAt}
-                  >
-                    {new Date(log.createdAt).toLocaleString()}
-                  </time>
-                </div>
-              </Card>
+                </Card>
+              </a>
             ))}
           </div>
 
