@@ -56,6 +56,12 @@ const tools = [
     description:
       "View and manage all currently running operations.",
   },
+  {
+    href: "/utilities/notification-logs",
+    name: "Notification Logs",
+    description:
+      "View web push notification history.",
+  },
 ];
 
 export default function UtilitiesPage() {

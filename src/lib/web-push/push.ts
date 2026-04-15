@@ -5,6 +5,7 @@ import {
   removePushSubscription,
   getAllPushSubscriptions,
 } from "@/lib/db/push";
+import { insertNotificationLog } from "@/lib/db/notification-logs";
 import { getConfig } from "@/lib/config";
 
 interface PushSubscriptionData {
@@ -43,9 +44,20 @@ function broadcastNotification(payload: NotificationPayload): void {
       .sendNotification(sub, json, { vapidDetails: vapid, TTL: 60 })
       .then(() => {
         console.log(`[web-push] sent OK to ${sub.endpoint.slice(0, 60)}…`);
+        insertNotificationLog({
+          ...payload,
+          endpoint: sub.endpoint,
+          success: true,
+        });
       })
       .catch((err) => {
         console.error(`[web-push] send failed: status=${err.statusCode}, message=${err.message}`);
+        insertNotificationLog({
+          ...payload,
+          endpoint: sub.endpoint,
+          success: false,
+          errorMessage: `status=${err.statusCode}, ${err.message}`,
+        });
         if (err.statusCode === 404 || err.statusCode === 410) {
           removePushSubscription(sub.endpoint);
         }

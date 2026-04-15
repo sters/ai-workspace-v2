@@ -11,6 +11,7 @@ const UTILITY_ITEMS = [
   { label: "Claude Settings", href: "/utilities/claude-settings" },
   { label: "Claude Auth", href: "/utilities/claude-auth" },
   { label: "Running Operations", href: "/utilities/running" },
+  { label: "Notification Logs", href: "/utilities/notification-logs" },
   { label: "Check Update", href: "/utilities/check-update" },
 ];
 
