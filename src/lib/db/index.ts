@@ -39,3 +39,6 @@ export { insertSuggestion, listActiveSuggestions, dismissSuggestion, getSuggesti
 // Workspace archives
 export { archiveWorkspace, unarchiveWorkspace, isWorkspaceArchived, listArchivedWorkspaces, getArchivedNameSet, _resetArchiveStatements } from "./archives";
 export type { ArchivedWorkspace } from "./archives";
+
+// Snippets
+export { insertSnippet, updateSnippet, deleteSnippet, getSnippet, listSnippets, _resetSnippetStatements } from "./snippets";
