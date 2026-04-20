@@ -170,3 +170,18 @@ export const pushSubscriptionSchema = z.object({
 export const pushUnsubscribeSchema = z.object({
   endpoint: z.string().url(),
 });
+
+export const snippetCreateSchema = z.object({
+  title: z.string().min(1, "title is required"),
+  content: z.string().min(1, "content is required"),
+});
+
+export const snippetUpdateSchema = z.object({
+  id: z.coerce.number().int().positive("id is required"),
+  title: z.string().min(1, "title is required"),
+  content: z.string().min(1, "content is required"),
+});
+
+export const snippetDeleteSchema = z.object({
+  id: z.coerce.number().int().positive("id is required"),
+});

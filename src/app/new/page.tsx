@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { InitOperation, InitSplitButton } from "@/components/operation/init-operation";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
+import { SnippetPicker } from "@/components/shared/forms/snippet-picker";
 import type { InteractionLevel } from "@/types/prompts";
 
 function NewWorkspacePageContent() {
@@ -23,9 +24,19 @@ function NewWorkspacePageContent() {
         {({ start, started }) => (
           <div className="w-full space-y-4">
             <div>
-              <label className="mb-1 block text-xs font-medium">
-                Task Description
-              </label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs font-medium">
+                  Task Description
+                </label>
+                <SnippetPicker
+                  onInsert={(content) =>
+                    setDescription((prev) =>
+                      prev.trim() ? `${prev}\n\n${content}` : content,
+                    )
+                  }
+                  disabled={started}
+                />
+              </div>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}

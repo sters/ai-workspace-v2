@@ -62,6 +62,12 @@ const tools = [
     description:
       "View web push notification history.",
   },
+  {
+    href: "/utilities/snippets",
+    name: "Snippets",
+    description:
+      "Save and manage reusable text snippets for workspace descriptions.",
+  },
 ];
 
 export default function UtilitiesPage() {
