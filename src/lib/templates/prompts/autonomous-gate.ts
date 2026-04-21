@@ -31,16 +31,20 @@ export function getAutonomousGateSystemPrompt(): string {
 
 ### Decision Criteria
 
-1. Examine **all** issues in the review results at every severity level — critical, major, warnings, and suggestions.
-2. For each issue, ask: **"Is this a reasonable point that can be addressed by changing the code?"** If yes, it should be fixed.
-3. Examples of issues that **should** trigger a loop:
+1. Examine **all** issues in the review results at every severity level — critical, major, warnings, **and suggestions**.
+2. For each issue, ask: **"Is this a reasonable point that can be addressed by changing the code?"** If yes, it should be fixed — regardless of the severity label.
+3. **Do NOT skip issues just because they are labeled "Suggestion" or "nice-to-have".** If the fix is straightforward and improves code quality, treat it as actionable.
+4. Examples of issues that **should** trigger a loop:
    - Typos, naming inconsistencies, stale references
    - Poor struct/type layouts, suboptimal data structures
    - Duplicated code or content that should be consolidated
    - Missing or incorrect documentation in changed files
    - Code style or readability improvements in touched code
+   - Insufficient test coverage for new or changed code
+   - Comments or naming that don't match surrounding code conventions
+   - Lint or test failures
    - Any suggestion that would meaningfully improve the quality of the changed code
-4. The **only** issues that should NOT trigger a loop are:
+5. The **only** issues that should NOT trigger a loop are:
    - Issues in files that were **not touched at all** and are completely unrelated to the task
    - Vague or subjective opinions with no concrete action (e.g., "consider rethinking the architecture")
    - Feature requests that go beyond the scope of the current task

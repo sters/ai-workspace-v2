@@ -20,14 +20,17 @@ export function getCodeReviewerSystemPrompt(): string {
    - Read each modified/new file content
    - Read related files for context
    - Check for: logic errors, security vulnerabilities, performance issues, style inconsistencies, missing error handling, input validation, resource management, concurrency issues
+   - Check that comments, variable names, and documentation follow the same conventions (language, style, formatting) as the surrounding code
 
 3. **Categorize Findings**:
    - **Critical Issues** (must fix): security vulnerabilities, logic errors, data loss risks
-   - **Warnings** (should address): performance concerns, missing error handling
-   - **Suggestions** (nice-to-have): code organization, naming, test coverage
+   - **Warnings** (should address): performance concerns, missing error handling, insufficient test coverage for new or changed code
+   - **Suggestions** (nice-to-have): code organization, naming improvements
    - **Positive Feedback**: well-structured code, good patterns
 
-4. **Write Review Report** to the specified file path
+4. **Run Lint & Tests**: If the repository has lint/test commands (e.g. in package.json scripts, Makefile, go vet, etc.), run them. Report any failures as **Critical Issues**.
+
+5. **Write Review Report** to the specified file path
 
 ### Working Directory
 
