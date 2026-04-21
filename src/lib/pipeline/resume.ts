@@ -115,10 +115,23 @@ async function rebuildPipeline(op: Operation): Promise<PipelinePhase[] | null> {
 
       case "autonomous": {
         const { buildAutonomousPipeline } = await import("@/lib/pipelines/autonomous");
-        // Count how many cycle phases existed so we pre-generate enough for resume.
-        // Cycle phases are those with labels matching "Cycle N".
+        // Parse saved phase labels to reconstruct cycle structure for resume.
+        // Labels are "Cycle N: Execute", "Cycle N: Review", "Cycle N: Gate", "Cycle N: Update TODO".
         const savedPhases = op.phases ?? [];
-        const cyclePhaseCount = savedPhases.filter((p) => /^Cycle \d+$/.test(p.label)).length;
+        const cyclePhaseMap = new Map<number, Set<string>>();
+        for (const p of savedPhases) {
+          const match = p.label.match(/^Cycle (\d+): (.+)$/);
+          if (match) {
+            const num = parseInt(match[1]);
+            if (!cyclePhaseMap.has(num)) cyclePhaseMap.set(num, new Set());
+            cyclePhaseMap.get(num)!.add(match[2]);
+          }
+        }
+        const resumeCycles = cyclePhaseMap.size > 0
+          ? [...cyclePhaseMap.entries()]
+              .sort(([a], [b]) => a - b)
+              .map(([cycle, steps]) => ({ cycle, hasUpdateTodo: steps.has("Update TODO") }))
+          : undefined;
         const hasCreatePr = savedPhases.some((p) => p.label === "Create PR");
         return buildAutonomousPipeline({
           startWith: inputs.startWith as "init" | "update-todo" | "execute",
@@ -129,7 +142,7 @@ async function rebuildPipeline(op: Operation): Promise<PipelinePhase[] | null> {
           interactionLevel: inputs.interactionLevel as InteractionLevel | undefined,
           repo: inputs.repo,
           maxLoops: inputs.maxLoops ? Number(inputs.maxLoops) : undefined,
-          resumeCycleCount: cyclePhaseCount > 0 ? cyclePhaseCount : undefined,
+          resumeCycles,
           resumeWithCreatePr: hasCreatePr,
         });
       }

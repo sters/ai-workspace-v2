@@ -118,8 +118,8 @@ export function buildAutonomousPipeline(input: {
   interactionLevel?: InteractionLevel;
   repo?: string;
   maxLoops?: number;
-  /** For resume: pre-generate this many cycle phases so resumeFrom index is valid. */
-  resumeCycleCount?: number;
+  /** For resume: pre-generate cycle phases matching the saved structure. */
+  resumeCycles?: { cycle: number; hasUpdateTodo: boolean }[];
   /** For resume: append a Create PR phase to match the saved phase structure. */
   resumeWithCreatePr?: boolean;
 }): PipelinePhase[] {
@@ -158,37 +158,59 @@ export function buildAutonomousPipeline(input: {
   }
 
   // ------------------------------------------------------------------
-  // Autonomous cycle: each iteration is its own dynamic phase
+  // Autonomous cycle: each step is its own top-level phase
   // ------------------------------------------------------------------
 
-  // Helper to build a single cycle phase (Execute → Review → Gate → UpdateTODO)
-  function buildCyclePhase(loopNumber: number): PipelinePhase {
+  function buildCycleExecutePhase(loopNumber: number): PipelinePhase {
     return {
       kind: "function",
-      label: `Cycle ${loopNumber}`,
-      timeoutMs: 50 * 60 * 1000,
+      label: `Cycle ${loopNumber}: Execute`,
+      timeoutMs: 25 * 60 * 1000,
       fn: async (ctx) => {
         if (ctx.signal.aborted) return false;
-
-        // Execute
         const ws = resolveWorkspace(ctx.operationId, workspace);
         if (!ws) {
           ctx.emitStatus("No workspace found — cannot execute");
           return false;
         }
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Executing workspace: ${ws}`);
-
         const execPhases = await buildExecutePipeline({ workspace: ws, repository: repo });
-        const execOk = await runSubPhases(ctx, execPhases, skip);
-        if (!execOk) return false;
+        return runSubPhases(ctx, execPhases, skip);
+      },
+    };
+  }
 
-        // Review
+  function buildCycleReviewPhase(loopNumber: number): PipelinePhase {
+    return {
+      kind: "function",
+      label: `Cycle ${loopNumber}: Review`,
+      timeoutMs: 15 * 60 * 1000,
+      fn: async (ctx) => {
+        if (ctx.signal.aborted) return false;
+        const ws = resolveWorkspace(ctx.operationId, workspace);
+        if (!ws) {
+          ctx.emitStatus("No workspace found — cannot review");
+          return false;
+        }
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Reviewing workspace: ${ws}`);
         const reviewPhases = await buildReviewPipeline({ workspace: ws, repository: repo });
-        const reviewOk = await runSubPhases(ctx, reviewPhases, skip);
-        if (!reviewOk) return false;
+        return runSubPhases(ctx, reviewPhases, skip);
+      },
+    };
+  }
 
-        // AI Gate
+  function buildCycleGatePhase(loopNumber: number): PipelinePhase {
+    return {
+      kind: "function",
+      label: `Cycle ${loopNumber}: Gate`,
+      timeoutMs: 10 * 60 * 1000,
+      fn: async (ctx) => {
+        if (ctx.signal.aborted) return false;
+        const ws = resolveWorkspace(ctx.operationId, workspace);
+        if (!ws) {
+          ctx.emitStatus("No workspace found — cannot evaluate");
+          return false;
+        }
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Evaluating review results`);
         const gateResult = await runAutonomousGate(ctx, ws, loopNumber, maxLoops);
         ctx.emitResult(
@@ -199,20 +221,42 @@ export function buildAutonomousPipeline(input: {
         );
 
         if (!gateResult.shouldLoop) {
-          // Append Create PR as the next phase
           ctx.appendPhases([buildCreatePrPhase()]);
           return true;
         }
 
-        // Update TODOs with specific issues
+        // Append: Update TODO for this cycle + next cycle's 3 phases
+        ctx.appendPhases([
+          buildCycleUpdateTodoPhase(loopNumber, gateResult.fixableIssues),
+          buildCycleExecutePhase(loopNumber + 1),
+          buildCycleReviewPhase(loopNumber + 1),
+          buildCycleGatePhase(loopNumber + 1),
+        ]);
+        return true;
+      },
+    };
+  }
+
+  function buildCycleUpdateTodoPhase(loopNumber: number, fixableIssues: string[]): PipelinePhase {
+    return {
+      kind: "function",
+      label: `Cycle ${loopNumber}: Update TODO`,
+      timeoutMs: 15 * 60 * 1000,
+      fn: async (ctx) => {
+        if (ctx.signal.aborted) return false;
+        const ws = resolveWorkspace(ctx.operationId, workspace);
+        if (!ws) {
+          ctx.emitStatus("No workspace found — cannot update TODOs");
+          return false;
+        }
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Updating TODOs for next iteration`);
         const stripped = await stripCompletedTodosFromWorkspace(ws, repo);
         if (stripped.length > 0) {
           ctx.emitStatus(`Removed completed TODO items from: ${stripped.join(", ")}`);
         }
         const updateInstruction =
-          gateResult.fixableIssues.length > 0
-            ? `Fix the following issues found in review:\n${gateResult.fixableIssues.map((i) => `- ${i}`).join("\n")}`
+          fixableIssues.length > 0
+            ? `Fix the following issues found in review:\n${fixableIssues.map((i) => `- ${i}`).join("\n")}`
             : DEFAULT_UPDATE_TODO_INSTRUCTION;
         const updatePhases = await buildUpdateTodoPipeline({
           workspace: ws,
@@ -220,12 +264,7 @@ export function buildAutonomousPipeline(input: {
           repo,
           interactionLevel,
         });
-        const updateOk = await runSubPhases(ctx, updatePhases, skip);
-        if (!updateOk) return false;
-
-        // Append next cycle phase
-        ctx.appendPhases([buildCyclePhase(loopNumber + 1)]);
-        return true;
+        return runSubPhases(ctx, updatePhases, skip);
       },
     };
   }
@@ -250,10 +289,20 @@ export function buildAutonomousPipeline(input: {
   }
 
   // Start with cycle 1 — subsequent cycles are appended dynamically by gate logic.
-  // For resume, pre-generate enough cycle phases so the resumeFrom index is valid.
-  const cycleCount = input.resumeCycleCount ?? 1;
-  for (let i = 1; i <= cycleCount; i++) {
-    phases.push(buildCyclePhase(i));
+  // For resume, pre-generate all cycle phases so the resumeFrom index is valid.
+  if (input.resumeCycles) {
+    for (const { cycle, hasUpdateTodo } of input.resumeCycles) {
+      phases.push(buildCycleExecutePhase(cycle));
+      phases.push(buildCycleReviewPhase(cycle));
+      phases.push(buildCycleGatePhase(cycle));
+      if (hasUpdateTodo) {
+        phases.push(buildCycleUpdateTodoPhase(cycle, []));
+      }
+    }
+  } else {
+    phases.push(buildCycleExecutePhase(1));
+    phases.push(buildCycleReviewPhase(1));
+    phases.push(buildCycleGatePhase(1));
   }
 
   // For resume: if "Create PR" was dynamically appended before crash, include it
