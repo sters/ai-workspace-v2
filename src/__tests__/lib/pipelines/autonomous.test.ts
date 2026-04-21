@@ -117,8 +117,8 @@ describe("buildAutonomousPipeline", () => {
         workspace: "test-ws",
         instruction: "fix things",
       });
-      // update-todo function phase + Cycle 1 phase
-      expect(phases).toHaveLength(2);
+      // update-todo function phase + Cycle 1 (Execute, Review, Gate)
+      expect(phases).toHaveLength(4);
       expect(phases[0].kind).toBe("function");
       if (phases[0].kind === "function") {
         expect(phases[0].label).toBe("Update TODOs");
@@ -141,38 +141,64 @@ describe("buildAutonomousPipeline", () => {
       expect(mockBuildUpdateTodo).toHaveBeenCalled();
     });
 
-    it("only has Cycle 1 when startWith is execute", () => {
+    it("has 3 phases (Execute, Review, Gate) when startWith is execute", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
       });
-      expect(phases).toHaveLength(1);
-      expect(phases[0].kind).toBe("function");
-      if (phases[0].kind === "function") {
-        expect(phases[0].label).toBe("Cycle 1");
-      }
+      expect(phases).toHaveLength(3);
+      expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
+        "Cycle 1: Execute",
+        "Cycle 1: Review",
+        "Cycle 1: Gate",
+      ]);
     });
   });
 
-  describe("autonomous cycle", () => {
-    it("runs execute, review, and appends create-pr when no critical issues", async () => {
+  describe("cycle phases", () => {
+    it("execute phase runs buildExecutePipeline", async () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
       });
-      const cycleFn = phases[0];
-      expect(cycleFn.kind).toBe("function");
-      if (cycleFn.kind !== "function") return;
+      const execPhase = phases[0];
+      if (execPhase.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      await execPhase.fn(ctx);
+
+      expect(mockBuildExecute).toHaveBeenCalled();
+    });
+
+    it("review phase runs buildReviewPipeline", async () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const reviewPhase = phases[1];
+      if (reviewPhase.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      await reviewPhase.fn(ctx);
+
+      expect(mockBuildReview).toHaveBeenCalled();
+    });
+
+    it("gate phase appends create-pr when no critical issues", async () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const gatePhase = phases[2];
+      if (gatePhase.kind !== "function") return;
 
       const appendedPhases: PipelinePhase[] = [];
       const ctx = createMockCtx({
         appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
       });
-      await cycleFn.fn(ctx);
+      await gatePhase.fn(ctx);
 
-      expect(mockBuildExecute).toHaveBeenCalled();
-      expect(mockBuildReview).toHaveBeenCalled();
-      // Create PR is appended as a dynamic phase, not called inline
+      // Gate returned shouldLoop: false (no review sessions) → appends Create PR
       expect(appendedPhases).toHaveLength(1);
       expect(appendedPhases[0].kind).toBe("function");
       if (appendedPhases[0].kind === "function") {
@@ -180,25 +206,14 @@ describe("buildAutonomousPipeline", () => {
       }
     });
 
-    it("sets per-cycle timeout", () => {
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-        maxLoops: 5,
-      });
-      const cycleFn = phases[0];
-      // Per-cycle timeout: 50 * 60 * 1000 = 3_000_000
-      expect(cycleFn.kind === "function" && cycleFn.timeoutMs).toBe(50 * 60 * 1000);
-    });
-
-    it("uses per-cycle timeout regardless of maxLoops", () => {
+    it("sets per-step timeouts", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
       });
-      const cycleFn = phases[0];
-      // Same per-cycle timeout: 50 * 60 * 1000 = 3_000_000
-      expect(cycleFn.kind === "function" && cycleFn.timeoutMs).toBe(50 * 60 * 1000);
+      expect(phases[0].kind === "function" && phases[0].timeoutMs).toBe(25 * 60 * 1000);
+      expect(phases[1].kind === "function" && phases[1].timeoutMs).toBe(15 * 60 * 1000);
+      expect(phases[2].kind === "function" && phases[2].timeoutMs).toBe(10 * 60 * 1000);
     });
 
     it("returns false when no workspace is found", async () => {
@@ -207,11 +222,11 @@ describe("buildAutonomousPipeline", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
       });
-      const cycleFn = phases[0];
-      if (cycleFn.kind !== "function") return;
+      const execPhase = phases[0];
+      if (execPhase.kind !== "function") return;
 
       const ctx = createMockCtx();
-      const result = await cycleFn.fn(ctx);
+      const result = await execPhase.fn(ctx);
 
       expect(result).toBe(false);
       expect(ctx.emitStatus).toHaveBeenCalledWith(
@@ -219,7 +234,57 @@ describe("buildAutonomousPipeline", () => {
       );
     });
 
-    it("strips completed TODOs before update-todo when gate says shouldLoop", async () => {
+    it("gate appends Update TODO + next cycle when shouldLoop is true", async () => {
+      mockGetReviewSessions.mockResolvedValue([{
+        timestamp: "2024-01-01",
+        critical: 0,
+        major: 0,
+        minor: 2,
+        total: 2,
+      }]);
+      mockGetReviewDetail.mockResolvedValue({
+        summary: "2 warnings found",
+        files: [{ name: "REVIEW-repo.md", content: "Warning: typo found" }],
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const gatePhase = phases[2];
+      if (gatePhase.kind !== "function") return;
+
+      const appendedPhases: PipelinePhase[] = [];
+      const ctx = createMockCtx({
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "Autonomous Gate") {
+            opts.onResultText(JSON.stringify({
+              shouldLoop: true,
+              reason: "Typo should be fixed",
+              fixableIssues: ["Fix executer -> executor typo"],
+            }));
+          }
+          return true;
+        }),
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
+      });
+
+      await gatePhase.fn(ctx);
+
+      expect(ctx.emitResult).toHaveBeenCalledWith(
+        expect.stringContaining("Continue"),
+      );
+      // Should append: Update TODO + next cycle (Execute, Review, Gate)
+      expect(appendedPhases).toHaveLength(4);
+      expect(appendedPhases.map((p) => p.kind === "function" && p.label)).toEqual([
+        "Cycle 1: Update TODO",
+        "Cycle 2: Execute",
+        "Cycle 2: Review",
+        "Cycle 2: Gate",
+      ]);
+    });
+
+    it("update-todo phase strips completed TODOs and runs update pipeline", async () => {
       mockGetReviewSessions.mockResolvedValue([{
         timestamp: "2024-01-01",
         critical: 1,
@@ -237,10 +302,12 @@ describe("buildAutonomousPipeline", () => {
         workspace: "test-ws",
         repo: "my-repo",
       });
-      const cycleFn = phases[0];
-      if (cycleFn.kind !== "function") return;
+      const gatePhase = phases[2];
+      if (gatePhase.kind !== "function") return;
 
-      const ctx = createMockCtx({
+      // Run gate to get the appended Update TODO phase
+      const appendedPhases: PipelinePhase[] = [];
+      const gateCtx = createMockCtx({
         runChild: vi.fn(async (_label, _prompt, opts) => {
           if (opts?.onResultText && _label === "Autonomous Gate") {
             opts.onResultText(JSON.stringify({
@@ -251,9 +318,15 @@ describe("buildAutonomousPipeline", () => {
           }
           return true;
         }),
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
       });
+      await gatePhase.fn(gateCtx);
 
-      await cycleFn.fn(ctx);
+      // Now run the appended Update TODO phase
+      const updatePhase = appendedPhases[0];
+      if (updatePhase.kind !== "function") return;
+      const updateCtx = createMockCtx();
+      await updatePhase.fn(updateCtx);
 
       expect(mockStripCompletedTodos).toHaveBeenCalledWith("test-ws", "my-repo");
       expect(mockBuildUpdateTodo).toHaveBeenCalled();
@@ -266,106 +339,17 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const cycleFn = phases[0];
-      if (cycleFn.kind !== "function") return;
+      const gatePhase = phases[2];
+      if (gatePhase.kind !== "function") return;
 
-      const ctx = createMockCtx();
-      await cycleFn.fn(ctx);
+      const appendedPhases: PipelinePhase[] = [];
+      const ctx = createMockCtx({
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
+      });
+      await gatePhase.fn(ctx);
 
-      // Gate returned shouldLoop: false (no review sessions), strip should not be called for cycle
+      // Gate returned shouldLoop: false → no Update TODO appended
       expect(mockStripCompletedTodos).not.toHaveBeenCalled();
-    });
-
-    it("calls AI gate even when critical=0 but warnings exist", async () => {
-      mockGetReviewSessions.mockResolvedValue([{
-        timestamp: "2024-01-01",
-        critical: 0,
-        major: 0,
-        minor: 2,
-        total: 2,
-      }]);
-      mockGetReviewDetail.mockResolvedValue({
-        summary: "2 warnings found",
-        files: [{ name: "REVIEW-repo.md", content: "Warning: typo found" }],
-      });
-
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-      });
-      const cycleFn = phases[0];
-      if (cycleFn.kind !== "function") return;
-
-      const runChildCalls: string[] = [];
-      const appendedPhases: PipelinePhase[] = [];
-      const ctx = createMockCtx({
-        runChild: vi.fn(async (label, _prompt, opts) => {
-          runChildCalls.push(label);
-          if (opts?.onResultText && label === "Autonomous Gate") {
-            opts.onResultText(JSON.stringify({
-              shouldLoop: true,
-              reason: "Typo should be fixed",
-              fixableIssues: ["Fix executer -> executor typo"],
-            }));
-          }
-          return true;
-        }),
-        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
-      });
-
-      await cycleFn.fn(ctx);
-
-      expect(runChildCalls).toContain("Autonomous Gate");
-      expect(ctx.emitResult).toHaveBeenCalledWith(
-        expect.stringContaining("Continue"),
-      );
-      // Should append next cycle phase
-      expect(appendedPhases).toHaveLength(1);
-      if (appendedPhases[0].kind === "function") {
-        expect(appendedPhases[0].label).toBe("Cycle 2");
-      }
-    });
-
-    it("appends next cycle when gate returns shouldLoop: true, then Create PR on stop", async () => {
-      // First review: has critical issues, gate says loop
-      mockGetReviewSessions
-        .mockResolvedValueOnce([{
-          timestamp: "2024-01-01",
-          critical: 2,
-          major: 0,
-          minor: 0,
-          total: 2,
-        }])
-        .mockResolvedValueOnce([]);
-
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-        maxLoops: 3,
-      });
-      const cycleFn = phases[0];
-      if (cycleFn.kind !== "function") return;
-
-      const appendedPhases: PipelinePhase[] = [];
-      const ctx = createMockCtx({
-        runChild: vi.fn(async (_label, _prompt, opts) => {
-          if (opts?.onResultText && _label === "Autonomous Gate") {
-            opts.onResultText(JSON.stringify({
-              shouldLoop: false,
-              reason: "No review detail",
-              fixableIssues: [],
-            }));
-          }
-          return true;
-        }),
-        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
-      });
-
-      await cycleFn.fn(ctx);
-
-      // Gate returned shouldLoop: false → appends Create PR
-      expect(mockBuildExecute).toHaveBeenCalled();
-      expect(mockBuildReview).toHaveBeenCalled();
       expect(appendedPhases).toHaveLength(1);
       if (appendedPhases[0].kind === "function") {
         expect(appendedPhases[0].label).toBe("Create PR");
@@ -378,11 +362,20 @@ describe("buildAutonomousPipeline", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
-        resumeCycleCount: 3,
+        resumeCycles: [
+          { cycle: 1, hasUpdateTodo: true },
+          { cycle: 2, hasUpdateTodo: true },
+          { cycle: 3, hasUpdateTodo: false },
+        ],
       });
-      expect(phases).toHaveLength(3);
+      // Cycle 1: Execute, Review, Gate, Update TODO (4)
+      // Cycle 2: Execute, Review, Gate, Update TODO (4)
+      // Cycle 3: Execute, Review, Gate (3)
+      expect(phases).toHaveLength(11);
       expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
-        "Cycle 1", "Cycle 2", "Cycle 3",
+        "Cycle 1: Execute", "Cycle 1: Review", "Cycle 1: Gate", "Cycle 1: Update TODO",
+        "Cycle 2: Execute", "Cycle 2: Review", "Cycle 2: Gate", "Cycle 2: Update TODO",
+        "Cycle 3: Execute", "Cycle 3: Review", "Cycle 3: Gate",
       ]);
     });
 
@@ -390,12 +383,17 @@ describe("buildAutonomousPipeline", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
-        resumeCycleCount: 2,
+        resumeCycles: [
+          { cycle: 1, hasUpdateTodo: true },
+          { cycle: 2, hasUpdateTodo: false },
+        ],
         resumeWithCreatePr: true,
       });
-      expect(phases).toHaveLength(3);
-      if (phases[2].kind === "function") {
-        expect(phases[2].label).toBe("Create PR");
+      // Cycle 1: 4 + Cycle 2: 3 + Create PR: 1 = 8
+      expect(phases).toHaveLength(8);
+      const lastPhase = phases[phases.length - 1];
+      if (lastPhase.kind === "function") {
+        expect(lastPhase.label).toBe("Create PR");
       }
     });
   });
