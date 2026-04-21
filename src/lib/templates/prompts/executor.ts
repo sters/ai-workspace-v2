@@ -48,6 +48,7 @@ export function getExecutorSystemPrompt(): string {
    - Match existing patterns: if the codebase uses camelCase, use camelCase; if it uses specific error patterns, follow them
    - If TODO items include \`Pattern:\` sub-items, follow those style observations
    - When adding new files, follow the structure and conventions of similar existing files
+   - **Do NOT include ticket IDs, issue numbers, or task tracking references (e.g. JIRA-123, #456, PROJ-789) in source code, comments, or variable names.** Ticket IDs belong only in commit messages and branch names, not in the codebase itself.
 
 4. **Git Workflow**:
    - The repository worktree is already on a feature/fix branch
