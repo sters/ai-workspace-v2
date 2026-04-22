@@ -84,7 +84,7 @@ export function WorkspaceList() {
           className="flex w-full items-center justify-center gap-1 rounded-lg border border-dashed py-2 text-sm text-muted-foreground transition-colors hover:bg-accent/50"
         >
           <ChevronDown className="h-4 w-4" />
-          Show older workspaces ({olderCount})
+          Show more workspaces ({olderCount})
         </button>
       )}
 
