@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
+import { getCleanEnv } from "../env";
 import { getArchivedNameSet } from "../db/archives";
 import { parseTodoFile } from "../parsers/todo";
 import { parseReadmeMeta } from "../parsers/readme";
@@ -343,7 +344,7 @@ export function getCommitDiff(name: string, hash: string): string | null {
   try {
     const result = Bun.spawnSync(
       ["git", "-C", wsPath, "show", hash, "--format=", "--patch"],
-      { stdout: "pipe", stderr: "pipe" }
+      { stdout: "pipe", stderr: "pipe", env: getCleanEnv() }
     );
     if (!result.success) return null;
     return result.stdout.toString();
@@ -412,7 +413,7 @@ export function getHistory(name: string, skip = 0): { entries: HistoryEntry[]; h
     // Fetch one extra to detect if there are more commits beyond this page
     const args = ["git", "-C", wsPath, "log", "--format=%H|%aI|%s|%an", `-${HISTORY_PAGE_SIZE + 1}`];
     if (skip > 0) args.push(`--skip=${skip}`);
-    const result = Bun.spawnSync(args, { stdout: "pipe", stderr: "pipe" });
+    const result = Bun.spawnSync(args, { stdout: "pipe", stderr: "pipe", env: getCleanEnv() });
     if (!result.success) return { entries: [], hasMore: false };
     const all = result.stdout
       .toString()

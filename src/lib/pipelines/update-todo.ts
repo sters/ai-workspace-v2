@@ -1,5 +1,6 @@
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
+import { getCleanEnv } from "@/lib/env";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { normalizeTodoCheckboxes } from "@/lib/parsers/todo";
 import { buildUpdaterPrompt } from "@/lib/templates";
@@ -90,14 +91,15 @@ export async function buildUpdateTodoPipeline(input: {
       if (modified.length > 0) {
         ctx.emitStatus(`Normalized checkbox format in: ${modified.join(", ")}`);
         // Stage and commit the normalized files
-        const add = Bun.spawn(["git", "add", ...modified], { cwd: workspacePath });
+        const env = getCleanEnv();
+        const add = Bun.spawn(["git", "add", ...modified], { cwd: workspacePath, env });
         await add.exited;
-        const diff = Bun.spawn(["git", "diff", "--cached", "--quiet"], { cwd: workspacePath });
+        const diff = Bun.spawn(["git", "diff", "--cached", "--quiet"], { cwd: workspacePath, env });
         const hasStagedChanges = (await diff.exited) !== 0;
         if (hasStagedChanges) {
           const commit = Bun.spawn(
             ["git", "commit", "-m", "Normalize TODO checkbox format"],
-            { cwd: workspacePath },
+            { cwd: workspacePath, env },
           );
           await commit.exited;
         }

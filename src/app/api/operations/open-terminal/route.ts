@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { workspaceSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 import { getConfig, resolveWorkspacePath } from "@/lib/config";
+import { getCleanEnv } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -19,13 +20,10 @@ export async function POST(request: Request) {
   const terminalCmd = getConfig().terminal.replace("{path}", workspacePath);
   const args = terminalCmd.split(/\s+/);
 
-  // Strip server-specific env vars so spawned terminals don't inherit them
-  const { PORT: _, AIW_PORT: _2, ...cleanEnv } = process.env;
-
   const proc = Bun.spawn(args, {
     stdout: "ignore",
     stderr: "pipe",
-    env: cleanEnv,
+    env: getCleanEnv(),
   });
   await proc.exited;
 
