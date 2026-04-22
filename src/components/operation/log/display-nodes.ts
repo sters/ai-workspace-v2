@@ -59,8 +59,21 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
       taskToolUseIds.add(e.parentToolUseId);
     }
   }
+  // The CLI may emit task_started/task_notification for regular tool calls
+  // (e.g. long-running Bash commands), not just Agent/Task sub-agents.
+  // Only promote taskInfo keys to sub-agent IDs if they don't have a known
+  // non-Agent/Task tool_call — otherwise they'd appear as orphan sub-agent
+  // sections instead of being nested inside their parent.
+  const nonSubagentToolIds = new Set<string>();
+  for (const e of entries) {
+    if (e.kind === "tool_call" && !SUBAGENT_TOOL_NAMES.has(e.toolName)) {
+      nonSubagentToolIds.add(e.toolId);
+    }
+  }
   for (const id of taskInfo.keys()) {
-    taskToolUseIds.add(id);
+    if (!nonSubagentToolIds.has(id)) {
+      taskToolUseIds.add(id);
+    }
   }
 
   // 3. Infer completion from tool_results when no task_notification was received.
@@ -103,8 +116,10 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
   }
 
   for (const e of entries) {
-    // Skip system task entries (shown in section header)
-    if (e.kind === "system" && e.taskToolUseId && taskToolUseIds.has(e.taskToolUseId)) {
+    // Skip all system task lifecycle entries (task_started / task_notification).
+    // For sub-agents they're shown in the section header; for regular tools
+    // (e.g. Bash) the CLI may also emit these as progress — hide them either way.
+    if (e.kind === "system" && e.taskToolUseId) {
       continue;
     }
     // Skip tool_progress for tasks (handled in section)

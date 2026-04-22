@@ -326,4 +326,48 @@ describe("buildDisplayNodes", () => {
     // "Starting verification", Read, tool_result(Read), "Spawning 3 sub-agents", "All done"
     expect(entryNodes).toHaveLength(5);
   });
+
+  it("does not promote Bash tool calls to sub-agents when CLI sends task_started for them", () => {
+    // The CLI emits task_started/task_notification for long-running tool calls
+    // (e.g. Bash) inside sub-agents, not just for Agent/Task sub-agents.
+    // These should NOT create separate sub-agent sections.
+    const entries: LogEntry[] = [
+      text("Starting work"),
+      toolCall("Agent", "agent-1", "Update TODOs"),
+      systemTask("agent-1", "running", "Task started: Update TODOs"),
+      // Sub-agent uses Bash, CLI also sends task_started for it
+      toolCall("Bash", "bash-1", "$ find /path -type f", "agent-1"),
+      systemTask("bash-1", "running", "Task started: find /path -type f"),
+      toolResult("bash-1", "file1.ts\nfile2.ts", "agent-1"),
+      // Sub-agent uses another Bash
+      toolCall("Bash", "bash-2", "$ grep -r pattern /path", "agent-1"),
+      systemTask("bash-2", "running", "Task started: grep -r pattern /path"),
+      toolResult("bash-2", "match found", "agent-1"),
+      // Agent completes
+      systemTask("agent-1", "completed", "Task completed", {
+        taskSummary: "Updated TODOs",
+        taskUsage: "10.0s, 4 tools",
+      }),
+      toolResult("agent-1", "TODOs updated"),
+      text("Done"),
+    ];
+
+    const nodes = buildDisplayNodes(entries);
+
+    const subagentNodes = nodes.filter(n => n.type === "subagent");
+    const entryNodes = nodes.filter(n => n.type === "entry");
+
+    // Only one sub-agent section (the Agent), NOT three
+    expect(subagentNodes).toHaveLength(1);
+
+    const agent = subagentNodes[0] as Extract<DisplayNode, { type: "subagent" }>;
+    expect(agent.toolUseId).toBe("agent-1");
+    expect(agent.description).toBe("Update TODOs");
+    expect(agent.status).toBe("completed");
+    // Bash tool calls and results are inside the agent, not at the top level
+    expect(agent.children).toHaveLength(4); // bash-1 call, bash-1 result, bash-2 call, bash-2 result
+
+    // Only "Starting work" and "Done" at top level
+    expect(entryNodes).toHaveLength(2);
+  });
 });
