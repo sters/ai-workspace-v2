@@ -19,9 +19,13 @@ export async function POST(request: Request) {
   const editorCmd = getConfig().editor.replace("{path}", workspacePath);
   const args = editorCmd.split(/\s+/);
 
+  // Strip server-specific env vars so spawned editors don't inherit them
+  const { PORT: _, AIW_PORT: _2, ...cleanEnv } = process.env;
+
   const proc = Bun.spawn(args, {
     stdout: "ignore",
     stderr: "pipe",
+    env: cleanEnv,
   });
   await proc.exited;
 

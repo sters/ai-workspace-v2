@@ -19,9 +19,13 @@ export async function POST(request: Request) {
   const terminalCmd = getConfig().terminal.replace("{path}", workspacePath);
   const args = terminalCmd.split(/\s+/);
 
+  // Strip server-specific env vars so spawned terminals don't inherit them
+  const { PORT: _, AIW_PORT: _2, ...cleanEnv } = process.env;
+
   const proc = Bun.spawn(args, {
     stdout: "ignore",
     stderr: "pipe",
+    env: cleanEnv,
   });
   await proc.exited;
 
