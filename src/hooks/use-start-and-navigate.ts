@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useSWRConfig } from "swr";
 import type { OperationType } from "@/types/operation";
 
 /**
@@ -10,6 +11,7 @@ import type { OperationType } from "@/types/operation";
  */
 export function useStartAndNavigate(workspaceName: string) {
   const router = useRouter();
+  const { mutate } = useSWRConfig();
 
   return useCallback(
     async (type: OperationType, body: Record<string, string>) => {
@@ -23,10 +25,16 @@ export function useStartAndNavigate(workspaceName: string) {
         return;
       }
       const op = await res.json();
+      // Invalidate operations SWR caches so the new operation appears on the target page
+      mutate(
+        (key) => typeof key === "string" && key.startsWith("/api/operations"),
+        undefined,
+        { revalidate: true },
+      );
       router.push(
         `/workspace/${encodeURIComponent(workspaceName)}/operations?operationId=${encodeURIComponent(op.id)}`
       );
     },
-    [router, workspaceName],
+    [router, workspaceName, mutate],
   );
 }

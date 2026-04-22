@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import useSWR from "swr";
 import { OperationCard } from "@/components/workspace/operation-card";
@@ -71,14 +71,6 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
     return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
   });
 
-  // Track locally-started operations so they appear immediately
-  const [localOps, setLocalOps] = useState<OperationListItem[]>([]);
-
-  // Merge local ops with server ops, deduplicating by ID
-  const serverIds = new Set(sortedOps.map((op) => op.id));
-  const pendingLocalOps = localOps.filter((op) => !serverIds.has(op.id));
-  const displayOps = [...pendingLocalOps, ...sortedOps];
-
   // Auto-expand specific operation from URL
   const expandOperationId = searchParams.get("operationId");
 
@@ -106,11 +98,7 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     })
-      .then((res) => res.json())
-      .then((op: OperationListItem) => {
-        setLocalOps((prev) => [op, ...prev]);
-        mutate();
-      })
+      .then(() => mutate())
       .catch((err) => console.error("Failed to start auto-action:", err));
   }, [searchParams, workspaceName, router, pathname, mutate]);
 
@@ -122,11 +110,9 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(await res.text());
-      const op: OperationListItem = await res.json();
-      setLocalOps((prev) => [op, ...prev]);
       mutate();
     },
-    [setLocalOps, mutate]
+    [mutate]
   );
 
   const handleCancel = useCallback(
@@ -138,7 +124,7 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
   );
 
 
-  if (displayOps.length === 0) {
+  if (sortedOps.length === 0) {
     return (
       <StatusText>
         No operations for this workspace. Use the buttons above to start one.
@@ -148,7 +134,7 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
 
   return (
     <div className="space-y-3">
-      {displayOps.map((op) => (
+      {sortedOps.map((op) => (
         <OperationCard
           key={op.id}
           operation={op}
