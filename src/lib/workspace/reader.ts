@@ -14,7 +14,7 @@ import type {
 } from "@/types/workspace";
 import type { QuickSearchResult } from "@/types/search";
 
-const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const DEFAULT_DISPLAY_LIMIT = 20;
 
 export async function listWorkspaces(
   options?: { recentOnly?: boolean },
@@ -23,10 +23,8 @@ export async function listWorkspaces(
     return { workspaces: [], olderCount: 0, archivedCount: 0 };
 
   const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
-  const cutoff = options?.recentOnly ? Date.now() - ONE_WEEK_MS : 0;
   const archived = getArchivedNameSet();
-  const workspaces: WorkspaceSummary[] = [];
-  let olderCount = 0;
+  const candidates: { name: string; wsPath: string; mtime: number }[] = [];
   let archivedCount = 0;
 
   for (const entry of entries) {
@@ -40,17 +38,25 @@ export async function listWorkspaces(
       continue;
     }
 
-    // When recentOnly, skip expensive summary build for old workspaces
-    if (cutoff > 0) {
-      const mtime = statSync(wsPath).mtime.getTime();
-      if (mtime < cutoff) {
-        olderCount++;
-        continue;
-      }
-    }
+    const mtime = statSync(wsPath).mtime.getTime();
+    candidates.push({ name: entry.name, wsPath, mtime });
+  }
 
+  // Sort by mtime desc (most recent first)
+  candidates.sort((a, b) => b.mtime - a.mtime);
+
+  // When recentOnly, limit to first N items to skip expensive summary builds
+  let olderCount = 0;
+  let selected = candidates;
+  if (options?.recentOnly && candidates.length > DEFAULT_DISPLAY_LIMIT) {
+    selected = candidates.slice(0, DEFAULT_DISPLAY_LIMIT);
+    olderCount = candidates.length - DEFAULT_DISPLAY_LIMIT;
+  }
+
+  const workspaces: WorkspaceSummary[] = [];
+  for (const c of selected) {
     try {
-      const summary = await buildWorkspaceSummary(entry.name, wsPath);
+      const summary = await buildWorkspaceSummary(c.name, c.wsPath);
       workspaces.push(summary);
     } catch {
       // skip broken workspaces
@@ -74,11 +80,9 @@ export async function listWorkspaceItems(
     return { workspaces: [], olderCount: 0, archivedCount: 0 };
 
   const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
-  const cutoff = options?.recentOnly ? Date.now() - ONE_WEEK_MS : 0;
   const archived = getArchivedNameSet();
   const includeArchived = options?.includeArchived ?? false;
-  const workspaces: WorkspaceListItem[] = [];
-  let olderCount = 0;
+  const candidates: { name: string; wsPath: string; mtime: number }[] = [];
   let archivedCount = 0;
 
   for (const entry of entries) {
@@ -93,17 +97,26 @@ export async function listWorkspaceItems(
       continue;
     }
 
-    if (!isArch && cutoff > 0) {
-      const mtime = statSync(wsPath).mtime.getTime();
-      if (mtime < cutoff) {
-        olderCount++;
-        continue;
-      }
-    }
+    const mtime = statSync(wsPath).mtime.getTime();
+    candidates.push({ name: entry.name, wsPath, mtime });
+  }
 
+  // Sort by mtime desc (most recent first)
+  candidates.sort((a, b) => b.mtime - a.mtime);
+
+  // When recentOnly, limit to first N items
+  let olderCount = 0;
+  let selected = candidates;
+  if (options?.recentOnly && candidates.length > DEFAULT_DISPLAY_LIMIT) {
+    selected = candidates.slice(0, DEFAULT_DISPLAY_LIMIT);
+    olderCount = candidates.length - DEFAULT_DISPLAY_LIMIT;
+  }
+
+  const workspaces: WorkspaceListItem[] = [];
+  for (const c of selected) {
     try {
-      const item = await buildWorkspaceListItem(entry.name, wsPath);
-      if (isArch) item.archived = true;
+      const item = await buildWorkspaceListItem(c.name, c.wsPath);
+      if (archived.has(c.name)) item.archived = true;
       workspaces.push(item);
     } catch {
       // skip broken workspaces
