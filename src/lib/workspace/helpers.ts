@@ -5,6 +5,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { getResolvedWorkspaceRoot, getWorkspaceDir } from "../config";
+import { getCleanEnv } from "../env";
 import type { StaleWorkspace, WorkspaceAgeInfo } from "@/types/workspace";
 
 export function exec(cmd: string, opts?: { cwd?: string; maxBuffer?: number }): string {
@@ -12,6 +13,7 @@ export function exec(cmd: string, opts?: { cwd?: string; maxBuffer?: number }): 
     cwd: opts?.cwd ?? getResolvedWorkspaceRoot(),
     stdout: "pipe",
     stderr: "pipe",
+    env: getCleanEnv(),
   });
   if (!result.success) {
     const stderr = result.stderr.toString().trim();

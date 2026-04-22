@@ -8,6 +8,7 @@ import type { TerminalSubprocess } from "@/types/pty";
 import { getResolvedWorkspaceRoot, getConfig } from "../config";
 import type { OperationEvent } from "@/types/operation";
 import { spawnTerminal } from "../pty";
+import { getCleanEnv } from "../env";
 import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
 
 // ---------------------------------------------------------------------------
@@ -34,14 +35,15 @@ function resolveCliPath(): string {
   }
 
   // Try realpath
-  const realpathResult = Bun.spawnSync(["realpath", bin], { stdout: "pipe", stderr: "pipe" });
+  const env = getCleanEnv();
+  const realpathResult = Bun.spawnSync(["realpath", bin], { stdout: "pipe", stderr: "pipe", env });
   if (realpathResult.success) {
     const resolved = realpathResult.stdout.toString().trim();
     if (resolved) return resolved;
   }
 
   // Try readlink -f
-  const readlinkResult = Bun.spawnSync(["readlink", "-f", bin], { stdout: "pipe", stderr: "pipe" });
+  const readlinkResult = Bun.spawnSync(["readlink", "-f", bin], { stdout: "pipe", stderr: "pipe", env });
   if (readlinkResult.success) {
     const resolved = readlinkResult.stdout.toString().trim();
     if (resolved) return resolved;
@@ -68,7 +70,7 @@ export function _resetCliPath(): void {
 export function getClaudeEnv(
   extra?: Record<string, string | undefined>,
 ): Record<string, string | undefined> {
-  return { ...process.env, CLAUDECODE: undefined, ...extra };
+  return getCleanEnv({ CLAUDECODE: undefined, ...extra });
 }
 
 /** Spawn Claude CLI asynchronously via Bun.spawn. */
