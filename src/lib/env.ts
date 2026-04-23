@@ -4,7 +4,15 @@
  */
 
 /** Env keys that are set by the server and should not be inherited by children. */
-const SERVER_ENV_KEYS = ["PORT", "AIW_PORT"] as const;
+const SERVER_ENV_KEYS = [
+  "PORT",
+  "TURBOPACK",
+  "AIW_PORT",
+  "AIW_CHAT_PORT",
+  "AIW_WORKSPACE_ROOT",
+  "AIW_DISABLE_ACCESS_LOG",
+  "NEXT_PUBLIC_GIT_HASH",
+] as const;
 
 export function getCleanEnv(
   extra?: Record<string, string | undefined>,
