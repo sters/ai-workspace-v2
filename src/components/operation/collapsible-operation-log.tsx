@@ -107,19 +107,23 @@ export function CollapsibleOperationLog({
         </div>
       )}
 
-      {/* Result — show only the last phase's result */}
-      {resultEntries.length > 0 && (() => {
-        const last = resultEntries[resultEntries.length - 1];
-        return (
-          <div className="border-t p-2">
-            <ResultBox
-              content={last.kind === "result" ? last.content : ""}
-              cost={last.kind === "result" ? last.cost : undefined}
-              duration={last.kind === "result" ? last.duration : undefined}
-            />
-          </div>
-        );
-      })()}
+      {/* Results — show all phase results */}
+      {resultEntries.length > 0 && (
+        <div className="border-t p-2 space-y-2">
+          {resultEntries.map((entry, i) => (
+            <div key={i}>
+              {entry.phaseLabel && resultEntries.length > 1 && (
+                <div className="text-xs text-muted-foreground mb-1">{entry.phaseLabel}</div>
+              )}
+              <ResultBox
+                content={entry.kind === "result" ? entry.content : ""}
+                cost={entry.kind === "result" ? entry.cost : undefined}
+                duration={entry.kind === "result" ? entry.duration : undefined}
+              />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
