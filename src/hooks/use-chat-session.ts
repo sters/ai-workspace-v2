@@ -50,7 +50,7 @@ function clearChatSession(workspaceId: string): void {
 
 export function useChatSession(
   workspaceId: string,
-  options?: { initialPrompt?: string; reviewTimestamp?: string },
+  options?: { initialPrompt?: string; reviewTimestamp?: string; researchChat?: boolean },
 ) {
   const { containerRef, termRef, init, dispose } = useTerminal({ webLinks: true });
   const [state, setState] = useState<SessionState>("idle");
@@ -62,6 +62,8 @@ export function useChatSession(
   initialPromptRef.current = options?.initialPrompt;
   const reviewTimestampRef = useRef(options?.reviewTimestamp);
   reviewTimestampRef.current = options?.reviewTimestamp;
+  const researchChatRef = useRef(options?.researchChat);
+  researchChatRef.current = options?.researchChat;
 
   // Refs for websocket (survive re-renders)
   const wsRef = useRef<WebSocket | null>(null);
@@ -269,7 +271,8 @@ export function useChatSession(
     ws.onopen = () => {
       const prompt = initialPromptRef.current;
       const review = reviewTimestampRef.current;
-      ws.send(JSON.stringify({ type: "start", workspaceId, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }) }));
+      const research = researchChatRef.current;
+      ws.send(JSON.stringify({ type: "start", workspaceId, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }) }));
     };
 
     ws.onmessage = (event) => {
@@ -348,7 +351,7 @@ export function useChatSession(
   // When reviewTimestamp is set, always start a fresh session (skip resume).
   useEffect(() => {
     if (stateRef.current !== "idle") return;
-    if (initialPromptRef.current || reviewTimestampRef.current) {
+    if (initialPromptRef.current || reviewTimestampRef.current || researchChatRef.current) {
       // Custom prompt requested — start a fresh session regardless of saved state
       clearChatSession(workspaceId);
       startSession();

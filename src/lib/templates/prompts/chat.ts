@@ -91,6 +91,47 @@ export async function buildReviewChatPrompt(
   return parts.join("\n");
 }
 
+/**
+ * System prompt for research-focused chat sessions.
+ * Instructs Claude NOT to read files proactively — all context is provided in the initial prompt.
+ */
+export function getResearchChatSystemPrompt(): string {
+  return `You are working on an ai-workspace. The workspace directory contains README.md (workspace overview and plan), TODO files (task tracking), and research artifacts.
+
+The initial user message includes the current README, TODO summary, and research summary. Do NOT proactively read additional files at startup. Only read files when the user explicitly asks you to.`;
+}
+
+/**
+ * Build the initial prompt for a chat session focused on research results.
+ * Embeds README, TODO summary, and research summary.md content.
+ */
+export async function buildResearchChatPrompt(
+  workspaceId: string,
+  workspacePath: string,
+  options?: { readme?: string | null; todos?: TodoFile[]; researchSummary?: string | null },
+): Promise<string> {
+  const readme = options?.readme ?? await readFileIfExists(path.join(workspacePath, "README.md"));
+  const todos = options?.todos ?? await listTodoFilesRaw(workspacePath);
+  const researchSummary = options?.researchSummary ?? await readFileIfExists(
+    path.join(workspacePath, "artifacts", "research", "summary.md"),
+  );
+
+  const parts = [
+    `I want to discuss the research results for workspace "${workspaceId}".`,
+    `The research artifacts are located at: ${workspacePath}/artifacts/research/`,
+    "",
+    "## README.md",
+    readme || "(no README.md)",
+    "",
+    "## TODO Progress",
+    formatTodoSummary(todos),
+    "",
+    "## Research Summary",
+    researchSummary || "(no summary.md found)",
+  ];
+  return parts.join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Helpers — lightweight file I/O to avoid importing the full workspace reader
 // ---------------------------------------------------------------------------

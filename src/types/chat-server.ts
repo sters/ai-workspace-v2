@@ -34,6 +34,7 @@ interface StartMessage {
   workspaceId: string;
   initialPrompt?: string;
   reviewTimestamp?: string;
+  researchChat?: boolean;
 }
 
 interface InputMessage {
