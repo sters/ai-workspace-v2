@@ -1,7 +1,7 @@
 import path from "node:path";
 import { spawnClaudeTerminal } from "../claude/cli";
 import type { DataListener } from "@/types/pty";
-import { buildInitPrompt, buildReviewChatPrompt } from "@/lib/templates";
+import { buildInitPrompt, buildReviewChatPrompt, buildResearchChatPrompt } from "@/lib/templates";
 import { ensureSessionSystemPrompt, cleanupSessionSystemPrompt } from "@/lib/workspace/prompts";
 import type { ChatSession, ClientMessage, ServerMessage, WsData } from "@/types/chat-server";
 import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
@@ -40,14 +40,18 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
   const workspacePath = path.join(root, "workspace", msg.workspaceId);
 
   const isReviewChat = !msg.initialPrompt && !!msg.reviewTimestamp;
+  const isResearchChat = !msg.initialPrompt && !msg.reviewTimestamp && !!msg.researchChat;
   const initPrompt = msg.initialPrompt
     || (msg.reviewTimestamp
       ? await buildReviewChatPrompt(msg.workspaceId, workspacePath, msg.reviewTimestamp)
-      : await buildInitPrompt(msg.workspaceId, workspacePath));
+      : msg.researchChat
+        ? await buildResearchChatPrompt(msg.workspaceId, workspacePath)
+        : await buildInitPrompt(msg.workspaceId, workspacePath));
 
+  const agentName = isReviewChat ? "review-chat" : isResearchChat ? "research-chat" : "chat";
   const systemPromptFile = ensureSessionSystemPrompt(
     workspacePath,
-    isReviewChat ? "review-chat" : "chat",
+    agentName,
     sessionId,
     { workspaceId: msg.workspaceId },
   );

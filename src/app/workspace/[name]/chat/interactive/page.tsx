@@ -13,10 +13,11 @@ export default function ChatInteractivePage({
   const decodedName = decodeURIComponent(name);
   const searchParams = useSearchParams();
   const reviewTimestamp = searchParams.get("reviewTimestamp") ?? undefined;
+  const researchChat = searchParams.get("researchChat") === "1" || undefined;
 
   return (
     <div className="h-[calc(100vh-24rem)]">
-      <ChatTerminal workspaceId={decodedName} reviewTimestamp={reviewTimestamp} />
+      <ChatTerminal workspaceId={decodedName} reviewTimestamp={reviewTimestamp} researchChat={researchChat} />
     </div>
   );
 }

@@ -114,6 +114,7 @@ const wsStartSchema = z.object({
   workspaceId: z.string().min(1),
   initialPrompt: z.string().optional(),
   reviewTimestamp: z.string().optional(),
+  researchChat: z.boolean().optional(),
 });
 
 const wsInputSchema = z.object({

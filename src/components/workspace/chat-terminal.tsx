@@ -4,7 +4,7 @@ import { useChatSession } from "@/hooks/use-chat-session";
 import { Button } from "../shared/buttons/button";
 import { StatusText } from "../shared/feedback/status-text";
 
-export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { workspaceId: string; initialPrompt?: string; reviewTimestamp?: string }) {
+export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp, researchChat }: { workspaceId: string; initialPrompt?: string; reviewTimestamp?: string; researchChat?: boolean }) {
   const {
     containerRef,
     state,
@@ -13,7 +13,7 @@ export function ChatTerminal({ workspaceId, initialPrompt, reviewTimestamp }: { 
     startSession,
     cancelResume,
     stopSession,
-  } = useChatSession(workspaceId, { initialPrompt, reviewTimestamp });
+  } = useChatSession(workspaceId, { initialPrompt, reviewTimestamp, researchChat });
 
   return (
     <div className="flex h-full flex-col">
