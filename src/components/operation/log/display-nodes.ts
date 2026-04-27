@@ -156,6 +156,9 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
           taskId: info?.taskId,
           outputFile: info?.outputFile,
           children: buildFromBucket(e.toolId),
+          childLabel: e.childLabel,
+          phaseIndex: e.phaseIndex,
+          phaseLabel: e.phaseLabel,
         });
         continue;
       }
@@ -193,6 +196,19 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
       const info = taskInfo.get(id);
       const childNodes = buildFromBucket(id);
       if (info || childNodes.length > 0) {
+        // Find childLabel/phaseIndex/phaseLabel from entries associated with this ID
+        let orphanChildLabel: string | undefined;
+        let orphanPhaseIndex: number | undefined;
+        let orphanPhaseLabel: string | undefined;
+        for (const e of entries) {
+          if ((e.kind === "system" && e.taskToolUseId === id) ||
+              e.parentToolUseId === id) {
+            orphanChildLabel ??= e.childLabel;
+            orphanPhaseIndex ??= e.phaseIndex;
+            orphanPhaseLabel ??= e.phaseLabel;
+            if (orphanChildLabel != null) break;
+          }
+        }
         nodes.push({
           type: "subagent",
           toolUseId: id,
@@ -203,6 +219,9 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
           taskId: info?.taskId,
           outputFile: info?.outputFile,
           children: childNodes,
+          childLabel: orphanChildLabel,
+          phaseIndex: orphanPhaseIndex,
+          phaseLabel: orphanPhaseLabel,
         });
       }
     }
@@ -218,6 +237,7 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
 function getChildLabel(node: DisplayNode): string | undefined {
   if (node.type === "entry") return node.entry.childLabel;
   if (node.type === "subagent") {
+    if (node.childLabel) return node.childLabel;
     for (const child of node.children) {
       const label = getChildLabel(child);
       if (label) return label;
@@ -277,7 +297,15 @@ export function groupByChildLabel(nodes: DisplayNode[]): DisplayNode[] {
 function getNodePhaseIndex(node: DisplayNode): number | undefined {
   if (node.type === "entry") return node.entry.phaseIndex;
   if (node.type === "phase-group") return node.phaseIndex;
-  if (node.type === "subagent" || node.type === "child-group") {
+  if (node.type === "subagent") {
+    if (node.phaseIndex != null) return node.phaseIndex;
+    for (const child of node.children) {
+      const idx = getNodePhaseIndex(child);
+      if (idx != null) return idx;
+    }
+    return undefined;
+  }
+  if (node.type === "child-group") {
     for (const child of node.children) {
       const idx = getNodePhaseIndex(child);
       if (idx != null) return idx;
@@ -290,7 +318,15 @@ function getNodePhaseIndex(node: DisplayNode): number | undefined {
 function getNodePhaseLabel(node: DisplayNode): string | undefined {
   if (node.type === "entry") return node.entry.phaseLabel;
   if (node.type === "phase-group") return node.phaseLabel;
-  if (node.type === "subagent" || node.type === "child-group") {
+  if (node.type === "subagent") {
+    if (node.phaseLabel) return node.phaseLabel;
+    for (const child of node.children) {
+      const label = getNodePhaseLabel(child);
+      if (label) return label;
+    }
+    return undefined;
+  }
+  if (node.type === "child-group") {
     for (const child of node.children) {
       const label = getNodePhaseLabel(child);
       if (label) return label;

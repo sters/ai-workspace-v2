@@ -139,6 +139,12 @@ export type DisplayNode =
       outputFile?: string;
       /** Child display nodes (sub-agent messages, including nested sub-agents). */
       children: DisplayNode[];
+      /** Inherited from the tool_call entry that created this node. Used for grouping when children are empty (background Agent tasks). */
+      childLabel?: string;
+      /** Inherited from the tool_call entry. */
+      phaseIndex?: number;
+      /** Inherited from the tool_call entry. */
+      phaseLabel?: string;
     }
   | {
       type: "child-group";

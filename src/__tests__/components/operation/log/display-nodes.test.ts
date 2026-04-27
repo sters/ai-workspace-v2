@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LogEntry, DisplayNode } from "@/types/claude";
-import { buildDisplayNodes } from "@/components/operation/log/display-nodes";
+import { buildDisplayNodes, groupByChildLabel } from "@/components/operation/log/display-nodes";
 
 // Helper to create LogEntry objects concisely
 function text(content: string, parentToolUseId?: string): LogEntry {
@@ -369,5 +369,50 @@ describe("buildDisplayNodes", () => {
 
     // Only "Starting work" and "Done" at top level
     expect(entryNodes).toHaveLength(2);
+  });
+
+  it("preserves childLabel on background Agent sub-agents with no child events", () => {
+    // When the CLI spawns Agent sub-agents in the background, no events with
+    // parent_tool_use_id are emitted — only task_started, task_notification,
+    // and tool_result arrive. The subagent node must inherit childLabel from
+    // the tool_call entry so groupByChildLabel can group it correctly.
+    const entries: LogEntry[] = [
+      { ...text("Starting work"), childLabel: "Update TODOs", phaseIndex: 0 },
+      { ...toolCall("Agent", "agent-1", "Check repo A"), childLabel: "Update TODOs", phaseIndex: 0 },
+      { ...toolCall("Agent", "agent-2", "Check repo B"), childLabel: "Update TODOs", phaseIndex: 0 },
+      { ...systemTask("agent-1", "running", "Task started: Check repo A"), childLabel: "Update TODOs", phaseIndex: 0 },
+      { ...systemTask("agent-2", "running", "Task started: Check repo B"), childLabel: "Update TODOs", phaseIndex: 0 },
+      // No child events with parent_tool_use_id — agents ran in background
+      { ...systemTask("agent-1", "completed", "Task completed", { taskSummary: "Repo A checked" }), childLabel: "Update TODOs", phaseIndex: 0 },
+      { ...toolResult("agent-1", "Repo A result"), childLabel: "Update TODOs", phaseIndex: 0 },
+      { ...systemTask("agent-2", "completed", "Task completed", { taskSummary: "Repo B checked" }), childLabel: "Update TODOs", phaseIndex: 0 },
+      { ...toolResult("agent-2", "Repo B result"), childLabel: "Update TODOs", phaseIndex: 0 },
+      { ...text("Done"), childLabel: "Update TODOs", phaseIndex: 0 },
+    ];
+
+    const nodes = buildDisplayNodes(entries);
+
+    const subagentNodes = nodes.filter(n => n.type === "subagent") as Extract<DisplayNode, { type: "subagent" }>[];
+    expect(subagentNodes).toHaveLength(2);
+
+    // Both subagent nodes must have childLabel even though children are empty
+    expect(subagentNodes[0].childLabel).toBe("Update TODOs");
+    expect(subagentNodes[0].children).toHaveLength(0);
+    expect(subagentNodes[1].childLabel).toBe("Update TODOs");
+    expect(subagentNodes[1].children).toHaveLength(0);
+
+    // groupByChildLabel must group them inside the child-group
+    const grouped = groupByChildLabel(nodes);
+    const childGroups = grouped.filter(n => n.type === "child-group") as Extract<DisplayNode, { type: "child-group" }>[];
+    expect(childGroups).toHaveLength(1);
+    expect(childGroups[0].label).toBe("Update TODOs");
+
+    // ALL nodes should be inside the child-group (text + subagent + text)
+    const topLevelEntries = grouped.filter(n => n.type === "entry");
+    expect(topLevelEntries).toHaveLength(0);
+
+    // Both subagents should be inside the child-group
+    const innerSubagents = childGroups[0].children.filter(n => n.type === "subagent");
+    expect(innerSubagents).toHaveLength(2);
   });
 });
