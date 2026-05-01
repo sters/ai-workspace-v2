@@ -65,8 +65,20 @@ Three-tier config system (priority: env vars > config file > defaults):
 | `AIW_CHAT_PORT` | 3742 | WebSocket chat server port |
 | `AIW_CLAUDE_PATH` | auto-detect | Custom Claude CLI path |
 | `AIW_CLAUDE_USE_CLI` | `true` | Use CLI (`true`) or legacy SDK (`false`) |
-| `AIW_EDITOR` | `code {path}` | Editor command template |
-| `AIW_TERMINAL` | `open -a Terminal {path}` | Terminal command template |
+
+The "Open in..." menu is configured via the `openers` field in `config.yml`:
+
+```yaml
+openers:
+  - name: Editor (VSCode)
+    command: code {path}
+  - name: Terminal
+    command: open -a Terminal {path}
+  - name: Cursor
+    command: cursor {path}
+```
+
+Legacy `editor:` and `terminal:` keys are auto-migrated into `openers` at runtime; you can keep them or replace them with the block above.
 
 ## Architecture
 
