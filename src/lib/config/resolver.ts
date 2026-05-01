@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
-import type { AppConfig, OperationTypeSettings } from "@/types/config";
+import type { AppConfig, Opener, OperationTypeSettings } from "@/types/config";
 import type { OperationType } from "@/types/operation";
 import { CONFIG_DEFAULTS, OPERATION_TYPE_NAMES } from "./defaults";
 import { getWorkspaceConfigFilePath } from "./workspace-dir";
@@ -46,7 +46,77 @@ export function normalizeRawConfig(raw: Record<string, unknown>): Partial<AppCon
     result.operations = ops;
   }
 
+  // Legacy migration: convert deprecated `editor` / `terminal` top-level keys
+  // into the new `openers` array. Only applied if `openers` isn't already set
+  // (so explicit user values win and the migration is idempotent).
+  const hasOpeners = Array.isArray((result as Record<string, unknown>).openers);
+  const legacyEditor = typeof (result as Record<string, unknown>).editor === "string"
+    ? ((result as Record<string, unknown>).editor as string)
+    : null;
+  const legacyTerminal = typeof (result as Record<string, unknown>).terminal === "string"
+    ? ((result as Record<string, unknown>).terminal as string)
+    : null;
+  if (!hasOpeners && (legacyEditor || legacyTerminal)) {
+    const migrated: Opener[] = [];
+    if (legacyEditor) migrated.push({ name: "Editor (VSCode)", command: legacyEditor });
+    if (legacyTerminal) migrated.push({ name: "Terminal", command: legacyTerminal });
+    (result as Record<string, unknown>).openers = migrated;
+    console.warn(
+      "[app-config] Migrated legacy `editor` / `terminal` keys to `openers`. " +
+        "Update config.yml to remove the deprecation warning.",
+    );
+  }
+  // Drop legacy keys so they don't leak into the merged AppConfig.
+  delete (result as Record<string, unknown>).editor;
+  delete (result as Record<string, unknown>).terminal;
+
   return result as Partial<AppConfig>;
+}
+
+/**
+ * Validate the `openers` array. Throws ConfigValidationError on the first
+ * problem encountered (so the error message is actionable). Called by the
+ * `/api/config` route — not at config load time, so a malformed `openers`
+ * doesn't break unrelated parts of the dashboard.
+ */
+export function validateOpeners(value: unknown): asserts value is Opener[] {
+  if (!Array.isArray(value)) {
+    throw new ConfigValidationError("openers must be an array");
+  }
+  const seen = new Set<string>();
+  for (let i = 0; i < value.length; i++) {
+    const entry = value[i];
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new ConfigValidationError(
+        `openers[${i}] must be an object with name + command`,
+      );
+    }
+    const e = entry as Record<string, unknown>;
+    if (typeof e.name !== "string" || e.name.trim() === "") {
+      throw new ConfigValidationError(
+        `openers[${i}].name must be a non-empty string`,
+      );
+    }
+    if (typeof e.command !== "string" || !e.command.includes("{path}")) {
+      throw new ConfigValidationError(
+        `openers[${i}].command must contain the "{path}" placeholder`,
+      );
+    }
+    if (seen.has(e.name)) {
+      throw new ConfigValidationError(
+        `openers[${i}].name "${e.name}" is duplicated; names must be unique`,
+      );
+    }
+    seen.add(e.name);
+  }
+}
+
+/** Thrown when the `openers` array fails validation. */
+export class ConfigValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigValidationError";
+  }
 }
 
 /**
@@ -107,14 +177,6 @@ function envOverrides(): Partial<AppConfig> {
   if (process.env.AIW_CLAUDE_USE_CLI !== undefined) {
     const claudeOverride: Partial<AppConfig["claude"]> = { ...result.claude, useCli: process.env.AIW_CLAUDE_USE_CLI !== "false" };
     result.claude = claudeOverride as AppConfig["claude"];
-  }
-
-  if (process.env.AIW_EDITOR) {
-    result.editor = process.env.AIW_EDITOR;
-  }
-
-  if (process.env.AIW_TERMINAL) {
-    result.terminal = process.env.AIW_TERMINAL;
   }
 
   return result;
@@ -224,8 +286,8 @@ export function mergeConfig(
       effort: pick(env.quickAsk?.effort, file.quickAsk?.effort, defaults.quickAsk.effort),
       allowedTools: (env.quickAsk?.allowedTools ?? file.quickAsk?.allowedTools ?? defaults.quickAsk.allowedTools),
     },
-    editor: pick(env.editor, file.editor, defaults.editor),
-    terminal: pick(env.terminal, file.terminal, defaults.terminal),
+    // openers is an array — file fully replaces defaults if present (no per-entry merging).
+    openers: env.openers ?? file.openers ?? defaults.openers,
   };
 }
 

@@ -3,6 +3,7 @@ import path from "node:path";
 import type { OperationTypeSettings } from "@/types/config";
 import {
   KNOWN_CONFIG_KEYS,
+  LEGACY_TOP_LEVEL_KEYS,
   OPERATION_TYPE_NAMES,
   OVERRIDABLE_SETTINGS_KEYS,
 } from "./defaults";
@@ -64,8 +65,11 @@ export function generateDefaultConfigContent(): string {
     "#   effort: medium                 # effort level (low / medium / high / max, null = CLI default)",
     "#   allowedTools: [Read, Glob, Grep, WebFetch, WebSearch]  # null = no restriction",
     "",
-    "# editor: code {path}",
-    "# terminal: open -a Terminal {path}",
+    "# openers:",
+    "#   - name: Editor (VSCode)",
+    "#     command: code {path}",
+    "#   - name: Terminal",
+    "#     command: open -a Terminal {path}",
     "",
   ];
   return lines.join("\n");
@@ -263,7 +267,8 @@ function commentOutUnknownKeys(lines: string[]): string[] {
         const isKnown = KNOWN_CONFIG_KEYS.some(
           (k) => k.section === null && k.key === parsed.key!,
         );
-        if (!isKnown) {
+        const isLegacy = LEGACY_TOP_LEVEL_KEYS.has(parsed.key!);
+        if (!isKnown && !isLegacy) {
           // If this is a section-like header (key with no inline value), mark children
           if (/^[\w-]+\s*:\s*$/.test(line)) {
             sectionCommentedOut = true;

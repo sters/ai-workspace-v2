@@ -59,9 +59,20 @@ export interface AppConfig {
     allowedTools: string[] | null;
   };
 
-  /** Editor launch command. Use `{path}` as placeholder for the target path. */
-  editor: string;
+  /** External tools that can open a workspace path (editor, terminal, etc.). */
+  openers: Opener[];
+}
 
-  /** Terminal launch command. Use `{path}` as placeholder for the target path. */
-  terminal: string;
+/**
+ * A user-defined external tool (editor, terminal, browser, ...) that can be
+ * launched to open a workspace or repository path.
+ *
+ * Names must be unique across `openers`. The `command` must contain the
+ * `{path}` placeholder which is replaced with the target absolute path.
+ */
+export interface Opener {
+  /** Unique display name. Shown in the "Open in..." menu. */
+  name: string;
+  /** Shell command. `{path}` is replaced with the target path. */
+  command: string;
 }

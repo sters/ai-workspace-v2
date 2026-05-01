@@ -3,6 +3,7 @@ export {
   CONFIG_DEFAULTS,
   OPERATION_TYPE_NAMES,
   KNOWN_CONFIG_KEYS,
+  LEGACY_TOP_LEVEL_KEYS,
 } from "./defaults";
 export type { ConfigKeyDef } from "./defaults";
 
@@ -23,6 +24,8 @@ export {
   loadConfigFile,
   normalizeRawConfig,
   setWorkspaceRoot,
+  ConfigValidationError,
+  validateOpeners,
   _resetConfig,
   _resetWorkspaceRoot,
   _setConfigFilePath,

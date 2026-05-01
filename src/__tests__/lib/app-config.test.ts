@@ -13,6 +13,7 @@ import {
   generateDefaultConfigContent,
   migrateConfigContent,
   migrateConfigFile,
+  validateOpeners,
 } from "@/lib/config";
 
 describe("CONFIG_DEFAULTS", () => {
@@ -27,8 +28,10 @@ describe("CONFIG_DEFAULTS", () => {
     expect(CONFIG_DEFAULTS.operations.functionTimeoutMinutes).toBe(3);
     expect(CONFIG_DEFAULTS.operations.defaultInteractionLevel).toBe("mid");
     expect(CONFIG_DEFAULTS.operations.typeOverrides).toEqual({});
-    expect(CONFIG_DEFAULTS.editor).toBe("code {path}");
-    expect(CONFIG_DEFAULTS.terminal).toBe("open -a Terminal {path}");
+    expect(CONFIG_DEFAULTS.openers).toEqual([
+      { name: "Editor (VSCode)", command: "code {path}" },
+      { name: "Terminal", command: "open -a Terminal {path}" },
+    ]);
   });
 });
 
@@ -135,10 +138,78 @@ describe("normalizeRawConfig", () => {
   });
 
   it("returns config unchanged when no operations section", () => {
-    const raw = { editor: "vim {path}" };
+    const raw = { workspaceRoot: "/tmp/x" };
     const result = normalizeRawConfig(raw);
-    expect(result.editor).toBe("vim {path}");
+    expect(result.workspaceRoot).toBe("/tmp/x");
     expect(result.operations).toBeUndefined();
+  });
+
+  it("migrates legacy editor + terminal keys into openers", () => {
+    const raw = { editor: "vim {path}", terminal: "open -a iTerm {path}" };
+    const result = normalizeRawConfig(raw);
+    expect(result.openers).toEqual([
+      { name: "Editor (VSCode)", command: "vim {path}" },
+      { name: "Terminal", command: "open -a iTerm {path}" },
+    ]);
+    // Legacy keys are stripped
+    expect((result as Record<string, unknown>).editor).toBeUndefined();
+    expect((result as Record<string, unknown>).terminal).toBeUndefined();
+  });
+
+  it("does not overwrite explicit openers when legacy keys are present", () => {
+    const raw = {
+      editor: "vim {path}",
+      openers: [{ name: "Custom", command: "cursor {path}" }],
+    };
+    const result = normalizeRawConfig(raw);
+    expect(result.openers).toEqual([{ name: "Custom", command: "cursor {path}" }]);
+    expect((result as Record<string, unknown>).editor).toBeUndefined();
+  });
+
+  it("does not validate openers (validation is deferred to API)", () => {
+    // Malformed openers must NOT throw at parse time — that would break
+    // every API route that calls getConfig(). Validation runs in /api/config.
+    expect(() =>
+      normalizeRawConfig({
+        openers: [{ name: "Bad", command: "code" }],
+      }),
+    ).not.toThrow();
+  });
+});
+
+describe("validateOpeners", () => {
+  it("accepts valid openers", () => {
+    expect(() =>
+      validateOpeners([
+        { name: "Editor", command: "code {path}" },
+        { name: "Term", command: "open {path}" },
+      ]),
+    ).not.toThrow();
+  });
+
+  it("throws when command is missing {path}", () => {
+    expect(() => validateOpeners([{ name: "Bad", command: "code" }])).toThrow(
+      /\{path\}/,
+    );
+  });
+
+  it("throws when names are duplicated", () => {
+    expect(() =>
+      validateOpeners([
+        { name: "Same", command: "a {path}" },
+        { name: "Same", command: "b {path}" },
+      ]),
+    ).toThrow(/duplicated/);
+  });
+
+  it("throws when name is empty", () => {
+    expect(() => validateOpeners([{ name: "  ", command: "a {path}" }])).toThrow(
+      /non-empty/,
+    );
+  });
+
+  it("throws when value is not an array", () => {
+    expect(() => validateOpeners("nope" as unknown)).toThrow(/array/);
   });
 
   it("returns config unchanged when no type overrides present", () => {
@@ -239,42 +310,17 @@ describe("mergeConfig", () => {
     expect(result.workspaceRoot).toBe("/from/file");
   });
 
-  it("file config overrides editor default", () => {
+  it("file config replaces openers default", () => {
     const fileConfig: Partial<AppConfig> = {
-      editor: "vim {path}",
+      openers: [{ name: "Custom", command: "cursor {path}" }],
     };
     const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, {});
-    expect(result.editor).toBe("vim {path}");
+    expect(result.openers).toEqual([{ name: "Custom", command: "cursor {path}" }]);
   });
 
-  it("env overrides editor from file", () => {
-    const fileConfig: Partial<AppConfig> = {
-      editor: "vim {path}",
-    };
-    const env: Partial<AppConfig> = {
-      editor: "nvim {path}",
-    };
-    const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, env);
-    expect(result.editor).toBe("nvim {path}");
-  });
-
-  it("file config overrides terminal default", () => {
-    const fileConfig: Partial<AppConfig> = {
-      terminal: "open -a iTerm {path}",
-    };
-    const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, {});
-    expect(result.terminal).toBe("open -a iTerm {path}");
-  });
-
-  it("env overrides terminal from file", () => {
-    const fileConfig: Partial<AppConfig> = {
-      terminal: "open -a iTerm {path}",
-    };
-    const env: Partial<AppConfig> = {
-      terminal: "warp {path}",
-    };
-    const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, env);
-    expect(result.terminal).toBe("warp {path}");
+  it("falls back to defaults when neither file nor env provide openers", () => {
+    const result = mergeConfig(CONFIG_DEFAULTS, {}, {});
+    expect(result.openers).toEqual(CONFIG_DEFAULTS.openers);
   });
 
   it("merges typeOverrides from file config", () => {
@@ -307,8 +353,6 @@ describe("getConfig", () => {
     "AIW_CHAT_PORT",
     "AIW_CLAUDE_PATH",
     "AIW_CLAUDE_USE_CLI",
-    "AIW_EDITOR",
-    "AIW_TERMINAL",
     "AIW_DISABLE_ACCESS_LOG",
   ];
 
@@ -365,26 +409,12 @@ describe("getConfig", () => {
     expect(first).not.toBe(second);
   });
 
-  it("picks up AIW_EDITOR env var", () => {
-    process.env.AIW_EDITOR = "cursor {path}";
+  it("defaults openers to VSCode + Terminal", () => {
     const config = getConfig();
-    expect(config.editor).toBe("cursor {path}");
-  });
-
-  it("defaults editor to code {path}", () => {
-    const config = getConfig();
-    expect(config.editor).toBe("code {path}");
-  });
-
-  it("picks up AIW_TERMINAL env var", () => {
-    process.env.AIW_TERMINAL = "open -a iTerm {path}";
-    const config = getConfig();
-    expect(config.terminal).toBe("open -a iTerm {path}");
-  });
-
-  it("defaults terminal to open -a Terminal {path}", () => {
-    const config = getConfig();
-    expect(config.terminal).toBe("open -a Terminal {path}");
+    expect(config.openers).toEqual([
+      { name: "Editor (VSCode)", command: "code {path}" },
+      { name: "Terminal", command: "open -a Terminal {path}" },
+    ]);
   });
 
   it("defaults disableAccessLog to false", () => {
@@ -419,8 +449,6 @@ describe("getOperationConfig", () => {
     "AIW_CHAT_PORT",
     "AIW_CLAUDE_PATH",
     "AIW_CLAUDE_USE_CLI",
-    "AIW_EDITOR",
-    "AIW_TERMINAL",
   ];
 
   beforeEach(() => {
@@ -499,8 +527,8 @@ describe("ensureConfigFile", () => {
       expect(fs.existsSync(tmpPath)).toBe(true);
       const content = fs.readFileSync(tmpPath, "utf-8");
       expect(content).toContain("# ai-workspace configuration");
-      expect(content).toContain("# editor:");
-      expect(content).toContain("# terminal:");
+      expect(content).toContain("# openers:");
+      expect(content).toContain("#   - name: Editor (VSCode)");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
@@ -516,10 +544,10 @@ describe("ensureConfigFile", () => {
       const created = ensureConfigFile(tmpPath);
       expect(created).toBe(false);
       const content = fs.readFileSync(tmpPath, "utf-8");
-      // User's active value is preserved
+      // Legacy `editor:` key is left intact (runtime auto-migrates it to openers)
       expect(content).toContain("editor: vim {path}");
-      // Missing keys are added as comments
-      expect(content).toContain("# terminal:");
+      // Missing known sections are added as comments
+      expect(content).toContain("# openers:");
       expect(content).toContain("# operations:");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -535,8 +563,12 @@ describe("generateDefaultConfigContent", () => {
     expect(content).toContain("#   port: 3741");
     expect(content).toContain("# claude:");
     expect(content).toContain("# operations:");
-    expect(content).toContain("# editor:");
-    expect(content).toContain("# terminal:");
+    expect(content).toContain("# openers:");
+    expect(content).toContain("#   - name: Editor (VSCode)");
+    expect(content).toContain("#   - name: Terminal");
+    // Legacy editor/terminal keys are no longer documented
+    expect(content).not.toMatch(/^# editor:/m);
+    expect(content).not.toMatch(/^# terminal:/m);
   });
 
   it("contains per-operation-type override reference", () => {
@@ -729,8 +761,11 @@ describe("migrateConfigContent", () => {
       "  effort: medium",
       "  allowedTools: [Read, Glob, Grep, WebFetch, WebSearch]",
       "",
-      "editor: code {path}",
-      "terminal: open -a Terminal {path}",
+      "openers:",
+      "  - name: Editor (VSCode)",
+      "    command: code {path}",
+      "  - name: Terminal",
+      "    command: open -a Terminal {path}",
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
@@ -843,8 +878,11 @@ describe("migrateConfigContent", () => {
       "  effort: medium",
       "  allowedTools: [Read, Glob, Grep, WebFetch, WebSearch]",
       "",
-      "editor: code {path}",
-      "terminal: open -a Terminal {path}",
+      "openers:",
+      "  - name: Editor (VSCode)",
+      "    command: code {path}",
+      "  - name: Terminal",
+      "    command: open -a Terminal {path}",
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
@@ -895,8 +933,9 @@ describe("migrateConfigFile", () => {
       const changed = migrateConfigFile(tmpPath);
       expect(changed).toBe(true);
       const content = fs.readFileSync(tmpPath, "utf-8");
+      // Legacy `editor:` is preserved (runtime auto-migrates)
       expect(content).toContain("editor: vim {path}");
-      expect(content).toContain("# terminal:");
+      expect(content).toContain("# openers:");
       expect(content).toContain("# operations:");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
