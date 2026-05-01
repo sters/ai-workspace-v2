@@ -21,9 +21,31 @@ vi.mock("node:fs", () => ({
 
 const mockResetConfig = vi.fn();
 
+class MockConfigValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ConfigValidationError";
+  }
+}
+
 vi.mock("@/lib/config", () => ({
   getConfigFilePath: () => "/mock-workspace/.ai-workspace/config.yml",
   _resetConfig: () => mockResetConfig(),
+  normalizeRawConfig: (raw: Record<string, unknown>) => raw,
+  validateOpeners: (value: unknown) => {
+    if (!Array.isArray(value)) {
+      throw new MockConfigValidationError("openers must be an array");
+    }
+    for (let i = 0; i < value.length; i++) {
+      const e = value[i] as Record<string, unknown>;
+      if (typeof e?.command !== "string" || !e.command.includes("{path}")) {
+        throw new MockConfigValidationError(
+          `openers[${i}].command must contain the "{path}" placeholder`,
+        );
+      }
+    }
+  },
+  ConfigValidationError: MockConfigValidationError,
 }));
 
 async function callGET() {
@@ -122,5 +144,18 @@ describe("POST /api/aiw-settings", () => {
     const { status, data } = await callPOST({ content });
     expect(status).toBe(200);
     expect(data.ok).toBe(true);
+  });
+
+  it("returns 400 when openers entry is missing {path}", async () => {
+    const content = [
+      "openers:",
+      "  - name: Bad",
+      "    command: cursor",
+      "",
+    ].join("\n");
+    const { status, data } = await callPOST({ content });
+    expect(status).toBe(400);
+    expect(data.error).toMatch(/\{path\}/);
+    expect(mockWriteFileSync).not.toHaveBeenCalled();
   });
 });
