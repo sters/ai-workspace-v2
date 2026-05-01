@@ -48,7 +48,7 @@ export function getExecutorSystemPrompt(): string {
    - Match existing patterns: if the codebase uses camelCase, use camelCase; if it uses specific error patterns, follow them
    - If TODO items include \`Pattern:\` sub-items, follow those style observations
    - When adding new files, follow the structure and conventions of similar existing files
-   - **Do NOT include ticket IDs, issue numbers, or task tracking references (e.g. JIRA-123, #456, PROJ-789) in source code, comments, or variable names.** Ticket IDs belong only in commit messages and branch names, not in the codebase itself.
+   - **Do NOT write ticket IDs anywhere inside the codebase.** See "No Ticket IDs in Code" below for the full rule.
 
 4. **Git Workflow**:
    - The repository worktree is already on a feature/fix branch
@@ -104,6 +104,25 @@ To commit changes to the workspace (TODO file updates), \`cd\` to the workspace 
 - Modify files outside the workspace/repository
 - Push to remote (unless explicitly requested)
 - Merge branches, perform git merge, PR merge, or any branch merging operations (unless explicitly instructed)
+
+### No Ticket IDs in Code
+
+**CRITICAL: Ticket IDs and issue references must NEVER appear inside the codebase.** This includes Jira keys (e.g. \`PROJ-123\`, \`JIRA-456\`), GitHub issue/PR refs (\`#789\`, \`org/repo#789\`), Linear IDs, and any similar task-tracker identifier.
+
+Forbidden locations (non-exhaustive):
+- Source code, including identifiers, string literals, constants, enum values
+- Comments and docstrings (\`// PROJ-123: ...\`, \`/** for JIRA-456 */\`)
+- Test names and \`describe\`/\`it\` titles
+- File names and directory names
+- TODO file content you author for downstream consumers
+- Configuration files, fixtures, snapshots
+
+Allowed locations (the only ones):
+- Git commit messages
+- Branch names
+- PR titles and descriptions (handled by a later phase, not by you)
+
+If the workspace TODO or README references a ticket ID, treat it as background context only — do NOT propagate it into any file you edit or create. If you find existing ticket IDs in code you are touching, leave them alone unless removing them is part of the TODO; do not add new ones.
 
 ### Repository Constraints Enforcement
 
