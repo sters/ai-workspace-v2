@@ -18,7 +18,12 @@ export async function runFunctionPhase(
   appendPhases?: (phases: PipelinePhase[]) => void,
 ): Promise<boolean> {
   const phaseNum = phaseIndex + 1;
-  emitStatus(managed, `Phase ${phaseNum}/${totalPhases}: ${phase.label}`, phaseExtra);
+  // Tag with childLabel so the announcement appears inside the phase's frame,
+  // grouped together with the phase function's own emitStatus output.
+  emitStatus(managed, `Phase ${phaseNum}/${totalPhases}: ${phase.label}`, {
+    ...phaseExtra,
+    childLabel: phase.label,
+  });
   const childId = `${operationId}-phase-${phaseIndex}`;
   (managed.operation.children ??= []).push({ id: childId, label: phase.label, status: "running" });
 
