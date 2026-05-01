@@ -332,6 +332,51 @@ describe("buildAutonomousPipeline", () => {
       expect(mockBuildUpdateTodo).toHaveBeenCalled();
     });
 
+    it("gate phase does not append create-pr when giveUp is true", async () => {
+      mockGetReviewSessions.mockResolvedValue([{
+        timestamp: "2024-01-01",
+        critical: 0,
+        major: 0,
+        minor: 1,
+        total: 1,
+      }]);
+      mockGetReviewDetail.mockResolvedValue({
+        summary: "1 suggestion found",
+        files: [{ name: "REVIEW-repo.md", content: "Suggestion: add comments" }],
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const gatePhase = phases[2];
+      if (gatePhase.kind !== "function") return;
+
+      const appendedPhases: PipelinePhase[] = [];
+      const ctx = createMockCtx({
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "Autonomous Gate") {
+            opts.onResultText(JSON.stringify({
+              shouldLoop: false,
+              giveUp: true,
+              reason: "Unable to resolve the issue — it requires external API access",
+              fixableIssues: [],
+            }));
+          }
+          return true;
+        }),
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
+      });
+
+      await gatePhase.fn(ctx);
+
+      // giveUp: true → no Create PR appended
+      expect(appendedPhases).toHaveLength(0);
+      expect(ctx.emitResult).toHaveBeenCalledWith(
+        expect.stringContaining("Give up"),
+      );
+    });
+
     it("does not strip TODOs when gate says stop", async () => {
       mockGetReviewSessions.mockResolvedValue([]);
 

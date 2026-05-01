@@ -187,6 +187,7 @@ export interface AutonomousGateInput {
   readmeContent: string;
   loopIteration: number;
   maxLoops: number;
+  previousGateResults?: { cycle: number; reason: string; fixableIssues: string[] }[];
 }
 
 export interface WorkspaceSuggesterInput {
