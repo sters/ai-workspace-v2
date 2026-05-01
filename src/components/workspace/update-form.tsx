@@ -5,6 +5,7 @@ import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";
 import { Textarea } from "../shared/forms/textarea";
 import { InteractionLevelSelector } from "../shared/forms/interaction-level-selector";
+import { getAddressPrReviewsInstruction } from "@/lib/templates/prompts/address-pr-reviews";
 import type { SplitButtonItem } from "@/types/components";
 import type { InteractionLevel } from "@/types/prompts";
 
@@ -54,11 +55,7 @@ export function UpdateForm({
           type="button"
           className="rounded border border-border bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
           disabled={disabled}
-          onClick={() =>
-            setInstruction(
-              "Check the PR opened on the current branch using `gh pr list` and `gh pr view`, then review all review comments with `gh pr view --comments` and `gh api` for review threads. Identify any unresolved review comments and actionable feedback, and convert them into TODO items in the TODO file.",
-            )
-          }
+          onClick={() => setInstruction(getAddressPrReviewsInstruction())}
         >
           Address PR Reviews
         </button>
