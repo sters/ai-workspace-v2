@@ -8,14 +8,19 @@ import { UpdateForm } from "./update-form";
 import { Card } from "../shared/containers/card";
 import { ProgressBar } from "../shared/feedback/progress-bar";
 import { Button } from "../shared/buttons/button";
-import { openInEditor, openInTerminal } from "@/lib/api";
+import {
+  DropdownMenu,
+  type DropdownItem,
+} from "../shared/menus/dropdown-menu";
+import { showToast } from "../shared/feedback/toast";
+import { openWith } from "@/lib/api";
+import { useOpeners } from "@/hooks/use-openers";
 import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
 import {
   Play,
   ClipboardCheck,
   GitPullRequest,
-  CodeXml,
-  Terminal,
+  FolderOpen,
 } from "lucide-react";
 
 export function RepoTodoCard({
@@ -32,9 +37,21 @@ export function RepoTodoCard({
   repoPath: string | undefined;
   onStartAndNavigate: (type: OperationType, body: Record<string, string>) => void;
 }) {
-  const repoFullPath = repoPath
-    ? `${workspacePath}/${repoPath}`
-    : undefined;
+  const { openers } = useOpeners();
+  const openerItems: DropdownItem[] = openers.map((opener) => ({
+    kind: "leaf" as const,
+    label: opener.name,
+    onSelect: async () => {
+      try {
+        await openWith(workspacePath, opener.name, repoPath);
+      } catch (err) {
+        showToast(
+          err instanceof Error ? err.message : `Failed to launch ${opener.name}`,
+          "error",
+        );
+      }
+    },
+  }));
 
   const baseBody = {
     workspace: workspacePath,
@@ -89,25 +106,13 @@ export function RepoTodoCard({
             >
               <GitPullRequest className="h-3.5 w-3.5" />
             </Button>
-            {repoFullPath && (
-              <>
-                <Button
-                  variant="ghost-toggle"
-                  className="h-6 w-6 p-0"
-                  title="Open in editor"
-                  onClick={() => openInEditor(repoFullPath)}
-                >
-                  <CodeXml className="h-3.5 w-3.5" />
-                </Button>
-                <Button
-                  variant="ghost-toggle"
-                  className="h-6 w-6 p-0"
-                  title="Open in terminal"
-                  onClick={() => openInTerminal(repoFullPath)}
-                >
-                  <Terminal className="h-3.5 w-3.5" />
-                </Button>
-              </>
+            {repoPath && openerItems.length > 0 && (
+              <DropdownMenu
+                ariaLabel="Open in..."
+                trigger={<FolderOpen className="h-3.5 w-3.5" />}
+                triggerClassName="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-50"
+                items={openerItems}
+              />
             )}
           </div>
         </div>

@@ -33,8 +33,10 @@ export const CONFIG_DEFAULTS: AppConfig = {
     effort: "medium",
     allowedTools: ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
   },
-  editor: "code {path}",
-  terminal: "open -a Terminal {path}",
+  openers: [
+    { name: "Editor (VSCode)", command: "code {path}" },
+    { name: "Terminal", command: "open -a Terminal {path}" },
+  ],
 };
 
 // ---------------------------------------------------------------------------
@@ -106,6 +108,25 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "model", section: "quickAsk", defaultLine: "#   model: sonnet                  # default model for quick-ask (null = CLI default)" },
   { key: "effort", section: "quickAsk", defaultLine: "#   effort: medium                 # effort level (low / medium / high / max, null = CLI default)" },
   { key: "allowedTools", section: "quickAsk", defaultLine: "#   allowedTools: [Read, Glob, Grep, WebFetch, WebSearch]  # null = no restriction" },
-  { key: "editor", section: null, defaultLine: "# editor: code {path}" },
-  { key: "terminal", section: null, defaultLine: "# terminal: open -a Terminal {path}" },
+  {
+    key: "openers",
+    section: null,
+    defaultLine: [
+      "# openers:",
+      "#   - name: Editor (VSCode)",
+      "#     command: code {path}",
+      "#   - name: Terminal",
+      "#     command: open -a Terminal {path}",
+    ].join("\n"),
+  },
 ];
+
+/**
+ * Legacy top-level keys that the migrator should recognize (and therefore not
+ * comment out as "unknown") but should never add to a new or partial config
+ * file. They're auto-converted to `openers` at runtime by `normalizeRawConfig`.
+ */
+export const LEGACY_TOP_LEVEL_KEYS: ReadonlySet<string> = new Set([
+  "editor",
+  "terminal",
+]);

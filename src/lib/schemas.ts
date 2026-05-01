@@ -149,6 +149,12 @@ export const suggestionAcceptSchema = z.object({
   id: z.string().min(1, "id is required"),
 });
 
+export const openSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  openerName: z.string().min(1, "openerName is required"),
+  subPath: z.string().optional(),
+});
+
 export const memoSaveSchema = z.object({
   content: z.string(),
 });
