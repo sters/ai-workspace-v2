@@ -30,9 +30,9 @@ Per-workspace config stored in `{workspaceRoot}/.ai-workspace/config.yml`. Three
 | `AIW_CHAT_PORT` | 3742 | WebSocket chat server port |
 | `AIW_CLAUDE_PATH` | auto-detect | Custom Claude CLI path |
 | `AIW_CLAUDE_USE_CLI` | `true` | Use CLI (`true`) or legacy SDK (`false`) |
-| `AIW_EDITOR` | `code {path}` | Editor command template |
-| `AIW_TERMINAL` | `open -a Terminal {path}` | Terminal command template |
 | `AIW_DISABLE_ACCESS_LOG` | `false` | Silence Next.js dev access logs (also `server.disableAccessLog` in config.yml) |
+
+The "Open in..." dropdown is configured via the `openers: { name, command }[]` field in `config.yml`. Defaults to one VSCode and one Terminal entry. Legacy `editor`/`terminal` top-level keys are auto-migrated to `openers` at runtime in `normalizeRawConfig` (`src/lib/config/resolver.ts`).
 
 ## Architecture
 
