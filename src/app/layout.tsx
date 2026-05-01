@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppSidebar } from "@/components/shared/app-sidebar";
+import { ToastHost } from "@/components/shared/feedback/toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({
             <div className="mx-auto max-w-6xl p-6">{children}</div>
           </main>
         </div>
+        <ToastHost />
       </body>
     </html>
   );
