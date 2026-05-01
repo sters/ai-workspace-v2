@@ -4,6 +4,9 @@ import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import {
   getConfigFilePath,
+  normalizeRawConfig,
+  validateOpeners,
+  ConfigValidationError,
   _resetConfig,
 } from "@/lib/config";
 import { aiwSettingsSchema } from "@/lib/schemas";
@@ -36,21 +39,38 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) return parsed.response;
     const { content } = parsed.data;
 
-    // Validate YAML syntax
+    // Validate YAML syntax + known schema constraints (openers shape).
     if (content.trim()) {
+      let yamlParsed: unknown;
       try {
-        const yamlParsed = parseYaml(content);
-        if (yamlParsed !== null && typeof yamlParsed !== "object") {
-          return NextResponse.json(
-            { error: "Config must be a YAML mapping (object), not a scalar or array" },
-            { status: 400 },
-          );
-        }
+        yamlParsed = parseYaml(content);
       } catch (err) {
         return NextResponse.json(
           { error: `Invalid YAML: ${err instanceof Error ? err.message : String(err)}` },
           { status: 400 },
         );
+      }
+      if (yamlParsed !== null && typeof yamlParsed !== "object") {
+        return NextResponse.json(
+          { error: "Config must be a YAML mapping (object), not a scalar or array" },
+          { status: 400 },
+        );
+      }
+      if (yamlParsed && typeof yamlParsed === "object" && !Array.isArray(yamlParsed)) {
+        // normalizeRawConfig migrates legacy `editor`/`terminal` into `openers`,
+        // so we validate the post-migration shape — matches what the runtime
+        // would actually consume.
+        const normalized = normalizeRawConfig(yamlParsed as Record<string, unknown>);
+        if (normalized.openers !== undefined) {
+          try {
+            validateOpeners(normalized.openers);
+          } catch (err) {
+            if (err instanceof ConfigValidationError) {
+              return NextResponse.json({ error: err.message }, { status: 400 });
+            }
+            throw err;
+          }
+        }
       }
     }
 
