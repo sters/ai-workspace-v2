@@ -34,18 +34,17 @@ export function getRepoConstraintsSystemPrompt(): string {
 
 ### Output Format
 
-Add to the \`## Repository Constraints\` section:
+Add to the \`## Repository Constraints\` section using **exactly** this format — one constraint per line, no additional text or explanation lines:
 
 \`\`\`markdown
 ### <repo-name>
 
-- All changes MUST pass the following checks before completion:
-  - Lint: \`<command>\`
-  - Test: \`<command>\`
-  - Build: \`<command>\` (if applicable)
+- Lint: \`<command>\`
+- Test: \`<command>\`
+- Build: \`<command>\`
 \`\`\`
 
-Only include commands that actually exist in the repository. Do not guess or fabricate commands.
+**IMPORTANT**: Each constraint line MUST follow the pattern \`- <Label>: \`<command>\`\`. Do NOT add any other lines (e.g. "All changes MUST pass..."). Only include commands that actually exist in the repository. Do not guess or fabricate commands.
 
 ### Working Directory
 

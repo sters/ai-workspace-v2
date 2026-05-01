@@ -27,6 +27,9 @@ ${input.verifyFiles.map((f) => `- ${f}`).join("\n") || "(none)"}
 ### README Verifications
 ${input.readmeVerifyFiles.map((f) => `- ${f}`).join("\n") || "(none)"}
 
+### Constraint Verifications
+${input.constraintFiles.map((f) => `- ${f}`).join("\n") || "(none)"}
+
 ## Summary Report Template
 
 Write the summary to: ${input.reviewDir}/SUMMARY.md
@@ -46,6 +49,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
    - Code Reviews: Extract repository name, overall assessment, critical/warning/suggestion counts, and individual warning descriptions
    - TODO Verifications: Extract verified/unverified/partial/incomplete/skipped counts and completion rate
    - README Verifications: Extract satisfied/unsatisfied/partial counts and satisfaction rate
+   - Constraint Verifications: Extract pass/fail/skipped/pre-existing status per constraint with exit codes and duration
 
 2. **Create Summary Report** at the specified path following the template structure:
    - Per-repository sections with links to all review/verification files
@@ -53,6 +57,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
    - Warning descriptions as a numbered list directly after the Code Review table (no separate heading)
    - TODO Verification status as a table with completion rate
    - README Verification status as a table with satisfaction rate
+   - Constraint Verification results as a table per repository (Constraint, Status, Exit Code, Duration). If ANY constraint has status FAIL, add it as a **Critical Issue**. SKIPPED and PRE-EXISTING constraints are informational — note them but do NOT flag as critical
    - Do NOT include an Aggregate Statistics section
 
 ### Working Directory Rules

@@ -152,6 +152,7 @@ export interface CollectorInput {
   reviewFiles: string[];
   verifyFiles: string[];
   readmeVerifyFiles: string[];
+  constraintFiles: string[];
 }
 
 export interface InitAnalyzeAndReadmeInput {
