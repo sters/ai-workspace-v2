@@ -8,6 +8,7 @@ import {
 describe("AUTONOMOUS_GATE_SCHEMA", () => {
   it("has required fields", () => {
     expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("shouldLoop");
+    expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("giveUp");
     expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("reason");
     expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("fixableIssues");
   });
@@ -110,5 +111,38 @@ describe("buildAutonomousGatePrompt", () => {
     expect(systemPrompt).toContain("stale references");
     expect(systemPrompt).toContain("struct/type layouts");
     expect(systemPrompt).toContain("suboptimal data structures");
+  });
+
+  it("includes give-up instructions for stagnation detection", () => {
+    const systemPrompt = getAutonomousGateSystemPrompt();
+    expect(systemPrompt).toContain("giveUp");
+    expect(systemPrompt).toContain("stagnation");
+  });
+
+  it("includes previous gate results when provided", () => {
+    const prompt = buildAutonomousGatePrompt({
+      ...baseInput,
+      loopIteration: 2,
+      previousGateResults: [
+        { cycle: 1, reason: "Fix typo found", fixableIssues: ["Fix typo in main.go"] },
+      ],
+    });
+    expect(prompt).toContain("Previous Gate Decisions");
+    expect(prompt).toContain("Cycle 1");
+    expect(prompt).toContain("Fix typo found");
+    expect(prompt).toContain("Fix typo in main.go");
+  });
+
+  it("does not include previous gate results section when empty", () => {
+    const prompt = buildAutonomousGatePrompt({
+      ...baseInput,
+      previousGateResults: [],
+    });
+    expect(prompt).not.toContain("Previous Gate Decisions");
+  });
+
+  it("does not include previous gate results section when undefined", () => {
+    const prompt = buildAutonomousGatePrompt(baseInput);
+    expect(prompt).not.toContain("Previous Gate Decisions");
   });
 });

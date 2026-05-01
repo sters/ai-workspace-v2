@@ -22,6 +22,7 @@ const DEFAULT_UPDATE_TODO_INSTRUCTION =
 
 interface AutonomousGateResult {
   shouldLoop: boolean;
+  giveUp: boolean;
   reason: string;
   fixableIssues: string[];
 }
@@ -31,16 +32,17 @@ async function runAutonomousGate(
   workspace: string,
   loopIteration: number,
   maxLoops: number,
+  previousGateResults?: { cycle: number; reason: string; fixableIssues: string[] }[],
 ): Promise<AutonomousGateResult> {
   // Final iteration: skip AI call
   if (loopIteration >= maxLoops) {
-    return { shouldLoop: false, reason: "Maximum loop iterations reached", fixableIssues: [] };
+    return { shouldLoop: false, giveUp: false, reason: "Maximum loop iterations reached", fixableIssues: [] };
   }
 
   // Check review results
   const sessions = await getReviewSessions(workspace);
   if (sessions.length === 0) {
-    return { shouldLoop: false, reason: "No review sessions found", fixableIssues: [] };
+    return { shouldLoop: false, giveUp: false, reason: "No review sessions found", fixableIssues: [] };
   }
 
   const latest = sessions[0];
@@ -48,7 +50,7 @@ async function runAutonomousGate(
   // Always let AI evaluate — even warnings/suggestions may be worth fixing
   const reviewDetail = await getReviewDetail(workspace, latest.timestamp);
   if (!reviewDetail) {
-    return { shouldLoop: false, reason: "Could not read review details", fixableIssues: [] };
+    return { shouldLoop: false, giveUp: false, reason: "Could not read review details", fixableIssues: [] };
   }
 
   // Get TODO files
@@ -76,6 +78,7 @@ async function runAutonomousGate(
     readmeContent,
     loopIteration,
     maxLoops,
+    previousGateResults,
   });
 
   // Run AI gate
@@ -90,22 +93,23 @@ async function runAutonomousGate(
   });
 
   if (!ok || !resultText) {
-    return { shouldLoop: false, reason: "Gate execution failed", fixableIssues: [] };
+    return { shouldLoop: false, giveUp: false, reason: "Gate execution failed", fixableIssues: [] };
   }
 
   // Parse result
   try {
     const parsed = JSON.parse(resultText) as AutonomousGateResult;
     if (typeof parsed.shouldLoop !== "boolean") {
-      return { shouldLoop: false, reason: "Invalid gate response", fixableIssues: [] };
+      return { shouldLoop: false, giveUp: false, reason: "Invalid gate response", fixableIssues: [] };
     }
     return {
       shouldLoop: parsed.shouldLoop,
+      giveUp: parsed.giveUp === true,
       reason: parsed.reason ?? "",
       fixableIssues: Array.isArray(parsed.fixableIssues) ? parsed.fixableIssues : [],
     };
   } catch {
-    return { shouldLoop: false, reason: "Failed to parse gate response", fixableIssues: [] };
+    return { shouldLoop: false, giveUp: false, reason: "Failed to parse gate response", fixableIssues: [] };
   }
 }
 
@@ -127,6 +131,7 @@ export function buildAutonomousPipeline(input: {
   const maxLoops = input.maxLoops ?? DEFAULT_MAX_LOOPS;
   const phases: PipelinePhase[] = [];
   const skip = { skipAskUserQuestion: true } as const;
+  const gateHistory: { cycle: number; reason: string; fixableIssues: string[] }[] = [];
 
   // ------------------------------------------------------------------
   // Leading phases: init, update-todo, or skip straight to execute
@@ -212,13 +217,24 @@ export function buildAutonomousPipeline(input: {
           return false;
         }
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Evaluating review results`);
-        const gateResult = await runAutonomousGate(ctx, ws, loopNumber, maxLoops);
+        const gateResult = await runAutonomousGate(ctx, ws, loopNumber, maxLoops, gateHistory);
+        gateHistory.push({ cycle: loopNumber, reason: gateResult.reason, fixableIssues: gateResult.fixableIssues });
+
+        const decisionLabel = gateResult.giveUp
+          ? "Give up"
+          : gateResult.shouldLoop
+            ? "Continue"
+            : "Proceed to PR";
         ctx.emitResult(
-          `**Gate decision (cycle ${loopNumber}/${maxLoops})**: ${gateResult.shouldLoop ? "Continue" : "Proceed to PR"} — ${gateResult.reason}` +
+          `**Gate decision (cycle ${loopNumber}/${maxLoops})**: ${decisionLabel} — ${gateResult.reason}` +
             (gateResult.fixableIssues.length > 0
               ? `\n- ${gateResult.fixableIssues.join("\n- ")}`
               : ""),
         );
+
+        if (gateResult.giveUp) {
+          return true;
+        }
 
         if (!gateResult.shouldLoop) {
           ctx.appendPhases([buildCreatePrPhase()]);
