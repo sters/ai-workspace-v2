@@ -10,6 +10,7 @@ vi.mock("@/lib/workspace/reader", () => ({
 
 vi.mock("@/lib/parsers/readme", () => ({
   parseReadmeMeta: vi.fn(() => ({ repositories: [] })),
+  parseConstraints: vi.fn(() => []),
 }));
 
 vi.mock("@/lib/workspace", () => ({
@@ -38,6 +39,15 @@ vi.mock("@/lib/workspace/prompts", () => ({
 
 vi.mock("@/lib/pipeline-manager", () => ({
   getTimeoutDefaults: vi.fn(() => ({ claudeMs: 60_000, functionMs: 30_000 })),
+}));
+
+vi.mock("@/lib/workspace/constraint-runner", () => ({
+  execConstraintCommand: vi.fn(),
+  buildConstraintReport: vi.fn(() => ""),
+}));
+
+vi.mock("@/lib/env", () => ({
+  getCleanEnv: vi.fn(() => ({})),
 }));
 
 // Mock Bun.file with a per-path map so we can simulate per-repo TODO files
