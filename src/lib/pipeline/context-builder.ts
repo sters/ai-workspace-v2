@@ -18,22 +18,28 @@ export function buildPhaseFunctionContext(
   const operation = managed.operation;
   let childCounter = 0;
 
+  // Tag native function-phase emissions with childLabel = phaseLabel so they
+  // group into a child-group section in the UI, matching how Claude child
+  // processes appear (their childLabel is set by wireChild).
+  // runChild / runChildGroup keep their own childLabel via wireChild.
+  const fnExtra = { ...phaseExtra, childLabel: phaseExtra.phaseLabel };
+
   return {
     operationId,
-    emitStatus: (msg) => emitStatus(managed, msg, phaseExtra),
+    emitStatus: (msg) => emitStatus(managed, msg, fnExtra),
     emitResult: (msg) => {
       emitEvent(managed, {
         type: "output",
         operationId: managed.operation.id,
         data: JSON.stringify({ type: "result", subtype: "success", result: msg }),
         timestamp: new Date().toISOString(),
-        ...phaseExtra,
+        ...fnExtra,
       });
     },
     setWorkspace: (ws) => {
       managed.operation.workspace = ws;
       updateOperationWorkspace(managed.operation.id, ws);
-      emitStatus(managed, `__setWorkspace:${ws}`, phaseExtra);
+      emitStatus(managed, `__setWorkspace:${ws}`, fnExtra);
     },
     emitAsk: (questions, askOptions) => {
       const toolUseId = `fn-ask-${operationId}-${phaseIndex}-${childCounter++}`;
@@ -60,7 +66,7 @@ export function buildPhaseFunctionContext(
           },
         }),
         timestamp: new Date().toISOString(),
-        ...phaseExtra,
+        ...fnExtra,
       });
       // Return a promise that resolves when the user answers
       // or rejects when the operation is cancelled
@@ -93,7 +99,7 @@ export function buildPhaseFunctionContext(
               },
             }),
             timestamp: new Date().toISOString(),
-            ...phaseExtra,
+            ...fnExtra,
           });
           resolve(answers);
         });
@@ -120,7 +126,7 @@ export function buildPhaseFunctionContext(
         operationId: managed.operation.id,
         data,
         timestamp: new Date().toISOString(),
-        ...phaseExtra,
+        ...fnExtra,
       });
     },
     signal: managed.abortController.signal,
