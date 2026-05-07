@@ -3,6 +3,7 @@ import type { OperationLogAgeInfo } from "./types";
 import {
   listOperations as dbListOperations,
   listOperationsWithAge as dbListOperationsWithAge,
+  listRecentFinishedOperations as dbListRecentFinishedOperations,
 } from "../db";
 import { validateWorkspace } from "./constants";
 
@@ -22,4 +23,12 @@ export function listStoredOperations(workspace?: string): OperationListItem[] {
  */
 export function listAllOperationLogsWithAge(staleDays: number): OperationLogAgeInfo[] {
   return dbListOperationsWithAge(staleDays);
+}
+
+/**
+ * List recent finished (completed + failed) operations as lightweight summaries.
+ * Returns summaries sorted by completedAt descending (newest first), capped at `limit`.
+ */
+export function listRecentFinishedOperations(limit: number): OperationListItem[] {
+  return dbListRecentFinishedOperations(limit);
 }

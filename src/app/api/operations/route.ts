@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { getOperationSummaries } from "@/lib/pipeline-manager";
-import { listStoredOperations } from "@/lib/operation-store";
+import { listStoredOperations, listRecentFinishedOperations } from "@/lib/operation-store";
 import type { OperationListItem } from "@/types/operation";
 
 export const dynamic = "force-dynamic";
+
+const COMPLETED_LIMIT_DEFAULT = 50;
+const COMPLETED_LIMIT_MAX = 200;
+
+function parseLimit(raw: string | null): number {
+  const parsed = raw == null ? NaN : parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return COMPLETED_LIMIT_DEFAULT;
+  return Math.min(parsed, COMPLETED_LIMIT_MAX);
+}
 
 export function GET(request: Request) {
   try {
@@ -19,6 +28,25 @@ export function GET(request: Request) {
       }
       running.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
       return NextResponse.json(running);
+    }
+
+    // Recent finished (completed + failed). Merges in-memory non-running with stored,
+    // dedups by id (in-memory wins), sorts by completedAt desc, caps at limit.
+    if (status === "completed") {
+      const limit = parseLimit(url.searchParams.get("limit"));
+      const inMemory = getOperationSummaries().filter((op) => op.status !== "running");
+      const inMemoryIds = new Set(inMemory.map((op) => op.id));
+      const stored = listRecentFinishedOperations(limit).filter((op) => !inMemoryIds.has(op.id));
+      let merged: OperationListItem[] = [...inMemory, ...stored];
+      if (workspace) {
+        merged = merged.filter((op) => op.workspace === workspace);
+      }
+      merged.sort((a, b) => {
+        const at = new Date(a.completedAt ?? a.startedAt).getTime();
+        const bt = new Date(b.completedAt ?? b.startedAt).getTime();
+        return bt - at;
+      });
+      return NextResponse.json(merged.slice(0, limit));
     }
 
     // Full listing: merge in-memory summaries with disk-stored summaries

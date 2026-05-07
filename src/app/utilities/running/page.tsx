@@ -28,11 +28,19 @@ function getViewHref(op: OperationListItem): string | null {
   return `/workspace/${encodeURIComponent(op.workspace)}/operations?operationId=${encodeURIComponent(op.id)}`;
 }
 
+const COMPLETED_LIMIT = 50;
+
 export default function RunningPage() {
   const { data, error, isLoading, mutate } = useSWR<OperationListItem[]>(
     "/api/operations?status=running",
     fetcher,
     { refreshInterval: 10000 }
+  );
+
+  const { data: completedData, mutate: mutateCompleted } = useSWR<OperationListItem[]>(
+    `/api/operations?status=completed&limit=${COMPLETED_LIMIT}`,
+    fetcher,
+    { refreshInterval: 30000 }
   );
 
   const { data: chatSessions, mutate: mutateChatSessions } = useSWR<ChatSessionInfo[]>(
@@ -42,14 +50,16 @@ export default function RunningPage() {
   );
 
   const running = data ?? [];
+  const completed = completedData ?? [];
   const activeChats = chatSessions ?? [];
   const now = useNow(running.length > 0 || activeChats.length > 0 ? 1000 : 0);
   const kill = useCallback(
     async (operationId: string) => {
       await killOperation(operationId);
       mutate();
+      mutateCompleted();
     },
-    [mutate]
+    [mutate, mutateCompleted]
   );
 
   const killChat = useCallback(
@@ -60,14 +70,24 @@ export default function RunningPage() {
     [mutateChatSessions]
   );
 
-  const nothingRunning = !isLoading && !error && running.length === 0 && activeChats.length === 0;
+  const refresh = useCallback(() => {
+    mutate();
+    mutateCompleted();
+  }, [mutate, mutateCompleted]);
+
+  const nothing =
+    !isLoading &&
+    !error &&
+    running.length === 0 &&
+    completed.length === 0 &&
+    activeChats.length === 0;
 
   return (
     <div>
       <PageHeader
         title="Running Operations"
         description="All currently running operations across workspaces."
-        onRefresh={() => mutate()}
+        onRefresh={refresh}
       />
 
       {isLoading && <StatusText>Loading...</StatusText>}
@@ -75,7 +95,7 @@ export default function RunningPage() {
         <StatusText variant="error">Failed to fetch operations.</StatusText>
       )}
 
-      {nothingRunning && <StatusText>No running operations.</StatusText>}
+      {nothing && <StatusText>No operations.</StatusText>}
 
       {running.length > 0 && (
         <div className="grid gap-3">
@@ -107,9 +127,40 @@ export default function RunningPage() {
         </div>
       )}
 
+      {completed.length > 0 && (
+        <>
+          {running.length > 0 && <hr className="my-6 border-border" />}
+          <h2 className="mb-3 text-lg font-semibold">Recent Operations</h2>
+          <div className="grid gap-3">
+            {completed.map((op) => (
+              <Card
+                key={op.id}
+                className="flex items-center justify-between"
+              >
+                <OperationSummary operation={op} now={now} />
+                <div className="flex shrink-0 items-center gap-2">
+                  {getViewHref(op) ? (
+                    <Link
+                      href={getViewHref(op)!}
+                      className={buttonVariants("outline-muted")}
+                    >
+                      View
+                    </Link>
+                  ) : (
+                    <span className={buttonVariants("outline-muted", "text-muted-foreground cursor-default hover:bg-transparent")}>
+                      View
+                    </span>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
       {activeChats.length > 0 && (
         <>
-          {running.length > 0 && <div className="my-4" />}
+          {(running.length > 0 || completed.length > 0) && <hr className="my-6 border-border" />}
           <h2 className="mb-3 text-lg font-semibold">Active Chat Sessions</h2>
           <div className="grid gap-3">
             {activeChats.map((chat) => (

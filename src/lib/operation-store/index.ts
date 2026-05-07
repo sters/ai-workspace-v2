@@ -5,7 +5,7 @@ export type { StoredOperationLog, OperationLogAgeInfo } from "./types";
 export { readOperationLog } from "./reader";
 
 // Listing
-export { listStoredOperations, listAllOperationLogsWithAge } from "./listing";
+export { listStoredOperations, listAllOperationLogsWithAge, listRecentFinishedOperations } from "./listing";
 
 // Writing
 export { writeOperationLog } from "./writer";
