@@ -19,6 +19,7 @@ let _deleteById: Statement | null = null;
 let _deleteByWorkspace: Statement | null = null;
 let _listWithAge: Statement | null = null;
 let _listRecentCompleted: Statement | null = null;
+let _listRecentFinished: Statement | null = null;
 
 function stmts(db: Database) {
   if (!_insert) {
@@ -78,6 +79,11 @@ function stmts(db: Database) {
       "SELECT * FROM operations WHERE status = 'completed' ORDER BY completed_at DESC LIMIT ?",
     );
   }
+  if (!_listRecentFinished) {
+    _listRecentFinished = db.prepare(
+      "SELECT * FROM operations WHERE status IN ('completed', 'failed') ORDER BY completed_at DESC LIMIT ?",
+    );
+  }
   return {
     insert: _insert,
     updateStatus: _updateStatus,
@@ -91,6 +97,7 @@ function stmts(db: Database) {
     deleteByWorkspace: _deleteByWorkspace,
     listWithAge: _listWithAge,
     listRecentCompleted: _listRecentCompleted,
+    listRecentFinished: _listRecentFinished,
   };
 }
 
@@ -108,6 +115,7 @@ export function _resetStatements(): void {
   _deleteByWorkspace = null;
   _listWithAge = null;
   _listRecentCompleted = null;
+  _listRecentFinished = null;
 }
 
 _onDbReset(_resetStatements);
@@ -289,5 +297,12 @@ export function listRecentCompletedOperations(limit: number = 20): OperationList
   const db = getDb();
   const s = stmts(db);
   const rows = s.listRecentCompleted.all(limit) as OperationRow[];
+  return rows.map(rowToListItem);
+}
+
+export function listRecentFinishedOperations(limit: number = 50): OperationListItem[] {
+  const db = getDb();
+  const s = stmts(db);
+  const rows = s.listRecentFinished.all(limit) as OperationRow[];
   return rows.map(rowToListItem);
 }
