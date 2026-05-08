@@ -8,15 +8,27 @@ describe("getChatSystemPrompt", () => {
     expect(systemPrompt).toContain("TODO");
   });
 
-  it("instructs not to proactively read files", () => {
+  it("forbids startup verification commands and analysis", () => {
     const systemPrompt = getChatSystemPrompt();
-    expect(systemPrompt).toContain("Do NOT proactively read");
+    expect(systemPrompt).toContain("Do NOT analyze");
+    expect(systemPrompt).toContain("Do NOT run any verification commands");
+  });
+
+  it("requires cd as the first Bash call", () => {
+    const systemPrompt = getChatSystemPrompt();
+    expect(systemPrompt).toContain("first Bash tool call MUST be");
+    expect(systemPrompt).toContain("cd");
   });
 });
 
 describe("buildInitPrompt", () => {
   const workspaceId = "my-project";
   const workspacePath = "/root/workspace/my-project";
+
+  it("includes a cd instruction so Claude operates in the workspace dir", async () => {
+    const prompt = await buildInitPrompt(workspaceId, workspacePath, { readme: "x", todos: [] });
+    expect(prompt).toContain(`cd ${workspacePath}`);
+  });
 
   it("embeds README content", async () => {
     const prompt = await buildInitPrompt(workspaceId, workspacePath, {
@@ -80,6 +92,13 @@ describe("buildReviewChatPrompt", () => {
   const workspaceId = "my-project";
   const workspacePath = "/root/workspace/my-project";
   const reviewTimestamp = "20260214-235920";
+
+  it("includes a cd instruction so Claude operates in the workspace dir", async () => {
+    const prompt = await buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp, {
+      readme: "x", todos: [], reviewSummary: "y",
+    });
+    expect(prompt).toContain(`cd ${workspacePath}`);
+  });
 
   it("includes the review timestamp and artifacts path", async () => {
     const prompt = await buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp, {
