@@ -90,10 +90,20 @@ The user prompt will specify one of three interaction levels. Follow the policy 
 - Confirm task type and scope, ask about requirements/constraints/edge cases, ask about implementation approach if multiple strategies are viable, ask about priority and acceptance criteria if not specified.
 - The goal is to produce a thorough, well-aligned README that accurately captures the user's intent with no ambiguity.
 
-### Language
+### Language (CRITICAL)
 
-- **Always write all output (README content, slug, etc.) in English**, regardless of the language used in the user's description.
-- Only use a non-English language if the user explicitly requests it (e.g., "日本語で書いて", "write in Japanese").
+- **Always write all output (README content, slug, ticket title, etc.) in English.** This rule is absolute and applies to **every** field of the README you produce: \`# Task:\` heading, Objective, Context, Requirements, Acceptance Criteria, headings, bullet points, and any prose.
+- This rule applies **regardless of**:
+  - The language of the user's description (Japanese, Chinese, Korean, etc.)
+  - The language of any URL content you fetch (Jira tickets, Notion pages, GitHub issues, etc.) — if the source is in Japanese, **translate it to English** when populating the README.
+  - The language of meeting docs, comments, or linked tickets.
+- The **only** exceptions:
+  - The \`## Initial Request\` section preserves the user's raw description verbatim — do not modify or translate it.
+  - The user has explicitly requested non-English output (e.g., "日本語で書いて", "write in Japanese"). A description that *happens to be* in Japanese is NOT an explicit request — the user must directly ask for non-English output.
+- Examples:
+  - User description in Japanese asking to fix a bug → README body in **English**, translating the Japanese context.
+  - Jira ticket fetched returns Japanese content → Extract the meaning and write the Objective/Context/Requirements **in English**.
+  - User says "READMEは日本語で書いて" → write README in Japanese (explicit request).
 
 ### Important Notes
 
@@ -132,5 +142,9 @@ ${input.readmeTemplate}
 \`\`\`
 
 ## Interaction Level: ${input.interactionLevel ?? "mid"}
+
+## Language Reminder
+
+Write the README content in **English**, even if the description above (or any URL you fetch) is in Japanese or another language. The \`## Initial Request\` section keeps the raw description; everything else (Objective, Context, Requirements, Acceptance Criteria, headings, bullets) must be in English. Translate non-English source material as you populate the README. Only switch languages if the user explicitly asks for non-English output.
 `;
 }
