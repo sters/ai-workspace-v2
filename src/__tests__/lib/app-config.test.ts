@@ -36,6 +36,9 @@ describe("CONFIG_DEFAULTS", () => {
       sessionStartGitContext: true,
       blockDangerousBash: true,
     });
+    expect(CONFIG_DEFAULTS.suggest).toEqual({
+      enabled: true,
+    });
   });
 });
 
@@ -771,6 +774,9 @@ describe("migrateConfigContent", () => {
       "  - name: Terminal",
       "    command: open -a Terminal {path}",
       "",
+      "suggest:",
+      "  enabled: true",
+      "",
       "hooks:",
       "  sessionStartGitContext: true",
       "  blockDangerousBash: true",
@@ -891,6 +897,9 @@ describe("migrateConfigContent", () => {
       "    command: code {path}",
       "  - name: Terminal",
       "    command: open -a Terminal {path}",
+      "",
+      "suggest:",
+      "  enabled: true",
       "",
       "hooks:",
       "  sessionStartGitContext: true",

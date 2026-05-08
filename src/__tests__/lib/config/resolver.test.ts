@@ -120,6 +120,20 @@ describe("mergeConfig", () => {
     expect(result.quickAsk.effort).toBeNull();
   });
 
+  it("defaults suggest.enabled to true", () => {
+    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
+    expect(result.suggest.enabled).toBe(true);
+  });
+
+  it("file config can disable suggest.enabled", () => {
+    const result = mergeConfig(
+      CONFIG_DEFAULTS,
+      { suggest: { enabled: false } } as Partial<AppConfig>,
+      {},
+    );
+    expect(result.suggest.enabled).toBe(false);
+  });
+
   it("merges steps in typeOverrides", () => {
     const result = mergeConfig(
       CONFIG_DEFAULTS,

@@ -62,6 +62,12 @@ export interface AppConfig {
   /** External tools that can open a workspace path (editor, terminal, etc.). */
   openers: Opener[];
 
+  /** Background workspace-suggestion feature (incidental observations from operation transcripts). */
+  suggest: {
+    /** When false, no suggestions are generated after operations complete. */
+    enabled: boolean;
+  };
+
   /** Auto-managed Claude Code hooks written into .claude/settings.local.json. */
   hooks: {
     /** Inject `git branch` + `git status --short` as SessionStart additionalContext. */

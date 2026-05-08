@@ -288,6 +288,9 @@ export function mergeConfig(
     },
     // openers is an array — file fully replaces defaults if present (no per-entry merging).
     openers: env.openers ?? file.openers ?? defaults.openers,
+    suggest: {
+      enabled: pick(env.suggest?.enabled, file.suggest?.enabled, defaults.suggest.enabled),
+    },
     hooks: {
       sessionStartGitContext: pick(
         env.hooks?.sessionStartGitContext,

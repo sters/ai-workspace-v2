@@ -2,6 +2,10 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { listActiveSuggestions } from "@/lib/db/suggestions";
+import { _resetConfig, _setConfigFilePath } from "@/lib/config";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 // Mock runClaude
 const mockRunClaude = vi.fn();
@@ -157,6 +161,27 @@ describe("triggerWorkspaceSuggestion", () => {
 
     const suggestions = listActiveSuggestions();
     expect(suggestions).toHaveLength(0);
+  });
+
+  it("does nothing when suggest.enabled is false", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "suggest-disabled-"));
+    const cfgPath = path.join(dir, "config.yml");
+    fs.writeFileSync(cfgPath, "suggest:\n  enabled: false\n", "utf-8");
+    _setConfigFilePath(cfgPath);
+    _resetConfig();
+
+    try {
+      const { triggerWorkspaceSuggestion } = await import("@/lib/suggest-workspace");
+      triggerWorkspaceSuggestion("test-ws", "op-1", "execute");
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(mockRunClaude).not.toHaveBeenCalled();
+      expect(listActiveSuggestions()).toHaveLength(0);
+    } finally {
+      _setConfigFilePath(null);
+      _resetConfig();
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("does not throw on error", async () => {

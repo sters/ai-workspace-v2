@@ -14,7 +14,7 @@ import { insertSuggestion } from "@/lib/db";
 import { flushEvents } from "@/lib/db/event-buffer";
 import { readOperationLog } from "@/lib/operation-store";
 import { parseStreamEvent } from "@/lib/parsers/stream";
-import { resolveModel, getWorkspaceDir } from "@/lib/config";
+import { getConfig, resolveModel, getWorkspaceDir } from "@/lib/config";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { OperationType } from "@/types/operation";
 import path from "node:path";
@@ -166,6 +166,7 @@ export function triggerWorkspaceSuggestion(
   operationId: string,
   parentOperationType: OperationType,
 ): void {
+  if (!getConfig().suggest.enabled) return;
   runSuggester(workspace, operationId, parentOperationType).catch((err) => {
     console.warn("[suggest-workspace] Background suggestion failed:", err);
   });

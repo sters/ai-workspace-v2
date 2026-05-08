@@ -84,6 +84,34 @@ describe("migration: model support", () => {
     expect(content).toContain("#   disableAccessLog: false");
   });
 
+  it("suggest.enabled appears in generated default config", () => {
+    const content = generateDefaultConfigContent();
+    expect(content).toContain("# suggest:");
+    expect(content).toContain("#   enabled: true");
+  });
+
+  it("adds suggest section when missing", () => {
+    const input = [
+      "operations:",
+      "  bestOfN: 3",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(input);
+    expect(result).toContain("# suggest:");
+    expect(result).toContain("#   enabled: true");
+  });
+
+  it("preserves user-set suggest.enabled = false", () => {
+    const input = [
+      "suggest:",
+      "  enabled: false",
+      "",
+    ].join("\n");
+    const result = migrateConfigContent(input);
+    expect(result).toContain("suggest:");
+    expect(result).toContain("  enabled: false");
+  });
+
   it("adds disableAccessLog to old server section missing it", () => {
     const input = [
       "server:",
