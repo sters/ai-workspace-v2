@@ -8,7 +8,7 @@ import {
   OVERRIDABLE_SETTINGS_KEYS,
 } from "./defaults";
 
-const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "quickAsk", "hooks"]);
+const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "quickAsk", "suggest", "hooks"]);
 
 // ---------------------------------------------------------------------------
 // Config file generation
@@ -70,6 +70,9 @@ export function generateDefaultConfigContent(): string {
     "#     command: code {path}",
     "#   - name: Terminal",
     "#     command: open -a Terminal {path}",
+    "",
+    "# suggest:",
+    "#   enabled: true                  # false disables the post-operation workspace-suggestion feature",
     "",
     "# hooks:",
     "#   sessionStartGitContext: true   # inject git branch+status into SessionStart",

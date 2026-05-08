@@ -37,6 +37,9 @@ export const CONFIG_DEFAULTS: AppConfig = {
     { name: "Editor (VSCode)", command: "code {path}" },
     { name: "Terminal", command: "open -a Terminal {path}" },
   ],
+  suggest: {
+    enabled: true,
+  },
   hooks: {
     sessionStartGitContext: true,
     blockDangerousBash: true,
@@ -123,6 +126,8 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
       "#     command: open -a Terminal {path}",
     ].join("\n"),
   },
+  { key: "suggest", section: null, defaultLine: "# suggest:" },
+  { key: "enabled", section: "suggest", defaultLine: "#   enabled: true                  # false disables the post-operation workspace-suggestion feature" },
   { key: "hooks", section: null, defaultLine: "# hooks:" },
   { key: "sessionStartGitContext", section: "hooks", defaultLine: "#   sessionStartGitContext: true   # inject git branch+status into SessionStart" },
   { key: "blockDangerousBash", section: "hooks", defaultLine: "#   blockDangerousBash: true        # PreToolUse(Bash) blocks rm -rf /, git push --force, git reset --hard" },
