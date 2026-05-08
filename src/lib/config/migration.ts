@@ -8,7 +8,7 @@ import {
   OVERRIDABLE_SETTINGS_KEYS,
 } from "./defaults";
 
-const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "quickAsk"]);
+const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "quickAsk", "hooks"]);
 
 // ---------------------------------------------------------------------------
 // Config file generation
@@ -70,6 +70,10 @@ export function generateDefaultConfigContent(): string {
     "#     command: code {path}",
     "#   - name: Terminal",
     "#     command: open -a Terminal {path}",
+    "",
+    "# hooks:",
+    "#   sessionStartGitContext: true   # inject git branch+status into SessionStart",
+    "#   blockDangerousBash: true        # PreToolUse(Bash) blocks rm -rf /, git push --force, git reset --hard",
     "",
   ];
   return lines.join("\n");

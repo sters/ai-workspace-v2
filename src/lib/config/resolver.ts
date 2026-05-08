@@ -288,6 +288,18 @@ export function mergeConfig(
     },
     // openers is an array — file fully replaces defaults if present (no per-entry merging).
     openers: env.openers ?? file.openers ?? defaults.openers,
+    hooks: {
+      sessionStartGitContext: pick(
+        env.hooks?.sessionStartGitContext,
+        file.hooks?.sessionStartGitContext,
+        defaults.hooks.sessionStartGitContext,
+      ),
+      blockDangerousBash: pick(
+        env.hooks?.blockDangerousBash,
+        file.hooks?.blockDangerousBash,
+        defaults.hooks.blockDangerousBash,
+      ),
+    },
   };
 }
 

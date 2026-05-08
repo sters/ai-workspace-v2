@@ -32,6 +32,10 @@ describe("CONFIG_DEFAULTS", () => {
       { name: "Editor (VSCode)", command: "code {path}" },
       { name: "Terminal", command: "open -a Terminal {path}" },
     ]);
+    expect(CONFIG_DEFAULTS.hooks).toEqual({
+      sessionStartGitContext: true,
+      blockDangerousBash: true,
+    });
   });
 });
 
@@ -767,6 +771,10 @@ describe("migrateConfigContent", () => {
       "  - name: Terminal",
       "    command: open -a Terminal {path}",
       "",
+      "hooks:",
+      "  sessionStartGitContext: true",
+      "  blockDangerousBash: true",
+      "",
     ].join("\n");
     const result = migrateConfigContent(content);
     // All keys present — no changes
@@ -883,6 +891,10 @@ describe("migrateConfigContent", () => {
       "    command: code {path}",
       "  - name: Terminal",
       "    command: open -a Terminal {path}",
+      "",
+      "hooks:",
+      "  sessionStartGitContext: true",
+      "  blockDangerousBash: true",
       "",
     ].join("\n");
     const result = migrateConfigContent(content);

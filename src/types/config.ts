@@ -61,6 +61,14 @@ export interface AppConfig {
 
   /** External tools that can open a workspace path (editor, terminal, etc.). */
   openers: Opener[];
+
+  /** Auto-managed Claude Code hooks written into .claude/settings.local.json. */
+  hooks: {
+    /** Inject `git branch` + `git status --short` as SessionStart additionalContext. */
+    sessionStartGitContext: boolean;
+    /** Block `rm -rf /...`, `git push --force` (without --force-with-lease), `git reset --hard`. */
+    blockDangerousBash: boolean;
+  };
 }
 
 /**

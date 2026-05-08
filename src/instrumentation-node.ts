@@ -12,6 +12,10 @@ export async function registerNode() {
   const { markAllSessionsExited } = await import("@/lib/db");
   markAllSessionsExited();
 
+  // Sync auto-managed Claude Code hooks into .claude/settings.local.json
+  const { syncManagedHooks } = await import("@/lib/claude/hooks/sync");
+  await syncManagedHooks().catch((err) => console.warn("[hooks] sync failed:", err));
+
   // Resume operations that were interrupted by server shutdown
   const { resumeStaleOperations } = await import("@/lib/pipeline-manager");
   await resumeStaleOperations();
