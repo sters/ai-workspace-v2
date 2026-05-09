@@ -204,6 +204,15 @@ export async function buildReviewPipeline(input: {
             ctx.emitStatus(
               `[${repo.repoName}] ${constraint.label}: ${status} (exit ${result.exitCode ?? "timeout"}, ${result.durationMs}ms)`,
             );
+
+            // Skip the rest of this repo's constraints: they often depend on the
+            // timed-out command's artifacts and stacking 5min timeouts blows the phase budget.
+            if (result.timedOut) {
+              ctx.emitStatus(
+                `[${repo.repoName}] timeout detected — skipping remaining constraints for this repo`,
+              );
+              break;
+            }
           }
 
           const report = buildConstraintReport(repo.repoName, results);
