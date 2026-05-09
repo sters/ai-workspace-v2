@@ -62,15 +62,24 @@ Bun.file = vi.fn((p: string | URL) => {
   };
 }) as unknown as typeof Bun.file;
 
+const originalBunWrite = Bun.write;
+const mockBunWrite = vi.fn(async () => 0);
+Bun.write = mockBunWrite as unknown as typeof Bun.write;
+
 afterAll(() => {
   Bun.file = originalBunFile;
+  Bun.write = originalBunWrite;
 });
 
 import { buildReviewPipeline } from "@/lib/pipelines/review";
 import { listWorkspaceRepos } from "@/lib/workspace";
-import type { PipelinePhaseGroup } from "@/types/pipeline";
+import { parseConstraints } from "@/lib/parsers/readme";
+import { execConstraintCommand } from "@/lib/workspace/constraint-runner";
+import type { PhaseFunctionContext, PipelinePhaseFunction, PipelinePhaseGroup } from "@/types/pipeline";
 
 const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
+const mockParseConstraints = vi.mocked(parseConstraints);
+const mockExecConstraintCommand = vi.mocked(execConstraintCommand);
 
 describe("buildReviewPipeline — skip verify-todo when TODO file is missing", () => {
   beforeEach(() => {
@@ -162,5 +171,106 @@ describe("buildReviewPipeline — skip verify-todo when TODO file is missing", (
     expect(labels).toContain("review-active-repo");
     expect(labels).toContain("verify-readme-no-todo-repo");
     expect(labels).toContain("verify-readme-active-repo");
+  });
+});
+
+function createMockCtx(): PhaseFunctionContext {
+  return {
+    operationId: "test-op",
+    emitStatus: vi.fn(),
+    emitResult: vi.fn(),
+    emitAsk: vi.fn(),
+    setWorkspace: vi.fn(),
+    runChild: vi.fn(async () => true),
+    runChildGroup: vi.fn(async () => [true]),
+    emitTerminal: vi.fn(),
+    signal: new AbortController().signal,
+    appendPhases: vi.fn(),
+  };
+}
+
+describe("buildReviewPipeline — constraint timeout aborts remaining commands in same repo", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+    mockBunWrite.mockClear();
+    mockExecConstraintCommand.mockReset();
+  });
+
+  it("stops running further constraints in the same repo on first timeout, but continues with other repos", async () => {
+    mockListWorkspaceRepos.mockReturnValue([
+      {
+        repoName: "repo-a",
+        repoPath: "owner/repo-a",
+        worktreePath: "/repos/repo-a/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+      {
+        repoName: "repo-b",
+        repoPath: "owner/repo-b",
+        worktreePath: "/repos/repo-b/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+    ]);
+
+    mockParseConstraints.mockReturnValue([
+      {
+        repoName: "repo-a",
+        constraints: [
+          { label: "Build", command: "make hydrate" },
+          { label: "Validate", command: "make validate" },
+        ],
+      },
+      {
+        repoName: "repo-b",
+        constraints: [
+          { label: "Build", command: "make hydrate" },
+          { label: "Validate", command: "make validate" },
+        ],
+      },
+    ]);
+
+    // First call (repo-a/Build) → timeout. Subsequent calls → success.
+    mockExecConstraintCommand.mockImplementation(async (command: string) => {
+      if (command === "make hydrate" && mockExecConstraintCommand.mock.calls.length === 1) {
+        return { exitCode: null, stdout: "", stderr: "", timedOut: true, durationMs: 300003 };
+      }
+      return { exitCode: 0, stdout: "", stderr: "", timedOut: false, durationMs: 100 };
+    });
+
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    const verifyPhase = phases[1] as PipelinePhaseFunction;
+    expect(verifyPhase.kind).toBe("function");
+    expect(verifyPhase.label).toBe("Verify constraints");
+
+    const ctx = createMockCtx();
+    const result = await verifyPhase.fn(ctx);
+    expect(result).toBe(true);
+
+    // repo-a/Build (timeout) + repo-b/Build + repo-b/Validate = 3 calls.
+    // repo-a/Validate must be skipped.
+    expect(mockExecConstraintCommand).toHaveBeenCalledTimes(3);
+    expect(mockExecConstraintCommand.mock.calls[0][0]).toBe("make hydrate");
+    expect(mockExecConstraintCommand.mock.calls[0][1]).toMatchObject({
+      cwd: "/repos/repo-a/worktrees/test-ws",
+    });
+    expect(mockExecConstraintCommand.mock.calls[1][1]).toMatchObject({
+      cwd: "/repos/repo-b/worktrees/test-ws",
+    });
+    expect(mockExecConstraintCommand.mock.calls[2][1]).toMatchObject({
+      cwd: "/repos/repo-b/worktrees/test-ws",
+    });
+
+    // Both repo reports should still be written (partial for repo-a, full for repo-b).
+    expect(mockBunWrite).toHaveBeenCalledTimes(2);
+
+    // anyFailure → "Constraint verification completed with failures"
+    expect(ctx.emitResult).toHaveBeenCalledWith("Constraint verification completed with failures");
+
+    // Status should mention skipping remaining constraints for the timed-out repo.
+    const statusMessages = vi.mocked(ctx.emitStatus).mock.calls.map((c) => c[0]);
+    expect(
+      statusMessages.some(
+        (m) => m.includes("repo-a") && /skip/i.test(m) && /timeout|timed out/i.test(m),
+      ),
+    ).toBe(true);
   });
 });
