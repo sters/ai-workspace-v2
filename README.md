@@ -65,6 +65,7 @@ Three-tier config system (priority: env vars > config file > defaults):
 | `AIW_CHAT_PORT` | 3742 | WebSocket chat server port |
 | `AIW_CLAUDE_PATH` | auto-detect | Custom Claude CLI path |
 | `AIW_CLAUDE_USE_CLI` | `true` | Use CLI (`true`) or legacy SDK (`false`) |
+| `AIW_DISABLE_ACCESS_LOG` | `false` | Silence Next.js dev access logs (also `server.disableAccessLog` in `config.yml`) |
 
 The "Open in..." menu is configured via the `openers` field in `config.yml`:
 
@@ -79,6 +80,23 @@ openers:
 ```
 
 Legacy `editor:` and `terminal:` keys are auto-migrated into `openers` at runtime; you can keep them or replace them with the block above.
+
+### Auto-managed Claude Code hooks
+
+On every startup, ai-workspace syncs a small set of managed hooks into `${AIW_WORKSPACE_ROOT}/.claude/settings.local.json` and writes the corresponding scripts under `.claude/hooks/aiw-*.sh`. Managed entries are identified by the `aiw-` command prefix; any user-authored hooks without that prefix are preserved as-is. Toggle each one in `config.yml`:
+
+```yaml
+hooks:
+  sessionStartGitContext: true   # SessionStart: inject `git branch` + `git status --short` as additionalContext
+  blockDangerousBash: true       # PreToolUse(Bash): block `rm -rf /...`, `git push --force` (without --force-with-lease), `git reset --hard`
+```
+
+### Other config options
+
+```yaml
+suggest:
+  enabled: true   # set false to disable the post-operation workspace-suggestion background job
+```
 
 ## Architecture
 
@@ -119,7 +137,7 @@ Legacy `editor:` and `terminal:` keys are auto-migrated into `openers` at runtim
   - `claude-version` — Claude version info
   - `mcp-servers` — MCP server management
   - `check-update` — Update checker
-  - `running` — Running operations monitor
+  - `running` — Running operations monitor (also lists up to 50 most recent completed/failed operations)
   - `operation-prune` — Operation cleanup
   - `workspace-prune` — Workspace cleanup
 
