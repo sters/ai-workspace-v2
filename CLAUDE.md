@@ -34,6 +34,8 @@ Per-workspace config stored in `{workspaceRoot}/.ai-workspace/config.yml`. Three
 
 The "Open in..." dropdown is configured via the `openers: { name, command }[]` field in `config.yml`. Defaults to one VSCode and one Terminal entry. Legacy `editor`/`terminal` top-level keys are auto-migrated to `openers` at runtime in `normalizeRawConfig` (`src/lib/config/resolver.ts`).
 
+Other notable `config.yml` sections: `hooks.{sessionStartGitContext,blockDangerousBash}` (auto-managed Claude Code hooks; see Architecture), `suggest.enabled` (default `true`; set `false` to disable the post-operation workspace-suggestion background job triggered from `triggerWorkspaceSuggestion`).
+
 ## Architecture
 
 **Next.js 16 App Router** with React 19, TypeScript strict mode, Tailwind CSS 4, SWR for data fetching. Bun runtime.
@@ -57,6 +59,8 @@ The "Open in..." dropdown is configured via the `openers: { name, command }[]` f
 - **TODO normalization** — `normalizeTodoCheckboxes()` fixes common LLM formatting errors (missing checkboxes, bracket spacing, asterisk bullets). `stripCompletedTodoItems()` removes `[x]` items before update-todo runs. Both prevent autonomous loops.
 - **Memo tab** — Per-workspace `artifacts/memo.md` file with Monaco editor (`src/components/workspace/memo-editor.tsx`). Auto-saves every 60s + on navigation/beforeunload. Module-level content cache prevents stale content on tab switches. Toolbar actions on selected text: "Update TODO" (starts update-todo operation) and "Ask Claude" (inline streamed response via quick-ask). API: `GET/POST /api/workspaces/[name]/memo`.
 - **Quick Ask** — Lightweight Claude queries for inline features (memo "Ask Claude", etc.). Configurable in `config.yml` under `quickAsk`: `model` (default sonnet), `effort` (default medium; low/medium/high/max, null = CLI default), `allowedTools` (default read-only tools: Read, Glob, Grep, WebFetch, WebSearch; set to `null` for no restriction). API: `POST /api/operations/quick-ask`.
+- **Auto-managed Claude Code hooks** — `src/lib/claude/hooks/sync.ts` writes hook entries into `.claude/settings.local.json` and `.claude/hooks/aiw-*.sh` scripts on every startup (called from `src/instrumentation-node.ts`). Managed entries are identified by the `aiw-` command prefix; user-authored hooks without that prefix are preserved verbatim. Two hooks ship today: `SessionStart` (injects `git branch` + `git status --short` as additionalContext) and `PreToolUse(Bash)` (blocks `rm -rf /...`, `git push --force` without `--force-with-lease`, `git reset --hard`). Toggleable per-workspace via `hooks.sessionStartGitContext` / `hooks.blockDangerousBash` in `config.yml` (both default `true`).
+- **Function phase output grouping** — `emitStatus`/`emitResult`/`emitTerminal`/`emitAsk`/`setWorkspace` from a function phase are auto-tagged with `childLabel = phaseLabel` so they render as boxed sections in the operation log alongside Claude child output. `runChild`/`runChildGroup` preserve `phaseExtra` so each child still gets its own label via `wireChild` (`src/lib/pipeline/context-builder.ts`).
 
 ### Server-side key directories
 
@@ -103,6 +107,7 @@ Vitest with jsdom, `@testing-library/react`, `@testing-library/jest-dom`. Global
 - **Event buffering is async** — Events aren't persisted immediately (500ms flush interval). Don't query events from the DB immediately after emitting them. SSE streaming replays from the in-memory buffer so clients see events before flush.
 - **Workspace root must be set before config/DB** — The entire config directory and DB path depend on workspace root being known first. `bin/start.ts` calls `setWorkspaceRoot()` before `getConfig()`.
 - **Function phase timeouts use separate AbortControllers** — Per-phase timeouts don't permanently abort the shared `managed.abortController` (which is for user-initiated kills). This is intentional to prevent timeout from killing the whole operation.
-- **Running vs completed operations live in different stores** — Running operations are in-memory (`src/lib/pipeline/store.ts`). Completed ones are on disk. `/api/operations` merges both, with running taking precedence on dedup.
+- **Running vs completed operations live in different stores** — Running operations are in-memory (`src/lib/pipeline/store.ts`). Completed ones are on disk. `/api/operations` merges both, with running taking precedence on dedup. The same route also serves `?status=completed&limit=N` (backed by `listRecentFinishedOperations`) for the "Recent Operations" panel on `/utilities/running`.
+- **Constraint phases stop on first timeout** — In `review.ts`, constraint commands run sequentially and skip the rest after any timeout, since they're deterministic and later ones often depend on earlier artifacts. Stacking 5-min timeouts otherwise pushes the parent autonomous Cycle Review past its 15-min budget.
 - **JSONL auto-migration** — On first startup, `getDb()` triggers `migrateJsonlToSqlite()` which imports legacy `.operations/` JSONL files if the SQLite table is empty.
 - **Dev mode clears `.next` cache** — `bin/next-server.ts` removes `.next` on dev/hot startup to avoid stale route issues.
