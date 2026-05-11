@@ -28,7 +28,12 @@ export const INIT_ANALYSIS_SCHEMA: Record<string, unknown> = {
     repositories: {
       type: "array",
       items: { type: "string" },
-      description: "Full repository paths (e.g. github.com/org/repo) found in description, or empty array",
+      description:
+        "Full repository paths (e.g. github.com/org/repo) found in description, or empty array. " +
+        "When the same repository needs to be worked on with multiple parallel branches " +
+        "(e.g., one task split into separate PRs by service or environment), include the path once per branch " +
+        "with a unique `:alias` suffix, e.g. [\"github.com/org/repo:variant-a\", \"github.com/org/repo:variant-b\"]. " +
+        "Each `:alias` entry creates a distinct worktree and branch. Do not use `:alias` for genuinely distinct repositories.",
     },
     readmeContent: {
       type: "string",
@@ -65,8 +70,13 @@ Edit the README template provided in the user prompt and return the full edited 
 2. **Update \`**Task Type**\` and \`**Ticket ID**\`** fields based on your analysis
 3. **Fill in** Objective, Context, Requirements, and Related Resources based on the description
 4. **If the description is a URL**, fetch it and extract details to populate the README sections
-5. **List repositories** in the Repositories section using the format:
-   \`- **repoName**: \\\`repoPath\\\` (base: \\\`main\\\`)\`
+5. **List repositories** in the Repositories section using one of two formats:
+   - **Single worktree per repo (default):**
+     \`- **repoName**: \\\`repoPath\\\` (base: \\\`main\\\`)\`
+   - **Multiple parallel worktrees of the same repo** (only when the task explicitly needs N branches against one repo, e.g. split into N PRs):
+     \`- **repoName (alias)**: \\\`repoPath:alias\\\` (base: \\\`main\\\`)\`
+     Each row must have a **distinct \`:alias\`** (no duplicates) and the bold label should mirror it for readability. The same \`:alias\` set must also appear in the \`repositories\` JSON array — once per alias.
+   - Only use the \`:alias\` form when you genuinely need parallel branches of the **same** repo. For distinct repositories, omit \`:alias\`.
    (Use \`main\` as default base branch since repos aren't set up yet)
 
 ### User Interaction Policy

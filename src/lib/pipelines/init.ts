@@ -1,6 +1,6 @@
 import { unlinkSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { readWorkspaceReadme } from "@/lib/parsers/readme";
+import { readWorkspaceReadme, denormalizeRepoPath } from "@/lib/parsers/readme";
 import {
   parseAnalysisResultText,
   setupWorkspace,
@@ -374,7 +374,9 @@ export function buildInitPipeline(
           for (const repoPath of analysis.repositories) {
             if (ctx.signal.aborted) return false;
             ctx.emitStatus(`Setting up repository: ${repoPath}`);
-            const prInfo = prUrlMap.get(repoPath);
+            // PR URLs are keyed by bare repo path, but repoPath may carry a `:alias` suffix
+            const bareRepoPath = repoPath.split(":")[0];
+            const prInfo = prUrlMap.get(bareRepoPath);
             try {
               // Only use PR info for baseBranch — init always creates a new branch.
               // Checking out the PR's headBranch would conflict with existing worktrees.
@@ -399,7 +401,13 @@ export function buildInitPipeline(
           if (!already) {
             ctx.emitStatus(`Setting up newly identified repository: ${metaRepo.path}`);
             try {
-              const repoResult = setupRepository(wsName, metaRepo.path, metaRepo.baseBranch, ctx.emitStatus);
+              // Parser stores `___alias`; setupRepository expects the `:alias` form.
+              const repoResult = setupRepository(
+                wsName,
+                denormalizeRepoPath(metaRepo.path),
+                metaRepo.baseBranch,
+                ctx.emitStatus,
+              );
               repoResults.push(repoResult);
             } catch (err) {
               ctx.emitStatus(`Warning: Failed to setup ${metaRepo.path}: ${err}`);
