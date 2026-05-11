@@ -20,6 +20,28 @@ export async function readWorkspaceReadme(wsPath: string): Promise<{ content: st
   return { content, meta: parseReadmeMeta(content) };
 }
 
+/**
+ * Convert `github.com/org/repo:alias` into the worktree-directory form
+ * `github.com/org/repo___alias` so it matches what `setupRepository`
+ * persists and what `listWorkspaceRepos` walks. Paths without `:` are
+ * returned unchanged.
+ */
+export function normalizeRepoPath(raw: string): string {
+  const colon = raw.indexOf(":");
+  if (colon < 0) return raw;
+  return `${raw.slice(0, colon)}___${raw.slice(colon + 1)}`;
+}
+
+/**
+ * Inverse of `normalizeRepoPath` — rewrite the first `___` back to `:` so
+ * the path can be passed to `setupRepository`, which parses `:alias`.
+ */
+export function denormalizeRepoPath(normalized: string): string {
+  const idx = normalized.indexOf("___");
+  if (idx < 0) return normalized;
+  return `${normalized.slice(0, idx)}:${normalized.slice(idx + 3)}`;
+}
+
 export function parseReadmeMeta(content: string): WorkspaceMeta {
   const titleMatch = content.match(/^#\s+Task:\s+(.+)$/m);
   const taskTypeMatch = content.match(/\*\*Task Type\*\*:\s*(\S+)/);
@@ -28,12 +50,12 @@ export function parseReadmeMeta(content: string): WorkspaceMeta {
 
   const repositories: WorkspaceMeta["repositories"] = [];
   const repoPattern =
-    /- \*\*(\S+?)\*\*:\s*`([^`]+)`\s*\(base:\s*`([^`]+)`\)/g;
+    /- \*\*([^*]+?)\*\*:\s*`([^`]+)`\s*\(base:\s*`([^`]+)`\)/g;
   let match;
   while ((match = repoPattern.exec(content)) !== null) {
     repositories.push({
-      alias: match[1],
-      path: match[2],
+      alias: match[1].trim(),
+      path: normalizeRepoPath(match[2].trim()),
       baseBranch: match[3],
     });
   }
