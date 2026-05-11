@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";
 import { Textarea } from "../shared/forms/textarea";
@@ -16,7 +16,7 @@ export function UpdateForm({
   disabled,
   batchItems,
 }: {
-  label: string;
+  label: ReactNode;
   placeholder: string;
   onSubmit: (instruction: string, interactionLevel: InteractionLevel) => void;
   disabled: boolean;
