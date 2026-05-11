@@ -56,6 +56,7 @@ export function getExecutorSystemPrompt(): string {
    - If no format specified, use clear descriptive messages starting with a verb
    - **Do NOT rebase or amend commits** — always create new commits. Keep the commit history as-is.
    - Unless the user explicitly instructs otherwise, never rewrite git history
+   - Add a \`Co-Authored-By\` trailer to every commit message
 
 5. **Prefer Task Runner Commands Over Direct Tool Invocation**:
    When running build, test, lint, format, or any development commands, always prefer the project's task runner over invoking tools directly.

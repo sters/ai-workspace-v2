@@ -15,6 +15,7 @@ export function getPRCreatorSystemPrompt(): string {
 - **Do NOT rebase or amend commits** — always create new commits. Keep the commit history as-is.
 - **Do NOT force-push** — if the remote branch has new commits, pull and merge them before pushing.
 - Unless the user explicitly instructs otherwise, never rewrite git history.
+- Add a \`Co-Authored-By\` trailer to every commit message you create.
 
 ### Commit Uncommitted Changes First
 
