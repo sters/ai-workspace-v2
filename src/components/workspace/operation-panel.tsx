@@ -12,7 +12,6 @@ import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { useOpeners } from "@/hooks/use-openers";
 import { openWith } from "@/lib/api";
-import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
 import type { InteractionLevel } from "@/types/prompts";
 import {
   Play,
@@ -91,16 +90,16 @@ export function OperationPanel({
 
       <div className="flex flex-wrap items-center gap-2">
         <SplitButton
-          label={<><Play className="h-3.5 w-3.5" /> Execute</>}
-          onClick={() => startAndNavigate("execute", body())}
+          label={<><Play className="h-3.5 w-3.5" /> Start autonomous</>}
+          onClick={() =>
+            startAndNavigate("autonomous", body({ startWith: "execute" }))
+          }
           disabled={isWorkspaceTypeRunning(workspaceName, "execute")}
           items={[
-            ...buildBatchItems("execute", body(), (b) =>
-              startAndNavigate("batch", b)
-            ),
-            ...buildAutonomousItems("execute", body(), (b) =>
-              startAndNavigate("autonomous", b)
-            ),
+            {
+              label: "Execute only",
+              onClick: () => startAndNavigate("execute", body()),
+            },
           ]}
         />
         <Button

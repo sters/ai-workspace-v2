@@ -7,7 +7,6 @@ import { UpdateForm } from "./update-form";
 import { RepoTodoCard } from "./repo-todo-card";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
-import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
 
 function findRepoPath(
   repoName: string,
@@ -46,27 +45,28 @@ export function TodoUpdater({
       <Card variant="dashed">
         <p className="mb-2 text-sm font-medium">Update workspace TODOs</p>
         <UpdateForm
-          label="Update"
+          label="Start autonomous"
           placeholder="Describe TODO changes to apply across all repositories..."
           disabled={isAnyRunning}
           onSubmit={(instruction, interactionLevel) => {
-            startAndNavigate("update-todo", {
+            startAndNavigate("autonomous", {
               workspace: workspacePath,
               instruction,
               interactionLevel,
+              startWith: "update-todo",
             });
           }}
-          batchItems={(instruction, interactionLevel) => {
-            const base = {
-              workspace: workspacePath,
-              interactionLevel,
-              ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-            };
-            return [
-              ...buildBatchItems("update-todo", base, (body) => startAndNavigate("batch", body)),
-              ...buildAutonomousItems("update-todo", base, (body) => startAndNavigate("autonomous", body)),
-            ];
-          }}
+          batchItems={(instruction, interactionLevel) => [
+            {
+              label: "Update TODOs only",
+              onClick: () =>
+                startAndNavigate("update-todo", {
+                  workspace: workspacePath,
+                  instruction: instruction.trim(),
+                  interactionLevel,
+                }),
+            },
+          ]}
         />
       </Card>
 

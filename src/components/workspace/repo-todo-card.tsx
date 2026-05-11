@@ -15,7 +15,6 @@ import {
 import { showToast } from "../shared/feedback/toast";
 import { openWith } from "@/lib/api";
 import { useOpeners } from "@/hooks/use-openers";
-import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
 import {
   Play,
   ClipboardCheck,
@@ -134,29 +133,30 @@ export function RepoTodoCard({
 
       <div className="mb-3">
         <UpdateForm
-          label="Update"
+          label="Start autonomous"
           placeholder={`Update TODOs for ${todo.repoName}...`}
           disabled={disabled}
           onSubmit={(instruction, interactionLevel) => {
-            onStartAndNavigate("update-todo", {
+            onStartAndNavigate("autonomous", {
               ...baseBody,
               workspace: workspacePath,
               instruction,
               interactionLevel,
+              startWith: "update-todo",
             });
           }}
-          batchItems={(instruction, interactionLevel) => {
-            const base = {
-              ...baseBody,
-              workspace: workspacePath,
-              interactionLevel,
-              ...(instruction.trim() ? { instruction: instruction.trim() } : {}),
-            };
-            return [
-              ...buildBatchItems("update-todo", base, (body) => onStartAndNavigate("batch", body)),
-              ...buildAutonomousItems("update-todo", base, (body) => onStartAndNavigate("autonomous", body)),
-            ];
-          }}
+          batchItems={(instruction, interactionLevel) => [
+            {
+              label: "Update TODOs only",
+              onClick: () =>
+                onStartAndNavigate("update-todo", {
+                  ...baseBody,
+                  workspace: workspacePath,
+                  instruction: instruction.trim(),
+                  interactionLevel,
+                }),
+            },
+          ]}
         />
       </div>
 

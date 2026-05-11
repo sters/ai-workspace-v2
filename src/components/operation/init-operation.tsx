@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ClaudeOperation } from "./claude-operation";
 import { SplitButton } from "@/components/shared/buttons/split-button";
-import { buildBatchItems, buildAutonomousItems } from "@/lib/batch-modes";
 import type { InteractionLevel } from "@/types/prompts";
 import type { OperationType } from "@/types/operation";
 
@@ -39,29 +38,24 @@ export function InitSplitButton({
   const trimmed = description.trim();
   return (
     <SplitButton
-      label="Initialize"
+      label="Start autonomous"
       onClick={() => {
         if (!trimmed) return;
-        start("init", { description: trimmed, interactionLevel });
+        start("autonomous", {
+          description: trimmed,
+          interactionLevel,
+          startWith: "init",
+        });
       }}
       disabled={disabled || !trimmed}
       items={[
-        ...buildBatchItems(
-          "init",
-          { description: trimmed, interactionLevel },
-          (body) => {
+        {
+          label: "Init only",
+          onClick: () => {
             if (!trimmed) return;
-            start("batch", body);
+            start("init", { description: trimmed, interactionLevel });
           },
-        ),
-        ...buildAutonomousItems(
-          "init",
-          { description: trimmed, interactionLevel },
-          (body) => {
-            if (!trimmed) return;
-            start("autonomous", body);
-          },
-        ),
+        },
       ]}
     />
   );
