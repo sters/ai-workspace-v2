@@ -238,7 +238,6 @@ describe("migration: old config upgrade", () => {
       "",
       "# claude:",
       "#   path: null           # null = auto-detect",
-      "#   useCli: true",
       "",
       "# operations:",
       "#   maxConcurrent: 3",

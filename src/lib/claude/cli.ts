@@ -1,6 +1,5 @@
 // Bun.spawn-based Claude CLI runner.
-// Spawns `claude -p` with `--output-format stream-json` and streams events
-// in the same format as @anthropic-ai/claude-agent-sdk.
+// Spawns `claude -p` with `--output-format stream-json` and streams events.
 
 import type { Subprocess } from "bun";
 import type { ClaudeProcess, RunClaudeOptions, SpawnClaudeOptions, SpawnClaudeTerminalOptions, StreamEvent } from "@/types/claude";

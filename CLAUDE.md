@@ -29,7 +29,6 @@ Per-workspace config stored in `{workspaceRoot}/.ai-workspace/config.yml`. Three
 | `AIW_PORT` | 3741 | Next.js server port |
 | `AIW_CHAT_PORT` | 3742 | WebSocket chat server port |
 | `AIW_CLAUDE_PATH` | auto-detect | Custom Claude CLI path |
-| `AIW_CLAUDE_USE_CLI` | `true` | Use CLI (`true`) or legacy SDK (`false`) |
 | `AIW_DISABLE_ACCESS_LOG` | `false` | Silence Next.js dev access logs (also `server.disableAccessLog` in config.yml) |
 
 The "Open in..." dropdown is configured via the `openers: { name, command }[]` field in `config.yml`. Defaults to one VSCode and one Terminal entry. Legacy `editor`/`terminal` top-level keys are auto-migrated to `openers` at runtime in `normalizeRawConfig` (`src/lib/config/resolver.ts`).
@@ -44,7 +43,7 @@ Other notable `config.yml` sections: `hooks.{sessionStartGitContext,blockDangero
 
 - **SQLite persistence** — Per-workspace database in `{workspaceRoot}/.ai-workspace/db.sqlite` via `bun:sqlite`. DB singleton on `globalThis` (`src/lib/db/connection.ts`). Events are buffered in memory and flushed every 5000ms or 50 events (`src/lib/db/event-buffer.ts`).
 - **Pipeline orchestration** — Operations are sequences of `PipelinePhase`s (single child, parallel group, or TypeScript function). Entry point: `startOperationPipeline()` in `src/lib/pipeline/orchestrator.ts`. Max 3 concurrent operations. Pipeline definitions per operation type in `src/lib/pipelines/`. Recovers interrupted operations on restart (`src/lib/pipeline/resume.ts`). Function phases can dynamically add phases via `appendPhases()` — the execution loop re-evaluates `phases.length` each iteration. The `runSubPhases()` utility in `src/lib/pipelines/actions/run-sub-phases.ts` runs sub-pipeline phases within a function phase context, handling all three phase kinds uniformly.
-- **Claude CLI execution** — `src/lib/claude/cli.ts` spawns `claude -p --output-format stream-json`. Handles `AskUserQuestion` via `--resume {session_id}`. Facade in `src/lib/claude/index.ts` delegates to CLI or SDK.
+- **Claude CLI execution** — `src/lib/claude/cli.ts` spawns `claude -p --output-format stream-json`. Handles `AskUserQuestion` via `--resume {session_id}`. Re-exported from `src/lib/claude/index.ts`.
 - **SSE streaming** — Clients connect to `/api/events?operationId=` for real-time operation output. Replays existing events on connection.
 - **Instrumentation split** — `src/instrumentation.ts` delegates to `src/instrumentation-node.ts` at runtime to avoid bundling Node.js-only imports (SQLite, pipeline resume) into Edge Runtime.
 - **Two-server setup** — `bin/start.ts` spawns both Next.js (`bin/next-server.ts`) and WebSocket chat (`bin/chat-server.ts`) as separate processes.
@@ -65,7 +64,7 @@ Other notable `config.yml` sections: `hooks.{sessionStartGitContext,blockDangero
 ### Server-side key directories
 
 - `src/lib/db/` — SQLite CRUD and migrations
-- `src/lib/claude/` — Claude CLI/SDK execution, auth, settings
+- `src/lib/claude/` — Claude CLI execution, auth, settings
 - `src/lib/pipeline/` — Pipeline orchestration engine
 - `src/lib/pipelines/` — Pipeline definitions per operation type (each exports `build*Pipeline()`)
 - `src/lib/workspace/` — Filesystem operations (reading workspace state, git ops, setup)
@@ -94,7 +93,7 @@ Other notable `config.yml` sections: `hooks.{sessionStartGitContext,blockDangero
 - **`globalThis` pattern**: Mutable state (DB connection, pipeline operations, app config, chat sessions) stored on `globalThis` to survive Next.js HMR. Tests must account for this (see `test-setup.ts`).
 - **`force-dynamic`**: All API routes export `const dynamic = "force-dynamic"`.
 - ESLint flat config (`eslint.config.ts`): unused vars must be prefixed with `_`. `bin/**` is excluded from linting.
-- `bun:sqlite` and `@anthropic-ai/claude-agent-sdk` are in `serverExternalPackages` in `next.config.ts`.
+- `bun:sqlite` is in `serverExternalPackages` in `next.config.ts`.
 - Types in `src/types/`, test files in `src/__tests__/` mirroring `src/` structure.
 
 ## Testing

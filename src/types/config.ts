@@ -34,7 +34,6 @@ export interface AppConfig {
 
   claude: {
     path: string | null;
-    useCli: boolean;
   };
 
   operations: OperationTypeSettings & {

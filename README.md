@@ -64,7 +64,6 @@ Three-tier config system (priority: env vars > config file > defaults):
 | `AIW_PORT` | 3741 | Next.js server port |
 | `AIW_CHAT_PORT` | 3742 | WebSocket chat server port |
 | `AIW_CLAUDE_PATH` | auto-detect | Custom Claude CLI path |
-| `AIW_CLAUDE_USE_CLI` | `true` | Use CLI (`true`) or legacy SDK (`false`) |
 | `AIW_DISABLE_ACCESS_LOG` | `false` | Silence Next.js dev access logs (also `server.disableAccessLog` in `config.yml`) |
 
 The "Open in..." menu is configured via the `openers` field in `config.yml`:
@@ -106,7 +105,7 @@ suggest:
 
 - **Workspace state**: API routes under `src/app/api/` read workspace data directly from the filesystem (`workspace/` directory in `AIW_WORKSPACE_ROOT`). Core reading logic is in `src/lib/workspace/reader.ts`.
 - **Pipeline orchestration**: Operations (init, execute, review, create-pr, autonomous, batch, search, etc.) are sequences of `PipelinePhase`s. Entry point: `startOperationPipeline()` in `src/lib/pipeline/orchestrator.ts`. Pipeline definitions per operation type in `src/lib/pipelines/`. Max 3 concurrent operations, with automatic resume of interrupted operations on restart.
-- **Claude Code execution**: Spawns Claude Code processes via `Bun.spawn` with `claude -p --output-format stream-json` (`src/lib/claude/cli.ts`). Handles `AskUserQuestion` via `--resume {session_id}`. Legacy SDK fallback is available via `AIW_CLAUDE_USE_CLI=false`.
+- **Claude Code execution**: Spawns Claude Code processes via `Bun.spawn` with `claude -p --output-format stream-json` (`src/lib/claude/cli.ts`). Handles `AskUserQuestion` via `--resume {session_id}`.
 - **SQLite persistence**: Per-workspace database in `{workspaceRoot}/.ai-workspace/db.sqlite` via `bun:sqlite`. Events are buffered in memory and flushed every 5000ms or 50 events (`src/lib/db/event-buffer.ts`).
 - **Configuration**: Per-workspace config resolution (env vars > config file > defaults) in `src/lib/config/resolver.ts`, cached on `globalThis`. Workspace root determines the config directory via `src/lib/config/workspace-dir.ts`.
 - **Parsers** (`src/lib/parsers/`): Extract structured data from markdown — TODO items, README metadata, review summaries, and stream-json log entries.
@@ -210,4 +209,4 @@ bunx vitest run <file> # Single file
 - **lucide-react** for icons
 - **web-push** for browser push notifications
 - **Vitest** + **@testing-library/react** for testing
-- **Claude Code CLI** (`claude -p --output-format stream-json`) for headless execution (legacy SDK fallback via `AIW_CLAUDE_USE_CLI=false`)
+- **Claude Code CLI** (`claude -p --output-format stream-json`) for headless execution

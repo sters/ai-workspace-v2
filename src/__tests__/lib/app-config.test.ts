@@ -22,7 +22,6 @@ describe("CONFIG_DEFAULTS", () => {
     expect(CONFIG_DEFAULTS.server.port).toBe(3741);
     expect(CONFIG_DEFAULTS.server.chatPort).toBe(3742);
     expect(CONFIG_DEFAULTS.claude.path).toBeNull();
-    expect(CONFIG_DEFAULTS.claude.useCli).toBe(true);
     expect(CONFIG_DEFAULTS.operations.maxConcurrent).toBe(3);
     expect(CONFIG_DEFAULTS.operations.claudeTimeoutMinutes).toBe(20);
     expect(CONFIG_DEFAULTS.operations.functionTimeoutMinutes).toBe(3);
@@ -256,7 +255,7 @@ describe("mergeConfig", () => {
     expect(result.server.port).toBe(8080);
     expect(result.server.chatPort).toBe(8081);
     // Other defaults preserved
-    expect(result.claude.useCli).toBe(true);
+    expect(result.claude.path).toBeNull();
     expect(result.operations.maxConcurrent).toBe(3);
   });
 
@@ -297,16 +296,14 @@ describe("mergeConfig", () => {
 
   it("merges all layers correctly for claude config", () => {
     const fileConfig: Partial<AppConfig> = {
-      claude: { path: "/usr/bin/claude", useCli: false },
+      claude: { path: "/usr/bin/claude" },
     };
     const env: Partial<AppConfig> = {
-      claude: { useCli: true } as AppConfig["claude"],
+      claude: { path: "/from/env" } as AppConfig["claude"],
     };
     const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, env);
-    // env wins for useCli
-    expect(result.claude.useCli).toBe(true);
-    // file wins for path (env didn't set it)
-    expect(result.claude.path).toBe("/usr/bin/claude");
+    // env wins for path
+    expect(result.claude.path).toBe("/from/env");
   });
 
   it("handles workspaceRoot from file", () => {
@@ -359,7 +356,6 @@ describe("getConfig", () => {
     "AIW_PORT",
     "AIW_CHAT_PORT",
     "AIW_CLAUDE_PATH",
-    "AIW_CLAUDE_USE_CLI",
     "AIW_DISABLE_ACCESS_LOG",
   ];
 
@@ -389,7 +385,7 @@ describe("getConfig", () => {
     const config = getConfig();
     expect(config.server.port).toBe(3741);
     expect(config.server.chatPort).toBe(3742);
-    expect(config.claude.useCli).toBe(true);
+    expect(config.claude.path).toBeNull();
     expect(config.operations.maxConcurrent).toBe(3);
   });
 
@@ -401,10 +397,10 @@ describe("getConfig", () => {
 
   it("picks up env vars", () => {
     process.env.AIW_PORT = "5555";
-    process.env.AIW_CLAUDE_USE_CLI = "false";
+    process.env.AIW_CLAUDE_PATH = "/custom/claude";
     const config = getConfig();
     expect(config.server.port).toBe(5555);
-    expect(config.claude.useCli).toBe(false);
+    expect(config.claude.path).toBe("/custom/claude");
   });
 
   it("_resetConfig clears cache", () => {
@@ -455,7 +451,6 @@ describe("getOperationConfig", () => {
     "AIW_PORT",
     "AIW_CHAT_PORT",
     "AIW_CLAUDE_PATH",
-    "AIW_CLAUDE_USE_CLI",
   ];
 
   beforeEach(() => {
@@ -674,7 +669,7 @@ describe("migrateConfigContent", () => {
     expect(result).toContain("# server:");
     expect(result).toContain("#   port:");
     expect(result).toContain("# claude:");
-    expect(result).toContain("#   useCli:");
+    expect(result).toContain("#   path:");
   });
 
   it("handles both commenting out and adding in same migration", () => {
@@ -732,7 +727,6 @@ describe("migrateConfigContent", () => {
       "",
       "claude:",
       "  path: null",
-      "  useCli: true",
       "",
       "operations:",
       "  maxConcurrent: 3",
@@ -854,7 +848,6 @@ describe("migrateConfigContent", () => {
       "",
       "claude:",
       "  path: null",
-      "  useCli: true",
       "",
       "operations:",
       "  maxConcurrent: 3",
