@@ -22,6 +22,25 @@ export function exec(cmd: string, opts?: { cwd?: string; maxBuffer?: number }): 
   return result.stdout.toString().trim();
 }
 
+/**
+ * Run a command by spawning the binary directly (no shell), so callers don't
+ * need to escape shell metacharacters in arguments. Prefer this over `exec`
+ * when any argument originates from user-controlled input.
+ */
+export function execArgs(args: string[], opts?: { cwd?: string }): string {
+  const result = Bun.spawnSync(args, {
+    cwd: opts?.cwd ?? getResolvedWorkspaceRoot(),
+    stdout: "pipe",
+    stderr: "pipe",
+    env: getCleanEnv(),
+  });
+  if (!result.success) {
+    const stderr = result.stderr.toString().trim();
+    throw new Error(stderr || `Command failed: ${args.join(" ")}`);
+  }
+  return result.stdout.toString().trim();
+}
+
 export function repoDir(): string {
   return path.join(getResolvedWorkspaceRoot(), "repositories");
 }

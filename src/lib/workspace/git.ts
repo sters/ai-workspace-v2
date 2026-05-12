@@ -5,7 +5,7 @@
 import { existsSync, readdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
-import { exec, repoDir } from "./helpers";
+import { exec, execArgs, repoDir } from "./helpers";
 import type { WorkspaceRepo } from "@/types/workspace";
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ export async function commitWorkspaceSnapshot(
       : "Snapshot: workspace updated";
   }
 
-  exec(`git -C "${wsPath}" commit -m "${commitMsg.replace(/"/g, '\\"')}"`);
+  execArgs(["git", "-C", wsPath, "commit", "-m", commitMsg]);
   return true;
 }
 
