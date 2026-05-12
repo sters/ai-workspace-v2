@@ -174,10 +174,6 @@ function envOverrides(): Partial<AppConfig> {
     const claudeOverride: Partial<AppConfig["claude"]> = { ...result.claude, path: process.env.AIW_CLAUDE_PATH };
     result.claude = claudeOverride as AppConfig["claude"];
   }
-  if (process.env.AIW_CLAUDE_USE_CLI !== undefined) {
-    const claudeOverride: Partial<AppConfig["claude"]> = { ...result.claude, useCli: process.env.AIW_CLAUDE_USE_CLI !== "false" };
-    result.claude = claudeOverride as AppConfig["claude"];
-  }
 
   return result;
 }
@@ -238,7 +234,6 @@ export function mergeConfig(
     },
     claude: {
       path: pick(env.claude?.path, file.claude?.path, defaults.claude.path),
-      useCli: pick(env.claude?.useCli, file.claude?.useCli, defaults.claude.useCli),
     },
     operations: {
       maxConcurrent: pick(

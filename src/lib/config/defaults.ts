@@ -14,7 +14,6 @@ export const CONFIG_DEFAULTS: AppConfig = {
   },
   claude: {
     path: null,
-    useCli: true,
   },
   operations: {
     maxConcurrent: 3,
@@ -100,7 +99,6 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "disableAccessLog", section: "server", defaultLine: "#   disableAccessLog: false   # true silences Next.js dev access logs" },
   { key: "claude", section: null, defaultLine: "# claude:" },
   { key: "path", section: "claude", defaultLine: "#   path: null           # null = auto-detect" },
-  { key: "useCli", section: "claude", defaultLine: "#   useCli: true" },
   { key: "operations", section: null, defaultLine: "# operations:" },
   { key: "maxConcurrent", section: "operations", defaultLine: "#   maxConcurrent: 3" },
   { key: "claudeTimeoutMinutes", section: "operations", defaultLine: "#   claudeTimeoutMinutes: 20" },

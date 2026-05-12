@@ -29,7 +29,6 @@ export function generateDefaultConfigContent(): string {
     "",
     "# claude:",
     "#   path: null           # null = auto-detect",
-    "#   useCli: true",
     "",
     "# operations:",
     "#   maxConcurrent: 3",
