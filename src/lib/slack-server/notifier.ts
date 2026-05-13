@@ -1,8 +1,15 @@
 import type { WebClient } from "@slack/web-api";
 import type { OperationEvent } from "@/types/operation";
 import { getEvents } from "@/lib/db/events";
+import { getOperation } from "@/lib/db/operations";
 import { listReadyNotifications, deleteNotification } from "@/lib/db/slack-notifications";
 import { extractPrUrls, type PrUrlInfo } from "@/lib/workspace/pr-url";
+
+/** Phase label set by the autonomous pipeline for the Create PR step
+ * (`src/lib/pipelines/autonomous.ts`, `buildCreatePrPhase`). Filtering by
+ * this label keeps PR URLs Claude only *read* (in READMEs, comments, gh
+ * arguments, etc.) out of the completion notification. */
+const CREATE_PR_PHASE_LABEL = "Create PR";
 
 /** Default polling interval for the notifier. 30s is a reasonable balance for
  * a kick-off-and-forget UX (latency tolerable, query overhead negligible). */
@@ -46,7 +53,9 @@ export function startNotifier(opts: NotifierOptions): Notifier {
       try {
         if (row.status === "completed") {
           const events = getEvents(row.operationId);
-          const prs = extractPrUrlsFromEvents(events);
+          const op = getOperation(row.operationId);
+          const inputDescription = op?.inputs?.description;
+          const prs = extractCreatedPrs(events, { inputDescription });
           await opts.client.chat.postMessage({
             channel: row.channel,
             thread_ts: row.threadTs,
@@ -88,13 +97,28 @@ export function startNotifier(opts: NotifierOptions): Notifier {
 }
 
 /**
- * Scan an operation's events for GitHub PR URLs. Concatenates the raw `data`
- * field of each event (which is JSON-stringified Claude output) and runs the
- * existing `extractPrUrls` regex over it. Returns deduplicated results.
+ * Extract PR URLs that were *actually created* during the autonomous run.
+ *
+ * Filters event stream to only those whose `phaseLabel === "Create PR"`
+ * (the autonomous pipeline's PR-creation phase). This keeps URLs Claude
+ * merely read (existing PRs in READMEs, `gh pr view <url>` arguments,
+ * issue comments, etc.) out of the notification.
+ *
+ * If `inputDescription` is provided, any URL that already appeared in the
+ * description (e.g. the user pasted "review https://github.com/.../pull/N")
+ * is also excluded — Claude is likely to echo it back during the Create PR
+ * phase even though it's not the freshly created PR.
  */
-export function extractPrUrlsFromEvents(events: OperationEvent[]): PrUrlInfo[] {
-  const blob = events.map((e) => e.data).join("\n");
-  return extractPrUrls(blob);
+export function extractCreatedPrs(
+  events: OperationEvent[],
+  opts: { inputDescription?: string } = {},
+): PrUrlInfo[] {
+  const phaseEvents = events.filter((e) => e.phaseLabel === CREATE_PR_PHASE_LABEL);
+  const candidates = extractPrUrls(phaseEvents.map((e) => e.data).join("\n"));
+  if (!opts.inputDescription) return candidates;
+
+  const inputUrls = new Set(extractPrUrls(opts.inputDescription).map((p) => p.url));
+  return candidates.filter((p) => !inputUrls.has(p.url));
 }
 
 /** Build the Slack message text for a completed autonomous run. */
