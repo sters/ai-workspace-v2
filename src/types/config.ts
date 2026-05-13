@@ -74,6 +74,27 @@ export interface AppConfig {
     /** Block `rm -rf /...`, `git push --force` (without --force-with-lease), `git reset --hard`. */
     blockDangerousBash: boolean;
   };
+
+  /**
+   * Slack bot integration. When enabled, a separate Bun process opens a Socket
+   * Mode connection and accepts mention commands (`init`, `execute`, `review`,
+   * `create-pr`, `autonomous`). Token strings support `{ENV:VAR_NAME}`
+   * substitution at config load time.
+   */
+  slack: {
+    /** Master switch. When false, the slack-server process is not spawned. */
+    enabled: boolean;
+    /** Bot User OAuth Token (`xoxb-...`). */
+    botToken: string;
+    /** App-Level Token (`xapp-...`) used to open the Socket Mode connection. */
+    appToken: string;
+    /**
+     * Slack user IDs (e.g. `U01234ABC`) allowed to invoke commands.
+     * Empty array = no one is allowed (fail closed). Mentions from
+     * non-allowed users are silently ignored.
+     */
+    allowedUserIds: string[];
+  };
 }
 
 /**

@@ -207,6 +207,24 @@ const chatServer = Bun.spawn(["bun", "--bun", "run", "bin/chat-server.ts"], {
   env: sharedEnv,
 });
 
+// Optionally start the Slack bot server (only when enabled + tokens present).
+// We re-check tokens here (rather than relying solely on the child) so a
+// disabled or misconfigured bot doesn't even spawn a process.
+const slackEnabled =
+  appConfig.slack.enabled && !!appConfig.slack.botToken && !!appConfig.slack.appToken;
+if (appConfig.slack.enabled && !slackEnabled) {
+  console.log(
+    "[slack] enabled in config but botToken or appToken is empty after env substitution; not spawning slack-server",
+  );
+}
+const slackServer = slackEnabled
+  ? Bun.spawn(["bun", "--bun", "run", "bin/slack-server.ts"], {
+      cwd: packageDir,
+      stdio: ["inherit", "inherit", "inherit"],
+      env: sharedEnv,
+    })
+  : null;
+
 function killAll() {
   // Start draining stdin immediately to catch terminal escape sequence
   // responses that arrive after child processes are killed. If we wait until
@@ -221,16 +239,19 @@ function killAll() {
   }
   nextServer.kill();
   chatServer.kill();
+  slackServer?.kill();
 }
 
 process.on("SIGINT", killAll);
 process.on("SIGTERM", killAll);
 
-// Wait for Next.js to exit, then clean up chat server
+// Wait for Next.js to exit, then clean up sibling servers
 const nextExitCode = await nextServer.exited;
 chatServer.kill();
-// Wait for chat server to exit so its cleanup runs before we exit
+slackServer?.kill();
+// Wait for siblings to exit so their cleanup runs before we exit
 await chatServer.exited;
+if (slackServer) await slackServer.exited;
 
 // The SIGINT handler already started draining stdin in raw mode to catch
 // terminal escape sequence responses. Wait a bit for any remaining responses
