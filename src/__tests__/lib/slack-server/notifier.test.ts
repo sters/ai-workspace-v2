@@ -1,48 +1,79 @@
 import { describe, expect, it } from "vitest";
 import {
-  extractPrUrlsFromEvents,
+  extractCreatedPrs,
   buildCompletionMessage,
 } from "@/lib/slack-server/notifier";
 import type { OperationEvent } from "@/types/operation";
 
-function ev(data: string): OperationEvent {
+function ev(data: string, phaseLabel?: string): OperationEvent {
   return {
     type: "output",
     operationId: "op-1",
     data,
     timestamp: "2026-05-13T00:00:00.000Z",
+    ...(phaseLabel && { phaseLabel }),
   };
 }
 
-describe("extractPrUrlsFromEvents", () => {
-  it("returns empty when no events contain a PR URL", () => {
-    expect(extractPrUrlsFromEvents([])).toEqual([]);
-    expect(extractPrUrlsFromEvents([ev("plain text"), ev("more text")])).toEqual([]);
+describe("extractCreatedPrs", () => {
+  it("returns empty when there are no events", () => {
+    expect(extractCreatedPrs([])).toEqual([]);
   });
 
-  it("finds a single PR URL in event data", () => {
-    const out = extractPrUrlsFromEvents([
-      ev('{"text":"opened https://github.com/acme/foo/pull/12"}'),
+  it("finds PR URLs only in events whose phaseLabel is 'Create PR'", () => {
+    const out = extractCreatedPrs([
+      ev("read https://github.com/acme/foo/pull/9 from a comment", "Analyze & draft README"),
+      ev("ran code-review on https://github.com/acme/foo/pull/9", "Code Review"),
+      ev('{"text":"created PR https://github.com/acme/foo/pull/12"}', "Create PR"),
     ]);
     expect(out).toHaveLength(1);
     expect(out[0].url).toBe("https://github.com/acme/foo/pull/12");
-    expect(out[0].owner).toBe("acme");
-    expect(out[0].repo).toBe("foo");
-    expect(out[0].prNumber).toBe(12);
   });
 
-  it("deduplicates the same URL across events", () => {
-    const out = extractPrUrlsFromEvents([
-      ev("https://github.com/acme/foo/pull/1"),
-      ev("https://github.com/acme/foo/pull/1 again"),
+  it("ignores URLs from non-Create-PR phases even if they look like real PRs", () => {
+    const out = extractCreatedPrs([
+      ev("https://github.com/acme/foo/pull/1", "Execute"),
+      ev("https://github.com/acme/foo/pull/2", "Review"),
+    ]);
+    expect(out).toEqual([]);
+  });
+
+  it("ignores events with no phaseLabel", () => {
+    const out = extractCreatedPrs([ev("https://github.com/acme/foo/pull/1")]);
+    expect(out).toEqual([]);
+  });
+
+  it("excludes URLs that were already in the input description", () => {
+    const out = extractCreatedPrs(
+      [ev("created https://github.com/acme/foo/pull/12", "Create PR")],
+      { inputDescription: "please base on https://github.com/acme/foo/pull/12 and extend" },
+    );
+    expect(out).toEqual([]);
+  });
+
+  it("keeps Create-PR URLs that were NOT in the description", () => {
+    const out = extractCreatedPrs(
+      [
+        ev("https://github.com/acme/foo/pull/12", "Create PR"),
+        ev("https://github.com/acme/bar/pull/3", "Create PR"),
+      ],
+      { inputDescription: "based on https://github.com/acme/foo/pull/12" },
+    );
+    expect(out.map((p) => p.url)).toEqual(["https://github.com/acme/bar/pull/3"]);
+  });
+
+  it("deduplicates a URL appearing in multiple Create PR events", () => {
+    const out = extractCreatedPrs([
+      ev("https://github.com/acme/foo/pull/1", "Create PR"),
+      ev("https://github.com/acme/foo/pull/1 (linked again)", "Create PR"),
     ]);
     expect(out).toHaveLength(1);
   });
 
-  it("collects multiple distinct PRs across events", () => {
-    const out = extractPrUrlsFromEvents([
-      ev("created https://github.com/acme/foo/pull/1"),
-      ev("and https://github.com/acme/bar/pull/9"),
+  it("collects URLs across multiple Create PR child events (different repos)", () => {
+    const out = extractCreatedPrs([
+      ev("https://github.com/acme/foo/pull/1", "Create PR"),
+      ev("https://github.com/acme/bar/pull/9", "Create PR"),
     ]);
     expect(out.map((p) => p.url).sort()).toEqual([
       "https://github.com/acme/bar/pull/9",
