@@ -8,7 +8,7 @@ import {
   OVERRIDABLE_SETTINGS_KEYS,
 } from "./defaults";
 
-const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "quickAsk", "suggest", "hooks"]);
+const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "quickAsk", "suggest", "hooks", "slack"]);
 
 // ---------------------------------------------------------------------------
 // Config file generation
@@ -76,6 +76,12 @@ export function generateDefaultConfigContent(): string {
     "# hooks:",
     "#   sessionStartGitContext: true   # inject git branch+status into SessionStart",
     "#   blockDangerousBash: true        # PreToolUse(Bash) blocks rm -rf /, git push --force, git reset --hard",
+    "",
+    "# slack:",
+    "#   enabled: false                  # opt-in; spawns a Socket Mode bot process",
+    "#   botToken: \"{ENV:AIW_SLACK_BOT_TOKEN}\"   # xoxb-... ; supports {ENV:VAR} substitution",
+    "#   appToken: \"{ENV:AIW_SLACK_APP_TOKEN}\"   # xapp-... ; Socket Mode app-level token",
+    "#   allowedUserIds: []              # Slack user IDs allowed to invoke commands; empty = none",
     "",
   ];
   return lines.join("\n");

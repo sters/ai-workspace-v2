@@ -4,6 +4,7 @@ import { parse as parseYaml } from "yaml";
 import type { AppConfig, Opener, OperationTypeSettings } from "@/types/config";
 import type { OperationType } from "@/types/operation";
 import { CONFIG_DEFAULTS, OPERATION_TYPE_NAMES } from "./defaults";
+import { substituteEnvVars } from "./env-substitution";
 import { getWorkspaceConfigFilePath } from "./workspace-dir";
 
 // ---------------------------------------------------------------------------
@@ -131,7 +132,8 @@ export function loadConfigFile(
     const raw = fs.readFileSync(filePath, "utf-8");
     const parsed = parseYaml(raw);
     if (!parsed || typeof parsed !== "object") return null;
-    return normalizeRawConfig(parsed as Record<string, unknown>);
+    const substituted = substituteEnvVars(parsed) as Record<string, unknown>;
+    return normalizeRawConfig(substituted);
   } catch (err) {
     console.warn(`[app-config] Failed to load config from ${filePath}:`, err);
     return null;
@@ -297,6 +299,13 @@ export function mergeConfig(
         file.hooks?.blockDangerousBash,
         defaults.hooks.blockDangerousBash,
       ),
+    },
+    slack: {
+      enabled: pick(env.slack?.enabled, file.slack?.enabled, defaults.slack.enabled),
+      botToken: pick(env.slack?.botToken, file.slack?.botToken, defaults.slack.botToken),
+      appToken: pick(env.slack?.appToken, file.slack?.appToken, defaults.slack.appToken),
+      // Arrays: file replaces defaults entirely (no per-element merge).
+      allowedUserIds: env.slack?.allowedUserIds ?? file.slack?.allowedUserIds ?? defaults.slack.allowedUserIds,
     },
   };
 }

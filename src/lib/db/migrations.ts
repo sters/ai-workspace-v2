@@ -133,6 +133,19 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 7,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE slack_pending_notifications (
+          operation_id  TEXT PRIMARY KEY REFERENCES operations(id) ON DELETE CASCADE,
+          channel       TEXT NOT NULL,
+          thread_ts     TEXT NOT NULL,
+          created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+      `);
+    },
+  },
 ];
 
 /**

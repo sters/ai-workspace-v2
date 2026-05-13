@@ -43,6 +43,12 @@ export const CONFIG_DEFAULTS: AppConfig = {
     sessionStartGitContext: true,
     blockDangerousBash: true,
   },
+  slack: {
+    enabled: false,
+    botToken: "",
+    appToken: "",
+    allowedUserIds: [],
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -129,6 +135,11 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "hooks", section: null, defaultLine: "# hooks:" },
   { key: "sessionStartGitContext", section: "hooks", defaultLine: "#   sessionStartGitContext: true   # inject git branch+status into SessionStart" },
   { key: "blockDangerousBash", section: "hooks", defaultLine: "#   blockDangerousBash: true        # PreToolUse(Bash) blocks rm -rf /, git push --force, git reset --hard" },
+  { key: "slack", section: null, defaultLine: "# slack:" },
+  { key: "enabled", section: "slack", defaultLine: "#   enabled: false                  # opt-in; spawns a Socket Mode bot process" },
+  { key: "botToken", section: "slack", defaultLine: "#   botToken: \"{ENV:AIW_SLACK_BOT_TOKEN}\"   # xoxb-... ; supports {ENV:VAR} substitution" },
+  { key: "appToken", section: "slack", defaultLine: "#   appToken: \"{ENV:AIW_SLACK_APP_TOKEN}\"   # xapp-... ; Socket Mode app-level token" },
+  { key: "allowedUserIds", section: "slack", defaultLine: "#   allowedUserIds: []              # Slack user IDs allowed to invoke commands; empty = none" },
 ];
 
 /**

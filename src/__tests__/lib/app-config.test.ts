@@ -775,6 +775,12 @@ describe("migrateConfigContent", () => {
       "  sessionStartGitContext: true",
       "  blockDangerousBash: true",
       "",
+      "slack:",
+      "  enabled: false",
+      "  botToken: \"{ENV:AIW_SLACK_BOT_TOKEN}\"",
+      "  appToken: \"{ENV:AIW_SLACK_APP_TOKEN}\"",
+      "  allowedUserIds: []",
+      "",
     ].join("\n");
     const result = migrateConfigContent(content);
     // All keys present — no changes
@@ -897,6 +903,12 @@ describe("migrateConfigContent", () => {
       "hooks:",
       "  sessionStartGitContext: true",
       "  blockDangerousBash: true",
+      "",
+      "slack:",
+      "  enabled: false",
+      "  botToken: \"{ENV:AIW_SLACK_BOT_TOKEN}\"",
+      "  appToken: \"{ENV:AIW_SLACK_APP_TOKEN}\"",
+      "  allowedUserIds: []",
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
