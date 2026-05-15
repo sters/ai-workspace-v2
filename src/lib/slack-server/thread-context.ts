@@ -5,6 +5,28 @@
  * Slack discussion as background.
  */
 
+export interface SlackAttachmentField {
+  title?: string;
+  value?: string;
+}
+
+/**
+ * Subset of Slack's attachment shape we read. Slack uses attachments for
+ * link unfurls (external links, Slack message links, integration posts).
+ * We pull text-only fields and ignore image/media URLs by design.
+ */
+export interface SlackAttachment {
+  title?: string;
+  title_link?: string;
+  text?: string;
+  pretext?: string;
+  fallback?: string;
+  author_name?: string;
+  service_name?: string;
+  from_url?: string;
+  fields?: SlackAttachmentField[];
+}
+
 export interface ThreadMessage {
   user?: string;
   text?: string;
@@ -15,6 +37,8 @@ export interface ThreadMessage {
   username?: string;
   /** Bot/app metadata; `name` is the app display name (e.g., "GitHub"). */
   bot_profile?: { name?: string };
+  /** Link-unfurl previews and integration-posted cards. */
+  attachments?: SlackAttachment[];
 }
 
 export interface FormatOptions {
@@ -29,16 +53,19 @@ export interface FormatOptions {
 }
 
 const SEPARATOR = "--- Slack thread context ---";
+const UNFURL_PREFIX = "  > ";
 
 /**
  * Formats messages as `<@USERID>: text` (or `<DisplayName>: text` for app
  * messages) lines, one per message. Drops:
  * - the message identified by `excludeTs` (the mention itself)
  * - the bot's own prior replies (matched by `ourBotUserId` / `ourBotId`)
- * - messages without text content
+ * - messages with neither text nor extractable attachment content
  *
  * Other bot/app messages (e.g. GitHub, CI, alerts) are included so prior
- * tooling output in the thread becomes part of the context.
+ * tooling output in the thread becomes part of the context. Link unfurls
+ * are extracted from `attachments` and rendered as indented `> ` lines
+ * beneath the message that triggered them.
  */
 export function formatThreadContext(
   messages: ThreadMessage[],
@@ -49,12 +76,73 @@ export function formatThreadContext(
     if (m.ts === opts.excludeTs) continue;
     if (opts.ourBotUserId && m.user === opts.ourBotUserId) continue;
     if (opts.ourBotId && m.bot_id === opts.ourBotId) continue;
-    const text = m.text?.trim();
-    if (!text) continue;
+
+    const text = m.text?.trim() ?? "";
+    const attachmentLines = (m.attachments ?? []).flatMap(extractAttachmentLines);
+    if (!text && attachmentLines.length === 0) continue;
+
     const label = displayNameFor(m);
-    lines.push(label ? `${label}: ${text}` : text);
+    if (text) {
+      lines.push(label ? `${label}: ${text}` : text);
+    } else if (label) {
+      lines.push(`${label}:`);
+    }
+    for (const al of attachmentLines) {
+      lines.push(`${UNFURL_PREFIX}${al}`);
+    }
   }
   return lines.join("\n");
+}
+
+/**
+ * Pull text-only content out of an attachment. Returns one string per
+ * logical line (header, body, each field). Images/thumbnails are ignored.
+ * `fallback` is used only when no other text fields are present, since
+ * Slack typically populates it as a denormalized copy of title+text.
+ */
+function extractAttachmentLines(att: SlackAttachment): string[] {
+  const lines: string[] = [];
+
+  const service = att.service_name?.trim();
+  const author = att.author_name?.trim();
+  const title = att.title?.trim();
+  const titleLink = att.title_link?.trim();
+
+  const headerParts: string[] = [];
+  if (service) headerParts.push(`[${service}]`);
+  if (author) headerParts.push(author);
+  if (title) {
+    headerParts.push(titleLink ? `${title} (${titleLink})` : title);
+  } else if (titleLink) {
+    headerParts.push(titleLink);
+  }
+  if (headerParts.length) lines.push(headerParts.join(" "));
+
+  const fromUrl = att.from_url?.trim();
+  if (fromUrl && fromUrl !== titleLink) {
+    lines.push(fromUrl);
+  }
+
+  const pretext = att.pretext?.trim();
+  if (pretext) lines.push(pretext);
+
+  const text = att.text?.trim();
+  if (text) lines.push(text);
+
+  for (const f of att.fields ?? []) {
+    const ft = f.title?.trim();
+    const fv = f.value?.trim();
+    if (ft && fv) lines.push(`${ft}: ${fv}`);
+    else if (fv) lines.push(fv);
+    else if (ft) lines.push(ft);
+  }
+
+  if (lines.length === 0) {
+    const fallback = att.fallback?.trim();
+    if (fallback) lines.push(fallback);
+  }
+
+  return lines;
 }
 
 function displayNameFor(m: ThreadMessage): string | null {
