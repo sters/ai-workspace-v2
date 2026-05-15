@@ -45,8 +45,37 @@ vi.mock("@/lib/workspace/prompts", () => ({
 vi.mock("@/lib/workspace/todo-cleanup", () => ({
   stripCompletedTodosFromWorkspace: vi.fn(async () => []),
 }));
+vi.mock("@/lib/workspace/git", () => ({
+  listWorkspaceRepos: vi.fn(() => [
+    { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+  ]),
+}));
+vi.mock("@/lib/parsers/readme", () => ({
+  readWorkspaceReadme: vi.fn(async () => ({
+    content: "",
+    meta: { title: "t", taskType: "feature", ticketId: "", date: "", repositories: [] },
+  })),
+  denormalizeRepoPath: (s: string) => s.replace("___", ":"),
+}));
+vi.mock("@/lib/pipelines/actions/setup-repository", () => ({
+  setupRepository: vi.fn(() => ({
+    repoPath: "github.com/sters/repo",
+    repoName: "repo",
+    worktreePath: "/x",
+    baseBranch: "main",
+    branchName: "feature-x",
+  })),
+}));
+vi.mock("@/lib/pipelines/actions/init-todo-analysis", () => ({
+  buildInitTodoAnalysisPhases: vi.fn(() => []),
+}));
 
 import { buildAutonomousPipeline } from "@/lib/pipelines/autonomous";
+import { listWorkspaceRepos } from "@/lib/workspace/git";
+import { readWorkspaceReadme } from "@/lib/parsers/readme";
+import { setupRepository } from "@/lib/pipelines/actions/setup-repository";
+import { buildInitTodoAnalysisPhases } from "@/lib/pipelines/actions/init-todo-analysis";
+import { getTodos } from "@/lib/workspace/reader";
 import { buildInitPipeline } from "@/lib/pipelines/init";
 import { buildUpdateTodoPipeline } from "@/lib/pipelines/update-todo";
 import { buildExecutePipeline } from "@/lib/pipelines/execute";
@@ -65,6 +94,11 @@ const mockBuildReview = vi.mocked(buildReviewPipeline);
 const mockBuildCreatePr = vi.mocked(buildCreatePrPipeline);
 const mockGetReviewSessions = vi.mocked(getReviewSessions);
 const mockStripCompletedTodos = vi.mocked(stripCompletedTodosFromWorkspace);
+const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
+const mockReadWorkspaceReadme = vi.mocked(readWorkspaceReadme);
+const mockSetupRepository = vi.mocked(setupRepository);
+const mockBuildInitTodoAnalysis = vi.mocked(buildInitTodoAnalysisPhases);
+const mockGetTodos = vi.mocked(getTodos);
 
 function createMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunctionContext {
   return {
@@ -98,6 +132,17 @@ describe("buildAutonomousPipeline", () => {
     mockBuildReview.mockResolvedValue([]);
     mockBuildCreatePr.mockResolvedValue([]);
     mockGetReviewSessions.mockResolvedValue([]);
+    mockListWorkspaceRepos.mockReturnValue([
+      { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+    ]);
+    mockReadWorkspaceReadme.mockResolvedValue({
+      content: "",
+      meta: { title: "t", taskType: "feature", ticketId: "", date: "", repositories: [] },
+    });
+    mockGetTodos.mockResolvedValue([
+      { repoName: "repo", filename: "TODO-repo.md", total: 1, done: 0, blocked: 0, inProgress: 0 },
+    ]);
+    mockBuildInitTodoAnalysis.mockReturnValue([]);
   });
 
   describe("phase structure", () => {
@@ -117,12 +162,16 @@ describe("buildAutonomousPipeline", () => {
         workspace: "test-ws",
         instruction: "fix things",
       });
-      // update-todo function phase + Cycle 1 (Execute, Review, Gate)
-      expect(phases).toHaveLength(4);
-      expect(phases[0].kind).toBe("function");
-      if (phases[0].kind === "function") {
-        expect(phases[0].label).toBe("Update TODOs");
-      }
+      // Ensure repositories + Ensure TODOs + update-todo + Cycle 1 (Execute, Review, Gate)
+      expect(phases).toHaveLength(6);
+      expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
+        "Ensure repositories",
+        "Ensure TODOs",
+        "Update TODOs",
+        "Cycle 1: Execute",
+        "Cycle 1: Review",
+        "Cycle 1: Gate",
+      ]);
     });
 
     it("strips completed TODOs before the leading Update TODOs phase", async () => {
@@ -131,7 +180,7 @@ describe("buildAutonomousPipeline", () => {
         workspace: "test-ws",
         instruction: "fix things",
       });
-      const updatePhase = phases[0];
+      const updatePhase = phases[2];
       if (updatePhase.kind !== "function") return;
 
       const ctx = createMockCtx();
@@ -141,17 +190,29 @@ describe("buildAutonomousPipeline", () => {
       expect(mockBuildUpdateTodo).toHaveBeenCalled();
     });
 
-    it("has 3 phases (Execute, Review, Gate) when startWith is execute", () => {
+    it("has 5 phases (Ensure repos, Ensure TODOs, Execute, Review, Gate) when startWith is execute", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
       });
-      expect(phases).toHaveLength(3);
+      expect(phases).toHaveLength(5);
       expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
+        "Ensure repositories",
+        "Ensure TODOs",
         "Cycle 1: Execute",
         "Cycle 1: Review",
         "Cycle 1: Gate",
       ]);
+    });
+
+    it("does not include salvage phases when startWith is init", () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "init",
+        description: "Test description",
+      });
+      const labels = phases.map((p) => p.kind === "function" && p.label);
+      expect(labels).not.toContain("Ensure repositories");
+      expect(labels).not.toContain("Ensure TODOs");
     });
   });
 
@@ -161,7 +222,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const execPhase = phases[0];
+      const execPhase = phases[2];
       if (execPhase.kind !== "function") return;
 
       const ctx = createMockCtx();
@@ -175,7 +236,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const reviewPhase = phases[1];
+      const reviewPhase = phases[3];
       if (reviewPhase.kind !== "function") return;
 
       const ctx = createMockCtx();
@@ -189,7 +250,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const gatePhase = phases[2];
+      const gatePhase = phases[4];
       if (gatePhase.kind !== "function") return;
 
       const appendedPhases: PipelinePhase[] = [];
@@ -211,9 +272,9 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      expect(phases[0].kind === "function" && phases[0].timeoutMs).toBe(25 * 60 * 1000);
-      expect(phases[1].kind === "function" && phases[1].timeoutMs).toBe(15 * 60 * 1000);
-      expect(phases[2].kind === "function" && phases[2].timeoutMs).toBe(10 * 60 * 1000);
+      expect(phases[2].kind === "function" && phases[2].timeoutMs).toBe(25 * 60 * 1000);
+      expect(phases[3].kind === "function" && phases[3].timeoutMs).toBe(15 * 60 * 1000);
+      expect(phases[4].kind === "function" && phases[4].timeoutMs).toBe(10 * 60 * 1000);
     });
 
     it("returns false when no workspace is found", async () => {
@@ -222,7 +283,7 @@ describe("buildAutonomousPipeline", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
       });
-      const execPhase = phases[0];
+      const execPhase = phases[2];
       if (execPhase.kind !== "function") return;
 
       const ctx = createMockCtx();
@@ -251,7 +312,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const gatePhase = phases[2];
+      const gatePhase = phases[4];
       if (gatePhase.kind !== "function") return;
 
       const appendedPhases: PipelinePhase[] = [];
@@ -302,7 +363,7 @@ describe("buildAutonomousPipeline", () => {
         workspace: "test-ws",
         repo: "my-repo",
       });
-      const gatePhase = phases[2];
+      const gatePhase = phases[4];
       if (gatePhase.kind !== "function") return;
 
       // Run gate to get the appended Update TODO phase
@@ -349,7 +410,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const gatePhase = phases[2];
+      const gatePhase = phases[4];
       if (gatePhase.kind !== "function") return;
 
       const appendedPhases: PipelinePhase[] = [];
@@ -384,7 +445,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const gatePhase = phases[2];
+      const gatePhase = phases[4];
       if (gatePhase.kind !== "function") return;
 
       const appendedPhases: PipelinePhase[] = [];
@@ -399,6 +460,233 @@ describe("buildAutonomousPipeline", () => {
       if (appendedPhases[0].kind === "function") {
         expect(appendedPhases[0].label).toBe("Create PR");
       }
+    });
+  });
+
+  describe("ensure repositories phase", () => {
+    it("skips when every README repository is already set up", async () => {
+      mockListWorkspaceRepos.mockReturnValue([
+        { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+      ]);
+      mockReadWorkspaceReadme.mockResolvedValue({
+        content: "",
+        meta: {
+          title: "t",
+          taskType: "feature",
+          ticketId: "",
+          date: "",
+          repositories: [
+            { alias: "repo", path: "github.com/sters/repo", baseBranch: "main" },
+          ],
+        },
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const ensurePhase = phases[0];
+      if (ensurePhase.kind !== "function") return;
+      expect(ensurePhase.label).toBe("Ensure repositories");
+
+      const ctx = createMockCtx();
+      const result = await ensurePhase.fn(ctx);
+
+      expect(result).toBe(true);
+      expect(mockSetupRepository).not.toHaveBeenCalled();
+    });
+
+    it("sets up only the README repositories missing from the workspace", async () => {
+      // Initial state: one of two README repos already set up. After setupRepository: both.
+      mockListWorkspaceRepos
+        .mockReturnValueOnce([
+          { repoPath: "github.com/sters/already", repoName: "already", worktreePath: "/a" },
+        ])
+        .mockReturnValueOnce([
+          { repoPath: "github.com/sters/already", repoName: "already", worktreePath: "/a" },
+          { repoPath: "github.com/sters/new", repoName: "new", worktreePath: "/b" },
+        ]);
+      mockReadWorkspaceReadme.mockResolvedValue({
+        content: "",
+        meta: {
+          title: "t",
+          taskType: "feature",
+          ticketId: "",
+          date: "",
+          repositories: [
+            { alias: "already", path: "github.com/sters/already", baseBranch: "main" },
+            { alias: "new", path: "github.com/sters/new", baseBranch: "main" },
+          ],
+        },
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const ensurePhase = phases[0];
+      if (ensurePhase.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      const result = await ensurePhase.fn(ctx);
+
+      expect(result).toBe(true);
+      expect(mockSetupRepository).toHaveBeenCalledTimes(1);
+      expect(mockSetupRepository).toHaveBeenCalledWith(
+        "test-ws",
+        "github.com/sters/new",
+        "main",
+        expect.any(Function),
+      );
+    });
+
+    it("returns false when README has no repos and no worktrees exist", async () => {
+      mockListWorkspaceRepos.mockReturnValue([]);
+      mockReadWorkspaceReadme.mockResolvedValue({
+        content: "",
+        meta: { title: "t", taskType: "feature", ticketId: "", date: "", repositories: [] },
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const ensurePhase = phases[0];
+      if (ensurePhase.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      const result = await ensurePhase.fn(ctx);
+
+      expect(result).toBe(false);
+      expect(mockSetupRepository).not.toHaveBeenCalled();
+    });
+
+    it("proceeds when README has no entries but worktrees exist on disk", async () => {
+      mockListWorkspaceRepos.mockReturnValue([
+        { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+      ]);
+      mockReadWorkspaceReadme.mockResolvedValue({
+        content: "",
+        meta: { title: "t", taskType: "feature", ticketId: "", date: "", repositories: [] },
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const ensurePhase = phases[0];
+      if (ensurePhase.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      const result = await ensurePhase.fn(ctx);
+
+      expect(result).toBe(true);
+      expect(mockSetupRepository).not.toHaveBeenCalled();
+    });
+
+    it("returns false when a README repository remains unset after setup attempt", async () => {
+      mockListWorkspaceRepos.mockReturnValue([]);
+      mockReadWorkspaceReadme.mockResolvedValue({
+        content: "",
+        meta: {
+          title: "t",
+          taskType: "feature",
+          ticketId: "",
+          date: "",
+          repositories: [
+            { alias: "repo", path: "github.com/x/y", baseBranch: "main" },
+          ],
+        },
+      });
+      mockSetupRepository.mockImplementation(() => {
+        throw new Error("clone failed");
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const ensurePhase = phases[0];
+      if (ensurePhase.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      const result = await ensurePhase.fn(ctx);
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("ensure todos phase", () => {
+    it("skips when every workspace repo has a TODO file", async () => {
+      mockListWorkspaceRepos.mockReturnValue([
+        { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+      ]);
+      mockGetTodos.mockResolvedValue([
+        { repoName: "repo", filename: "TODO-repo.md", total: 1, done: 0, blocked: 0, inProgress: 0 },
+      ]);
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const ensureTodos = phases[1];
+      if (ensureTodos.kind !== "function") return;
+      expect(ensureTodos.label).toBe("Ensure TODOs");
+
+      const ctx = createMockCtx();
+      const result = await ensureTodos.fn(ctx);
+
+      expect(result).toBe(true);
+      expect(mockBuildInitTodoAnalysis).not.toHaveBeenCalled();
+    });
+
+    it("runs TODO analysis only for repos missing TODO files", async () => {
+      mockListWorkspaceRepos.mockReturnValue([
+        { repoPath: "github.com/sters/already", repoName: "already", worktreePath: "/a" },
+        { repoPath: "github.com/sters/new", repoName: "new", worktreePath: "/b" },
+      ]);
+      mockGetTodos.mockResolvedValue([
+        { repoName: "already", filename: "TODO-already.md", total: 1, done: 0, blocked: 0, inProgress: 0 },
+      ]);
+      mockReadWorkspaceReadme.mockResolvedValue({
+        content: "",
+        meta: { title: "t", taskType: "feature", ticketId: "", date: "", repositories: [] },
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const ensureTodos = phases[1];
+      if (ensureTodos.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      const result = await ensureTodos.fn(ctx);
+
+      expect(result).toBe(true);
+      expect(mockBuildInitTodoAnalysis).toHaveBeenCalledTimes(1);
+      const call = mockBuildInitTodoAnalysis.mock.calls[0]?.[0];
+      expect(call?.repos()).toEqual([
+        { repoPath: "github.com/sters/new", repoName: "new", worktreePath: "/b" },
+      ]);
+      expect(call?.taskType()).toBe("feature");
+    });
+
+    it("returns false when no repos are set up at all", async () => {
+      mockListWorkspaceRepos.mockReturnValue([]);
+      mockGetTodos.mockResolvedValue([]);
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const ensureTodos = phases[1];
+      if (ensureTodos.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      const result = await ensureTodos.fn(ctx);
+
+      expect(result).toBe(false);
+      expect(mockBuildInitTodoAnalysis).not.toHaveBeenCalled();
     });
   });
 
@@ -440,6 +728,40 @@ describe("buildAutonomousPipeline", () => {
       if (lastPhase.kind === "function") {
         expect(lastPhase.label).toBe("Create PR");
       }
+    });
+
+    it("omits salvage phases on resume by default (saved phases didn't have them)", () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+        resumeCycles: [{ cycle: 1, hasUpdateTodo: false }],
+      });
+      const labels = phases.map((p) => p.kind === "function" && p.label);
+      expect(labels).not.toContain("Ensure repositories");
+      expect(labels).not.toContain("Ensure TODOs");
+    });
+
+    it("includes Ensure repositories on resume when resumeWithEnsureRepos is true", () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+        resumeCycles: [{ cycle: 1, hasUpdateTodo: false }],
+        resumeWithEnsureRepos: true,
+      });
+      expect(phases[0].kind === "function" && phases[0].label).toBe(
+        "Ensure repositories",
+      );
+    });
+
+    it("includes Ensure TODOs on resume when resumeWithEnsureTodos is true", () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+        resumeCycles: [{ cycle: 1, hasUpdateTodo: false }],
+        resumeWithEnsureTodos: true,
+      });
+      const labels = phases.map((p) => p.kind === "function" && p.label);
+      expect(labels).toContain("Ensure TODOs");
     });
   });
 });

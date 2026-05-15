@@ -1,5 +1,9 @@
 import { getReviewSessions, getReviewDetail, getTodos, getReadme } from "@/lib/workspace/reader";
 import { stripCompletedTodosFromWorkspace } from "@/lib/workspace/todo-cleanup";
+import { listWorkspaceRepos } from "@/lib/workspace/git";
+import { readWorkspaceReadme, denormalizeRepoPath } from "@/lib/parsers/readme";
+import { setupRepository } from "./actions/setup-repository";
+import { buildInitTodoAnalysisPhases } from "./actions/init-todo-analysis";
 import { buildInitPipeline } from "./init";
 import { buildExecutePipeline } from "./execute";
 import { buildReviewPipeline } from "./review";
@@ -126,6 +130,10 @@ export function buildAutonomousPipeline(input: {
   resumeCycles?: { cycle: number; hasUpdateTodo: boolean }[];
   /** For resume: append a Create PR phase to match the saved phase structure. */
   resumeWithCreatePr?: boolean;
+  /** For resume: prepend the Ensure repositories phase if it was in the saved structure. */
+  resumeWithEnsureRepos?: boolean;
+  /** For resume: prepend the Ensure TODOs phase if it was in the saved structure. */
+  resumeWithEnsureTodos?: boolean;
 }): PipelinePhase[] {
   const { startWith, description, workspace, instruction, draft, interactionLevel, repo } = input;
   const maxLoops = input.maxLoops ?? DEFAULT_MAX_LOOPS;
@@ -137,10 +145,170 @@ export function buildAutonomousPipeline(input: {
   // Leading phases: init, update-todo, or skip straight to execute
   // ------------------------------------------------------------------
 
+  function buildEnsureRepositoriesPhase(): PipelinePhase {
+    return {
+      kind: "function",
+      label: "Ensure repositories",
+      timeoutMs: 10 * 60 * 1000,
+      maxRetries: 0,
+      fn: async (ctx) => {
+        const ws = resolveWorkspace(ctx.operationId, workspace);
+        if (!ws) {
+          ctx.emitStatus("No workspace found — cannot ensure repositories");
+          return false;
+        }
+
+        const wsPath = path.join(getWorkspaceDir(), ws);
+        let metaRepos: { alias: string; path: string; baseBranch: string }[];
+        try {
+          const { meta } = await readWorkspaceReadme(wsPath);
+          metaRepos = meta.repositories;
+        } catch (err) {
+          ctx.emitResult(`Failed to read README: ${err}`);
+          return false;
+        }
+
+        const existing = listWorkspaceRepos(ws);
+        const existingPaths = new Set(existing.map((r) => r.repoPath));
+
+        if (metaRepos.length === 0) {
+          if (existing.length > 0) {
+            // Workspace has worktrees but README is missing entries — proceed,
+            // executor will use what's on disk.
+            ctx.emitStatus(
+              `README has no repository entries, but ${existing.length} worktree(s) on disk: ${existing.map((r) => r.repoName).join(", ")}`,
+            );
+            return true;
+          }
+          ctx.emitResult(
+            "README has no repository entries. Add repositories to README.md and retry.",
+          );
+          return false;
+        }
+
+        const missing = metaRepos.filter((r) => !existingPaths.has(r.path));
+
+        if (missing.length === 0) {
+          ctx.emitStatus(
+            `All ${metaRepos.length} README repositor${metaRepos.length === 1 ? "y" : "ies"} already set up`,
+          );
+          return true;
+        }
+
+        ctx.emitStatus(
+          `Setting up ${missing.length} missing repositor${missing.length === 1 ? "y" : "ies"} from README`,
+        );
+        for (const repo of missing) {
+          if (ctx.signal.aborted) return false;
+          ctx.emitStatus(`Setting up repository: ${repo.path}`);
+          try {
+            setupRepository(
+              ws,
+              denormalizeRepoPath(repo.path),
+              repo.baseBranch,
+              ctx.emitStatus,
+            );
+          } catch (err) {
+            ctx.emitStatus(`Warning: Failed to set up ${repo.path}: ${err}`);
+          }
+        }
+
+        const after = listWorkspaceRepos(ws);
+        const afterPaths = new Set(after.map((r) => r.repoPath));
+        const stillMissing = metaRepos.filter((r) => !afterPaths.has(r.path));
+        if (stillMissing.length > 0) {
+          ctx.emitResult(
+            `Failed to set up: ${stillMissing.map((r) => r.path).join(", ")}. Check README.md and try again.`,
+          );
+          return false;
+        }
+        ctx.emitResult(
+          `Set up ${missing.length} repositor${missing.length === 1 ? "y" : "ies"}: ${missing.map((r) => r.path).join(", ")}`,
+        );
+        return true;
+      },
+    };
+  }
+
+  function buildEnsureTodosPhase(): PipelinePhase {
+    return {
+      kind: "function",
+      label: "Ensure TODOs",
+      timeoutMs: 60 * 60 * 1000, // Plan TODO sub-phase may wait for human interaction
+      maxRetries: 0,
+      fn: async (ctx) => {
+        const ws = resolveWorkspace(ctx.operationId, workspace);
+        if (!ws) {
+          ctx.emitStatus("No workspace found — cannot ensure TODOs");
+          return false;
+        }
+
+        const wsPath = path.join(getWorkspaceDir(), ws);
+        const repos = listWorkspaceRepos(ws);
+        if (repos.length === 0) {
+          ctx.emitResult(
+            "No repositories in workspace — cannot plan TODOs. Run Ensure repositories first.",
+          );
+          return false;
+        }
+
+        const existing = await getTodos(ws);
+        const existingTodoRepos = new Set(existing.map((t) => t.repoName));
+        const missing = repos.filter((r) => !existingTodoRepos.has(r.repoName));
+
+        if (missing.length === 0) {
+          ctx.emitStatus(
+            `TODO files present for all ${repos.length} repositor${repos.length === 1 ? "y" : "ies"}`,
+          );
+          return true;
+        }
+
+        let taskType = "";
+        try {
+          const { meta } = await readWorkspaceReadme(wsPath);
+          taskType = meta.taskType;
+        } catch (err) {
+          ctx.emitStatus(`Warning: failed to read README: ${err}`);
+        }
+
+        ctx.emitStatus(
+          `Missing TODO files for ${missing.length} repositor${missing.length === 1 ? "y" : "ies"}: ${missing.map((r) => r.repoName).join(", ")}`,
+        );
+
+        const subPhases = buildInitTodoAnalysisPhases({
+          wsName: () => ws,
+          wsPath: () => wsPath,
+          repos: () => missing.map((r) => ({
+            repoPath: r.repoPath,
+            repoName: r.repoName,
+            worktreePath: r.worktreePath,
+          })),
+          taskType: () => taskType,
+          interactionLevel,
+          commitMessage: "Recover: workspace TODO analysis completed",
+          commitResultMessage: `Workspace **${ws}** TODO analysis recovered.`,
+        });
+
+        return runSubPhases(ctx, subPhases, skip);
+      },
+    };
+  }
+
   if (startWith === "init") {
     const initPhases = buildInitPipeline(description ?? "", interactionLevel);
     phases.push(...initPhases);
-  } else if (startWith === "update-todo") {
+  } else {
+    // Prepend salvage phases for non-init paths.
+    // On resume, only include them if the saved phase structure had them.
+    if (!input.resumeCycles || input.resumeWithEnsureRepos) {
+      phases.push(buildEnsureRepositoriesPhase());
+    }
+    if (!input.resumeCycles || input.resumeWithEnsureTodos) {
+      phases.push(buildEnsureTodosPhase());
+    }
+  }
+
+  if (startWith === "update-todo") {
     phases.push({
       kind: "function",
       label: "Update TODOs",
