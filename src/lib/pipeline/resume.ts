@@ -133,6 +133,8 @@ async function rebuildPipeline(op: Operation): Promise<PipelinePhase[] | null> {
               .map(([cycle, steps]) => ({ cycle, hasUpdateTodo: steps.has("Update TODO") }))
           : undefined;
         const hasCreatePr = savedPhases.some((p) => p.label === "Create PR");
+        const hasEnsureRepos = savedPhases.some((p) => p.label === "Ensure repositories");
+        const hasEnsureTodos = savedPhases.some((p) => p.label === "Ensure TODOs");
         return buildAutonomousPipeline({
           startWith: inputs.startWith as "init" | "update-todo" | "execute",
           description: inputs.description,
@@ -144,6 +146,8 @@ async function rebuildPipeline(op: Operation): Promise<PipelinePhase[] | null> {
           maxLoops: inputs.maxLoops ? Number(inputs.maxLoops) : undefined,
           resumeCycles,
           resumeWithCreatePr: hasCreatePr,
+          resumeWithEnsureRepos: hasEnsureRepos,
+          resumeWithEnsureTodos: hasEnsureTodos,
         });
       }
 

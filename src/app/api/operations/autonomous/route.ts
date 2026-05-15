@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
-import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildAutonomousPipeline } from "@/lib/pipelines/autonomous";
 import { autonomousSchema } from "@/lib/schemas";
 import { parseBody, applyOperationDefaults } from "@/lib/validate";
@@ -32,13 +31,8 @@ export async function POST(request: Request) {
       );
     }
     workspace = resolveWorkspaceName(workspace);
-    const repos = listWorkspaceRepos(workspace);
-    if (repos.length === 0) {
-      return NextResponse.json(
-        { error: "No repositories found in workspace" },
-        { status: 400 },
-      );
-    }
+    // Empty repos are handled by the pipeline's "Ensure repositories" phase,
+    // which tries to set them up from README before execute runs.
   }
 
   try {

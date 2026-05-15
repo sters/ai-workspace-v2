@@ -1,4 +1,4 @@
-import { unlinkSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { readWorkspaceReadme, denormalizeRepoPath } from "@/lib/parsers/readme";
 import {
@@ -8,7 +8,7 @@ import {
   writeTodoTemplate,
   writeReportTemplates,
 } from "@/lib/workspace";
-import { ensureGlobalSystemPrompt, ensureSystemPrompt } from "@/lib/workspace/prompts";
+import { ensureGlobalSystemPrompt } from "@/lib/workspace/prompts";
 import type { TaskAnalysis } from "@/types/workspace";
 import { setupRepository } from "./actions/setup-repository";
 import type { SetupRepositoryResult } from "@/types/pipeline";
@@ -18,19 +18,13 @@ import {
   buildReadmeContent,
   buildInitAnalyzeAndReadmePrompt,
   INIT_ANALYSIS_SCHEMA,
-  buildPlannerPrompt,
   buildBestOfNFileReviewerPrompt,
   BEST_OF_N_REVIEW_SCHEMA,
 } from "@/lib/templates";
-import { runBestOfNFiles } from "./actions/best-of-n-files";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
-import { getTimeoutDefaults } from "@/lib/pipeline-manager";
-import { buildCommitSnapshotPhase } from "./actions/commit-snapshot";
-import { buildCoordinateTodosPhase } from "./actions/coordinate-todos";
-import { buildDiscoverConstraintsPhase } from "./actions/discover-constraints";
-import { buildReviewTodosPhase } from "./actions/review-todos";
+import { buildInitTodoAnalysisPhases } from "./actions/init-todo-analysis";
 
 interface InitBestOfNOptions {
   bestOfN?: number;
@@ -445,153 +439,19 @@ export function buildInitPipeline(
         return true;
       },
     },
-    // Phase C: Discover repo constraints (lint/test/build) and append to README
-    {
-      kind: "function",
-      label: "Discover repo constraints",
-      timeoutMs: getTimeoutDefaults("init").claudeMs,
-      fn: (ctx) => buildDiscoverConstraintsPhase({
-        workspace: wsName,
-        wsPath,
-        repos: repoResults.map((r) => ({
-          repoName: r.repoName,
-          worktreePath: r.worktreePath,
-        })),
-      }).fn(ctx),
-    },
-    // Phase D: Plan TODOs for each repo (parallel, with optional Best-of-N)
-    {
-      kind: "function",
-      label: "Plan TODO items",
-      timeoutMs: 60 * 60 * 1000, // 1 hour — may wait for human when Best-of-N
-      fn: async (ctx) => {
-        if (analysis?.taskType === "review" || analysis?.taskType === "research") {
-          ctx.emitStatus(`${analysis?.taskType === "review" ? "Review" : "Research"} workspace — skipping TODO planning`);
-          return true;
-        }
-
-        const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
-
-        if (repoResults.length === 0) {
-          ctx.emitResult("No repositories configured — skipping TODO planning.");
-          return true;
-        }
-
-        const plannerAgent = meta.taskType === "research" ? "research-planner" : "planner";
-        const buildPlannerChildren = (todoOutputDir?: string, addDirsOverride?: string[]) =>
-          repoResults.map((repo) => ({
-            label: `plan-${repo.repoName}`,
-            stepType: STEP_TYPES.PLAN_TODO,
-            prompt: buildPlannerPrompt({
-              workspaceName: wsName,
-              repoPath: repo.repoPath,
-              repoName: repo.repoName,
-              readmeContent,
-              worktreePath: repo.worktreePath,
-              taskType: meta.taskType,
-              interactive: interactionLevel === "high",
-              todoOutputDir,
-            }),
-            addDirs: addDirsOverride ?? [wsPath],
-            appendSystemPromptFile: ensureSystemPrompt(wsPath, plannerAgent),
-          }));
-
-        const cleanup = () => {
-          const templatePath = path.join(wsPath, "templates", "TODO-template.md");
-          if (existsSync(templatePath)) {
-            unlinkSync(templatePath);
-          }
-        };
-
-        // Best-of-N for TODO planning
-        if (useBestOfN && bestOfN && bestOfN >= 2) {
-          const todoFiles = repoResults.map((r) => path.join(wsPath, `TODO-${r.repoName}.md`));
-          // Include template so each candidate dir has it for the planner to read
-          const templatePath = path.join(wsPath, "templates", "TODO-template.md");
-          const filesToCapture = existsSync(templatePath)
-            ? [...todoFiles, templatePath]
-            : todoFiles;
-
-          const result = await runBestOfNFiles({
-            ctx,
-            n: bestOfN,
-            operationType: "plan-todo",
-            filesToCapture,
-            buildChildren: (candidateDir) =>
-              buildPlannerChildren(
-                candidateDir,
-                [candidateDir, ...repoResults.map((r) => r.worktreePath)],
-              ),
-            interactionLevel,
-          });
-
-          cleanup();
-          return result;
-        }
-
-        // Normal execution
-        const children = buildPlannerChildren();
-        ctx.emitStatus(`Planning TODOs for ${children.length} repositories`);
-        const results = await ctx.runChildGroup(children);
-        const allSuccess = results.every(Boolean);
-        ctx.emitStatus(
-          `Planning complete: ${results.filter(Boolean).length}/${results.length} succeeded`,
-        );
-        cleanup();
-        return allSuccess;
-      },
-    },
-    // Phase E: Coordinate TODOs across repos (single, skip for single repo)
-    // Delegates to shared action at runtime when wsName/repoResults are populated
-    {
-      kind: "function",
-      label: "Coordinate TODOs",
-      timeoutMs: getTimeoutDefaults("init").claudeMs,
-      fn: (ctx) => {
-        if (analysis?.taskType === "review" || analysis?.taskType === "research") {
-          ctx.emitStatus(`${analysis?.taskType === "review" ? "Review" : "Research"} workspace — skipping TODO coordination`);
-          return Promise.resolve(true);
-        }
-        return buildCoordinateTodosPhase({
-          workspace: wsName,
-          wsPath,
-          repoNames: repoResults.map((r) => r.repoName),
-          repoWorktrees: repoResults.map((r) => ({
-            repoName: r.repoName,
-            worktreePath: r.worktreePath,
-          })),
-        }).fn(ctx);
-      },
-    },
-    // Phase F: Review TODOs (parallel, per repo)
-    {
-      kind: "function",
-      label: "Review TODOs",
-      timeoutMs: getTimeoutDefaults("init").claudeMs,
-      fn: (ctx) => {
-        if (analysis?.taskType === "review" || analysis?.taskType === "research") {
-          ctx.emitStatus(`${analysis?.taskType === "review" ? "Review" : "Research"} workspace — skipping TODO review`);
-          return Promise.resolve(true);
-        }
-        return buildReviewTodosPhase({
-          workspace: wsName,
-          wsPath,
-          repos: repoResults.map((r) => ({
-            repoName: r.repoName,
-            worktreePath: r.worktreePath,
-          })),
-        }).fn(ctx);
-      },
-    },
-    // Phase G: Commit workspace snapshot
-    {
-      kind: "function",
-      label: "Commit snapshot",
-      fn: (ctx) => buildCommitSnapshotPhase(
-        wsName,
-        "Init complete: workspace setup and TODO planning",
-        `Workspace **${wsName}** initialization complete.`,
-      ).fn(ctx),
-    },
+    // Phases C–G: constraints, plan, coordinate, review, commit
+    ...buildInitTodoAnalysisPhases({
+      wsName: () => wsName,
+      wsPath: () => wsPath,
+      repos: () => repoResults.map((r) => ({
+        repoPath: r.repoPath,
+        repoName: r.repoName,
+        worktreePath: r.worktreePath,
+      })),
+      taskType: () => analysis?.taskType ?? "",
+      interactionLevel,
+      bestOfN,
+      getUseBestOfN: () => useBestOfN,
+    }),
   ];
 }
