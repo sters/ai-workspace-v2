@@ -117,6 +117,177 @@ describe("formatThreadContext", () => {
     );
     expect(out).toBe("<@U1>: one\n<@U1>: two\n<@U1>: three");
   });
+
+  describe("attachments (link unfurls)", () => {
+    it("includes service_name, title, title_link, and text from an unfurl", () => {
+      const out = formatThreadContext(
+        [
+          {
+            user: "U1",
+            text: "check this",
+            ts: "1.0",
+            attachments: [
+              {
+                service_name: "GitHub",
+                title: "Fix login bug",
+                title_link: "https://github.com/org/repo/pull/123",
+                text: "This PR fixes the login bug.",
+              },
+            ],
+          },
+        ],
+        { excludeTs: "999.0" },
+      );
+      expect(out).toBe(
+        "<@U1>: check this\n" +
+          "  > [GitHub] Fix login bug (https://github.com/org/repo/pull/123)\n" +
+          "  > This PR fixes the login bug.",
+      );
+    });
+
+    it("includes author_name and text for a Slack message unfurl (no title)", () => {
+      const out = formatThreadContext(
+        [
+          {
+            user: "U1",
+            text: "このスレッド見て",
+            ts: "1.0",
+            attachments: [
+              {
+                author_name: "Alice",
+                text: "Original message body in the linked thread.",
+                from_url: "https://example.slack.com/archives/C1/p123",
+              },
+            ],
+          },
+        ],
+        { excludeTs: "999.0" },
+      );
+      expect(out).toBe(
+        "<@U1>: このスレッド見て\n" +
+          "  > Alice\n" +
+          "  > https://example.slack.com/archives/C1/p123\n" +
+          "  > Original message body in the linked thread.",
+      );
+    });
+
+    it("renders attachment fields as key: value lines", () => {
+      const out = formatThreadContext(
+        [
+          {
+            user: "U1",
+            text: "x",
+            ts: "1.0",
+            attachments: [
+              {
+                title: "T",
+                fields: [
+                  { title: "Status", value: "Open" },
+                  { title: "Assignee", value: "bob" },
+                ],
+              },
+            ],
+          },
+        ],
+        { excludeTs: "999.0" },
+      );
+      expect(out).toBe(
+        "<@U1>: x\n  > T\n  > Status: Open\n  > Assignee: bob",
+      );
+    });
+
+    it("uses fallback only when no other text fields are present", () => {
+      const out = formatThreadContext(
+        [
+          {
+            user: "U1",
+            text: "x",
+            ts: "1.0",
+            attachments: [{ fallback: "plain text version" }],
+          },
+        ],
+        { excludeTs: "999.0" },
+      );
+      expect(out).toBe("<@U1>: x\n  > plain text version");
+    });
+
+    it("ignores fallback when title/text are present (avoids duplicates)", () => {
+      const out = formatThreadContext(
+        [
+          {
+            user: "U1",
+            text: "x",
+            ts: "1.0",
+            attachments: [
+              { title: "T", text: "body", fallback: "T - body" },
+            ],
+          },
+        ],
+        { excludeTs: "999.0" },
+      );
+      expect(out).toBe("<@U1>: x\n  > T\n  > body");
+    });
+
+    it("includes a message that has only attachments (no text)", () => {
+      const out = formatThreadContext(
+        [
+          {
+            user: "U1",
+            ts: "1.0",
+            attachments: [{ title: "PR opened", text: "details" }],
+          },
+        ],
+        { excludeTs: "999.0" },
+      );
+      expect(out).toBe("<@U1>:\n  > PR opened\n  > details");
+    });
+
+    it("handles multiple attachments", () => {
+      const out = formatThreadContext(
+        [
+          {
+            user: "U1",
+            text: "two links",
+            ts: "1.0",
+            attachments: [
+              { title: "A", title_link: "https://a" },
+              { title: "B", title_link: "https://b" },
+            ],
+          },
+        ],
+        { excludeTs: "999.0" },
+      );
+      expect(out).toBe(
+        "<@U1>: two links\n  > A (https://a)\n  > B (https://b)",
+      );
+    });
+
+    it("skips attachments that contain no extractable text", () => {
+      const out = formatThreadContext(
+        [
+          {
+            user: "U1",
+            text: "x",
+            ts: "1.0",
+            attachments: [{}, { title: "  " }],
+          },
+        ],
+        { excludeTs: "999.0" },
+      );
+      expect(out).toBe("<@U1>: x");
+    });
+
+    it("drops messages that have neither text nor extractable attachments", () => {
+      const out = formatThreadContext(
+        [
+          { user: "U1", text: "kept", ts: "1.0" },
+          { user: "U2", ts: "2.0", attachments: [{}] },
+        ],
+        { excludeTs: "999.0" },
+      );
+      expect(out).toBe("<@U1>: kept");
+    });
+  });
 });
 
 describe("mergeIntoDescription", () => {
