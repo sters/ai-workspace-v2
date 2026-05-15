@@ -6,6 +6,7 @@ export { readOperationLog } from "./reader";
 
 // Listing
 export { listStoredOperations, listAllOperationLogsWithAge, listRecentFinishedOperations } from "./listing";
+export { listRecentNewOriginatedOperations } from "./new-history";
 
 // Writing
 export { writeOperationLog } from "./writer";
