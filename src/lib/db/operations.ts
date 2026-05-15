@@ -306,3 +306,17 @@ export function listRecentFinishedOperations(limit: number = 50): OperationListI
   const rows = s.listRecentFinished.all(limit) as OperationRow[];
   return rows.map(rowToListItem);
 }
+
+export function listRecentOperationsByTypes(
+  types: readonly string[],
+  limit: number,
+): OperationListItem[] {
+  if (types.length === 0) return [];
+  const db = getDb();
+  const placeholders = types.map(() => "?").join(",");
+  const stmt = db.prepare(
+    `SELECT * FROM operations WHERE type IN (${placeholders}) ORDER BY started_at DESC LIMIT ?`,
+  );
+  const rows = stmt.all(...types, limit) as OperationRow[];
+  return rows.map(rowToListItem);
+}

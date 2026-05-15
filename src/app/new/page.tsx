@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { InitOperation, InitSplitButton } from "@/components/operation/init-operation";
+import { NewOperationsHistory } from "@/components/operation/new-operations-history";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import { SnippetPicker } from "@/components/shared/forms/snippet-picker";
@@ -76,6 +77,10 @@ function NewWorkspacePageContent() {
           </div>
         )}
       </InitOperation>
+
+      <hr className="my-8 border-border" />
+
+      <NewOperationsHistory />
     </div>
   );
 }
