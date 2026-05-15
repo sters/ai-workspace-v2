@@ -51,6 +51,7 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 5. **Update the title** if the scope of changes has significantly shifted
 6. **Push** latest changes: \`git push\` — if rejected, run \`git pull --no-rebase\` to merge remote changes first. Do NOT force-push.
 7. **Update** PR using \`gh pr edit\`
+8. **Preserve the current draft/ready state** — do NOT run \`gh pr ready\` or \`gh pr ready --undo\`. Ignore the \`Draft:\` field below when updating; it only applies to newly created PRs.
 
 ### Working Directory
 
@@ -66,7 +67,8 @@ The workspace directory is also available via \`--add-dir\` for reading workspac
 
 ### Guidelines
 
-- Always use draft mode unless Draft is explicitly false
+- For new PRs: use draft mode unless Draft is explicitly false
+- For existing PRs: never change the draft/ready state — leave it as the user set it
 - Follow repository's PR template exactly if one exists
 - Keep title concise (under 70 characters)
 - Include all commits in summary, not just the latest
