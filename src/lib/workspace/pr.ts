@@ -48,8 +48,7 @@ export function checkExistingPR(worktreePath: string): ExistingPR {
     const title = exec(`gh pr view --json title -q ".title"`, { cwd: worktreePath });
     const body = exec(`gh pr view --json body -q ".body"`, { cwd: worktreePath });
     return { exists: true, url, title, body };
-  } catch (err) {
-    console.debug("[pr] checkExistingPR failed (no PR exists or gh not available):", err);
+  } catch {
     return { exists: false };
   }
 }
