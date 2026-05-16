@@ -26,6 +26,7 @@ export function OperationLog({
         const parsed = parseStreamEvent(event.data);
         for (const entry of parsed) {
           if (event.childLabel) entry.childLabel = event.childLabel;
+          if (event.parentChildLabel) entry.parentChildLabel = event.parentChildLabel;
           if (event.phaseIndex != null) entry.phaseIndex = event.phaseIndex;
           if (event.phaseLabel) entry.phaseLabel = event.phaseLabel;
         }
@@ -35,6 +36,7 @@ export function OperationLog({
           kind: "error",
           content: event.data,
           childLabel: event.childLabel,
+          parentChildLabel: event.parentChildLabel,
           phaseIndex: event.phaseIndex,
           phaseLabel: event.phaseLabel,
         });
@@ -45,6 +47,7 @@ export function OperationLog({
             kind: "complete",
             exitCode: d.exitCode ?? -1,
             childLabel: event.childLabel,
+            parentChildLabel: event.parentChildLabel,
             phaseIndex: event.phaseIndex,
             phaseLabel: event.phaseLabel,
           });
@@ -53,6 +56,7 @@ export function OperationLog({
             kind: "complete",
             exitCode: -1,
             childLabel: event.childLabel,
+            parentChildLabel: event.parentChildLabel,
             phaseIndex: event.phaseIndex,
             phaseLabel: event.phaseLabel,
           });
@@ -62,6 +66,7 @@ export function OperationLog({
           kind: "system",
           content: event.data,
           childLabel: event.childLabel,
+          parentChildLabel: event.parentChildLabel,
           phaseIndex: event.phaseIndex,
           phaseLabel: event.phaseLabel,
         });

@@ -11,7 +11,7 @@ import { emitEvent, emitStatus } from "./events";
 function dismissPendingAsksForChild(
   managed: ManagedOperation,
   childLabel: string,
-  phaseExtra?: { phaseIndex?: number; phaseLabel?: string },
+  phaseExtra?: { phaseIndex?: number; phaseLabel?: string; parentChildLabel?: string },
 ): void {
   const answeredIds = new Set<string>();
   const pendingAskIds: string[] = [];
@@ -55,6 +55,7 @@ function dismissPendingAsksForChild(
       childLabel,
       ...(phaseExtra?.phaseIndex !== undefined && { phaseIndex: phaseExtra.phaseIndex }),
       ...(phaseExtra?.phaseLabel && { phaseLabel: phaseExtra.phaseLabel }),
+      ...(phaseExtra?.parentChildLabel && { parentChildLabel: phaseExtra.parentChildLabel }),
     });
   }
 
@@ -72,7 +73,7 @@ export function wireChild(
   childId: string,
   childLabel: string,
   process: ClaudeProcess,
-  phaseExtra?: { phaseIndex?: number; phaseLabel?: string },
+  phaseExtra?: { phaseIndex?: number; phaseLabel?: string; parentChildLabel?: string },
 ): Promise<WireChildResult> {
   managed.childProcesses.set(childId, {
     process,

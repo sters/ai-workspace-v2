@@ -59,6 +59,10 @@ export type LogEntryBase = {
   parentToolUseId?: string | null;
   /** Label for grouping entries in operation groups/pipelines. */
   childLabel?: string;
+  /** Parent child-group label when this entry was emitted from a child process
+   * spawned inside a function phase whose own emissions use a different
+   * childLabel. Used to nest child groups under their parent. */
+  parentChildLabel?: string;
   /** Phase index for pipeline operations. */
   phaseIndex?: number;
   /** Phase label for pipeline operations. */
@@ -141,6 +145,8 @@ export type DisplayNode =
       children: DisplayNode[];
       /** Inherited from the tool_call entry that created this node. Used for grouping when children are empty (background Agent tasks). */
       childLabel?: string;
+      /** Inherited from the tool_call entry. */
+      parentChildLabel?: string;
       /** Inherited from the tool_call entry. */
       phaseIndex?: number;
       /** Inherited from the tool_call entry. */

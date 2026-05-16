@@ -21,8 +21,10 @@ export function buildPhaseFunctionContext(
   // Tag native function-phase emissions with childLabel = phaseLabel so they
   // group into a child-group section in the UI, matching how Claude child
   // processes appear (their childLabel is set by wireChild).
-  // runChild / runChildGroup keep their own childLabel via wireChild.
+  // runChild / runChildGroup keep their own childLabel via wireChild, but get
+  // parentChildLabel = phaseLabel so the UI can nest them under this group.
   const fnExtra = { ...phaseExtra, childLabel: phaseExtra.phaseLabel };
+  const childPhaseExtra = { ...phaseExtra, parentChildLabel: phaseExtra.phaseLabel };
 
   return {
     operationId,
@@ -114,7 +116,7 @@ export function buildPhaseFunctionContext(
           ? { jsonSchema: childOptions?.jsonSchema, cwd: childOptions?.cwd, addDirs: childOptions?.addDirs, allowedTools: childOptions?.allowedTools, skipAskUserQuestion: childOptions?.skipAskUserQuestion, appendSystemPromptFile: childOptions?.appendSystemPromptFile, model }
           : undefined;
       const proc = runClaude(cid, prompt, claudeOpts);
-      const result = await wireChild(managed, cid, label, proc, phaseExtra);
+      const result = await wireChild(managed, cid, label, proc, childPhaseExtra);
       if (result.resultText && childOptions?.onResultText) {
         childOptions.onResultText(result.resultText);
       }
@@ -145,7 +147,7 @@ export function buildPhaseFunctionContext(
               ? { cwd: child.cwd, addDirs: child.addDirs, allowedTools: child.allowedTools, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion, appendSystemPromptFile: child.appendSystemPromptFile, model }
               : undefined;
           const proc = runClaude(cid, child.prompt, claudeOpts);
-          const result = await wireChild(managed, cid, child.label, proc, phaseExtra);
+          const result = await wireChild(managed, cid, child.label, proc, childPhaseExtra);
           if (result.resultText && child.onResultText) {
             child.onResultText(result.resultText);
           }

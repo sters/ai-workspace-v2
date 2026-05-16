@@ -79,6 +79,10 @@ export interface OperationEvent {
   timestamp: string;
   /** Which child operation this event belongs to (for operation groups). */
   childLabel?: string;
+  /** Parent child-group label, when this event was emitted from a child process
+   * spawned inside a function phase whose own emissions use a different
+   * childLabel. Lets the UI nest the child group under its parent. */
+  parentChildLabel?: string;
   /** Pipeline phase index (0-based) this event belongs to. */
   phaseIndex?: number;
   /** Pipeline phase label this event belongs to. */
