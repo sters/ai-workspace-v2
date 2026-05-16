@@ -371,6 +371,46 @@ describe("buildDisplayNodes", () => {
     expect(entryNodes).toHaveLength(2);
   });
 
+  it("nests a child-group under its parent function-phase child-group via parentChildLabel", () => {
+    // Simulates an autonomous Cycle 1: Execute function-phase emitting its own
+    // status events tagged with childLabel="Cycle 1: Execute", which then
+    // spawns a Claude child process labeled "child-repo-a" via runChild.
+    // The child process events carry parentChildLabel="Cycle 1: Execute" so
+    // they should nest INSIDE the parent group, not appear as siblings.
+    const entries: LogEntry[] = [
+      // Function-phase's own emissions
+      { kind: "system", content: "Starting pipeline with 6 phases", childLabel: "Cycle 1: Execute", phaseIndex: 3, phaseLabel: "Cycle 1: Execute" } as LogEntry,
+      // Child process emissions — parentChildLabel points to the function phase's label
+      { kind: "text", content: "child working", childLabel: "child-repo-a", parentChildLabel: "Cycle 1: Execute", phaseIndex: 3, phaseLabel: "Cycle 1: Execute" } as LogEntry,
+      { kind: "complete", exitCode: 0, childLabel: "child-repo-a", parentChildLabel: "Cycle 1: Execute", phaseIndex: 3, phaseLabel: "Cycle 1: Execute" } as LogEntry,
+    ];
+
+    const grouped = groupByChildLabel(buildDisplayNodes(entries));
+    const childGroups = grouped.filter((n) => n.type === "child-group") as Extract<DisplayNode, { type: "child-group" }>[];
+
+    // Top level: only the parent group ("Cycle 1: Execute"). The child group
+    // ("child-repo-a") should be nested inside it, NOT at top level.
+    expect(childGroups).toHaveLength(1);
+    expect(childGroups[0].label).toBe("Cycle 1: Execute");
+
+    const nestedGroups = childGroups[0].children.filter((n) => n.type === "child-group") as Extract<DisplayNode, { type: "child-group" }>[];
+    expect(nestedGroups).toHaveLength(1);
+    expect(nestedGroups[0].label).toBe("child-repo-a");
+  });
+
+  it("keeps a child-group at top level when its parentChildLabel does not match any other group", () => {
+    const entries: LogEntry[] = [
+      { kind: "text", content: "orphan child", childLabel: "child-repo-a", parentChildLabel: "Nonexistent Parent" } as LogEntry,
+    ];
+
+    const grouped = groupByChildLabel(buildDisplayNodes(entries));
+    const childGroups = grouped.filter((n) => n.type === "child-group") as Extract<DisplayNode, { type: "child-group" }>[];
+
+    // Parent group doesn't exist → keep child at top level rather than dropping it.
+    expect(childGroups).toHaveLength(1);
+    expect(childGroups[0].label).toBe("child-repo-a");
+  });
+
   it("preserves childLabel on background Agent sub-agents with no child events", () => {
     // When the CLI spawns Agent sub-agents in the background, no events with
     // parent_tool_use_id are emitted — only task_started, task_notification,

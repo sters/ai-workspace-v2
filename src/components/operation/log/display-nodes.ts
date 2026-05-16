@@ -157,6 +157,7 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
           outputFile: info?.outputFile,
           children: buildFromBucket(e.toolId),
           childLabel: e.childLabel,
+          parentChildLabel: e.parentChildLabel,
           phaseIndex: e.phaseIndex,
           phaseLabel: e.phaseLabel,
         });
@@ -198,12 +199,14 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
       if (info || childNodes.length > 0) {
         // Find childLabel/phaseIndex/phaseLabel from entries associated with this ID
         let orphanChildLabel: string | undefined;
+        let orphanParentChildLabel: string | undefined;
         let orphanPhaseIndex: number | undefined;
         let orphanPhaseLabel: string | undefined;
         for (const e of entries) {
           if ((e.kind === "system" && e.taskToolUseId === id) ||
               e.parentToolUseId === id) {
             orphanChildLabel ??= e.childLabel;
+            orphanParentChildLabel ??= e.parentChildLabel;
             orphanPhaseIndex ??= e.phaseIndex;
             orphanPhaseLabel ??= e.phaseLabel;
             if (orphanChildLabel != null) break;
@@ -220,6 +223,7 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
           outputFile: info?.outputFile,
           children: childNodes,
           childLabel: orphanChildLabel,
+          parentChildLabel: orphanParentChildLabel,
           phaseIndex: orphanPhaseIndex,
           phaseLabel: orphanPhaseLabel,
         });
@@ -246,9 +250,22 @@ function getChildLabel(node: DisplayNode): string | undefined {
   return undefined;
 }
 
+function getParentChildLabel(node: DisplayNode): string | undefined {
+  if (node.type === "entry") return node.entry.parentChildLabel;
+  if (node.type === "subagent") {
+    if (node.parentChildLabel) return node.parentChildLabel;
+    for (const child of node.children) {
+      const label = getParentChildLabel(child);
+      if (label) return label;
+    }
+  }
+  return undefined;
+}
+
 export function groupByChildLabel(nodes: DisplayNode[]): DisplayNode[] {
   const labelOrder: string[] = [];
   const labelNodes = new Map<string, DisplayNode[]>();
+  const labelParent = new Map<string, string | undefined>();
   const result: DisplayNode[] = [];
 
   for (const node of nodes) {
@@ -259,6 +276,11 @@ export function groupByChildLabel(nodes: DisplayNode[]): DisplayNode[] {
         labelNodes.set(label, []);
       }
       labelNodes.get(label)!.push(node);
+      // Record first non-empty parentChildLabel seen for this group
+      if (!labelParent.has(label)) {
+        const parent = getParentChildLabel(node);
+        if (parent !== undefined) labelParent.set(label, parent);
+      }
     } else {
       // Non-labeled nodes go directly to result
       result.push(node);
@@ -268,9 +290,12 @@ export function groupByChildLabel(nodes: DisplayNode[]): DisplayNode[] {
   // No child-label groups needed
   if (labelOrder.length === 0) return nodes;
 
+  // Build each child-group node, then arrange into a hierarchy where groups
+  // whose parentChildLabel matches another existing group nest inside it.
+  type ChildGroupNode = Extract<DisplayNode, { type: "child-group" }>;
+  const groups = new Map<string, ChildGroupNode>();
   for (const label of labelOrder) {
     const children = labelNodes.get(label)!;
-    // Determine group status
     let status: "running" | "completed" | "failed" = "completed";
     let hasComplete = false;
     for (const child of children) {
@@ -283,7 +308,17 @@ export function groupByChildLabel(nodes: DisplayNode[]): DisplayNode[] {
     }
     if (!hasComplete && status !== "failed") status = "running";
 
-    result.push({ type: "child-group", label, status, children });
+    groups.set(label, { type: "child-group", label, status, children });
+  }
+
+  for (const label of labelOrder) {
+    const parentLabel = labelParent.get(label);
+    const group = groups.get(label)!;
+    if (parentLabel && parentLabel !== label && groups.has(parentLabel)) {
+      groups.get(parentLabel)!.children.push(group);
+    } else {
+      result.push(group);
+    }
   }
 
   return result;
