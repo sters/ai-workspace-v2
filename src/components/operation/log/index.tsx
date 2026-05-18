@@ -101,6 +101,19 @@ export function OperationLog({
     });
   }, [entries, activePhaseTab, livePhases]);
 
+  // Map of phaseLabel -> status, used as a fallback for legacy operations
+  // whose function-phase child-groups lack a synthetic complete event.
+  const phaseStatusByLabel = useMemo(() => {
+    if (!livePhases) return undefined;
+    const map = new Map<string, "running" | "completed" | "failed">();
+    for (const p of livePhases) {
+      if (p.status === "completed" || p.status === "failed" || p.status === "running") {
+        map.set(p.label, p.status);
+      }
+    }
+    return map;
+  }, [livePhases]);
+
   // Build display nodes: group sub-agent entries under their parent Task tool_use_id,
   // then group by childLabel for operation groups/pipelines.
   const nodes = useMemo(() => {
@@ -108,13 +121,13 @@ export function OperationLog({
     const cleanEntries = activePhaseTab === "all" && livePhases
       ? entries.filter((e) => !(e.kind === "system" && e.content.startsWith("__phaseUpdate:")))
       : filteredEntries;
-    const grouped = groupByChildLabel(buildDisplayNodes(cleanEntries));
+    const grouped = groupByChildLabel(buildDisplayNodes(cleanEntries), { phaseStatusByLabel });
     // In "all" view with multiple phases, group nodes into phase sections
     if (activePhaseTab === "all" && livePhases && livePhases.length > 1) {
       return groupByPhase(grouped);
     }
     return grouped;
-  }, [entries, filteredEntries, activePhaseTab, livePhases]);
+  }, [entries, filteredEntries, activePhaseTab, livePhases, phaseStatusByLabel]);
 
 
   if (events.length === 0) {

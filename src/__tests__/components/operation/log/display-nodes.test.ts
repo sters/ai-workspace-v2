@@ -398,6 +398,53 @@ describe("buildDisplayNodes", () => {
     expect(nestedGroups[0].label).toBe("child-repo-a");
   });
 
+  it("marks a child-group as completed via phaseStatusByLabel fallback when no complete entry exists", () => {
+    // Simulates an older operation (logged before the runFunctionPhase synthetic
+    // complete fix) where a function-phase's child-group has status events but
+    // no kind=complete entry. Without the fallback, the group would render as
+    // "running" forever even though the phase has finished.
+    const entries: LogEntry[] = [
+      { kind: "system", content: "Constraint discovery complete: 3/3 succeeded", childLabel: "Discover repo constraints", phaseIndex: 2, phaseLabel: "Discover repo constraints" } as LogEntry,
+    ];
+
+    const nodes = buildDisplayNodes(entries);
+
+    // Without fallback: group is "running"
+    const withoutFallback = groupByChildLabel(nodes);
+    const groupNoFallback = withoutFallback.find((n) => n.type === "child-group") as Extract<DisplayNode, { type: "child-group" }>;
+    expect(groupNoFallback.status).toBe("running");
+
+    // With fallback: phase is reported completed → group is "completed"
+    const phaseStatusByLabel = new Map([["Discover repo constraints", "completed" as const]]);
+    const withFallback = groupByChildLabel(nodes, { phaseStatusByLabel });
+    const groupWithFallback = withFallback.find((n) => n.type === "child-group") as Extract<DisplayNode, { type: "child-group" }>;
+    expect(groupWithFallback.status).toBe("completed");
+  });
+
+  it("marks a child-group as failed via phaseStatusByLabel when the phase failed", () => {
+    const entries: LogEntry[] = [
+      { kind: "system", content: "Working...", childLabel: "Plan TODO items", phaseIndex: 3, phaseLabel: "Plan TODO items" } as LogEntry,
+    ];
+    const phaseStatusByLabel = new Map([["Plan TODO items", "failed" as const]]);
+    const grouped = groupByChildLabel(buildDisplayNodes(entries), { phaseStatusByLabel });
+    const group = grouped.find((n) => n.type === "child-group") as Extract<DisplayNode, { type: "child-group" }>;
+    expect(group.status).toBe("failed");
+  });
+
+  it("explicit complete entry takes precedence over phaseStatusByLabel fallback", () => {
+    // If the synthetic complete event IS present, its exitCode wins over the
+    // phaseStatusByLabel fallback (so a failed exitCode overrides a "completed"
+    // phase status).
+    const entries: LogEntry[] = [
+      { kind: "system", content: "Working...", childLabel: "Some Phase", phaseIndex: 0, phaseLabel: "Some Phase" } as LogEntry,
+      { kind: "complete", exitCode: 1, childLabel: "Some Phase", phaseIndex: 0, phaseLabel: "Some Phase" } as LogEntry,
+    ];
+    const phaseStatusByLabel = new Map([["Some Phase", "completed" as const]]);
+    const grouped = groupByChildLabel(buildDisplayNodes(entries), { phaseStatusByLabel });
+    const group = grouped.find((n) => n.type === "child-group") as Extract<DisplayNode, { type: "child-group" }>;
+    expect(group.status).toBe("failed");
+  });
+
   it("keeps a child-group at top level when its parentChildLabel does not match any other group", () => {
     const entries: LogEntry[] = [
       { kind: "text", content: "orphan child", childLabel: "child-repo-a", parentChildLabel: "Nonexistent Parent" } as LogEntry,

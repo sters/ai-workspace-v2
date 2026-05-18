@@ -262,7 +262,20 @@ function getParentChildLabel(node: DisplayNode): string | undefined {
   return undefined;
 }
 
-export function groupByChildLabel(nodes: DisplayNode[]): DisplayNode[] {
+export interface GroupByChildLabelOptions {
+  /**
+   * Fallback phase statuses keyed by phaseLabel. Used to mark function-phase
+   * child-groups completed/failed for operations logged before the
+   * runFunctionPhase synthetic complete event was added (where no kind=complete
+   * entry exists for the group). Ignored when the group has its own complete entry.
+   */
+  phaseStatusByLabel?: Map<string, "running" | "completed" | "failed">;
+}
+
+export function groupByChildLabel(
+  nodes: DisplayNode[],
+  options?: GroupByChildLabelOptions,
+): DisplayNode[] {
   const labelOrder: string[] = [];
   const labelNodes = new Map<string, DisplayNode[]>();
   const labelParent = new Map<string, string | undefined>();
@@ -306,7 +319,14 @@ export function groupByChildLabel(nodes: DisplayNode[]): DisplayNode[] {
       if (child.type === "subagent" && child.status === "failed") { status = "failed"; break; }
       if (child.type === "subagent" && child.status === "running") { status = "running"; }
     }
-    if (!hasComplete && status !== "failed") status = "running";
+    if (!hasComplete && status !== "failed") {
+      // Fallback for legacy operations (logged before runFunctionPhase emitted
+      // its synthetic complete event): consult the phaseStatusByLabel map.
+      const fallback = options?.phaseStatusByLabel?.get(label);
+      if (fallback === "completed") status = "completed";
+      else if (fallback === "failed") status = "failed";
+      else status = "running";
+    }
 
     groups.set(label, { type: "child-group", label, status, children });
   }
