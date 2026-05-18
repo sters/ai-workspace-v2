@@ -1,7 +1,7 @@
 import type { PipelinePhase, PipelinePhaseFunction, PipelinePhaseSingle, PipelinePhaseGroup } from "@/types/pipeline";
 import type { RunClaudeOptions } from "@/types/claude";
 import type { ManagedOperation } from "./types";
-import { emitStatus } from "./events";
+import { emitEvent, emitStatus } from "./events";
 import { wireChild } from "./wire-child";
 import { buildPhaseFunctionContext } from "./context-builder";
 import { runClaude } from "@/lib/claude";
@@ -40,6 +40,22 @@ export async function runFunctionPhase(
 
   const child = (managed.operation.children ??= []).find((c) => c.id === childId);
   if (child) child.status = phaseSuccess ? "completed" : "failed";
+
+  // Emit a synthetic complete event tagged with the function-phase's own
+  // childLabel so the UI's child-group rendering can flip the group from
+  // running -> completed. Without this marker, the boxed group in the
+  // operation log stays "running" (blue dot) forever even though the phase
+  // has finished and the pipeline has advanced.
+  emitEvent(managed, {
+    type: "complete",
+    operationId: managed.operation.id,
+    data: JSON.stringify({ exitCode: phaseSuccess ? 0 : 1 }),
+    timestamp: new Date().toISOString(),
+    childLabel: phase.label,
+    phaseIndex: phaseExtra.phaseIndex,
+    phaseLabel: phaseExtra.phaseLabel,
+  });
+
   return phaseSuccess;
 }
 
