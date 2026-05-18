@@ -221,6 +221,32 @@ describe("pipeline-manager killOperation", () => {
     const killed = killOperation(op.id);
     expect(killed).toBe(false);
   });
+
+  it("killOperation marks DB-only running operation as failed", async () => {
+    const { insertOperation, getOperation } = await import("@/lib/db");
+    const id = "00000000-0000-4000-8000-000000000099";
+    insertOperation({
+      id,
+      type: "autonomous",
+      workspace: "",
+      status: "running",
+      startedAt: new Date().toISOString(),
+    });
+
+    expect(getGlobalOps().has(id)).toBe(false);
+
+    const killed = killOperation(id);
+    expect(killed).toBe(true);
+
+    const op = getOperation(id);
+    expect(op?.status).toBe("failed");
+    expect(op?.completedAt).toBeTruthy();
+  });
+
+  it("killOperation returns false for unknown id (not in memory or DB)", () => {
+    const killed = killOperation("00000000-0000-4000-8000-0000000000ff");
+    expect(killed).toBe(false);
+  });
 });
 
 describe("pipeline-manager phase timeout", () => {

@@ -1,16 +1,28 @@
 import { operations } from "./store";
 import { emitEvent } from "./events";
+import { getOperation, updateOperationStatus } from "@/lib/db";
 
 export function killOperation(id: string): boolean {
   const managed = operations.get(id);
-  if (!managed || managed.operation.status !== "running") return false;
-  managed.abortController.abort();
-  // kill() sends SIGTERM. The ClaudeProcess.kill() in cli.ts already
-  // includes its own SIGKILL fallback for the internal subprocess.
-  if (managed.claudeProcess) managed.claudeProcess.kill();
-  for (const [, entry] of managed.childProcesses) {
-    entry.process.kill(); // SIGTERM (with SIGKILL fallback inside ClaudeProcess.kill)
+  if (managed) {
+    if (managed.operation.status !== "running") return false;
+    managed.abortController.abort();
+    // kill() sends SIGTERM. The ClaudeProcess.kill() in cli.ts already
+    // includes its own SIGKILL fallback for the internal subprocess.
+    if (managed.claudeProcess) managed.claudeProcess.kill();
+    for (const [, entry] of managed.childProcesses) {
+      entry.process.kill(); // SIGTERM (with SIGKILL fallback inside ClaudeProcess.kill)
+    }
+    return true;
   }
+  // Fallback: row is "running" in DB but absent from the in-memory store —
+  // typically a stale operation from a previous server session that resume
+  // never picked back up (e.g. resume crashed, or the user clicked Cancel
+  // before resumeStaleOperations() reached it). Mark it failed directly so
+  // the stuck row clears and resume won't try to revive it on next restart.
+  const row = getOperation(id);
+  if (!row || row.status !== "running") return false;
+  updateOperationStatus(id, "failed", new Date().toISOString());
   return true;
 }
 
