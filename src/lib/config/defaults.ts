@@ -25,7 +25,7 @@ export const CONFIG_DEFAULTS: AppConfig = {
     typeOverrides: {},
   },
   chat: {
-    model: "sonnet",
+    model: null,
   },
   quickAsk: {
     model: "sonnet",
@@ -114,7 +114,7 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "batchSize", section: "operations", defaultLine: "#   batchSize: 10                  # TODO groups per batch in execute operations" },
   { key: "model", section: "operations", defaultLine: "#   model: null                    # null = CLI default (opus / sonnet / haiku)" },
   { key: "chat", section: null, defaultLine: "# chat:" },
-  { key: "model", section: "chat", defaultLine: "#   model: sonnet                  # default model for interactive chat (null = CLI default)" },
+  { key: "model", section: "chat", defaultLine: "#   model: null                    # default model for interactive chat (null = CLI default)" },
   { key: "quickAsk", section: null, defaultLine: "# quickAsk:" },
   { key: "model", section: "quickAsk", defaultLine: "#   model: sonnet                  # default model for quick-ask (null = CLI default)" },
   { key: "effort", section: "quickAsk", defaultLine: "#   effort: medium                 # effort level (low / medium / high / max, null = CLI default)" },

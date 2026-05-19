@@ -67,9 +67,9 @@ describe("mergeConfig", () => {
     expect(result.server.disableAccessLog).toBe(true);
   });
 
-  it("defaults chat.model to sonnet", () => {
+  it("defaults chat.model to null (CLI default)", () => {
     const result = mergeConfig(CONFIG_DEFAULTS, null, {});
-    expect(result.chat.model).toBe("sonnet");
+    expect(result.chat.model).toBeNull();
   });
 
   it("defaults quickAsk.model to sonnet", () => {
