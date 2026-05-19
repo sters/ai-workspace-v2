@@ -57,7 +57,7 @@ export function generateDefaultConfigContent(): string {
     "#   #       model: haiku",
     "",
     "# chat:",
-    "#   model: sonnet                  # default model for interactive chat (null = CLI default)",
+    "#   model: null                    # default model for interactive chat (null = CLI default)",
     "",
     "# quickAsk:",
     "#   model: sonnet                  # default model for quick-ask (null = CLI default)",
