@@ -144,6 +144,18 @@ describe("resolveModel", () => {
     expect(resolveModel("review", "code-review")).toBe("sonnet");
   });
 
+  it("uses opus as the code-level default for plan-like steps (think carefully)", () => {
+    setConfig({});
+    expect(resolveModel("init", "analyze-readme")).toBe("opus");
+    expect(resolveModel("init", "plan-todo")).toBe("opus");
+    expect(resolveModel("review", "plan-todo-from-review")).toBe("opus");
+  });
+
+  it("uses sonnet as the code-level default for execute (procedural execution)", () => {
+    setConfig({});
+    expect(resolveModel("execute", "execute")).toBe("sonnet");
+  });
+
   it("falls back to global when operation type has no model", () => {
     setConfig({
       operations: {

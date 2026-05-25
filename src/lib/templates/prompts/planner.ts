@@ -54,15 +54,36 @@ After that, run commands like \`git status\`, \`git diff\`, etc. as separate Bas
 
 ### TODO Item Format
 
-Each TODO item MUST follow this structured format:
+Each TODO item MUST follow this structured format. There are TWO profiles — pick based on whether the item modifies source code.
+
+**A. Code-change items** (implementation, refactor, bugfix, test additions — anything that edits source files):
 
 \`\`\`markdown
 - [ ] **[Target]** Action description
-  - Target: file path or descriptive target
-  - Action: Specific change to make (what to add/modify/remove)
-  - Pattern: (optional) Reference to existing code pattern to follow
-  - Verify: (optional) How to verify the change is correct
+  - Target: (required) path:line of the edit site, OR path + the exact symbol/function name (e.g. \`src/foo/bar.ts:42\` or \`src/foo/bar.ts → handleClick\`)
+  - Action: (required) Concrete step-by-step recipe — name the import to add, the function to call, the literal to change. No generalities.
+  - Pattern: (required) Reference to existing code to mirror, with path:line (e.g. \`src/other/file.ts:120-135\`). If genuinely no analogue exists, write \`Pattern: none (greenfield)\` and justify in Why.
+  - Why: (required) The motivation — what breaks or stays broken without this item. One sentence.
+  - Verify: (required) Concrete check the executor can run: a shell command, a test to add, or an observable behavior. NOT "ensure it works".
+  - Acceptance: (required for implementation/feature tasks) A test-checkable fact, e.g. "Calling foo() with bar returns baz" or "Unit test at path/to/test.ts:NN passes".
 \`\`\`
+
+**B. Doc-only / config-only / non-code items** (README updates, comment-only edits, license files, CI YAML touch-ups that don't change build output):
+
+\`\`\`markdown
+- [ ] **[Target]** Action description
+  - Target: file path
+  - Action: What to change
+  - Verify: (optional) How to check the change is correct
+\`\`\`
+
+### Target Strictness (code-change items)
+
+**FORBIDDEN — do not use vague Target values such as:**
+- "relevant module", "the affected file", "appropriate test file", "wherever needed", "TBD"
+- Bare directory paths without a specific file ("src/auth/")
+
+Instead, identify the exact file (and line number or symbol) by reading the source code during the analysis step. If you genuinely cannot pin down the location without deeper investigation, add a preceding investigation TODO ("Investigate: locate X") rather than ship a vague item.
 
 ### Repository Constraints
 
@@ -95,14 +116,15 @@ Example:
 ### Guidelines
 
 1. Focus on this repository only — do NOT read other repositories' source code
-2. Be actionable: each TODO should be something the executor can act on
-3. Match the depth of analysis to the task — simple tasks need less investigation, complex implementation tasks need more
+2. Be actionable: each TODO should be something the executor can act on without re-deriving context
+3. Match the depth of analysis to the task — simple tasks need less investigation, complex implementation tasks need more. **However**: never trade rigor of the *format* for brevity. Code-change items always carry Target/Action/Pattern/Why/Verify/Acceptance.
 4. Include commands: specify exact build/test/lint commands from repository docs (only for tasks that change code)
 5. Prefer task runner commands: use \`make lint\` / \`npm run test\` etc. over direct tool invocation. Only fall back to direct commands (e.g. \`golangci-lint\`, \`tsc\`) if no task runner target exists
 6. Order logically: dependencies first, then implementation, then tests
 7. Honour Repository Constraints: if the workspace README lists constraints AND the task modifies code, they MUST appear as verification items. Skip verification for non-code-change tasks
 8. **No merging**: Do NOT perform git merge, PR merge, or any branch merging operations unless explicitly instructed to do so
 9. **Cross-repo deps**: Mark items that depend on other repos with \`[CROSS-REPO]\` — never attempt to read other repos to resolve them
+10. **Scope discipline**: each item should describe a single, atomic change. If you find yourself writing "and also …", split into two items.
 
 ### Interactive Mode
 
