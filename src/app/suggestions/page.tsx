@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useOperation } from "@/hooks/use-operation";
 import { useSuggestions } from "@/hooks/use-suggestions";
 import { postJson } from "@/lib/api";
@@ -29,6 +30,7 @@ function formatRelativeTime(dateStr: string): string {
 }
 
 export default function SuggestionsPage() {
+  useDocumentTitle("Suggestions");
   const { suggestions, isLoading, refresh } = useSuggestions();
   const { start } = useOperation(INIT_STORAGE_KEY);
   const { start: startAggregate } = useOperation(AGGREGATE_STORAGE_KEY);
