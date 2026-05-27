@@ -1,6 +1,7 @@
 "use client";
 
 import { use } from "react";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { TodoUpdater } from "@/components/workspace/todo-updater";
 
@@ -11,6 +12,7 @@ export default function WorkspaceTodoPage({
 }) {
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
+  useDocumentTitle(`TODO - ${decodedName}`);
   const { workspace } = useWorkspace(decodedName);
 
   if (!workspace) return null;

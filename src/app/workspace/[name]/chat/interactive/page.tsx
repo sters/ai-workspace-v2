@@ -2,6 +2,7 @@
 
 import { use } from "react";
 import { useSearchParams } from "next/navigation";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { ChatTerminal } from "@/components/workspace/chat-terminal";
 
 export default function ChatInteractivePage({
@@ -11,6 +12,7 @@ export default function ChatInteractivePage({
 }) {
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
+  useDocumentTitle(`Interactive Chat - ${decodedName}`);
   const searchParams = useSearchParams();
   const reviewTimestamp = searchParams.get("reviewTimestamp") ?? undefined;
   const researchChat = searchParams.get("researchChat") === "1" || undefined;

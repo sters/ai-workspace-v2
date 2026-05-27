@@ -2,6 +2,7 @@
 
 import { use, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useReviews } from "@/hooks/use-workspace";
 
 export default function WorkspaceReviewPage({
@@ -11,6 +12,7 @@ export default function WorkspaceReviewPage({
 }) {
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
+  useDocumentTitle(`Review - ${decodedName}`);
   const { reviews } = useReviews(decodedName);
   const router = useRouter();
 

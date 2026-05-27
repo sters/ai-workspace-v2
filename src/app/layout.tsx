@@ -4,7 +4,10 @@ import { ToastHost } from "@/components/shared/feedback/toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ai-workspace",
+  title: {
+    default: "ai-workspace",
+    template: "%s | ai-workspace",
+  },
   description: "Multi-repository workspace manager dashboard",
 };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { use } from "react";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { QuickAsk } from "@/components/workspace/quick-ask";
 
 export default function ChatQuickAskPage({
@@ -10,6 +11,7 @@ export default function ChatQuickAskPage({
 }) {
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
+  useDocumentTitle(`Quick Ask - ${decodedName}`);
 
   return <QuickAsk workspaceName={decodedName} />;
 }
