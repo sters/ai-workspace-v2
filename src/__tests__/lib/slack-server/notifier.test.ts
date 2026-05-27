@@ -15,81 +15,182 @@ function ev(data: string, phaseLabel?: string): OperationEvent {
   };
 }
 
+/** Build an assistant event with a single Bash `tool_use` block. */
+function bashUse(toolUseId: string, command: string, phaseLabel = "Create PR"): OperationEvent {
+  return ev(
+    JSON.stringify({
+      type: "assistant",
+      message: {
+        content: [
+          { type: "tool_use", id: toolUseId, name: "Bash", input: { command } },
+        ],
+      },
+    }),
+    phaseLabel,
+  );
+}
+
+/** Build a user event with a `tool_result` block. */
+function bashResult(
+  toolUseId: string,
+  content: unknown,
+  opts: { isError?: boolean; phaseLabel?: string } = {},
+): OperationEvent {
+  return ev(
+    JSON.stringify({
+      type: "user",
+      message: {
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: toolUseId,
+            content,
+            is_error: opts.isError ?? false,
+          },
+        ],
+      },
+    }),
+    opts.phaseLabel ?? "Create PR",
+  );
+}
+
 describe("extractCreatedPrs", () => {
   it("returns empty when there are no events", () => {
     expect(extractCreatedPrs([])).toEqual([]);
   });
 
-  it("finds PR URLs only in events whose phaseLabel is 'Create PR'", () => {
+  it("extracts the PR URL from a `gh pr create` tool_result", () => {
     const out = extractCreatedPrs([
-      ev("read https://github.com/acme/foo/pull/9 from a comment", "Analyze & draft README"),
-      ev("ran code-review on https://github.com/acme/foo/pull/9", "Code Review"),
-      ev('{"text":"created PR https://github.com/acme/foo/pull/12"}', "Create PR"),
+      bashUse("tu_1", "gh pr create --title 'x' --body 'y'"),
+      bashResult("tu_1", "https://github.com/sters/ai-workspace-v2/pull/12\n"),
     ]);
-    expect(out).toHaveLength(1);
-    expect(out[0].url).toBe("https://github.com/acme/foo/pull/12");
+    expect(out.map((p) => p.url)).toEqual(["https://github.com/sters/ai-workspace-v2/pull/12"]);
   });
 
-  it("ignores URLs from non-Create-PR phases even if they look like real PRs", () => {
+  it("ignores PR URLs that only appear in the PR body (tool_use input), not the created URL", () => {
+    // Regression: PR body referenced an example PR like
+    //   "result of release will be posted like [this](https://.../pull/502...)"
+    // The actual created PR URL is only in the tool_result stdout.
     const out = extractCreatedPrs([
-      ev("https://github.com/acme/foo/pull/1", "Execute"),
-      ev("https://github.com/acme/foo/pull/2", "Review"),
+      bashUse(
+        "tu_1",
+        "gh pr create --body 'see https://github.com/sters/ai-workspace-v2/pull/502 for example'",
+      ),
+      bashResult("tu_1", "https://github.com/sters/ai-workspace-v2/pull/3393"),
+    ]);
+    expect(out.map((p) => p.url)).toEqual(["https://github.com/sters/ai-workspace-v2/pull/3393"]);
+  });
+
+  it("ignores tool_results from non-`gh pr create` Bash calls", () => {
+    const out = extractCreatedPrs([
+      bashUse("tu_1", "gh pr view https://github.com/sters/ai-workspace-v2/pull/9"),
+      bashResult("tu_1", "https://github.com/sters/ai-workspace-v2/pull/9"),
+    ]);
+    expect(out).toEqual([]);
+  });
+
+  it("ignores errored `gh pr create` results", () => {
+    const out = extractCreatedPrs([
+      bashUse("tu_1", "gh pr create --base main"),
+      bashResult("tu_1", "error: a PR already exists for branch", { isError: true }),
+    ]);
+    expect(out).toEqual([]);
+  });
+
+  it("collects URLs across multiple successful `gh pr create` calls", () => {
+    const out = extractCreatedPrs([
+      bashUse("tu_1", "gh pr create --base main"),
+      bashResult("tu_1", "https://github.com/sters/ai-workspace-v2/pull/1"),
+      bashUse("tu_2", "gh pr create --base master"),
+      bashResult("tu_2", "https://github.com/sters/other-repo/pull/9"),
+    ]);
+    expect(out.map((p) => p.url).sort()).toEqual([
+      "https://github.com/sters/ai-workspace-v2/pull/1",
+      "https://github.com/sters/other-repo/pull/9",
+    ]);
+  });
+
+  it("deduplicates a URL that appears in multiple results", () => {
+    const out = extractCreatedPrs([
+      bashUse("tu_1", "gh pr create"),
+      bashResult("tu_1", "https://github.com/sters/ai-workspace-v2/pull/1"),
+      bashUse("tu_2", "gh pr create"),
+      bashResult("tu_2", "https://github.com/sters/ai-workspace-v2/pull/1"),
+    ]);
+    expect(out).toHaveLength(1);
+  });
+
+  it("ignores events from non-Create-PR phases even with `gh pr create`", () => {
+    const out = extractCreatedPrs([
+      bashUse("tu_1", "gh pr create", "Execute"),
+      bashResult("tu_1", "https://github.com/sters/ai-workspace-v2/pull/1", { phaseLabel: "Execute" }),
     ]);
     expect(out).toEqual([]);
   });
 
   it("ignores events with no phaseLabel", () => {
-    const out = extractCreatedPrs([ev("https://github.com/acme/foo/pull/1")]);
+    const out = extractCreatedPrs([
+      ev(JSON.stringify({
+        type: "user",
+        message: {
+          content: [{ type: "tool_result", tool_use_id: "tu_1", content: "https://github.com/sters/ai-workspace-v2/pull/1" }],
+        },
+      })),
+    ]);
     expect(out).toEqual([]);
   });
 
   it("excludes URLs that were already in the input description", () => {
     const out = extractCreatedPrs(
-      [ev("created https://github.com/acme/foo/pull/12", "Create PR")],
-      { inputDescription: "please base on https://github.com/acme/foo/pull/12 and extend" },
+      [
+        bashUse("tu_1", "gh pr create"),
+        bashResult("tu_1", "https://github.com/sters/ai-workspace-v2/pull/12"),
+      ],
+      { inputDescription: "please base on https://github.com/sters/ai-workspace-v2/pull/12 and extend" },
     );
     expect(out).toEqual([]);
   });
 
-  it("keeps Create-PR URLs that were NOT in the description", () => {
-    const out = extractCreatedPrs(
-      [
-        ev("https://github.com/acme/foo/pull/12", "Create PR"),
-        ev("https://github.com/acme/bar/pull/3", "Create PR"),
-      ],
-      { inputDescription: "based on https://github.com/acme/foo/pull/12" },
-    );
-    expect(out.map((p) => p.url)).toEqual(["https://github.com/acme/bar/pull/3"]);
+  it("handles tool_result content as an array of text blocks", () => {
+    const out = extractCreatedPrs([
+      bashUse("tu_1", "gh pr create"),
+      bashResult("tu_1", [
+        { type: "text", text: "https://github.com/sters/ai-workspace-v2/pull/7" },
+      ]),
+    ]);
+    expect(out.map((p) => p.url)).toEqual(["https://github.com/sters/ai-workspace-v2/pull/7"]);
   });
 
-  it("deduplicates a URL appearing in multiple Create PR events", () => {
+  it("tolerates non-JSON event data without throwing", () => {
     const out = extractCreatedPrs([
-      ev("https://github.com/acme/foo/pull/1", "Create PR"),
-      ev("https://github.com/acme/foo/pull/1 (linked again)", "Create PR"),
+      ev("not-json https://github.com/sters/ai-workspace-v2/pull/1", "Create PR"),
+      bashUse("tu_1", "gh pr create"),
+      bashResult("tu_1", "https://github.com/sters/ai-workspace-v2/pull/2"),
     ]);
-    expect(out).toHaveLength(1);
-  });
-
-  it("collects URLs across multiple Create PR child events (different repos)", () => {
-    const out = extractCreatedPrs([
-      ev("https://github.com/acme/foo/pull/1", "Create PR"),
-      ev("https://github.com/acme/bar/pull/9", "Create PR"),
-    ]);
-    expect(out.map((p) => p.url).sort()).toEqual([
-      "https://github.com/acme/bar/pull/9",
-      "https://github.com/acme/foo/pull/1",
-    ]);
+    expect(out.map((p) => p.url)).toEqual(["https://github.com/sters/ai-workspace-v2/pull/2"]);
   });
 });
 
 describe("buildCompletionMessage", () => {
   it("formats a list when PRs are present", () => {
     const msg = buildCompletionMessage([
-      { url: "https://github.com/a/b/pull/1", owner: "a", repo: "b", repoPath: "github.com/a/b", prNumber: 1 },
-      { url: "https://github.com/a/c/pull/2", owner: "a", repo: "c", repoPath: "github.com/a/c", prNumber: 2 },
+      {
+        url: "https://github.com/sters/ai-workspace-v2/pull/1",
+        owner: "sters",
+        repo: "ai-workspace-v2",
+        repoPath: "github.com/sters/ai-workspace-v2",
+        prNumber: 1,
+      },
+      {
+        url: "https://github.com/sters/other-repo/pull/2",
+        owner: "sters",
+        repo: "other-repo",
+        repoPath: "github.com/sters/other-repo",
+        prNumber: 2,
+      },
     ]);
     expect(msg).toBe(
-      "Done! Created PRs:\n• https://github.com/a/b/pull/1\n• https://github.com/a/c/pull/2",
+      "Done! Created PRs:\n• https://github.com/sters/ai-workspace-v2/pull/1\n• https://github.com/sters/other-repo/pull/2",
     );
   });
 

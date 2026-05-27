@@ -96,29 +96,93 @@ export function startNotifier(opts: NotifierOptions): Notifier {
   };
 }
 
+/** `gh pr create` outputs only the newly created PR URL on stdout, so we treat
+ * the tool_result of a Bash call matching this pattern as the authoritative
+ * source of created-PR URLs. Anything else (URLs in PR bodies, related-PR
+ * references, etc.) is ignored. */
+const GH_PR_CREATE_RE = /^\s*gh\s+pr\s+create\b/;
+
 /**
  * Extract PR URLs that were *actually created* during the autonomous run.
  *
- * Filters event stream to only those whose `phaseLabel === "Create PR"`
- * (the autonomous pipeline's PR-creation phase). This keeps URLs Claude
- * merely read (existing PRs in READMEs, `gh pr view <url>` arguments,
- * issue comments, etc.) out of the notification.
+ * Strategy: walk the "Create PR" phase events, find Bash `tool_use` blocks
+ * whose command is `gh pr create ...`, then pair them with their matching
+ * `tool_result` blocks (by `tool_use_id`) and extract PR URLs only from those
+ * successful results. This avoids false positives from URLs that appear in
+ * the PR body itself (e.g. a template referencing an example PR).
  *
  * If `inputDescription` is provided, any URL that already appeared in the
  * description (e.g. the user pasted "review https://github.com/.../pull/N")
- * is also excluded — Claude is likely to echo it back during the Create PR
- * phase even though it's not the freshly created PR.
+ * is also excluded as a safety net.
  */
 export function extractCreatedPrs(
   events: OperationEvent[],
   opts: { inputDescription?: string } = {},
 ): PrUrlInfo[] {
   const phaseEvents = events.filter((e) => e.phaseLabel === CREATE_PR_PHASE_LABEL);
-  const candidates = extractPrUrls(phaseEvents.map((e) => e.data).join("\n"));
+  const ghPrCreateIds = new Set<string>();
+  const resultTexts: string[] = [];
+
+  for (const e of phaseEvents) {
+    const blocks = getContentBlocks(e.data);
+    for (const block of blocks) {
+      if (block.type === "tool_use" && block.name === "Bash") {
+        const command = typeof block.input?.command === "string" ? block.input.command : "";
+        if (GH_PR_CREATE_RE.test(command) && typeof block.id === "string") {
+          ghPrCreateIds.add(block.id);
+        }
+      } else if (block.type === "tool_result") {
+        const id = typeof block.tool_use_id === "string" ? block.tool_use_id : null;
+        if (id && ghPrCreateIds.has(id) && block.is_error !== true) {
+          resultTexts.push(toolResultText(block.content));
+        }
+      }
+    }
+  }
+
+  const candidates = extractPrUrls(resultTexts.join("\n"));
   if (!opts.inputDescription) return candidates;
 
   const inputUrls = new Set(extractPrUrls(opts.inputDescription).map((p) => p.url));
   return candidates.filter((p) => !inputUrls.has(p.url));
+}
+
+interface ParsedBlock {
+  type?: string;
+  id?: string;
+  name?: string;
+  input?: { command?: string };
+  tool_use_id?: string;
+  is_error?: boolean;
+  content?: unknown;
+}
+
+/** Pull `message.content[]` blocks from a stream-json event's stringified data.
+ * Returns `[]` for non-JSON data or events without a message.content array. */
+function getContentBlocks(data: string): ParsedBlock[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(data);
+  } catch {
+    return [];
+  }
+  if (!parsed || typeof parsed !== "object") return [];
+  const msg = (parsed as { message?: unknown }).message;
+  if (!msg || typeof msg !== "object") return [];
+  const content = (msg as { content?: unknown }).content;
+  return Array.isArray(content) ? (content as ParsedBlock[]) : [];
+}
+
+/** Flatten a tool_result `content` field, which can be a string or an array of
+ * text blocks (`[{type:"text", text:"..."}]`). */
+function toolResultText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((c) => (c && typeof c === "object" && typeof (c as { text?: unknown }).text === "string"
+      ? (c as { text: string }).text
+      : ""))
+    .join("\n");
 }
 
 /** Build the Slack message text for a completed autonomous run. */
