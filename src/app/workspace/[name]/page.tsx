@@ -19,13 +19,13 @@ export default function WorkspaceOverviewPage({
 
   return (
     <div className="space-y-6">
-      <ReadmeViewer content={readme} />
       {workspace && (
         <ReadmeUpdater
           workspaceName={decodedName}
           workspacePath={workspace.path}
         />
       )}
+      <ReadmeViewer content={readme} />
     </div>
   );
 }
