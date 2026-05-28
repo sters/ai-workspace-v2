@@ -108,6 +108,19 @@ export function buildUpdaterPrompt(input: UpdaterInput): string {
   const todoFilePath = `${input.workspacePath}/TODO-${input.repoName}.md`;
   const todoFileName = todoFilePath.split("/").pop()!;
 
+  const interjectionSection = input.interject
+    ? `\n## Interjection Notice
+
+This update is being applied while an autonomous loop was interrupted mid-flight. The repository may be in an inconsistent state (uncommitted edits, half-finished work, failing tests).
+
+After applying the requested update, you MUST prepend the following item to the very top of the TODO file (above all other items):
+
+- [!] 中断から再開：作業途中の可能性があるので現在の状態（git status, 編集中のファイル, テスト結果）を確認してから進める
+
+This item must be present even if the rest of the TODO list is empty. Do not modify, translate, or summarize it.
+`
+    : "";
+
   return `# Task: Update TODO items for ${input.repoName}
 
 ## Workspace: ${input.workspaceName}
@@ -125,7 +138,7 @@ ${input.readmeContent}
 ## Current TODO File (TODO-${input.repoName}.md)
 
 ${input.todoContent}
-
+${interjectionSection}
 ### Working Directory
 
 \`\`\`bash

@@ -143,6 +143,7 @@ export interface UpdaterInput {
   workspacePath: string;
   instruction: string;
   interactive?: boolean;
+  interject?: boolean;
 }
 
 export interface CollectorInput {

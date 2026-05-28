@@ -41,6 +41,7 @@ export const updateTodoSchema = z.object({
   repo: z.string().optional(),
   interactionLevel: interactionLevelEnum.optional(),
   bestOfN: z.coerce.number().min(0).max(5).optional(),
+  interject: z.coerce.boolean().optional(),
 });
 
 export const createTodoSchema = z.object({

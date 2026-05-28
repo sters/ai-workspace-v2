@@ -140,6 +140,41 @@ describe("buildUpdateTodoPipeline", () => {
     });
   });
 
+  describe("interject flag", () => {
+    beforeEach(() => {
+      mockListWorkspaceRepos.mockReturnValue([
+        {
+          repoName: "my-repo",
+          repoPath: "/repos/my-repo",
+          worktreePath: "/repos/my-repo/worktrees/test-ws",
+        } as ReturnType<typeof listWorkspaceRepos>[number],
+      ]);
+    });
+
+    it("threads interject=true into buildUpdaterPrompt", async () => {
+      const { buildUpdaterPrompt } = await import("@/lib/templates");
+      const mockBuildUpdaterPrompt = vi.mocked(buildUpdaterPrompt);
+      mockBuildUpdaterPrompt.mockClear();
+
+      await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests", interject: true });
+
+      expect(mockBuildUpdaterPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ interject: true }),
+      );
+    });
+
+    it("does not set interject when flag is omitted", async () => {
+      const { buildUpdaterPrompt } = await import("@/lib/templates");
+      const mockBuildUpdaterPrompt = vi.mocked(buildUpdaterPrompt);
+      mockBuildUpdaterPrompt.mockClear();
+
+      await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
+
+      const call = mockBuildUpdaterPrompt.mock.calls[0][0];
+      expect(call.interject).toBeUndefined();
+    });
+  });
+
   describe("multiple repos", () => {
     beforeEach(() => {
       mockListWorkspaceRepos.mockReturnValue([

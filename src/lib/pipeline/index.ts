@@ -12,6 +12,7 @@ export {
   subscribeToOperation,
   deleteOperation,
 } from "./queries";
-export { killOperation, submitAnswer } from "./controls";
+export { killOperation, submitAnswer, whenOperationFinished } from "./controls";
+export { findRunningOpByWorkspace, interjectsInFlight } from "./store";
 export { _gc } from "./gc";
 export { resumeStaleOperations } from "./resume";
