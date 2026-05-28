@@ -1,3 +1,4 @@
+import type { OperationEvent } from "@/types/operation";
 import { operations } from "./store";
 import { emitEvent } from "./events";
 import { getOperation, updateOperationStatus } from "@/lib/db";
@@ -24,6 +25,45 @@ export function killOperation(id: string): boolean {
   if (!row || row.status !== "running") return false;
   updateOperationStatus(id, "failed", new Date().toISOString());
   return true;
+}
+
+/**
+ * Resolves when the given operation is no longer in the "running" state.
+ * Uses both listener subscription and a polling fallback because markComplete
+ * clears managed.listeners after firing the complete event — if a caller
+ * subscribes after that clear, it would otherwise never see the transition.
+ * Hard cap at 60 s so callers never hang on a leaked op.
+ */
+export function whenOperationFinished(id: string): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const managed = operations.get(id);
+    if (!managed || managed.operation.status !== "running") {
+      resolve();
+      return;
+    }
+
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      managed.listeners.delete(listener);
+      clearInterval(poller);
+      clearTimeout(hardCap);
+      resolve();
+    };
+
+    const listener = (event: OperationEvent) => {
+      if (event.type === "complete") finish();
+    };
+    managed.listeners.add(listener);
+
+    const poller = setInterval(() => {
+      const m = operations.get(id);
+      if (!m || m.operation.status !== "running") finish();
+    }, 250);
+
+    const hardCap = setTimeout(finish, 60_000);
+  });
 }
 
 export function submitAnswer(

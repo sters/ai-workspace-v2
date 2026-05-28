@@ -17,8 +17,9 @@ export async function buildUpdateTodoPipeline(input: {
   bestOfN?: number;
   bestOfNConfirm?: boolean;
   interactionLevel?: InteractionLevel;
+  interject?: boolean;
 }): Promise<PipelinePhase[]> {
-  const { workspace, instruction, repo, bestOfN, bestOfNConfirm, interactionLevel } = input;
+  const { workspace, instruction, repo, bestOfN, bestOfNConfirm, interactionLevel, interject } = input;
   const workspacePath = path.join(getWorkspaceDir(), workspace);
 
   const readmeFile = Bun.file(path.join(workspacePath, "README.md"));
@@ -48,6 +49,7 @@ export async function buildUpdateTodoPipeline(input: {
         worktreePath: r.worktreePath,
         workspacePath: wsDir,
         instruction,
+        ...(interject && { interject: true }),
       }),
     );
     return prompts.length === 1
