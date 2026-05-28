@@ -35,6 +35,8 @@ export {
   buildResearchIntegrationPrompt,
   getUpdaterSystemPrompt,
   buildUpdaterPrompt,
+  getReadmeUpdaterSystemPrompt,
+  buildReadmeUpdaterPrompt,
   getCollectorSystemPrompt,
   buildCollectorPrompt,
   getInitReadmeSystemPrompt,

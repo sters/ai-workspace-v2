@@ -16,6 +16,7 @@ export const STEP_TYPES = {
   REVIEW_TODOS: "review-todos",
   CREATE_PR: "create-pr",
   UPDATE_TODO: "update-todo",
+  UPDATE_README: "update-readme",
   PLAN_TODO_FROM_REVIEW: "plan-todo-from-review",
   DEEP_SEARCH: "deep-search",
   AUTONOMOUS_GATE: "autonomous-gate",

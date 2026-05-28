@@ -18,6 +18,7 @@ export {
   buildResearchIntegrationPrompt,
 } from "./researcher";
 export { getUpdaterSystemPrompt, buildUpdaterPrompt } from "./updater";
+export { getReadmeUpdaterSystemPrompt, buildReadmeUpdaterPrompt } from "./readme-updater";
 export { getCollectorSystemPrompt, buildCollectorPrompt } from "./collector";
 export { getInitReadmeSystemPrompt, buildInitAnalyzeAndReadmePrompt, INIT_ANALYSIS_SCHEMA } from "./init-readme";
 export { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildReviewChatPrompt, getResearchChatSystemPrompt, buildResearchChatPrompt } from "./chat";

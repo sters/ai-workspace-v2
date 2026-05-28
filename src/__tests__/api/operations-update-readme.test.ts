@@ -25,21 +25,20 @@ vi.mock("@/lib/pipeline/interject", () => ({
 
 vi.mock("@/lib/config", () => ({
   resolveWorkspaceName: (name: string) => name,
-  getOperationConfig: () => ({ bestOfN: 0 }),
   getConfig: () => ({ operations: { defaultInteractionLevel: "mid" } }),
   getWorkspaceDir: () => "/ws",
 }));
 
-const mockBuildUpdateTodoPipeline = vi.fn(async () => [{ kind: "single" }]);
+const mockBuildUpdateReadmePipeline = vi.fn(async () => [{ kind: "single" }]);
 
-vi.mock("@/lib/pipelines/update-todo", () => ({
-  buildUpdateTodoPipeline: (...a: unknown[]) => mockBuildUpdateTodoPipeline(...a),
+vi.mock("@/lib/pipelines/update-readme", () => ({
+  buildUpdateReadmePipeline: (...a: unknown[]) => mockBuildUpdateReadmePipeline(...a),
 }));
 
-function makeOpResponse(id = "new-op", workspace = "ws-a"): Operation {
+function makeOpResponse(id = "readme-op", workspace = "ws-a"): Operation {
   return {
     id,
-    type: "update-todo",
+    type: "update-readme",
     workspace,
     status: "running",
     startedAt: new Date().toISOString(),
@@ -47,9 +46,9 @@ function makeOpResponse(id = "new-op", workspace = "ws-a"): Operation {
   };
 }
 
-async function postUpdateTodo(body: Record<string, unknown>) {
-  const { POST } = await import("@/app/api/operations/update-todo/route");
-  const request = new Request("http://localhost:3741/api/operations/update-todo", {
+async function postUpdateReadme(body: Record<string, unknown>) {
+  const { POST } = await import("@/app/api/operations/update-readme/route");
+  const request = new Request("http://localhost:3741/api/operations/update-readme", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -63,33 +62,59 @@ beforeEach(() => {
   mockReleaseInterject.mockReset();
   mockKillAndAwait.mockReset().mockResolvedValue({ wasAutonomous: false });
   mockScheduleAutonomousRekick.mockReset();
-  mockBuildUpdateTodoPipeline.mockClear();
+  mockBuildUpdateReadmePipeline.mockClear();
 });
 
-describe("POST /api/operations/update-todo (interject)", () => {
-  it("interject=true with running autonomous: kills, awaits, starts update-todo, schedules re-kick", async () => {
+describe("POST /api/operations/update-readme", () => {
+  it("default (no interject): starts update-readme, no interject helpers called", async () => {
+    const response = await postUpdateReadme({
+      workspace: "ws-a",
+      instruction: "add risks section",
+    });
+    expect(response.status).toBe(200);
+    expect(mockAcquireInterject).not.toHaveBeenCalled();
+    expect(mockKillAndAwait).not.toHaveBeenCalled();
+    expect(mockStartOperationPipeline).toHaveBeenCalledWith(
+      "update-readme",
+      "ws-a",
+      expect.anything(),
+      undefined,
+      expect.objectContaining({ instruction: "add risks section" }),
+    );
+  });
+
+  it("validates: rejects when workspace is missing", async () => {
+    const response = await postUpdateReadme({ instruction: "x" });
+    expect(response.status).toBe(400);
+  });
+
+  it("validates: rejects when instruction is missing", async () => {
+    const response = await postUpdateReadme({ workspace: "ws-a" });
+    expect(response.status).toBe(400);
+  });
+
+  it("interject=true with running autonomous: kills, awaits, starts update-readme, schedules re-kick", async () => {
     mockKillAndAwait.mockResolvedValue({
       wasAutonomous: true,
-      autonomousInputs: { description: "task", maxLoops: "3" },
+      autonomousInputs: { description: "task" },
     });
 
-    const response = await postUpdateTodo({
+    const response = await postUpdateReadme({
       workspace: "ws-a",
-      instruction: "refresh",
+      instruction: "tighten objective",
       interject: true,
     });
     expect(response.status).toBe(200);
 
     expect(mockAcquireInterject).toHaveBeenCalledWith("ws-a");
     expect(mockKillAndAwait).toHaveBeenCalledWith("ws-a");
-    expect(mockBuildUpdateTodoPipeline).toHaveBeenCalledWith(
+    expect(mockBuildUpdateReadmePipeline).toHaveBeenCalledWith(
       expect.objectContaining({ interject: true }),
     );
-    expect(mockStartOperationPipeline).toHaveBeenCalledTimes(1);
     expect(mockScheduleAutonomousRekick).toHaveBeenCalledWith(
-      "new-op",
+      "readme-op",
       "ws-a",
-      { description: "task", maxLoops: "3" },
+      { description: "task" },
     );
     expect(mockReleaseInterject).toHaveBeenCalledWith("ws-a");
   });
@@ -97,9 +122,9 @@ describe("POST /api/operations/update-todo (interject)", () => {
   it("interject=true with non-autonomous running op: no re-kick scheduled", async () => {
     mockKillAndAwait.mockResolvedValue({ wasAutonomous: false });
 
-    const response = await postUpdateTodo({
+    const response = await postUpdateReadme({
       workspace: "ws-a",
-      instruction: "refresh",
+      instruction: "x",
       interject: true,
     });
     expect(response.status).toBe(200);
@@ -111,56 +136,24 @@ describe("POST /api/operations/update-todo (interject)", () => {
   it("returns 409 when acquireInterject returns false", async () => {
     mockAcquireInterject.mockReturnValue(false);
 
-    const response = await postUpdateTodo({
+    const response = await postUpdateReadme({
       workspace: "ws-a",
-      instruction: "refresh",
+      instruction: "x",
       interject: true,
     });
     expect(response.status).toBe(409);
     expect(mockKillAndAwait).not.toHaveBeenCalled();
-    expect(mockStartOperationPipeline).not.toHaveBeenCalled();
-    expect(mockReleaseInterject).not.toHaveBeenCalled();
   });
 
-  it("interject=false preserves existing behavior (no interject helpers called)", async () => {
-    const response = await postUpdateTodo({
+  it("releaseInterject is called even when pipeline build throws", async () => {
+    mockBuildUpdateReadmePipeline.mockRejectedValueOnce(new Error("boom"));
+
+    const response = await postUpdateReadme({
       workspace: "ws-a",
-      instruction: "refresh",
-    });
-    expect(response.status).toBe(200);
-
-    expect(mockAcquireInterject).not.toHaveBeenCalled();
-    expect(mockKillAndAwait).not.toHaveBeenCalled();
-    expect(mockScheduleAutonomousRekick).not.toHaveBeenCalled();
-    expect(mockStartOperationPipeline).toHaveBeenCalledTimes(1);
-    expect(mockBuildUpdateTodoPipeline).toHaveBeenCalledWith(
-      expect.not.objectContaining({ interject: true }),
-    );
-  });
-
-  it("releaseInterject is called even when buildUpdateTodoPipeline throws", async () => {
-    mockBuildUpdateTodoPipeline.mockRejectedValueOnce(new Error("boom"));
-
-    const response = await postUpdateTodo({
-      workspace: "ws-a",
-      instruction: "refresh",
+      instruction: "x",
       interject: true,
     });
     expect(response.status).toBe(500);
-    expect(mockReleaseInterject).toHaveBeenCalledWith("ws-a");
-  });
-
-  it("returns 429 on ConcurrencyLimitError and still releases the interject", async () => {
-    mockStartOperationPipeline.mockImplementationOnce(() => {
-      throw new ConcurrencyLimitError(3);
-    });
-
-    const response = await postUpdateTodo({
-      workspace: "ws-a",
-      instruction: "refresh",
-      interject: true,
-    });
-    expect(response.status).toBe(429);
     expect(mockReleaseInterject).toHaveBeenCalledWith("ws-a");
   });
 });

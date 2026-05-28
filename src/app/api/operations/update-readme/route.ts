@@ -6,24 +6,21 @@ import {
   killAndAwait,
   scheduleAutonomousRekick,
 } from "@/lib/pipeline/interject";
-import { resolveWorkspaceName, getOperationConfig } from "@/lib/config";
-import { buildUpdateTodoPipeline } from "@/lib/pipelines/update-todo";
-import { updateTodoSchema } from "@/lib/schemas";
+import { resolveWorkspaceName } from "@/lib/config";
+import { buildUpdateReadmePipeline } from "@/lib/pipelines/update-readme";
+import { updateReadmeSchema } from "@/lib/schemas";
 import { parseBody, applyOperationDefaults } from "@/lib/validate";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
-  const parsed = parseBody(updateTodoSchema, body);
+  const parsed = parseBody(updateReadmeSchema, body);
   if (!parsed.success) return parsed.response;
   const data = applyOperationDefaults(parsed.data);
 
   const workspace = resolveWorkspaceName(data.workspace);
-  const { instruction, repo, interactionLevel, interject } = data;
-
-  const bestOfN = data.bestOfN ?? getOperationConfig("update-todo").bestOfN;
-  const bestOfNFromConfig = data.bestOfN == null;
+  const { instruction, interactionLevel, interject } = data;
 
   if (interject) {
     if (!acquireInterject(workspace)) {
@@ -36,20 +33,15 @@ export async function POST(request: Request) {
     try {
       const { wasAutonomous, autonomousInputs } = await killAndAwait(workspace);
 
-      const phases = await buildUpdateTodoPipeline({
+      const phases = await buildUpdateReadmePipeline({
         workspace,
         instruction,
-        repo,
-        bestOfN: bestOfN >= 2 ? bestOfN : undefined,
-        bestOfNConfirm: bestOfNFromConfig,
         interactionLevel,
         interject: true,
       });
-      const operation = startOperationPipeline("update-todo", workspace, phases, undefined, {
+      const operation = startOperationPipeline("update-readme", workspace, phases, undefined, {
         instruction,
         interactionLevel,
-        ...(repo && { repo }),
-        ...(bestOfN >= 2 && { bestOfN: String(bestOfN) }),
         interject: "true",
       });
 
@@ -69,19 +61,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const phases = await buildUpdateTodoPipeline({
+    const phases = await buildUpdateReadmePipeline({
       workspace,
       instruction,
-      repo,
-      bestOfN: bestOfN >= 2 ? bestOfN : undefined,
-      bestOfNConfirm: bestOfNFromConfig,
       interactionLevel,
     });
-    const operation = startOperationPipeline("update-todo", workspace, phases, undefined, {
+    const operation = startOperationPipeline("update-readme", workspace, phases, undefined, {
       instruction,
       interactionLevel,
-      ...(repo && { repo }),
-      ...(bestOfN >= 2 && { bestOfN: String(bestOfN) }),
     });
     return NextResponse.json(operation);
   } catch (err) {

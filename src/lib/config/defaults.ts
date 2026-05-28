@@ -62,6 +62,7 @@ export const OPERATION_TYPE_NAMES: ReadonlySet<string> = new Set<OperationType>(
   "review",
   "create-pr",
   "update-todo",
+  "update-readme",
   "create-todo",
   "delete",
   "workspace-prune",

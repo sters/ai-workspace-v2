@@ -35,6 +35,13 @@ export const createPrSchema = z.object({
   bestOfN: z.coerce.number().min(0).max(5).optional(),
 });
 
+export const updateReadmeSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  instruction: z.string().min(1, "instruction is required"),
+  interactionLevel: interactionLevelEnum.optional(),
+  interject: z.coerce.boolean().optional(),
+});
+
 export const updateTodoSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   instruction: z.string().min(1, "instruction is required"),
