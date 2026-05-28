@@ -5,7 +5,7 @@ import { addPendingNotification } from "@/lib/db/slack-notifications";
 import { parseCommand, USAGE, type Command } from "./commands";
 import { dispatch } from "./dispatcher";
 import { startNotifier, type Notifier } from "./notifier";
-import { formatThreadContext, mergeIntoDescription, type ThreadMessage } from "./thread-context";
+import { mergeWithThreadLink } from "./thread-link";
 
 export interface SlackServerOptions {
   botToken: string;
@@ -30,8 +30,9 @@ export interface RunningSlackServer {
  * The bot only handles `app_mention` events. Mentions from non-allowlisted
  * users are silently dropped (no reply, no reaction).
  *
- * If the mention is inside an existing thread, the thread's prior messages
- * are folded into the description so Claude has the discussion context.
+ * If the mention is inside an existing thread, the thread's permalink (only
+ * the URL, not the message bodies) is appended to the description so Claude
+ * can decide to fetch the thread on demand.
  *
  * After dispatching `init` (autonomous mode), a pending-notification row is
  * inserted into SQLite so the notifier can post the PR list once the run
@@ -44,23 +45,6 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
     socketMode: true,
     logLevel: LogLevel.INFO,
   });
-
-  // Resolve our own identity once at startup so the thread-context formatter
-  // can drop our prior replies (otherwise re-running `init` in the same
-  // thread would feed the bot's own answers back in as context).
-  let ourBotUserId: string | undefined;
-  let ourBotId: string | undefined;
-  try {
-    const auth = await app.client.auth.test();
-    ourBotUserId = auth.user_id;
-    ourBotId = auth.bot_id;
-    console.log(`[slack-server] auth.test → user_id=${ourBotUserId} bot_id=${ourBotId}`);
-  } catch (err) {
-    console.warn(
-      "[slack-server] auth.test failed — own bot replies may leak back into thread context:",
-      err instanceof Error ? err.message : String(err),
-    );
-  }
 
   app.event("app_mention", async ({ event, say, client }) => {
     const mention = event as AppMentionEvent;
@@ -77,14 +61,11 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
       return;
     }
 
-    const command = await maybeAttachThreadContext(client, mention, parsed.command, {
-      ourBotUserId,
-      ourBotId,
-    });
+    const command = await maybeAttachThreadLink(client, mention, parsed.command);
 
     if (command.description.trim() === "") {
       await say({
-        text: "init requires a description (or post the mention inside a thread that has discussion).\n\n" + USAGE,
+        text: "init requires a description (or post the mention inside a thread so a link can be attached).\n\n" + USAGE,
         thread_ts: mention.thread_ts ?? mention.ts,
       });
       return;
@@ -138,40 +119,33 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
 }
 
 /**
- * If the mention is inside a thread, fetch it and fold into the command's
- * description. Failures (missing scope, network, etc.) are logged but do not
+ * If the mention is inside a thread, fetch a permalink for the thread's root
+ * message via `chat.getPermalink` and fold it into the command's description.
+ * Failures (network, channel not accessible, etc.) are logged but do not
  * abort the operation — the user's typed description is used as-is.
  */
-async function maybeAttachThreadContext(
+async function maybeAttachThreadLink(
   client: WebClient,
   mention: AppMentionEvent,
   command: Command,
-  identity: { ourBotUserId?: string; ourBotId?: string },
 ): Promise<Command> {
   if (!mention.thread_ts) return command;
 
-  let messages: ThreadMessage[];
+  let permalink: string;
   try {
-    const res = await client.conversations.replies({
+    const res = await client.chat.getPermalink({
       channel: mention.channel,
-      ts: mention.thread_ts,
-      limit: 200,
+      message_ts: mention.thread_ts,
     });
-    messages = (res.messages ?? []) as ThreadMessage[];
+    permalink = res.permalink ?? "";
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(
-      `[slack-server] could not fetch thread (channel=${mention.channel} ts=${mention.thread_ts}): ${msg} — proceeding without thread context`,
+      `[slack-server] could not fetch permalink (channel=${mention.channel} ts=${mention.thread_ts}): ${msg} — proceeding without thread link`,
     );
     return command;
   }
 
-  const threadContext = formatThreadContext(messages, {
-    excludeTs: mention.ts,
-    ourBotUserId: identity.ourBotUserId,
-    ourBotId: identity.ourBotId,
-  });
-  if (!threadContext) return command;
-
-  return { ...command, description: mergeIntoDescription(command.description, threadContext) };
+  if (!permalink) return command;
+  return { ...command, description: mergeWithThreadLink(command.description, permalink) };
 }
