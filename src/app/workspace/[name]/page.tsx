@@ -2,8 +2,9 @@
 
 import { use } from "react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import { useReadme } from "@/hooks/use-workspace";
+import { useReadme, useWorkspace } from "@/hooks/use-workspace";
 import { ReadmeViewer } from "@/components/workspace/readme-viewer";
+import { ReadmeUpdater } from "@/components/workspace/readme-updater";
 
 export default function WorkspaceOverviewPage({
   params,
@@ -14,6 +15,17 @@ export default function WorkspaceOverviewPage({
   const decodedName = decodeURIComponent(name);
   useDocumentTitle(`Overview - ${decodedName}`);
   const { readme } = useReadme(decodedName);
+  const { workspace } = useWorkspace(decodedName);
 
-  return <ReadmeViewer content={readme} />;
+  return (
+    <div className="space-y-6">
+      <ReadmeViewer content={readme} />
+      {workspace && (
+        <ReadmeUpdater
+          workspaceName={decodedName}
+          workspacePath={workspace.path}
+        />
+      )}
+    </div>
+  );
 }
