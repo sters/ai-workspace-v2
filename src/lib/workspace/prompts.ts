@@ -18,6 +18,7 @@ import { getResolvedWorkspaceRoot } from "@/lib/config";
 import {
   getExecutorSystemPrompt,
   getUpdaterSystemPrompt,
+  getReadmeUpdaterSystemPrompt,
   getCodeReviewerSystemPrompt,
   getReviewerSystemPrompt,
   getResearchFindingsRepoSystemPrompt,
@@ -51,6 +52,7 @@ import {
 const SYSTEM_PROMPTS: Record<string, () => string> = {
   "executor.md": getExecutorSystemPrompt,
   "updater.md": getUpdaterSystemPrompt,
+  "readme-updater.md": getReadmeUpdaterSystemPrompt,
   "code-reviewer.md": getCodeReviewerSystemPrompt,
   "reviewer.md": getReviewerSystemPrompt,
   "research-findings-repo.md": getResearchFindingsRepoSystemPrompt,

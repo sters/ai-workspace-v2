@@ -4,6 +4,7 @@ export type OperationType =
   | "review"
   | "create-pr"
   | "update-todo"
+  | "update-readme"
   | "create-todo"
   | "delete"
   | "workspace-prune"

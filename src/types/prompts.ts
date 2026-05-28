@@ -134,6 +134,15 @@ export interface ResearchIntegrationInput {
   allFiles: { name: string; content: string }[];
 }
 
+export interface ReadmeUpdaterInput {
+  workspaceName: string;
+  readmeContent: string;
+  workspacePath: string;
+  instruction: string;
+  interactive?: boolean;
+  interject?: boolean;
+}
+
 export interface UpdaterInput {
   workspaceName: string;
   repoName: string;

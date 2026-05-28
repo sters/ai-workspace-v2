@@ -84,6 +84,15 @@ async function rebuildPipeline(op: Operation): Promise<PipelinePhase[] | null> {
         });
       }
 
+      case "update-readme": {
+        const { buildUpdateReadmePipeline } = await import("@/lib/pipelines/update-readme");
+        return buildUpdateReadmePipeline({
+          workspace,
+          instruction: inputs.instruction ?? "",
+          interactionLevel: inputs.interactionLevel as InteractionLevel | undefined,
+        });
+      }
+
       case "create-todo": {
         const { buildCreateTodoPipeline } = await import("@/lib/pipelines/create-todo");
         return buildCreateTodoPipeline(
