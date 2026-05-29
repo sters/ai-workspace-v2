@@ -50,7 +50,19 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
   // Callback for function phases to dynamically append new phases to the pipeline.
   // The for-loop evaluates phases.length each iteration, so appended phases are
   // picked up automatically.
+  //
+  // `phaseInfos` and `managed.operation.phases` share the same array reference
+  // (set by orchestrator.ts and resume.ts), so a single push covers both.
+  // Pushing to both used to silently duplicate every appended entry, which
+  // shifted phaseInfos[i] away from phases[i] and caused every subsequent
+  // phase's events to be tagged with the previous phase's label.
   const appendPhases = (newPhases: PipelinePhase[]) => {
+    if (managed.operation.phases !== phaseInfos) {
+      // Defensive: callers are expected to alias these. If they ever diverge,
+      // fall back to keeping both in sync explicitly rather than silently
+      // dropping appended entries from the operation's phase list.
+      managed.operation.phases = phaseInfos;
+    }
     for (const p of newPhases) {
       const idx = phases.length;
       phases.push(p);
@@ -60,7 +72,6 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
         status: "pending",
       };
       phaseInfos.push(info);
-      (managed.operation.phases ??= []).push(info);
       emitPhaseUpdate(managed, idx, info.label, "pending");
     }
     updateOperationMeta(operationId, { phases: managed.operation.phases });
