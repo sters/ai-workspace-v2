@@ -175,4 +175,67 @@ describe("execute-phases appendPhases", () => {
     );
     expect(createPrPhaseLabels).toEqual(new Set(["CreatePR"]));
   });
+
+  it("every __phaseUpdate event's (phaseIndex, phaseLabel) matches phases[phaseIndex].label", async () => {
+    // Stronger invariant: across pending / running / completed status emissions,
+    // the label in every __phaseUpdate must match the label of the phase that
+    // actually sits at that index. Guards against any future drift between
+    // phaseInfos and the pipeline's PipelinePhase[] array, not just the
+    // duplicate-push bug above.
+    const phases: PipelinePhase[] = [
+      {
+        kind: "function",
+        label: "Cycle 1: Gate",
+        fn: async (ctx) => {
+          ctx.appendPhases([
+            { kind: "function", label: "Cycle 1: Update TODO", fn: async () => true },
+            { kind: "function", label: "Cycle 2: Execute", fn: async () => true },
+            {
+              kind: "function",
+              label: "Cycle 2: Gate",
+              fn: async (innerCtx) => {
+                innerCtx.appendPhases([
+                  { kind: "function", label: "Create PR", fn: async () => true },
+                ]);
+                return true;
+              },
+            },
+          ]);
+          return true;
+        },
+      },
+    ];
+
+    const { managed, phaseInfos, capturedEvents } = makeManagedOperation(phases);
+
+    await executePipelinePhases({
+      managed,
+      phases,
+      phaseInfos,
+      operationType: "autonomous",
+    });
+
+    const updates = capturedEvents
+      .filter((e) => e.type === "status" && e.data.startsWith("__phaseUpdate:"))
+      .map((e) => JSON.parse(e.data.slice("__phaseUpdate:".length)) as {
+        phaseIndex: number;
+        phaseLabel: string;
+        phaseStatus: string;
+      });
+
+    expect(updates.length).toBeGreaterThan(0);
+    for (const u of updates) {
+      const phase = phases[u.phaseIndex];
+      expect(phase, `phases[${u.phaseIndex}] missing`).toBeDefined();
+      const expectedLabel = phase.kind === "group" ? `Phase ${u.phaseIndex + 1}` : phase.label;
+      expect(
+        u.phaseLabel,
+        `__phaseUpdate at index=${u.phaseIndex} status=${u.phaseStatus} expected label "${expectedLabel}" but got "${u.phaseLabel}"`,
+      ).toBe(expectedLabel);
+    }
+
+    // Sanity: pipeline ended with 5 phases (1 initial + 3 from first append + 1 from nested append).
+    expect(phases).toHaveLength(5);
+    expect(phaseInfos).toHaveLength(5);
+  });
 });
