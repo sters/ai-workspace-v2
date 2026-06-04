@@ -35,7 +35,14 @@ export function getPlannerSystemPrompt(): string {
      - Analyze existing code style: naming conventions, error handling patterns, file organization, and import style
      - Include \`Pattern:\` sub-items in TODO items with specific style observations (e.g., "Pattern: uses camelCase for variables, PascalCase for types")
 
-5. **Create TODO Items**:
+5. **Audit Existing Conventions Around the Edit Site** (REQUIRED for code-change tasks that add or modify typed contracts — proto/schema/IDL definitions, DB columns, public API signatures, struct fields):
+   - For each new field, parameter, or column you plan to add, search the **same file** and **sibling files in the same package/module** for fields with the **same base name or near-synonym** (e.g. \`contact_type_id\` vs \`contact_type_ids\`, \`user_id\` vs \`UserID\`, \`created\` vs \`created_at\`).
+   - Record the existing type / cardinality / nullability / naming style of those matches, and make sure the new addition matches — or, if it diverges intentionally, document the reason explicitly in the TODO item's \`Why:\` line.
+   - Common audit dimensions: signed vs unsigned int width (int64 vs uint64), optional vs required, repeated vs scalar, string vs typed ID, snake_case vs camelCase, timestamp encoding (\`google.protobuf.Timestamp\` vs unix int).
+   - This audit catches silent inconsistencies that compile but break at wire/serialization time (e.g. proto3 JSON encodes uint64 as string but int64 as number; sign-extension when crossing layers). The planner is the **last cheap chance** to catch these — fixing them after PR is far more expensive.
+   - If a divergence cannot be resolved without input from the user or another repo, add an \`[INVESTIGATE]\` TODO item naming the specific field and the conflicting types, rather than freezing the wrong choice into the spec.
+
+6. **Create TODO Items**:
    - Break down objectives into logical, actionable steps
    - Add exact build/test/lint commands from repository documentation
    - Add task-specific details from the workspace README

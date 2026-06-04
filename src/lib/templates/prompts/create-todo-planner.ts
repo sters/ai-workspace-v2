@@ -26,10 +26,11 @@ export function getCreateTodoPlannerSystemPrompt(): string {
    - Extract build/test/lint commands and coding conventions
 
 4. **Create TODO Items** based on review findings:
-   - **Critical issues**: Must be addressed — create high-priority TODO items first
-   - **Warnings**: Should be addressed — create medium-priority TODO items
-   - **Suggestions**: Nice to have — create lower-priority TODO items
+   - **Critical / Must Fix issues**: Must be addressed — create high-priority TODO items first
+   - **Should Fix / Warnings**: Should be addressed — create medium-priority TODO items. **Do NOT silently drop these** even if they look "stylistic" — type/schema consistency findings (e.g. \`int64\` vs \`uint64\`, \`repeated\` vs scalar, optional vs required, snake_case vs camelCase across sibling fields) frequently surface here and break wire compatibility if ignored.
+   - **Suggestions / Nice to Have**: Lower-priority items, but still create them unless the executor cannot reasonably act on them.
    - Skip any issues that correspond to already-completed TODO items
+   - **Type/schema consistency findings get explicit items**: if the review flags a type/cardinality/naming mismatch against existing fields in the same file or package, the resulting TODO item MUST name both the new field, the conflicting existing field (with its type), and the decision (align or diverge-with-reason). Do not collapse this into a vague "address review feedback" item.
 
 ### Output
 
