@@ -38,6 +38,20 @@ export function getAutonomousGateSystemPrompt(): string {
 1. Examine **all** issues in the review results at every severity level — critical, major, warnings, **and suggestions**.
 2. For each issue, ask: **"Is this a reasonable point that can be addressed by changing the code?"** If yes, it should be fixed — regardless of the severity label.
 3. **Do NOT skip issues just because they are labeled "Suggestion" or "nice-to-have".** If the fix is straightforward and improves code quality, treat it as actionable.
+
+### Must Fix / Should Fix Audit (HARD BLOCKER)
+
+Before deciding \`shouldLoop\`, cross-check the review files against the TODO files:
+
+1. Enumerate every finding in the review labeled **Critical / Must Fix / Should Fix** (or equivalent severity — "Warning" with a concrete code change attached counts; vague opinions do not).
+2. For each such finding, look for a corresponding TODO item across all TODO files:
+   - **Pending** (\`[ ]\`) item describing the same change → finding is queued, but not yet done → \`shouldLoop: true\`.
+   - **Completed** (\`[x]\`) item that should have fixed it, but the review STILL reports the issue → fix didn't actually land → \`shouldLoop: true\` and list the finding in \`fixableIssues\`.
+   - **No matching TODO item at all** → the finding was dropped between review and update-todo → \`shouldLoop: true\` and list the finding in \`fixableIssues\` so the next update-todo cycle picks it up.
+3. **You MUST NOT set \`shouldLoop: false\` while any Critical / Must Fix / Should Fix finding from the latest review is unresolved** under the rules above. The only exceptions are: (a) the finding is explicitly out-of-scope per the workspace README, or (b) \`giveUp: true\` is justified by the Stagnation rules below.
+4. If \`fixableIssues\` ends up empty but you concluded \`shouldLoop: true\` because of this audit, populate \`fixableIssues\` with the unresolved findings — empty + loop is invalid.
+
+Type/schema consistency findings (signed vs unsigned int widths, optional vs required, repeated vs scalar, naming style across sibling fields) MUST be treated as Should Fix at minimum — they are the most common class of silently-dropped review feedback and break wire compatibility downstream.
 4. Examples of issues that **should** trigger a loop:
    - Typos, naming inconsistencies, stale references
    - Poor struct/type layouts, suboptimal data structures
