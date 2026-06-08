@@ -18,6 +18,8 @@ export {
   buildReviewerPrompt,
   getCodeReviewerSystemPrompt,
   buildCodeReviewerPrompt,
+  getCrossRepositoryReviewerSystemPrompt,
+  buildCrossRepositoryReviewerPrompt,
   getTodoVerifierSystemPrompt,
   buildTodoVerifierPrompt,
   getReadmeVerifierSystemPrompt,

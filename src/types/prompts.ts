@@ -57,6 +57,21 @@ export interface CodeReviewerInput extends RepoPromptInput {
   reviewFilePath: string;
 }
 
+/** Cross-repository code-review agent input (multi-repo workspaces only). */
+export interface CrossRepositoryReviewerInput {
+  workspaceName: string;
+  reviewTimestamp: string;
+  readmeContent: string;
+  reviewFilePath: string;
+  repos: {
+    repoName: string;
+    repoPath: string;
+    baseBranch: string;
+    worktreePath: string;
+    repoChanges: string;
+  }[];
+}
+
 export interface TodoVerifierInput extends RepoPromptInput {
   baseBranch: string;
   reviewTimestamp: string;

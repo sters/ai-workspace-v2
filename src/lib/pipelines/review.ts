@@ -14,6 +14,7 @@ import {
   buildTodoVerifierPrompt,
   buildReadmeVerifierPrompt,
   buildCollectorPrompt,
+  buildCrossRepositoryReviewerPrompt,
 } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { execConstraintCommand, buildConstraintReport } from "@/lib/workspace/constraint-runner";
@@ -51,6 +52,14 @@ export async function buildReviewPipeline(input: {
   // Build review + verify children for phase 1 (parallel)
   const reviewChildren: GroupChild[] = [];
   const repoBaseBranches = new Map<string, string>();
+  // Collected per-repo context for the cross-repository reviewer (multi-repo only).
+  const crossRepoInputs: {
+    repoName: string;
+    repoPath: string;
+    baseBranch: string;
+    worktreePath: string;
+    repoChanges: string;
+  }[] = [];
 
   for (const repo of repos) {
     const metaRepo = meta.repositories.find(
@@ -59,6 +68,15 @@ export async function buildReviewPipeline(input: {
     const baseBranch = metaRepo?.baseBranch ?? detectBaseBranch(repo.worktreePath);
     repoBaseBranches.set(repo.repoName, baseBranch);
     const changes = getRepoChanges(workspace, repo.repoPath, baseBranch);
+    const repoChangesText = `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`;
+
+    crossRepoInputs.push({
+      repoName: repo.repoName,
+      repoPath: repo.repoPath,
+      baseBranch,
+      worktreePath: repo.worktreePath,
+      repoChanges: repoChangesText,
+    });
 
     const orgName = repo.repoPath.split("/").slice(0, -1).join("_") || "local";
     const reviewFileName = `REVIEW-${orgName}_${repo.repoName}.md`;
@@ -76,7 +94,7 @@ export async function buildReviewPipeline(input: {
         reviewTimestamp,
         readmeContent,
         worktreePath: repo.worktreePath,
-        repoChanges: `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`,
+        repoChanges: repoChangesText,
         reviewFilePath: path.join(reviewDir, reviewFileName),
       }),
       addDirs: [reviewDir],
@@ -123,11 +141,32 @@ export async function buildReviewPipeline(input: {
         reviewTimestamp,
         readmeContent,
         worktreePath: repo.worktreePath,
-        repoChanges: `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`,
+        repoChanges: repoChangesText,
         verifyFilePath: path.join(reviewDir, readmeVerifyFileName),
       }),
       addDirs: [reviewDir],
       appendSystemPromptFile: ensureSystemPrompt(wsPath, "readme-verifier"),
+    });
+  }
+
+  // Cross-repository review: only when the whole workspace (no single-repo
+  // filter) has more than one repo. Catches issues that span repos — API/contract
+  // mismatches, shared-type drift, coordinated migrations — that per-repo
+  // reviewers can't see in isolation. Output filename matches the REVIEW-* glob
+  // so the collector and autonomous gate pick it up automatically.
+  if (!repository && repos.length > 1) {
+    reviewChildren.push({
+      label: "review-cross-repository",
+      stepType: STEP_TYPES.CODE_REVIEW,
+      prompt: buildCrossRepositoryReviewerPrompt({
+        workspaceName: workspace,
+        reviewTimestamp,
+        readmeContent,
+        reviewFilePath: path.join(reviewDir, "REVIEW-cross-repository.md"),
+        repos: crossRepoInputs,
+      }),
+      addDirs: [reviewDir, ...repos.map((r) => r.worktreePath)],
+      appendSystemPromptFile: ensureSystemPrompt(wsPath, "cross-repository-reviewer"),
     });
   }
 
