@@ -15,4 +15,4 @@ export {
 export { killOperation, submitAnswer, whenOperationFinished } from "./controls";
 export { findRunningOpByWorkspace, interjectsInFlight } from "./store";
 export { _gc } from "./gc";
-export { resumeStaleOperations } from "./resume";
+export { failStaleOperations } from "./cleanup-stale";

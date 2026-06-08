@@ -37,7 +37,7 @@ function makeOp(id: string, overrides?: Partial<Operation>): Operation {
   };
 }
 
-describe("pipeline/resume", () => {
+describe("pipeline/cleanup-stale", () => {
   beforeEach(() => {
     _resetDb();
     _setDbPath(":memory:");
@@ -61,20 +61,19 @@ describe("pipeline/resume", () => {
     });
   });
 
-  describe("resumeStaleOperations", () => {
-    it("marks non-resumable types as failed", async () => {
-      const nonResumable = ["delete", "workspace-prune", "operation-prune", "mcp-auth", "claude-login"] as const;
-      for (let i = 0; i < nonResumable.length; i++) {
-        const id = `00000000-0000-4000-8000-00000000${String(i + 1).padStart(4, "0")}`;
-        insertOperation(makeOp(id, { type: nonResumable[i], status: "running" }));
-      }
+  describe("failStaleOperations", () => {
+    it("marks interrupted running operations as failed instead of resuming them", async () => {
+      // Partially-completed pipeline (Phase B was running) — must not be resumed.
+      insertOperation(makeOp(OP_ID_1, { type: "execute", status: "running" }));
+      insertOperation(makeOp(OP_ID_2, { type: "autonomous", status: "running" }));
 
-      const { resumeStaleOperations } = await import("@/lib/pipeline/resume");
-      await resumeStaleOperations();
+      const { failStaleOperations } = await import("@/lib/pipeline/cleanup-stale");
+      failStaleOperations();
 
-      // All should be marked as failed
-      const running = listRunningOperations();
-      expect(running).toHaveLength(0);
+      // Nothing left running — neither resumed nor stuck.
+      expect(listRunningOperations()).toHaveLength(0);
+      expect(dbGetOperation(OP_ID_1)?.status).toBe("failed");
+      expect(dbGetOperation(OP_ID_2)?.status).toBe("failed");
     });
 
     it("marks operations with all phases completed as completed", async () => {
@@ -85,8 +84,8 @@ describe("pipeline/resume", () => {
       insertOperation(makeOp(OP_ID_1, { status: "running", phases }));
       updateOperationMeta(OP_ID_1, { phases });
 
-      const { resumeStaleOperations } = await import("@/lib/pipeline/resume");
-      await resumeStaleOperations();
+      const { failStaleOperations } = await import("@/lib/pipeline/cleanup-stale");
+      failStaleOperations();
 
       const op = dbGetOperation(OP_ID_1);
       expect(op?.status).toBe("completed");
@@ -95,8 +94,8 @@ describe("pipeline/resume", () => {
     it("does nothing when no running operations exist", async () => {
       insertOperation(makeOp(OP_ID_1, { status: "completed" }));
 
-      const { resumeStaleOperations } = await import("@/lib/pipeline/resume");
-      await resumeStaleOperations(); // Should not throw
+      const { failStaleOperations } = await import("@/lib/pipeline/cleanup-stale");
+      failStaleOperations(); // Should not throw
     });
   });
 

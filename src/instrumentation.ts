@@ -1,6 +1,6 @@
 /**
  * Next.js instrumentation hook — runs once when the server starts.
- * Used to initialize the database and resume interrupted operations.
+ * Used to initialize the database and settle interrupted operations.
  *
  * The NEXT_RUNTIME check is specifically recognized by Next.js's bundler,
  * so the dynamic import of instrumentation-node is excluded from the
