@@ -17,10 +17,9 @@ export function killOperation(id: string): boolean {
     return true;
   }
   // Fallback: row is "running" in DB but absent from the in-memory store —
-  // typically a stale operation from a previous server session that resume
-  // never picked back up (e.g. resume crashed, or the user clicked Cancel
-  // before resumeStaleOperations() reached it). Mark it failed directly so
-  // the stuck row clears and resume won't try to revive it on next restart.
+  // typically a stale operation from a previous server session that startup
+  // cleanup hasn't settled yet (e.g. the user clicked Cancel before
+  // failStaleOperations() ran). Mark it failed directly so the stuck row clears.
   const row = getOperation(id);
   if (!row || row.status !== "running") return false;
   updateOperationStatus(id, "failed", new Date().toISOString());

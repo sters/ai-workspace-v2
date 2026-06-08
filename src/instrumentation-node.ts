@@ -16,7 +16,9 @@ export async function registerNode() {
   const { syncManagedHooks } = await import("@/lib/claude/hooks/sync");
   await syncManagedHooks().catch((err) => console.warn("[hooks] sync failed:", err));
 
-  // Resume operations that were interrupted by server shutdown
-  const { resumeStaleOperations } = await import("@/lib/pipeline-manager");
-  await resumeStaleOperations();
+  // Settle operations that were interrupted by server shutdown.
+  // We do NOT resume them — interrupted phases can't continue and resuming
+  // re-runs side effects. Stale "running" rows are marked failed/completed.
+  const { failStaleOperations } = await import("@/lib/pipeline-manager");
+  failStaleOperations();
 }
