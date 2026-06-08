@@ -9,23 +9,23 @@ import { getConfig } from "./resolver";
  * These are the lowest-priority defaults — config overrides them.
  */
 export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
-  // Opus — plan-shaped steps that benefit from deep thinking up front.
-  // Execution downstream is procedural, so we spend the budget here.
+  // Opus — plan-shaped steps that benefit from deep thinking up front,
+  // plus execution/review/coordination steps where quality compounds downstream.
   [STEP_TYPES.ANALYZE_README]: "opus",
   [STEP_TYPES.PLAN_TODO]: "opus",
   [STEP_TYPES.PLAN_TODO_FROM_REVIEW]: "opus",
+  [STEP_TYPES.EXECUTE]: "opus",
+  [STEP_TYPES.DISCOVER_CONSTRAINTS]: "opus",
+  [STEP_TYPES.VERIFY_README]: "opus",
+  [STEP_TYPES.CODE_REVIEW]: "opus",
+  [STEP_TYPES.REVIEW_TODOS]: "opus",
+  [STEP_TYPES.COORDINATE_TODOS]: "opus",
 
   // Sonnet — procedural execution, structured analysis, review, coordination tasks
-  [STEP_TYPES.EXECUTE]: "sonnet",
   [STEP_TYPES.CREATE_PR]: "sonnet",
-  [STEP_TYPES.COORDINATE_TODOS]: "sonnet",
-  [STEP_TYPES.REVIEW_TODOS]: "sonnet",
   [STEP_TYPES.BEST_OF_N_REVIEWER]: "sonnet",
-  [STEP_TYPES.DISCOVER_CONSTRAINTS]: "sonnet",
   [STEP_TYPES.SUGGEST_WORKSPACE]: "sonnet",
   [STEP_TYPES.AUTONOMOUS_GATE]: "sonnet",
-  [STEP_TYPES.VERIFY_README]: "sonnet",
-  [STEP_TYPES.CODE_REVIEW]: "sonnet",
 
   // Haiku — simple extraction, aggregation, verification tasks
   [STEP_TYPES.COLLECT_REVIEWS]: "haiku",

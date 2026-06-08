@@ -137,23 +137,22 @@ describe("resolveModel", () => {
     expect(resolveModel("review", "suggest-workspace")).toBe("sonnet");
   });
 
-  it("uses sonnet as the code-level default for autonomous-gate, verify-readme, and code-review", () => {
+  it("uses sonnet as the code-level default for autonomous-gate", () => {
     setConfig({});
     expect(resolveModel("autonomous", "autonomous-gate")).toBe("sonnet");
-    expect(resolveModel("review", "verify-readme")).toBe("sonnet");
-    expect(resolveModel("review", "code-review")).toBe("sonnet");
   });
 
-  it("uses opus as the code-level default for plan-like steps (think carefully)", () => {
+  it("uses opus as the code-level default for plan-like and heavy-reasoning steps", () => {
     setConfig({});
     expect(resolveModel("init", "analyze-readme")).toBe("opus");
     expect(resolveModel("init", "plan-todo")).toBe("opus");
     expect(resolveModel("review", "plan-todo-from-review")).toBe("opus");
-  });
-
-  it("uses sonnet as the code-level default for execute (procedural execution)", () => {
-    setConfig({});
-    expect(resolveModel("execute", "execute")).toBe("sonnet");
+    expect(resolveModel("execute", "execute")).toBe("opus");
+    expect(resolveModel("review", "verify-readme")).toBe("opus");
+    expect(resolveModel("review", "code-review")).toBe("opus");
+    expect(resolveModel("review", "discover-constraints")).toBe("opus");
+    expect(resolveModel("review", "review-todos")).toBe("opus");
+    expect(resolveModel("review", "coordinate-todos")).toBe("opus");
   });
 
   it("falls back to global when operation type has no model", () => {
