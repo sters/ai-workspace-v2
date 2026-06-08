@@ -3,6 +3,10 @@ export { getPlannerSystemPrompt, getResearchPlannerSystemPrompt, buildPlannerPro
 export { getCoordinatorSystemPrompt, buildCoordinatorPrompt } from "./coordinator";
 export { getReviewerSystemPrompt, buildReviewerPrompt } from "./reviewer";
 export { getCodeReviewerSystemPrompt, buildCodeReviewerPrompt } from "./code-reviewer";
+export {
+  getCrossRepositoryReviewerSystemPrompt,
+  buildCrossRepositoryReviewerPrompt,
+} from "./cross-repository-reviewer";
 export { getTodoVerifierSystemPrompt, buildTodoVerifierPrompt } from "./todo-verifier";
 export { getReadmeVerifierSystemPrompt, buildReadmeVerifierPrompt } from "./readme-verifier";
 export { getPRCreatorSystemPrompt, buildPRCreatorPrompt } from "./pr-creator";

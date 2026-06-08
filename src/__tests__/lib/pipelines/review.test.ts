@@ -31,6 +31,7 @@ vi.mock("@/lib/templates", () => ({
   buildTodoVerifierPrompt: vi.fn(() => "todo-verifier-prompt"),
   buildReadmeVerifierPrompt: vi.fn(() => "readme-verifier-prompt"),
   buildCollectorPrompt: vi.fn(() => "collector-prompt"),
+  buildCrossRepositoryReviewerPrompt: vi.fn(() => "cross-repo-reviewer-prompt"),
 }));
 
 vi.mock("@/lib/workspace/prompts", () => ({
@@ -171,6 +172,63 @@ describe("buildReviewPipeline — skip verify-todo when TODO file is missing", (
     expect(labels).toContain("review-active-repo");
     expect(labels).toContain("verify-readme-no-todo-repo");
     expect(labels).toContain("verify-readme-active-repo");
+  });
+});
+
+describe("buildReviewPipeline — cross-repository review", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+  });
+
+  function twoRepos() {
+    return [
+      {
+        repoName: "api",
+        repoPath: "owner/api",
+        worktreePath: "/repos/api/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+      {
+        repoName: "web",
+        repoPath: "owner/web",
+        worktreePath: "/repos/web/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+    ];
+  }
+
+  it("adds a cross-repository review child when the workspace has multiple repos and no repository filter", async () => {
+    mockListWorkspaceRepos.mockReturnValue(twoRepos());
+
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const labels = groupPhase.children.map((c) => c.label);
+
+    expect(labels).toContain("review-cross-repository");
+  });
+
+  it("does NOT add a cross-repository review child for a single-repo workspace", async () => {
+    mockListWorkspaceRepos.mockReturnValue([twoRepos()[0]]);
+
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const labels = groupPhase.children.map((c) => c.label);
+
+    expect(labels).not.toContain("review-cross-repository");
+  });
+
+  it("does NOT add a cross-repository review child when a single repository is targeted", async () => {
+    mockListWorkspaceRepos.mockReturnValue(twoRepos());
+
+    const phases = await buildReviewPipeline({
+      workspace: "test-ws",
+      repository: "owner/api",
+    });
+    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const labels = groupPhase.children.map((c) => c.label);
+
+    expect(labels).not.toContain("review-cross-repository");
+    expect(labels).toContain("review-api");
+    expect(labels).not.toContain("review-web");
   });
 });
 

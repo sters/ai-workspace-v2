@@ -53,6 +53,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
 
 2. **Create Summary Report** at the specified path following the template structure:
    - Per-repository sections with links to all review/verification files
+   - If a \`REVIEW-cross-repository.md\` file is present, give it its own "Cross-Repository" section (it reviews issues that span multiple repos, e.g. API/contract mismatches) and surface any of its Critical Issues in the top priority list
    - Code Review metrics as a table (Overall Assessment, Critical Issues, Warnings, Suggestions)
    - Warning descriptions as a numbered list directly after the Code Review table (no separate heading)
    - TODO Verification status as a table with completion rate
