@@ -4,6 +4,48 @@ import type { ManagedOperation, WireChildResult } from "./types";
 import { emitEvent, emitStatus } from "./events";
 
 /**
+ * Recompute managed.hasPendingAsk from the event stream, mirroring the client's
+ * findPendingAsk() in src/components/operation/log/display-nodes.ts: a pending
+ * ask exists only if some AskUserQuestion tool_use has no matching tool_result
+ * AND its emitting child process has not already finished. This keeps the
+ * server flag (which drives the dashboard "asking" badge) consistent with what
+ * the UI actually renders, including across concurrent best-of-N children.
+ */
+export function recomputeHasPendingAsk(managed: ManagedOperation): void {
+  const answeredIds = new Set<string>();
+  const finishedChildren = new Set<string>();
+  const asks: { id: string; childLabel?: string }[] = [];
+
+  for (const evt of managed.events) {
+    if (evt.type === "complete" && evt.childLabel) {
+      finishedChildren.add(evt.childLabel);
+    }
+    try {
+      const data = JSON.parse(evt.data);
+      if (data.type === "result" && evt.childLabel) {
+        finishedChildren.add(evt.childLabel);
+      } else if (data.type === "user") {
+        for (const block of data.message?.content ?? []) {
+          if (block.type === "tool_result") answeredIds.add(block.tool_use_id);
+        }
+      } else if (data.type === "assistant") {
+        for (const block of data.message?.content ?? []) {
+          if (block.type === "tool_use" && block.name === "AskUserQuestion") {
+            asks.push({ id: block.id, childLabel: evt.childLabel });
+          }
+        }
+      }
+    } catch {
+      // ignore parse errors (non-JSON status/terminal payloads)
+    }
+  }
+
+  managed.hasPendingAsk = asks.some(
+    (a) => !answeredIds.has(a.id) && !(a.childLabel && finishedChildren.has(a.childLabel)),
+  );
+}
+
+/**
  * Emit synthetic tool_result events for any unanswered AskUserQuestion from a
  * specific childLabel. This ensures findPendingAsk() on the client won't keep
  * showing stale ask inputs after the child process has finished.
@@ -59,9 +101,11 @@ function dismissPendingAsksForChild(
     });
   }
 
-  if (pendingAskIds.some((id) => !answeredIds.has(id))) {
-    managed.hasPendingAsk = false;
-  }
+  // Recompute the global flag from the full event stream. The narrow
+  // "only reset when this child had an unanswered ask" check missed the case
+  // where the child's ask was auto-answered (skipAskUserQuestion mode emits a
+  // synthetic tool_result), leaving hasPendingAsk stuck true forever.
+  recomputeHasPendingAsk(managed);
 }
 
 /**
