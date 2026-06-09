@@ -1,8 +1,8 @@
 import { getReviewSessions, getReviewDetail, getTodos, getReadme } from "@/lib/workspace/reader";
 import { stripCompletedTodosFromWorkspace } from "@/lib/workspace/todo-cleanup";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
-import { readWorkspaceReadme, denormalizeRepoPath } from "@/lib/parsers/readme";
-import { setupRepository } from "./actions/setup-repository";
+import { readWorkspaceReadme } from "@/lib/parsers/readme";
+import { syncReadmeRepositories } from "./actions/ensure-repositories";
 import { buildInitTodoAnalysisPhases } from "./actions/init-todo-analysis";
 import { buildInitPipeline } from "./init";
 import { buildExecutePipeline } from "./execute";
@@ -158,25 +158,19 @@ export function buildAutonomousPipeline(input: {
           return false;
         }
 
-        const wsPath = path.join(getWorkspaceDir(), ws);
-        let metaRepos: { alias: string; path: string; baseBranch: string }[];
-        try {
-          const { meta } = await readWorkspaceReadme(wsPath);
-          metaRepos = meta.repositories;
-        } catch (err) {
-          ctx.emitResult(`Failed to read README: ${err}`);
+        const res = await syncReadmeRepositories(ws, ctx.emitStatus, ctx.signal);
+
+        if (res.readError) {
+          ctx.emitResult(`Failed to read README: ${res.readError}`);
           return false;
         }
 
-        const existing = listWorkspaceRepos(ws);
-        const existingPaths = new Set(existing.map((r) => r.repoPath));
-
-        if (metaRepos.length === 0) {
-          if (existing.length > 0) {
+        if (res.metaRepoCount === 0) {
+          if (res.existingCount > 0) {
             // Workspace has worktrees but README is missing entries — proceed,
             // executor will use what's on disk.
             ctx.emitStatus(
-              `README has no repository entries, but ${existing.length} worktree(s) on disk: ${existing.map((r) => r.repoName).join(", ")}`,
+              `README has no repository entries, but ${res.existingCount} worktree(s) on disk`,
             );
             return true;
           }
@@ -186,45 +180,22 @@ export function buildAutonomousPipeline(input: {
           return false;
         }
 
-        const missing = metaRepos.filter((r) => !existingPaths.has(r.path));
-
-        if (missing.length === 0) {
-          ctx.emitStatus(
-            `All ${metaRepos.length} README repositor${metaRepos.length === 1 ? "y" : "ies"} already set up`,
-          );
-          return true;
-        }
-
-        ctx.emitStatus(
-          `Setting up ${missing.length} missing repositor${missing.length === 1 ? "y" : "ies"} from README`,
-        );
-        for (const repo of missing) {
-          if (ctx.signal.aborted) return false;
-          ctx.emitStatus(`Setting up repository: ${repo.path}`);
-          try {
-            setupRepository(
-              ws,
-              denormalizeRepoPath(repo.path),
-              repo.baseBranch,
-              ctx.emitStatus,
-            );
-          } catch (err) {
-            ctx.emitStatus(`Warning: Failed to set up ${repo.path}: ${err}`);
-          }
-        }
-
-        const after = listWorkspaceRepos(ws);
-        const afterPaths = new Set(after.map((r) => r.repoPath));
-        const stillMissing = metaRepos.filter((r) => !afterPaths.has(r.path));
-        if (stillMissing.length > 0) {
+        if (res.stillMissing.length > 0) {
           ctx.emitResult(
-            `Failed to set up: ${stillMissing.map((r) => r.path).join(", ")}. Check README.md and try again.`,
+            `Failed to set up: ${res.stillMissing.join(", ")}. Check README.md and try again.`,
           );
           return false;
         }
-        ctx.emitResult(
-          `Set up ${missing.length} repositor${missing.length === 1 ? "y" : "ies"}: ${missing.map((r) => r.path).join(", ")}`,
-        );
+
+        if (res.setUp.length > 0) {
+          ctx.emitResult(
+            `Set up ${res.setUp.length} repositor${res.setUp.length === 1 ? "y" : "ies"}: ${res.setUp.join(", ")}`,
+          );
+        } else {
+          ctx.emitStatus(
+            `All ${res.metaRepoCount} README repositor${res.metaRepoCount === 1 ? "y" : "ies"} already set up`,
+          );
+        }
         return true;
       },
     };

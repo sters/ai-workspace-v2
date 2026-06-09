@@ -57,6 +57,21 @@ Do NOT combine \`cd\` with other commands using \`&&\` or \`;\`.
 
 If Mode is "interactive", preview changes before applying and ask for user approval.
 
+### Adding Repositories
+
+If the instruction asks to add a repository (or repositories) to the workspace, add it to the **Repositories** section of the README using this exact format so the system can detect and set it up:
+
+- **Single worktree per repo (default):**
+  \`- **repoName**: \\\`repoPath\\\` (base: \\\`branch\\\`)\`
+  e.g. \`- **my-service**: \\\`github.com/org/my-service\\\` (base: \\\`main\\\`)\`
+- **Multiple parallel worktrees of the same repo** (only when the task explicitly needs N branches against one repo):
+  \`- **repoName (alias)**: \\\`repoPath:alias\\\` (base: \\\`branch\\\`)\` — each row must have a distinct \`:alias\`.
+
+Rules:
+- Always include the host in \`repoPath\` (e.g. \`github.com/org/repo\`).
+- Use \`main\` as the base branch unless the instruction specifies otherwise.
+- Only edit README.md — you do NOT clone or set up the repository yourself. A follow-up step reads the README and sets up any newly added repositories automatically.
+
 ### Language
 
 - **Always write README content in English**, regardless of the language used in the existing README or update request.
