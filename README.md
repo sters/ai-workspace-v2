@@ -182,8 +182,8 @@ bun run test
 # Run tests in watch mode
 bun run test:watch
 
-# Run a single test file
-bunx vitest run src/__tests__/lib/parsers/todo.test.ts
+# Run a single test file (--bun is required so bun:sqlite resolves)
+bun --bun vitest run src/__tests__/lib/parsers/todo.test.ts
 ```
 
 ## Testing
@@ -193,7 +193,7 @@ Tests use **Vitest** with jsdom environment, `@testing-library/react`, and `@tes
 ```bash
 bun run test          # Run all tests
 bun run test:watch    # Watch mode
-bunx vitest run <file> # Single file
+bun --bun vitest run <file>  # Single file (plain `bunx vitest` fails to bundle bun:sqlite)
 ```
 
 ## Tech Stack

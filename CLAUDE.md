@@ -16,7 +16,7 @@ bun run build && bun run start                               # Production build 
 bun run lint                    # Runs both tsc --noEmit AND eslint src/
 bun run test                    # Run all tests
 bun run test:watch              # Run tests in watch mode
-bunx vitest run src/__tests__/lib/parsers/todo.test.ts  # Single test file
+bun --bun vitest run src/__tests__/lib/parsers/todo.test.ts  # Single test file (--bun is required for bun:sqlite)
 ```
 
 ## Configuration
