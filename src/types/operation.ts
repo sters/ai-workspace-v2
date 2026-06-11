@@ -101,6 +101,8 @@ export interface OperationContext {
     type: OperationType,
     body: Record<string, string>
   ) => Promise<void>;
+  /** Clear the current operation (in-memory state + localStorage persistence). */
+  reset: () => void;
   /** True while an operation is running (or starting). */
   isRunning: boolean;
   /** True when there is an active or completed operation. */

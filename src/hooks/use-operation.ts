@@ -14,26 +14,39 @@ const STORAGE_PREFIX = "aiw-op:";
  *                    away and returning automatically reconnects to the SSE stream.
  */
 export function useOperation(storageKey?: string, initialOperationId?: string) {
-  // Restore from localStorage via lazy initializer (runs once, client-only)
-  const [baseOperation, setBaseOperation] = useState<OperationListItem | null>(() => {
-    if (typeof window === "undefined" || initialOperationId || !storageKey) return null;
+  const [baseOperation, setBaseOperation] = useState<OperationListItem | null>(null);
+  // Whether the post-mount localStorage restore has run. Until it has, the
+  // persist effect below must NOT touch localStorage, otherwise the null
+  // first render would clobber the persisted operation before we restore it.
+  const [hydrated, setHydrated] = useState(false);
+
+  // Restore from localStorage AFTER mount (client-only). Reading during the
+  // initial render would make the server (always null) and client diverge,
+  // causing a hydration mismatch — so the first render is deliberately null
+  // on both sides and we reconnect here.
+  useEffect(() => {
+    if (initialOperationId || !storageKey) {
+      setHydrated(true);
+      return;
+    }
     try {
       const raw = localStorage.getItem(`${STORAGE_PREFIX}${storageKey}`);
-      if (!raw) return null;
-      const result = operationListItemSchema.safeParse(JSON.parse(raw));
-      if (result.success) {
-        const op = result.data as OperationListItem;
-        if (op.status === "completed" || op.status === "failed") {
-          localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
-          return null;
+      if (raw) {
+        const result = operationListItemSchema.safeParse(JSON.parse(raw));
+        if (result.success) {
+          const op = result.data as OperationListItem;
+          if (op.status === "completed" || op.status === "failed") {
+            localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
+          } else {
+            setBaseOperation(op);
+          }
         }
-        return op;
       }
     } catch (err) {
       console.warn("[use-operation] localStorage restore failed:", err);
     }
-    return null;
-  });
+    setHydrated(true);
+  }, [storageKey, initialOperationId]);
 
   // Fetch initial operation by ID (async — setState in callback is OK)
   useEffect(() => {
@@ -98,6 +111,9 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
   // ---------- Persist to localStorage ----------
   useEffect(() => {
     if (!storageKey) return;
+    // Wait for the restore effect — persisting the null first render would
+    // erase the operation we're about to reconnect to.
+    if (!hydrated) return;
     if (operation) {
       localStorage.setItem(
         `${STORAGE_PREFIX}${storageKey}`,
@@ -106,7 +122,7 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
     } else {
       localStorage.removeItem(`${STORAGE_PREFIX}${storageKey}`);
     }
-  }, [storageKey, operation]);
+  }, [storageKey, operation, hydrated]);
 
   // ---------- Actions ----------
   const start = useCallback(

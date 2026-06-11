@@ -101,6 +101,7 @@ export function ClaudeOperation({
 
   const childContent = children({
     start: handleStart,
+    reset,
     isRunning: effectiveRunning,
     hasOperation: !!operation,
     workspace: operation?.workspace,
