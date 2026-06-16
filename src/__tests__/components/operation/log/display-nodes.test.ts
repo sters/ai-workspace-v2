@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LogEntry, DisplayNode } from "@/types/claude";
-import { buildDisplayNodes, groupByChildLabel } from "@/components/operation/log/display-nodes";
+import { buildDisplayNodes, groupByChildLabel, findPendingAsk } from "@/components/operation/log/display-nodes";
 
 // Helper to create LogEntry objects concisely
 function text(content: string, parentToolUseId?: string): LogEntry {
@@ -501,5 +501,52 @@ describe("buildDisplayNodes", () => {
     // Both subagents should be inside the child-group
     const innerSubagents = childGroups[0].children.filter(n => n.type === "subagent");
     expect(innerSubagents).toHaveLength(2);
+  });
+});
+
+describe("findPendingAsk", () => {
+  function ask(toolId: string, childLabel?: string): LogEntry {
+    return {
+      kind: "ask",
+      toolId,
+      questions: [
+        { question: "Push?", options: [{ label: "Yes" }, { label: "No" }] },
+      ],
+      childLabel,
+    } as LogEntry;
+  }
+
+  it("returns the latest unanswered ask", () => {
+    const result = findPendingAsk([text("working"), ask("a1")]);
+    expect(result?.toolId).toBe("a1");
+  });
+
+  it("returns null when the ask has a matching tool_result", () => {
+    const result = findPendingAsk([
+      ask("a1"),
+      toolResult("a1", "answered"),
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it("skips an ask whose child finished AFTER it (stale, dismissed)", () => {
+    const result = findPendingAsk([
+      ask("a1", "repo [batch 1/2]"),
+      { kind: "complete", exitCode: 0, childLabel: "repo [batch 1/2]" } as LogEntry,
+    ]);
+    expect(result).toBeNull();
+  });
+
+  it("returns a pending ask even when an EARLIER cycle reused the same childLabel and completed", () => {
+    // Autonomous reuses child labels across cycles (e.g. the same repo runs in
+    // Cycle 1 and Cycle 2). A completion in an earlier cycle must not suppress a
+    // still-pending ask emitted by the same label in a later cycle.
+    const result = findPendingAsk([
+      ask("a1", "repo [batch 1/2]"), // cycle 1 ask
+      toolResult("a1", "answered"), // cycle 1 answered
+      { kind: "complete", exitCode: 0, childLabel: "repo [batch 1/2]" } as LogEntry, // cycle 1 done
+      ask("a2", "repo [batch 1/2]"), // cycle 2 ask — pending, no later completion
+    ]);
+    expect(result?.toolId).toBe("a2");
   });
 });

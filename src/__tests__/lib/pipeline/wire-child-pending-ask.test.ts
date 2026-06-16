@@ -114,6 +114,26 @@ describe("wireChild — hasPendingAsk lifecycle", () => {
     expect(managed.hasPendingAsk).toBe(false);
   });
 
+  it("keeps hasPendingAsk for a later-cycle ask when an earlier cycle reused the same childLabel and finished", async () => {
+    const managed = makeManaged();
+
+    // Cycle 1: the repo child asked, was answered, then finished.
+    emitEvent(managed, { ...askEvent("toolu_c1"), childLabel: "repo [batch 1/2]" });
+    emitEvent(managed, { ...toolResultEvent("toolu_c1", "Yes"), childLabel: "repo [batch 1/2]" });
+    emitEvent(managed, { ...completeEvent(0), childLabel: "repo [batch 1/2]" });
+
+    // Cycle 2: the SAME repo label asks again and is still pending.
+    emitEvent(managed, { ...askEvent("toolu_c2"), childLabel: "repo [batch 1/2]" });
+
+    // Force a recompute (as a sibling child finishing would trigger).
+    const { process, fire } = makeMockProcess();
+    const done = wireChild(managed, "c-other", "other-repo", process);
+    fire(completeEvent(0));
+    await done;
+
+    expect(managed.hasPendingAsk).toBe(true);
+  });
+
   it("keeps hasPendingAsk when another still-running child has a genuine unanswered ask", async () => {
     const managed = makeManaged();
     managed.operation.children = [{ id: "c1", label: "review-foo", status: "running" }];
