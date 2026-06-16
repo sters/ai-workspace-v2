@@ -13,17 +13,24 @@ import { emitEvent, emitStatus } from "./events";
  */
 export function recomputeHasPendingAsk(managed: ManagedOperation): void {
   const answeredIds = new Set<string>();
-  const finishedChildren = new Set<string>();
-  const asks: { id: string; childLabel?: string }[] = [];
+  // Ordered markers of asks and child completions as they appear in the stream.
+  // Order matters: a completion only dismisses asks that came BEFORE it. Child
+  // labels are reused across autonomous cycles (the same repo runs in Cycle 1
+  // and Cycle 2), so an earlier-cycle completion must not suppress a genuine
+  // pending ask emitted by the same label in a later cycle.
+  type Marker =
+    | { kind: "ask"; id: string; childLabel?: string }
+    | { kind: "finish"; childLabel: string };
+  const markers: Marker[] = [];
 
   for (const evt of managed.events) {
     if (evt.type === "complete" && evt.childLabel) {
-      finishedChildren.add(evt.childLabel);
+      markers.push({ kind: "finish", childLabel: evt.childLabel });
     }
     try {
       const data = JSON.parse(evt.data);
       if (data.type === "result" && evt.childLabel) {
-        finishedChildren.add(evt.childLabel);
+        markers.push({ kind: "finish", childLabel: evt.childLabel });
       } else if (data.type === "user") {
         for (const block of data.message?.content ?? []) {
           if (block.type === "tool_result") answeredIds.add(block.tool_use_id);
@@ -31,7 +38,7 @@ export function recomputeHasPendingAsk(managed: ManagedOperation): void {
       } else if (data.type === "assistant") {
         for (const block of data.message?.content ?? []) {
           if (block.type === "tool_use" && block.name === "AskUserQuestion") {
-            asks.push({ id: block.id, childLabel: evt.childLabel });
+            markers.push({ kind: "ask", id: block.id, childLabel: evt.childLabel });
           }
         }
       }
@@ -40,9 +47,22 @@ export function recomputeHasPendingAsk(managed: ManagedOperation): void {
     }
   }
 
-  managed.hasPendingAsk = asks.some(
-    (a) => !answeredIds.has(a.id) && !(a.childLabel && finishedChildren.has(a.childLabel)),
-  );
+  // Walk backward; a childLabel seen finishing later in the stream marks any
+  // earlier same-label ask as stale.
+  const finishedAfter = new Set<string>();
+  let pending = false;
+  for (let i = markers.length - 1; i >= 0; i--) {
+    const m = markers[i];
+    if (m.kind === "finish") {
+      finishedAfter.add(m.childLabel);
+      continue;
+    }
+    if (!answeredIds.has(m.id) && !(m.childLabel && finishedAfter.has(m.childLabel))) {
+      pending = true;
+      break;
+    }
+  }
+  managed.hasPendingAsk = pending;
 }
 
 /**

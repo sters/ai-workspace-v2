@@ -443,23 +443,29 @@ export function findPendingAsk(
   entries: LogEntry[]
 ): { toolId: string; questions: AskQuestion[]; allowFreeText: boolean } | null {
   const answeredIds = new Set<string>();
-  // Collect childLabels whose process has finished (complete/result event).
-  const finishedChildren = new Set<string>();
   for (const e of entries) {
     if (e.kind === "tool_result") {
       answeredIds.add(e.toolId);
     }
-    if ((e.kind === "complete" || e.kind === "result") && e.childLabel) {
-      finishedChildren.add(e.childLabel);
-    }
   }
 
-  // Walk backward to find the latest unanswered ask
+  // Walk backward to find the latest unanswered ask. Track childLabels whose
+  // process finished AFTER the current position. A completion that appears
+  // *later* in the stream than an ask means that ask is stale (the child ended
+  // without it being answered). A completion from an *earlier* cycle must NOT
+  // suppress it: autonomous reuses child labels across cycles (the same repo
+  // runs in Cycle 1 and Cycle 2), so a global by-label "finished" set would
+  // hide a still-pending ask in a later cycle.
+  const finishedAfter = new Set<string>();
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i];
+    if ((e.kind === "complete" || e.kind === "result") && e.childLabel) {
+      finishedAfter.add(e.childLabel);
+      continue;
+    }
     if (e.kind === "ask" && !answeredIds.has(e.toolId)) {
-      // Skip asks from child processes that have already finished
-      if (e.childLabel && finishedChildren.has(e.childLabel)) continue;
+      // Skip asks whose child process finished later in the stream
+      if (e.childLabel && finishedAfter.has(e.childLabel)) continue;
       return { toolId: e.toolId, questions: e.questions, allowFreeText: e.allowFreeText ?? true };
     }
   }
