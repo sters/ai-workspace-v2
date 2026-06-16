@@ -58,6 +58,11 @@ export interface OperationCardProps {
   onCancel: (operationId: string) => void;
   /** Whether this card should be expanded by default. */
   defaultExpanded?: boolean;
+  /**
+   * When set, a finished operation shows a "View" link to this href instead of
+   * the inline "Retry" button (used in cross-workspace history lists).
+   */
+  viewHref?: string;
 }
 
 export interface McpAuthTerminalProps {
