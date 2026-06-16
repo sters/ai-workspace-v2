@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import Link from "next/link";
 import { OperationSummary, useNow } from "@/components/operation/operation-summary";
 import { OperationInputs } from "@/components/operation/operation-inputs";
 import { OperationLog } from "@/components/operation/log";
-import { Button } from "@/components/shared/buttons/button";
+import { Button, buttonVariants } from "@/components/shared/buttons/button";
 import { Card } from "@/components/shared/containers/card";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { ResultBox } from "@/components/shared/feedback/result-box";
@@ -17,6 +18,7 @@ export function OperationCard({
   onStartOperation,
   onCancel,
   defaultExpanded,
+  viewHref,
 }: OperationCardProps) {
   const isRunning = operation.status === "running";
   const isDone = operation.status === "completed" || operation.status === "failed";
@@ -120,24 +122,30 @@ export function OperationCard({
             </Button>
           ) : isDone ? (
             <>
-              {operation.type !== "delete" && (
-                <Button
-                  variant="outline"
-                  disabled={retrying}
-                  onClick={async () => {
-                    setRetrying(true);
-                    try {
-                      await onStartOperation(operation.type, {
-                        workspace: operation.workspace,
-                        ...operation.inputs,
-                      });
-                    } finally {
-                      setRetrying(false);
-                    }
-                  }}
-                >
-                  {retrying ? "Starting…" : "Retry"}
-                </Button>
+              {viewHref ? (
+                <Link href={viewHref} className={buttonVariants("outline")}>
+                  View
+                </Link>
+              ) : (
+                operation.type !== "delete" && (
+                  <Button
+                    variant="outline"
+                    disabled={retrying}
+                    onClick={async () => {
+                      setRetrying(true);
+                      try {
+                        await onStartOperation(operation.type, {
+                          workspace: operation.workspace,
+                          ...operation.inputs,
+                        });
+                      } finally {
+                        setRetrying(false);
+                      }
+                    }}
+                  >
+                    {retrying ? "Starting…" : "Retry"}
+                  </Button>
+                )
               )}
             </>
           ) : null}

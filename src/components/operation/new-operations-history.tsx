@@ -63,6 +63,7 @@ export function NewOperationsHistory() {
               onStartOperation={handleStartOperation}
               onCancel={handleCancel}
               defaultExpanded={false}
+              viewHref={`/workspace/${encodeURIComponent(op.workspace)}/operations?operationId=${encodeURIComponent(op.id)}`}
             />
           ))}
         </div>
