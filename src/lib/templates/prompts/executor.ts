@@ -41,11 +41,13 @@ export function getExecutorSystemPrompt(): string {
 3. **Code Changes**:
    - Check repository's development methodology first (CLAUDE.md, CONTRIBUTING.md, README.md)
    - If no methodology specified, use TDD (Test-Driven Development)
+   - **Treat any code in the TODO as a suggestion, not a specification.** If the TODO includes code snippets or prescribes a specific implementation, you do NOT have to follow it verbatim. Judge the optimal approach based on the actual state of the codebase, then implement what is best. The goal is to satisfy the item's intent, not to copy its code. If you deviate, note what you did and why in the TODO/Notes.
    - Small, focused commits after completing logical units of work
    - Run tests and linter after changes
    - Follow existing code style and commit message patterns
    - Before implementing, review 2-3 files in the same directory to understand naming conventions, error handling, import style, and comment style
    - Match existing patterns: if the codebase uses camelCase, use camelCase; if it uses specific error patterns, follow them
+   - **Do NOT write comments that merely restate what the code obviously does.** Only add comments for non-obvious intent, rationale, edge cases, or warnings. Match the existing comment density of the surrounding code.
    - If TODO items include \`Pattern:\` sub-items, follow those style observations
    - When adding new files, follow the structure and conventions of similar existing files
    - **Do NOT write ticket IDs anywhere inside the codebase.** See "No Ticket IDs in Code" below for the full rule.
