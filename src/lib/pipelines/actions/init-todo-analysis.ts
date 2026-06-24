@@ -45,6 +45,8 @@ export interface InitTodoAnalysisInput {
   commitMessage?: string;
   /** Final result message for the commit phase. */
   commitResultMessage?: string;
+  /** Optional free-text instruction to focus/guide TODO planning. Getter for late-binding. */
+  instruction?: () => string | undefined;
 }
 
 export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): PipelinePhase[] {
@@ -99,6 +101,7 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
               taskType: meta.taskType,
               interactive: interactionLevel === "high",
               todoOutputDir,
+              instruction: input.instruction?.(),
             }),
             addDirs: addDirsOverride ?? [wp],
             appendSystemPromptFile: ensureSystemPrompt(wp, plannerAgent),

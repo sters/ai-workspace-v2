@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   initSchema,
+  initFromPrSchema,
   workspaceSchema,
   createPrSchema,
   updateTodoSchema,
@@ -21,6 +22,44 @@ describe("initSchema", () => {
 
   it("rejects missing description", () => {
     expect(initSchema.safeParse({}).success).toBe(false);
+  });
+});
+
+describe("initFromPrSchema", () => {
+  it("accepts a PR url", () => {
+    const result = initFromPrSchema.safeParse({
+      prUrl: "https://github.com/org/repo/pull/123",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty prUrl", () => {
+    expect(initFromPrSchema.safeParse({ prUrl: "" }).success).toBe(false);
+  });
+
+  it("rejects missing prUrl", () => {
+    expect(initFromPrSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("accepts a todoInstruction string and coerces withReview", () => {
+    const result = initFromPrSchema.safeParse({
+      prUrl: "https://github.com/org/repo/pull/1",
+      todoInstruction: "Plan TODOs for tests",
+      withReview: "true",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.todoInstruction).toBe("Plan TODOs for tests");
+      expect(result.data.withReview).toBe(true);
+    }
+  });
+
+  it("accepts an interaction level", () => {
+    const result = initFromPrSchema.safeParse({
+      prUrl: "https://github.com/org/repo/pull/1",
+      interactionLevel: "high",
+    });
+    expect(result.success).toBe(true);
   });
 });
 
