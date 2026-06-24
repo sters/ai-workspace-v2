@@ -209,6 +209,10 @@ export function buildPlannerPrompt(input: PlannerInput): string {
     ? `${input.todoOutputDir}/templates/TODO-template.md`
     : `workspace/${input.workspaceName}/templates/TODO-template.md`;
 
+  const instructionSection = input.instruction?.trim()
+    ? `\n## User Instruction\n\nThe user provided the following instruction to focus TODO planning. Use your judgment to interpret it and prioritize TODO items accordingly, while still respecting the workspace README:\n\n> ${input.instruction.trim().replace(/\n/g, "\n> ")}\n`
+    : "";
+
   return `# Task: Plan TODO items for ${input.repoName}
 
 ## Workspace: ${input.workspaceName}
@@ -220,6 +224,7 @@ ${input.interactive ? "## Mode: interactive" : ""}
 ## Workspace README
 
 ${input.readmeContent}
+${instructionSection}
 
 ## TODO Template
 

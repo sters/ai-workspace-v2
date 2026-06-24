@@ -31,6 +31,8 @@ export interface PlannerInput extends RepoPromptInput {
   interactive?: boolean;
   /** Override directory for TODO file output. When set, uses this absolute path instead of the default relative path. */
   todoOutputDir?: string;
+  /** Optional free-text instruction from the user to focus/guide TODO planning. */
+  instruction?: string;
 }
 
 export interface CoordinatorInput {

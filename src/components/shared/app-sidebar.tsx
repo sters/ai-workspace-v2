@@ -41,6 +41,12 @@ export function AppSidebar() {
             </Link>
             <div className="ml-3 border-l pl-2">
               <Link
+                href="/new/from-pr"
+                className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                From PR
+              </Link>
+              <Link
                 href="/suggestions"
                 className="block rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
               >

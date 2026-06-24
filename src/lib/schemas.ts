@@ -9,6 +9,15 @@ export const initSchema = z.object({
   bestOfN: z.coerce.number().min(0).max(5).optional(),
 });
 
+export const initFromPrSchema = z.object({
+  prUrl: z.string().min(1, "prUrl is required"),
+  interactionLevel: interactionLevelEnum.optional(),
+  /** Free-text instruction for TODO planning. When non-empty, TODO phases are appended. */
+  todoInstruction: z.string().optional(),
+  /** Append a review pass after the worktree is created. */
+  withReview: z.coerce.boolean().optional(),
+});
+
 export const workspaceSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
 });

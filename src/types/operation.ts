@@ -1,5 +1,6 @@
 export type OperationType =
   | "init"
+  | "init-from-pr"
   | "execute"
   | "review"
   | "create-pr"
