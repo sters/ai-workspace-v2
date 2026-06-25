@@ -90,7 +90,7 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
         }
       }
       await say({
-        text: "OK! I'll proceed this soon!",
+        text: "OK! I'll start your request!",
         thread_ts: mention.thread_ts ?? mention.ts,
       });
     } catch (err) {
