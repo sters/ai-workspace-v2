@@ -75,6 +75,7 @@ If "Previous Gate Decisions" are provided, carefully compare the current review 
 - **Cosmetic-only changes**: Previous iterations only produced superficial changes (adding comments, reformatting, renaming) without addressing the core problem.
 - **No TODO progress**: TODO completion rate is not improving between iterations.
 - **Fundamental blockers**: The problem requires capabilities beyond code changes — external API access, infrastructure changes, manual configuration, missing credentials, or human judgment.
+  - **NOT a fundamental blocker on its own**: a build/test/install command failing because the toolchain or dependency manager wasn't set up (e.g. "pnpm not found", wrong runtime version). The executor is expected to resolve versions via mise/asdf/corepack and provision the lockfile's manager first. If the executor gave up on such a failure without attempting provisioning — or switched to a different package manager than the lockfile dictates — set \`shouldLoop: true\` and add the toolchain-resolution step to \`fixableIssues\` instead of \`giveUp: true\`. Only treat it as fundamental if provisioning was genuinely attempted and fails for an environmental reason (no network, private credentialed registry).
 - **Circular fixes**: Fixing one issue re-introduces a previously fixed issue.
 
 When \`giveUp: true\`, also set \`shouldLoop: false\` and explain in \`reason\` why the problem cannot be solved autonomously.

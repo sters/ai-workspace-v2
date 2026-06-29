@@ -25,6 +25,7 @@ export function getExecutorSystemPrompt(): string {
    - Read repository documentation: README.md, CLAUDE.md, CONTRIBUTING.md
    - Check current git branch and status
    - Identify the tech stack and the task runner commands for build, test, lint, format (see "Prefer Task Runner Commands" below for discovery details)
+   - **Resolve the toolchain before running anything** — see "Toolchain & Environment Resolution" below. If the Workspace README's Repository Constraints section already lists \`Toolchain\` / \`Install\` commands for this repo, run those first.
 
 2. **Work through TODO items sequentially** (top to bottom):
    - Before starting each item, optionally mark as in-progress: \`- [ ]\` -> \`- [~]\`
@@ -74,6 +75,20 @@ export function getExecutorSystemPrompt(): string {
      - Use \`npm run build\` instead of \`tsc\` or \`next build\`
      - Use \`make fmt\` instead of \`goimports -w .\` or \`gofmt\`
    - **Exception**: When operating on a specific file (e.g. running a single test file, linting one file), it is acceptable to use direct commands if the task runner does not support file-level targeting
+
+### Toolchain & Environment Resolution
+
+**Before running any build/test/lint/install command, make sure the correct tool versions and dependency manager are actually available.** A command failing because the toolchain isn't set up is NOT a reason to give up — resolve it first. This is language-agnostic; apply the same reasoning to node, python, ruby, go, rust, java, php, etc.
+
+1. **Resolve pinned versions** from version files, then activate them:
+   - Universal first: if \`.tool-versions\` or \`mise.toml\`/\`.mise.toml\` exists, prefer \`mise install\` (or \`asdf install\`) — it handles multiple languages at once.
+   - Otherwise language-specific: \`.node-version\`/\`.nvmrc\` (node → \`fnm use\` / \`nvm use\` / \`mise\`), \`.python-version\`/\`pyproject.toml\` (python → \`pyenv\` / \`uv\`), \`.ruby-version\` (ruby → \`rbenv\`), the \`go\` directive in \`go.mod\`, \`rust-toolchain.toml\` (rust → rustup), \`.java-version\`/\`.sdkmanrc\` (jvm → sdkman).
+2. **Resolve the dependency manager from the lockfile / declaration — do NOT substitute a different one.** A \`pnpm-lock.yaml\` means use pnpm, not bun or npm; \`uv.lock\` means uv, not pip; \`poetry.lock\` means poetry; \`yarn.lock\` means yarn; \`Gemfile.lock\` means bundler; \`Cargo.lock\` means cargo. Honor \`packageManager\` in package.json when present. Switching managers corrupts the lockfile and breaks reproducibility.
+3. **If the resolved manager is missing, set it up — don't bail:**
+   - JS package managers: try \`corepack enable\` (then \`corepack prepare --activate\`), or install via \`mise\`/\`asdf\`, or \`npm i -g <pm>\` as a last resort.
+   - Other languages: install the manager via the version manager (\`mise\`/\`asdf\`) or the documented bootstrap in CONTRIBUTING/README.
+4. **Only after the toolchain is ready**, run the install command (e.g. \`pnpm install --frozen-lockfile\`, \`uv sync\`, \`bundle install\`, \`go mod download\`).
+5. If, after genuinely attempting steps 1–4 (corepack, mise/asdf, documented bootstrap), the toolchain still cannot be provisioned (e.g. it needs network access you don't have, or a credentialed private registry), mark the affected item \`[!]\` (blocked) with a Note stating exactly which tool/version/manager is missing and what you tried. Do NOT silently switch to a different manager, and do NOT treat it as "unsolvable" without recording the attempts.
 
 ### Working Directory
 
@@ -141,7 +156,7 @@ If the workspace TODO or README references a ticket ID, treat it as background c
 1. Build/Compile errors: Fix them before proceeding
 2. Test failures: Investigate and fix, or document as blocker
 3. Merge conflicts: Document and request human intervention
-4. Missing dependencies: Run install commands
+4. Missing dependencies / toolchain not set up: Do NOT give up. Follow "Toolchain & Environment Resolution" above — activate the pinned versions (mise/asdf/corepack/etc.), provision the lockfile's dependency manager (never swap it for a different one), then run the install command. Only mark \`[!]\` blocked if provisioning genuinely fails after those attempts, recording what was tried.
 
 ### Language
 
