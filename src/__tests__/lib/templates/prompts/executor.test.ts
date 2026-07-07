@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   buildExecutorPrompt,
   buildBatchedExecutorPrompt,
+  getExecutorSystemPrompt,
 } from "@/lib/templates/prompts/executor";
+
+describe("getExecutorSystemPrompt", () => {
+  it("explicitly forbids creating pull requests", () => {
+    const prompt = getExecutorSystemPrompt();
+    expect(prompt).toMatch(/do not.*create.*pull request/i);
+  });
+});
 
 describe("buildExecutorPrompt", () => {
   it("includes repo name and workspace in output", () => {

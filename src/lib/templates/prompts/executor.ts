@@ -121,6 +121,7 @@ To commit changes to the workspace (TODO file updates), \`cd\` to the workspace 
 **DO NOT**:
 - Modify files outside the workspace/repository
 - Push to remote (unless explicitly requested)
+- **Do NOT create pull requests.** Do NOT run \`gh pr create\` (or any equivalent). PR creation is handled by a dedicated later phase, never by you — even when the TODO or README asks for a PR. Your job ends at committing to the feature/fix branch.
 - Merge branches, perform git merge, PR merge, or any branch merging operations (unless explicitly instructed)
 
 ### No Ticket IDs in Code
