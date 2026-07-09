@@ -29,12 +29,25 @@ This is the ai-workspace root. It contains \`workspace/\` (per-workspace README/
  * @param message the user's Slack message text
  * @param isFirstTurn when true, prepend the conversation instructions; on
  *   resume turns pass false so only the message is sent.
+ * @param threadContext optional transcript of the surrounding Slack thread,
+ *   folded in on the first turn so Claude can answer questions like
+ *   "summarize this thread". Ignored on resume turns.
  */
 export function buildSlackChatPrompt(
   workspaceRoot: string,
   message: string,
   isFirstTurn: boolean,
+  threadContext?: string,
 ): string {
   if (!isFirstTurn) return message;
-  return `${slackChatInstructions(workspaceRoot)}\n\n---\n\n${message}`;
+
+  const parts = [slackChatInstructions(workspaceRoot)];
+  if (threadContext && threadContext.trim() !== "") {
+    parts.push(
+      "--- Slack thread so far (earlier messages in this thread, for context) ---\n" +
+        threadContext,
+    );
+  }
+  parts.push("--- The user's message to you follows ---\n" + message);
+  return parts.join("\n\n");
 }
