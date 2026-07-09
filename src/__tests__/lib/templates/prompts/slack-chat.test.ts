@@ -2,18 +2,27 @@ import { describe, expect, it } from "vitest";
 import { buildSlackChatPrompt, getSlackChatSystemPrompt } from "@/lib/templates/prompts/slack-chat";
 
 describe("getSlackChatSystemPrompt", () => {
-  it("strongly forbids state-changing actions", () => {
+  it("defaults to read-only but permits explicitly-requested writes", () => {
     const sys = getSlackChatSystemPrompt();
     expect(sys).toContain("READ-ONLY");
-    expect(sys).toMatch(/NEVER/);
-    // Covers the three tool families that can mutate state.
-    expect(sys).toMatch(/git/);
+    // Writes are gated on an explicit user request, not the model's initiative.
+    expect(sys).toMatch(/EXPLICIT/);
     expect(sys).toMatch(/MCP/);
   });
 
-  it("carves out the memories table as the one permitted write", () => {
+  it("keeps repository/codebase changes and destructive actions forbidden even on request", () => {
     const sys = getSlackChatSystemPrompt();
-    expect(sys).toMatch(/MEMORY EXCEPTION/);
+    expect(sys).toMatch(/NEVER/);
+    expect(sys).toMatch(/git/);
+    // Irreversible/destructive operations stay off-limits.
+    expect(sys).toMatch(/reset --hard|force-push|rm -rf/);
+    // Code changes are routed to the WebUI / init instead.
+    expect(sys).toMatch(/WebUI|init/);
+  });
+
+  it("lets the model read and write the per-user memory database", () => {
+    const sys = getSlackChatSystemPrompt();
+    expect(sys).toMatch(/MEMORY/);
     expect(sys).toContain("memories");
     expect(sys).toMatch(/EXPLICITLY/);
   });
