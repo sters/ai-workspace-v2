@@ -6,17 +6,18 @@
  * held in memory only — if the slack-server process restarts, threads start
  * fresh, which is acceptable for a chat surface.
  *
- * The session is intentionally READ-ONLY: only Read/Glob/Grep/WebFetch/
- * WebSearch are allowed. Mutations happen through the WebUI or the `init`
- * command, never here.
+ * The session inherits the ambient Claude permissions of the host (the same
+ * `~/.claude/settings.json` every other operation runs under), so Bash, git,
+ * gh, and MCP servers work wherever the environment already permits them.
+ * Read-only behavior is NOT enforced at the tool layer — it is enforced by
+ * the system prompt (`getSlackChatSystemPrompt`), see `slack-chat.ts`.
+ * Mutations should still go through the WebUI or `init`.
  */
 
 import { runClaude } from "@/lib/claude";
 import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
 import { buildSlackChatPrompt } from "@/lib/templates/prompts";
-
-/** Tools the Slack conversation is permitted to use. Read-only by design. */
-const READ_ONLY_TOOLS = ["Read", "Glob", "Grep", "WebFetch", "WebSearch"];
+import { ensureGlobalSystemPrompt } from "@/lib/workspace/prompts";
 
 /** How long a thread's session is kept before it is considered stale. */
 const SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
@@ -125,7 +126,10 @@ export async function converse(
 
   const proc = runClaude("slack-chat", prompt, {
     cwd: workspaceRoot,
-    allowedTools: READ_ONLY_TOOLS,
+    // No allowedTools/addDirs: inherit the host's ambient Claude permissions
+    // (same as every other operation). Read-only is enforced by the system
+    // prompt below, not at the tool layer.
+    appendSystemPromptFile: ensureGlobalSystemPrompt("slack-chat"),
     resumeSessionId,
     skipAskUserQuestion: true,
     model: chatModel ?? undefined,
