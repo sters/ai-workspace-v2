@@ -84,6 +84,7 @@ export function generateDefaultConfigContent(): string {
     "#   allowedUserIds: []              # Slack user IDs allowed to invoke commands; empty = none",
     "#   chatModel: sonnet               # model for read-only conversation (non-init mentions); null = CLI default",
     "#   chatEffort: medium              # conversation effort level (low / medium / high / max, null = CLI default)",
+    "#   memoryEnabled: true             # per-user memory the conversation can read/write via sqlite3",
     "",
   ];
   return lines.join("\n");

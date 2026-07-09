@@ -101,6 +101,12 @@ export interface AppConfig {
     chatModel: ClaudeModel | null;
     /** Claude CLI --effort level for the read-only conversation. null = CLI default. */
     chatEffort: ClaudeEffort | null;
+    /**
+     * When true, the read-only conversation is given a per-Slack-user memory
+     * database (`.ai-workspace/slack-memory.sqlite`) it can read/write via the
+     * `sqlite3` CLI to recall/persist facts across threads. Default true.
+     */
+    memoryEnabled: boolean;
   };
 }
 

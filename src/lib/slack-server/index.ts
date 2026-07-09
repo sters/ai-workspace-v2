@@ -60,7 +60,7 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
     const parsed = parseCommand(mention.text ?? "");
     if (!parsed.ok) {
       if (parsed.kind === "chat") {
-        await handleConversation(client, mention, parsed.message);
+        await handleConversation(client, mention, parsed.message, user);
       } else {
         await say({ text: parsed.reply, thread_ts: mention.thread_ts ?? mention.ts });
       }
@@ -132,12 +132,14 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
  * gets an answer.
  *
  * The Slack thread (`thread_ts ?? ts`) is the conversation key, so follow-up
- * mentions in the same thread continue the same Claude session.
+ * mentions in the same thread continue the same Claude session. `userId` scopes
+ * the conversation's per-user memory.
  */
 async function handleConversation(
   client: WebClient,
   mention: AppMentionEvent,
   message: string,
+  userId: string,
 ): Promise<void> {
   const threadTs = mention.thread_ts ?? mention.ts;
 
@@ -172,7 +174,10 @@ async function handleConversation(
 
   let reply: string;
   try {
-    reply = await converse(threadTs, message, threadContext || undefined);
+    reply = await converse(threadTs, message, {
+      userId,
+      threadContext: threadContext || undefined,
+    });
   } catch (err) {
     reply = `Sorry, something went wrong: ${err instanceof Error ? err.message : String(err)}`;
   }

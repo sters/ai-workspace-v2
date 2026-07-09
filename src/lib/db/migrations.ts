@@ -146,6 +146,18 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 8,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE slack_conversation_sessions (
+          thread_key  TEXT PRIMARY KEY,
+          session_id  TEXT NOT NULL,
+          last_active INTEGER NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 /**
