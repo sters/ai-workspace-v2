@@ -27,6 +27,8 @@ export interface ClaudeProcess {
   submitAnswer: (toolUseId: string, answers: Record<string, string>) => boolean;
   /** Returns the model's final text response (captured from the result event). */
   getResultText: () => string | undefined;
+  /** Returns the CLI session id (captured from the system/init event), or null if not yet known. Use with `resumeSessionId` to continue the conversation. */
+  getSessionId: () => string | null;
 }
 
 export interface RunClaudeOptions {
@@ -46,6 +48,8 @@ export interface RunClaudeOptions {
   appendSystemPromptFile?: string;
   /** Explicit --allowedTools values. When set, overrides the auto-generated Edit/Write patterns from addDirs. */
   allowedTools?: string[];
+  /** Resume an existing CLI session (passed as --resume on the initial spawn). Used to continue a multi-turn conversation. */
+  resumeSessionId?: string;
 }
 
 // TODO: Replace with Record<string, unknown> or a discriminated union once

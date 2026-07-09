@@ -3,6 +3,7 @@ import type { WebClient } from "@slack/web-api";
 import type { AppMentionEvent } from "@slack/types";
 import { addPendingNotification } from "@/lib/db/slack-notifications";
 import { parseCommand, USAGE, type Command } from "./commands";
+import { converse } from "./conversation";
 import { dispatch } from "./dispatcher";
 import { startNotifier, type Notifier } from "./notifier";
 import { mergeWithThreadLink } from "./thread-link";
@@ -57,7 +58,11 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
 
     const parsed = parseCommand(mention.text ?? "");
     if (!parsed.ok) {
-      await say({ text: parsed.reply, thread_ts: mention.thread_ts ?? mention.ts });
+      if (parsed.kind === "chat") {
+        await handleConversation(client, mention, parsed.message);
+      } else {
+        await say({ text: parsed.reply, thread_ts: mention.thread_ts ?? mention.ts });
+      }
       return;
     }
 
@@ -116,6 +121,60 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
       await app.stop();
     },
   };
+}
+
+/**
+ * Handle a free-form conversation mention: post a placeholder in the thread,
+ * run a read-only Claude query (continuing the thread's session if one
+ * exists), then edit the placeholder with the reply. On any Slack API failure
+ * along the way we fall back to posting a fresh message so the user always
+ * gets an answer.
+ *
+ * The Slack thread (`thread_ts ?? ts`) is the conversation key, so follow-up
+ * mentions in the same thread continue the same Claude session.
+ */
+async function handleConversation(
+  client: WebClient,
+  mention: AppMentionEvent,
+  message: string,
+): Promise<void> {
+  const threadTs = mention.thread_ts ?? mention.ts;
+
+  let placeholderTs: string | undefined;
+  try {
+    const posted = await client.chat.postMessage({
+      channel: mention.channel,
+      thread_ts: threadTs,
+      text: "🤔 Thinking…",
+    });
+    placeholderTs = posted.ts;
+  } catch (err) {
+    console.warn(
+      "[slack-server] could not post placeholder:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
+
+  let reply: string;
+  try {
+    reply = await converse(threadTs, message);
+  } catch (err) {
+    reply = `Sorry, something went wrong: ${err instanceof Error ? err.message : String(err)}`;
+  }
+
+  if (placeholderTs) {
+    try {
+      await client.chat.update({ channel: mention.channel, ts: placeholderTs, text: reply });
+      return;
+    } catch (err) {
+      console.warn(
+        "[slack-server] could not update placeholder, posting fresh message:",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  await client.chat.postMessage({ channel: mention.channel, thread_ts: threadTs, text: reply });
 }
 
 /**

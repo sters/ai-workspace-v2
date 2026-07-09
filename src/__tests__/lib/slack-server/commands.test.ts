@@ -78,37 +78,69 @@ describe("parseCommand", () => {
     it("rejects unknown flag", () => {
       const r = parseCommand("init --foo do a thing");
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.reply).toContain("--foo");
+      if (!r.ok && r.kind === "usage") expect(r.reply).toContain("--foo");
     });
   });
 
-  describe("removed commands now reject", () => {
+  describe("non-init text is treated as free-form conversation", () => {
     for (const op of ["execute", "review", "create-pr", "autonomous"]) {
-      it(`rejects ${op}`, () => {
+      it(`routes ${op} to chat`, () => {
         const r = parseCommand(`${op} myws`);
         expect(r.ok).toBe(false);
-        if (!r.ok) expect(r.reply).toContain("Unknown");
+        if (!r.ok) {
+          expect(r.kind).toBe("chat");
+          if (r.kind === "chat") expect(r.message).toBe(`${op} myws`);
+        }
       });
     }
+
+    it("routes a plain question to chat with the stripped text", () => {
+      const r = parseCommand("<@U0BOT123> what is the status of the foo workspace?");
+      expect(r.ok).toBe(false);
+      if (!r.ok) {
+        expect(r.kind).toBe("chat");
+        if (r.kind === "chat") expect(r.message).toBe("what is the status of the foo workspace?");
+      }
+    });
+
+    it("routes a single unknown token to chat", () => {
+      const r = parseCommand("doSomething");
+      expect(r.ok).toBe(false);
+      if (!r.ok) {
+        expect(r.kind).toBe("chat");
+        if (r.kind === "chat") expect(r.message).toBe("doSomething");
+      }
+    });
   });
 
-  describe("help / unknown / empty", () => {
+  describe("help / empty return usage", () => {
     it("returns USAGE on help", () => {
       const r = parseCommand("help");
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.reply).toBe(USAGE);
+      if (!r.ok) {
+        expect(r.kind).toBe("usage");
+        if (r.kind === "usage") expect(r.reply).toBe(USAGE);
+      }
     });
 
     it("returns USAGE on empty input", () => {
       const r = parseCommand("");
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.reply).toBe(USAGE);
+      if (!r.ok) {
+        expect(r.kind).toBe("usage");
+        if (r.kind === "usage") expect(r.reply).toBe(USAGE);
+      }
     });
+  });
 
-    it("returns Unknown reply on unrecognized op", () => {
-      const r = parseCommand("doSomething");
+  describe("init flag errors return usage", () => {
+    it("returns usage (not chat) on unknown init flag", () => {
+      const r = parseCommand("init --foo do a thing");
       expect(r.ok).toBe(false);
-      if (!r.ok) expect(r.reply).toContain("Unknown");
+      if (!r.ok) {
+        expect(r.kind).toBe("usage");
+        if (r.kind === "usage") expect(r.reply).toContain("--foo");
+      }
     });
   });
 });

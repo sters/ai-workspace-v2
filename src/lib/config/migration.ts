@@ -82,6 +82,8 @@ export function generateDefaultConfigContent(): string {
     "#   botToken: \"{ENV:AIW_SLACK_BOT_TOKEN}\"   # xoxb-... ; supports {ENV:VAR} substitution",
     "#   appToken: \"{ENV:AIW_SLACK_APP_TOKEN}\"   # xapp-... ; Socket Mode app-level token",
     "#   allowedUserIds: []              # Slack user IDs allowed to invoke commands; empty = none",
+    "#   chatModel: sonnet               # model for read-only conversation (non-init mentions); null = CLI default",
+    "#   chatEffort: medium              # conversation effort level (low / medium / high / max, null = CLI default)",
     "",
   ];
   return lines.join("\n");
