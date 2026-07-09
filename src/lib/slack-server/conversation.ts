@@ -1,5 +1,5 @@
 /**
- * Free-form, read-only Slack conversation backed by the Claude CLI.
+ * Free-form Slack conversation backed by the Claude CLI.
  *
  * Each Slack thread maps to one Claude CLI session so follow-up messages in
  * the same thread continue the conversation (via `--resume`). The mapping is
@@ -8,15 +8,18 @@
  *
  * The session inherits the ambient Claude permissions of the host (the same
  * `~/.claude/settings.json` every other operation runs under), so Bash, git,
- * gh, and MCP servers work wherever the environment already permits them.
- * Read-only behavior is NOT enforced at the tool layer — it is enforced by
- * the system prompt (`getSlackChatSystemPrompt`), see `slack-chat.ts`.
- * Mutations should still go through the WebUI or `init`.
+ * gh, and MCP servers work wherever the environment already permits them. The
+ * write policy is NOT enforced at the tool layer — it is enforced by the system
+ * prompt (`getSlackChatSystemPrompt`), see `slack-chat.ts`: read-only on the
+ * model's own initiative, writes only when the user explicitly asks (mainly
+ * external MCP actions like creating a Jira ticket), and git/codebase changes
+ * plus destructive operations forbidden regardless — those still go through the
+ * WebUI or `init`.
  *
- * The one exception is per-user memory: when `slack.memoryEnabled` is set and a
- * Slack user id is known, the conversation is pointed at a dedicated SQLite
- * file (`@/lib/slack-server/memory-db`) it may read/write via `sqlite3` to
- * recall and persist facts across threads. The prompt scopes all access to the
+ * Per-user memory: when `slack.memoryEnabled` is set and a Slack user id is
+ * known, the conversation is pointed at a dedicated SQLite file
+ * (`@/lib/slack-server/memory-db`) it may read/write via `sqlite3` to recall
+ * and persist facts across threads. The prompt scopes all access to the
  * current user's rows.
  */
 
@@ -128,8 +131,9 @@ function runTurn(
   const proc = runClaude("slack-chat", prompt, {
     cwd: getResolvedWorkspaceRoot(),
     // No allowedTools/addDirs: inherit the host's ambient Claude permissions
-    // (same as every other operation). Read-only (plus the memory carve-out) is
-    // enforced by the system prompt below, not at the tool layer.
+    // (same as every other operation). The write policy (read-only by default,
+    // explicitly-requested writes only, no repo/destructive changes) is
+    // enforced by the system prompt, not at the tool layer.
     appendSystemPromptFile: ensureGlobalSystemPrompt("slack-chat"),
     resumeSessionId,
     skipAskUserQuestion: true,
