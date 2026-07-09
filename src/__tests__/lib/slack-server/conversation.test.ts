@@ -4,6 +4,7 @@ import { describe, expect, it, beforeEach, vi } from "vitest";
 const runClaudeMock = vi.fn();
 const getConfigMock = vi.fn();
 const ensureMemoryMock = vi.fn();
+const summarizeMock = vi.fn();
 
 vi.mock("@/lib/claude", () => ({
   runClaude: (...args: unknown[]) => runClaudeMock(...args),
@@ -18,6 +19,9 @@ vi.mock("@/lib/workspace/prompts", () => ({
 vi.mock("@/lib/slack-server/memory-db", () => ({
   ensureSlackMemoryDb: (...args: unknown[]) => ensureMemoryMock(...args),
 }));
+vi.mock("@/lib/slack-server/progress-summary", () => ({
+  summarizeProgress: (...args: unknown[]) => summarizeMock(...args),
+}));
 
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { setSession, getSession } from "@/lib/db/slack-sessions";
@@ -29,7 +33,12 @@ interface FakeEvent {
 }
 
 /** A stub ClaudeProcess that replays scripted events when onEvent is attached. */
-function fakeProc(opts: { sessionId?: string; resultText?: string; events: FakeEvent[] }) {
+function fakeProc(opts: {
+  sessionId?: string;
+  resultText?: string;
+  assistantText?: string;
+  events: FakeEvent[];
+}) {
   return {
     id: "slack-chat",
     onEvent: (handler: (e: FakeEvent) => void) => {
@@ -37,6 +46,7 @@ function fakeProc(opts: { sessionId?: string; resultText?: string; events: FakeE
     },
     getSessionId: () => opts.sessionId ?? null,
     getResultText: () => opts.resultText,
+    getAssistantText: () => opts.assistantText ?? "",
     kill: () => {},
     submitAnswer: () => false,
   };
@@ -63,8 +73,17 @@ describe("converse", () => {
     runClaudeMock.mockReset();
     ensureMemoryMock.mockReset();
     ensureMemoryMock.mockReturnValue("/ws/.ai-workspace/slack-memory.sqlite");
+    summarizeMock.mockReset();
+    summarizeMock.mockResolvedValue("a summary");
     getConfigMock.mockReturnValue({
-      slack: { memoryEnabled: true, chatModel: "sonnet", chatEffort: "medium" },
+      slack: {
+        memoryEnabled: true,
+        chatModel: "sonnet",
+        chatEffort: "medium",
+        chatHeartbeatMs: 3 * 60 * 1000,
+        chatMaxTurnMs: 18 * 60 * 1000,
+        chatProgressModel: "haiku",
+      },
     });
   });
 
@@ -94,7 +113,14 @@ describe("converse", () => {
 
   it("omits memory when memoryEnabled is false", async () => {
     getConfigMock.mockReturnValue({
-      slack: { memoryEnabled: false, chatModel: null, chatEffort: null },
+      slack: {
+        memoryEnabled: false,
+        chatModel: null,
+        chatEffort: null,
+        chatHeartbeatMs: 3 * 60 * 1000,
+        chatMaxTurnMs: 18 * 60 * 1000,
+        chatProgressModel: "haiku",
+      },
     });
     runClaudeMock.mockReturnValue(
       fakeProc({ sessionId: "s", resultText: "ok", events: [complete(0)] }),
@@ -140,5 +166,113 @@ describe("converse", () => {
     await converse("thread-x", "hi", { userId: "U1" });
 
     expect(runClaudeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists the session id on the hard cap so the thread can resume", async () => {
+    vi.useFakeTimers();
+    try {
+      // No complete event → the turn never settles on its own and hits the cap.
+      runClaudeMock.mockReturnValue(
+        fakeProc({ sessionId: "sess-timeout", events: [] }),
+      );
+
+      const promise = converse("thread-timeout", "a big investigation", { userId: "U1" });
+      await vi.advanceTimersByTimeAsync(18 * 60 * 1000);
+      const reply = await promise;
+
+      expect(reply).toContain("took too long");
+      expect(getSession("thread-timeout", Date.now())).toBe("sess-timeout");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not persist a session on the hard cap when none was captured", async () => {
+    vi.useFakeTimers();
+    try {
+      runClaudeMock.mockReturnValue(fakeProc({ events: [] }));
+
+      const promise = converse("thread-none", "hi", { userId: "U1" });
+      await vi.advanceTimersByTimeAsync(18 * 60 * 1000);
+      await promise;
+
+      expect(getSession("thread-none", Date.now())).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("summarizes progress on the heartbeat and posts the summary", async () => {
+    vi.useFakeTimers();
+    try {
+      runClaudeMock.mockReturnValue(
+        fakeProc({ sessionId: "s", assistantText: "grepping the logs…", events: [] }),
+      );
+      summarizeMock.mockResolvedValue("Reading the auth logs.");
+      const onProgress = vi.fn();
+
+      const promise = converse("thread-hb", "investigate", { userId: "U1", onProgress });
+      // One heartbeat interval elapses before the turn completes.
+      await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+
+      expect(summarizeMock).toHaveBeenCalledWith("grepping the logs…", "haiku");
+      expect(onProgress).toHaveBeenCalledWith("Reading the auth logs.");
+
+      // Let it reach the cap so the promise settles.
+      await vi.advanceTimersByTimeAsync(18 * 60 * 1000);
+      await promise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("posts a bare marker (no summarization) when there is no assistant text yet", async () => {
+    vi.useFakeTimers();
+    try {
+      runClaudeMock.mockReturnValue(fakeProc({ sessionId: "s", assistantText: "", events: [] }));
+      const onProgress = vi.fn();
+
+      const promise = converse("thread-empty", "investigate", { userId: "U1", onProgress });
+      await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+
+      expect(summarizeMock).not.toHaveBeenCalled();
+      expect(onProgress).toHaveBeenCalledWith("");
+
+      await vi.advanceTimersByTimeAsync(18 * 60 * 1000);
+      await promise;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("skips summarization and posts a bare marker when chatProgressModel is null", async () => {
+    vi.useFakeTimers();
+    try {
+      getConfigMock.mockReturnValue({
+        slack: {
+          memoryEnabled: true,
+          chatModel: "sonnet",
+          chatEffort: "medium",
+          chatHeartbeatMs: 3 * 60 * 1000,
+          chatMaxTurnMs: 18 * 60 * 1000,
+          chatProgressModel: null,
+        },
+      });
+      runClaudeMock.mockReturnValue(
+        fakeProc({ sessionId: "s", assistantText: "grepping the logs…", events: [] }),
+      );
+      const onProgress = vi.fn();
+
+      const promise = converse("thread-null", "investigate", { userId: "U1", onProgress });
+      await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+
+      expect(summarizeMock).not.toHaveBeenCalled();
+      expect(onProgress).toHaveBeenCalledWith("");
+
+      await vi.advanceTimersByTimeAsync(18 * 60 * 1000);
+      await promise;
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -782,6 +782,9 @@ describe("migrateConfigContent", () => {
       "  allowedUserIds: []",
       "  chatModel: sonnet",
       "  chatEffort: medium",
+      "  chatHeartbeatMs: 180000",
+      "  chatMaxTurnMs: 1080000",
+      "  chatProgressModel: haiku",
       "  memoryEnabled: true",
       "",
     ].join("\n");
@@ -914,6 +917,9 @@ describe("migrateConfigContent", () => {
       "  allowedUserIds: []",
       "  chatModel: sonnet",
       "  chatEffort: medium",
+      "  chatHeartbeatMs: 180000",
+      "  chatMaxTurnMs: 1080000",
+      "  chatProgressModel: haiku",
       "  memoryEnabled: true",
       "",
     ].join("\n");

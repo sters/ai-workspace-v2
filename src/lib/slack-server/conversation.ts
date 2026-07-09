@@ -26,9 +26,7 @@ import { deleteSession, getSession, setSession } from "@/lib/db/slack-sessions";
 import { buildSlackChatPrompt } from "@/lib/templates/prompts";
 import { ensureGlobalSystemPrompt } from "@/lib/workspace/prompts";
 import { ensureSlackMemoryDb } from "./memory-db";
-
-/** Kill a conversation turn that runs longer than this. */
-const TURN_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+import { summarizeProgress } from "./progress-summary";
 
 /**
  * Whether a live (non-expired) CLI session already exists for a thread. Used
@@ -45,6 +43,15 @@ export interface ConverseOptions {
   userId?: string;
   /** Transcript of the surrounding Slack thread, folded into the first turn. */
   threadContext?: string;
+  /**
+   * Called periodically (every `slack.chatHeartbeatMs`) while the turn is still
+   * running, with a one-line summary of the assistant's progress so far
+   * (produced by `slack.chatProgressModel`, default haiku). The string is empty
+   * when the model has only run tools, summarization is disabled, or the
+   * summarizer failed — the caller should render a bare "still working" marker
+   * in that case. Errors thrown by the callback are ignored.
+   */
+  onProgress?: (progress: string) => void | Promise<void>;
 }
 
 interface TurnResult {
@@ -95,7 +102,7 @@ export async function converse(
       threadContext: opts.threadContext,
       ...memoryOpts(),
     });
-    return runTurn(threadKey, prompt, resume, config);
+    return runTurn(threadKey, prompt, resume, config, opts.onProgress);
   };
 
   let result = await runAttempt(resumeSessionId);
@@ -116,6 +123,7 @@ function runTurn(
   prompt: string,
   resumeSessionId: string | undefined,
   config: ReturnType<typeof getConfig>,
+  onProgress?: (progress: string) => void | Promise<void>,
 ): Promise<TurnResult> {
   const proc = runClaude("slack-chat", prompt, {
     cwd: getResolvedWorkspaceRoot(),
@@ -129,23 +137,68 @@ function runTurn(
     effort: config.slack.chatEffort ?? undefined,
   });
 
+  const heartbeatMs = config.slack.chatHeartbeatMs;
+  const maxTurnMs = config.slack.chatMaxTurnMs;
+
   return new Promise<TurnResult>((resolve) => {
     let settled = false;
+    let summarizing = false;
     const finish = (result: TurnResult) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      clearTimeout(hardCap);
+      clearInterval(heartbeat);
       resolve(result);
     };
 
-    const timer = setTimeout(() => {
+    // Interim progress: while the turn keeps running (no completion yet),
+    // summarize what the assistant has said so far into a one-liner and post it
+    // back to the thread. This turns a long investigation into a visible pulse
+    // instead of a silent wait, without dumping raw output. Only one summary is
+    // in flight at a time; an empty snapshot or disabled/failed summarization
+    // yields a bare liveness marker (empty string to onProgress).
+    const heartbeat = setInterval(() => {
+      if (settled || !onProgress || summarizing) return;
+      const progress = proc.getAssistantText().trim();
+      const model = config.slack.chatProgressModel;
+      if (!progress || !model) {
+        void Promise.resolve(onProgress("")).catch(() => {});
+        return;
+      }
+      summarizing = true;
+      void summarizeProgress(progress, model)
+        .then((summary) => {
+          if (settled || !onProgress) return;
+          return onProgress(summary ?? "");
+        })
+        .catch(() => {})
+        .finally(() => {
+          summarizing = false;
+        });
+    }, heartbeatMs);
+
+    const hardCap = setTimeout(() => {
       proc.kill();
+      // Persist whatever session the CLI reported before the timeout so the
+      // next message in this thread resumes it (continuing the work) and the
+      // logged id can be inspected via `claude --resume`.
+      const sessionId = proc.getSessionId();
+      if (sessionId) {
+        setSession(threadKey, sessionId, Date.now());
+        console.warn(
+          `[slack-chat] turn hit the ${maxTurnMs}ms cap; persisted session ${sessionId} for thread ${threadKey} — resume to continue`,
+        );
+      } else {
+        console.warn(
+          `[slack-chat] turn hit the ${maxTurnMs}ms cap for thread ${threadKey} (no session id captured)`,
+        );
+      }
       finish({
         ok: false,
         reason: "timeout",
-        text: "Sorry, that took too long and I gave up. Please try a narrower question.",
+        text: "Sorry, that took too long and I gave up. The work so far is saved — reply in this thread to continue.",
       });
-    }, TURN_TIMEOUT_MS);
+    }, maxTurnMs);
 
     proc.onEvent((event) => {
       if (event.type === "error") {

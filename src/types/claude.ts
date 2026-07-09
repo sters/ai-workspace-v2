@@ -29,6 +29,8 @@ export interface ClaudeProcess {
   getResultText: () => string | undefined;
   /** Returns the CLI session id (captured from the system/init event), or null if not yet known. Use with `resumeSessionId` to continue the conversation. */
   getSessionId: () => string | null;
+  /** Returns all assistant text emitted so far (intermediate + final blocks, joined by newlines). Useful for interim progress snapshots while the turn is still running. */
+  getAssistantText: () => string;
 }
 
 export interface RunClaudeOptions {

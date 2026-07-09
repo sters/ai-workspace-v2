@@ -186,6 +186,9 @@ export function runClaude(
 
   // Accumulated result text from StructuredOutput tool_use or the "result" event
   let resultText: string | undefined;
+  // All assistant text blocks seen so far (intermediate + final), for interim
+  // progress snapshots via getAssistantText().
+  const assistantTextParts: string[] = [];
   // Whether resultText was set from a StructuredOutput tool_use (takes precedence over result event)
   let hasStructuredOutput = false;
 
@@ -286,7 +289,10 @@ export function runClaude(
           for (const parsed of result.values as StreamEvent[]) {
             // Record session_id from system/init event
             if (parsed.type === "system" && parsed.session_id) {
-              sessionId = parsed.session_id;
+              if (sessionId !== parsed.session_id) {
+                sessionId = parsed.session_id;
+                log(operationId, `session_id=${sessionId} (resume with: claude --resume ${sessionId})`);
+              }
             }
 
             // Capture result text from the result event (unless StructuredOutput already set it)
@@ -297,6 +303,9 @@ export function runClaude(
             // Detect AskUserQuestion / StructuredOutput tool_use in assistant messages
             if (parsed.type === "assistant" && parsed.message?.content) {
               for (const block of parsed.message.content) {
+                if (block.type === "text" && typeof block.text === "string" && block.text.trim()) {
+                  assistantTextParts.push(block.text);
+                }
                 if (block.type === "tool_use" && block.name === "AskUserQuestion") {
                   pendingAskToolUseId = block.id;
                 }
@@ -478,6 +487,7 @@ export function runClaude(
     },
     getResultText: () => resultText,
     getSessionId: () => sessionId,
+    getAssistantText: () => assistantTextParts.join("\n"),
   };
 }
 

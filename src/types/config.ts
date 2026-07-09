@@ -102,6 +102,24 @@ export interface AppConfig {
     /** Claude CLI --effort level for the read-only conversation. null = CLI default. */
     chatEffort: ClaudeEffort | null;
     /**
+     * Interval (ms) at which a still-running conversation turn posts an interim
+     * progress snapshot back to the Slack thread. Default 60000 (1 min).
+     */
+    chatHeartbeatMs: number;
+    /**
+     * Hard cap (ms) on a single conversation turn. When exceeded the turn is
+     * killed and reported as timed out (the CLI session is persisted so the
+     * thread can resume). Default 1080000 (18 min).
+     */
+    chatMaxTurnMs: number;
+    /**
+     * Model used to compress an interim progress snapshot into a one-line
+     * status before posting it to the thread. Default "haiku" (cheap). null
+     * disables summarization — heartbeats then post only a bare "still working"
+     * marker instead of any assistant text.
+     */
+    chatProgressModel: ClaudeModel | null;
+    /**
      * When true, the read-only conversation is given a per-Slack-user memory
      * database (`.ai-workspace/slack-memory.sqlite`) it can read/write via the
      * `sqlite3` CLI to recall/persist facts across threads. Default true.
