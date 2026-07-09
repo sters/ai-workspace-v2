@@ -87,20 +87,39 @@ export class ConversationSessions {
 const sessions = new ConversationSessions();
 
 /**
+ * Whether a live (non-expired) CLI session already exists for a thread. Used
+ * by the handler to decide whether this is the first turn (and therefore
+ * whether to fetch and fold in the thread transcript).
+ */
+export function hasThreadSession(threadKey: string): boolean {
+  return sessions.get(threadKey, Date.now()) !== undefined;
+}
+
+/**
  * Answer one conversation turn for the given Slack thread.
  *
  * `threadKey` should be stable per Slack thread (e.g. `thread_ts ?? ts`). The
- * first turn sends full instructions; resume turns send only the message and
- * rely on the CLI session for context.
+ * first turn sends full instructions (and any `threadContext`); resume turns
+ * send only the message and rely on the CLI session for context.
  *
  * Returns the assistant's reply text. Never throws — on failure it returns a
  * short human-readable error string suitable for posting to Slack.
  */
-export async function converse(threadKey: string, message: string): Promise<string> {
+export async function converse(
+  threadKey: string,
+  message: string,
+  threadContext?: string,
+): Promise<string> {
   const now = Date.now();
   const resumeSessionId = sessions.get(threadKey, now);
+  const isFirstTurn = resumeSessionId === undefined;
   const workspaceRoot = getResolvedWorkspaceRoot();
-  const prompt = buildSlackChatPrompt(workspaceRoot, message, resumeSessionId === undefined);
+  const prompt = buildSlackChatPrompt(
+    workspaceRoot,
+    message,
+    isFirstTurn,
+    isFirstTurn ? threadContext : undefined,
+  );
 
   const { chatModel, chatEffort } = getConfig().slack;
 

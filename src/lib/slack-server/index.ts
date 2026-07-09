@@ -3,9 +3,10 @@ import type { WebClient } from "@slack/web-api";
 import type { AppMentionEvent } from "@slack/types";
 import { addPendingNotification } from "@/lib/db/slack-notifications";
 import { parseCommand, USAGE, type Command } from "./commands";
-import { converse } from "./conversation";
+import { converse, hasThreadSession } from "./conversation";
 import { dispatch } from "./dispatcher";
 import { startNotifier, type Notifier } from "./notifier";
+import { fetchThreadTranscript } from "./thread-fetch";
 import { mergeWithThreadLink } from "./thread-link";
 
 export interface SlackServerOptions {
@@ -140,6 +141,20 @@ async function handleConversation(
 ): Promise<void> {
   const threadTs = mention.thread_ts ?? mention.ts;
 
+  // First mention inside an existing thread: fold the whole thread in as
+  // context so the user can ask things like "summarize this thread". On
+  // resume turns the CLI session already holds the context, so we skip the
+  // fetch. Fetch before posting the placeholder so it isn't included.
+  let threadContext = "";
+  if (mention.thread_ts && !hasThreadSession(threadTs)) {
+    threadContext = await fetchThreadTranscript(
+      client,
+      mention.channel,
+      mention.thread_ts,
+      mention.ts,
+    );
+  }
+
   let placeholderTs: string | undefined;
   try {
     const posted = await client.chat.postMessage({
@@ -157,7 +172,7 @@ async function handleConversation(
 
   let reply: string;
   try {
-    reply = await converse(threadTs, message);
+    reply = await converse(threadTs, message, threadContext || undefined);
   } catch (err) {
     reply = `Sorry, something went wrong: ${err instanceof Error ? err.message : String(err)}`;
   }
