@@ -1,55 +1,144 @@
-import { describe, expect, it } from "vitest";
-import { ConversationSessions } from "@/lib/slack-server/conversation";
+// @vitest-environment node
+import { describe, expect, it, beforeEach, vi } from "vitest";
 
-describe("ConversationSessions", () => {
-  it("stores and retrieves a session id for a thread", () => {
-    const s = new ConversationSessions();
-    s.set("thread-1", "sess-abc", 1000);
-    expect(s.get("thread-1", 1000)).toBe("sess-abc");
-    expect(s.get("thread-2", 1000)).toBeUndefined();
+const runClaudeMock = vi.fn();
+const getConfigMock = vi.fn();
+const ensureMemoryMock = vi.fn();
+
+vi.mock("@/lib/claude", () => ({
+  runClaude: (...args: unknown[]) => runClaudeMock(...args),
+}));
+vi.mock("@/lib/config", () => ({
+  getConfig: () => getConfigMock(),
+  getResolvedWorkspaceRoot: () => "/ws",
+}));
+vi.mock("@/lib/workspace/prompts", () => ({
+  ensureGlobalSystemPrompt: () => "/ws/prompts/slack-chat.md",
+}));
+vi.mock("@/lib/slack-server/memory-db", () => ({
+  ensureSlackMemoryDb: (...args: unknown[]) => ensureMemoryMock(...args),
+}));
+
+import { getDb, _resetDb, _setDbPath } from "@/lib/db";
+import { setSession, getSession } from "@/lib/db/slack-sessions";
+import { converse } from "@/lib/slack-server/conversation";
+
+interface FakeEvent {
+  type: string;
+  data?: string;
+}
+
+/** A stub ClaudeProcess that replays scripted events when onEvent is attached. */
+function fakeProc(opts: { sessionId?: string; resultText?: string; events: FakeEvent[] }) {
+  return {
+    id: "slack-chat",
+    onEvent: (handler: (e: FakeEvent) => void) => {
+      for (const e of opts.events) handler(e);
+    },
+    getSessionId: () => opts.sessionId ?? null,
+    getResultText: () => opts.resultText,
+    kill: () => {},
+    submitAnswer: () => false,
+  };
+}
+
+const complete = (exitCode = 0): FakeEvent => ({
+  type: "complete",
+  data: JSON.stringify({ exitCode }),
+});
+
+/** Last prompt string passed to runClaude. */
+function lastPrompt(): string {
+  return runClaudeMock.mock.calls.at(-1)![1] as string;
+}
+function callResume(i: number): string | undefined {
+  return (runClaudeMock.mock.calls[i][2] as { resumeSessionId?: string }).resumeSessionId;
+}
+
+describe("converse", () => {
+  beforeEach(() => {
+    _resetDb();
+    _setDbPath(":memory:");
+    getDb();
+    runClaudeMock.mockReset();
+    ensureMemoryMock.mockReset();
+    ensureMemoryMock.mockReturnValue("/ws/.ai-workspace/slack-memory.sqlite");
+    getConfigMock.mockReturnValue({
+      slack: { memoryEnabled: true, chatModel: "sonnet", chatEffort: "medium" },
+    });
   });
 
-  it("overwrites the session id when a thread is updated", () => {
-    const s = new ConversationSessions();
-    s.set("t", "sess-1", 1000);
-    s.set("t", "sess-2", 2000);
-    expect(s.get("t", 2000)).toBe("sess-2");
-    expect(s.size).toBe(1);
+  it("runs a first turn without resume and persists the session id", async () => {
+    runClaudeMock.mockReturnValue(
+      fakeProc({ sessionId: "sess-1", resultText: "hello!", events: [complete(0)] }),
+    );
+
+    const reply = await converse("thread-1", "hi", { userId: "U1" });
+
+    expect(reply).toBe("hello!");
+    expect(callResume(0)).toBeUndefined();
+    expect(getSession("thread-1", Date.now())).toBe("sess-1");
   });
 
-  it("expires sessions older than the TTL", () => {
-    const ttl = 1000;
-    const s = new ConversationSessions(ttl, 100);
-    s.set("t", "sess", 0);
-    expect(s.get("t", ttl)).toBe("sess"); // exactly at TTL is still live
-    expect(s.get("t", ttl + 1)).toBeUndefined(); // past TTL is gone
-    expect(s.size).toBe(0);
+  it("folds per-user memory into the first-turn prompt when enabled", async () => {
+    runClaudeMock.mockReturnValue(
+      fakeProc({ sessionId: "s", resultText: "ok", events: [complete(0)] }),
+    );
+
+    await converse("t", "hi", { userId: "U9" });
+
+    expect(ensureMemoryMock).toHaveBeenCalledWith("/ws");
+    expect(lastPrompt()).toContain("Your memory about this user");
+    expect(lastPrompt()).toContain("U9");
   });
 
-  it("refreshing a session resets its expiry", () => {
-    const ttl = 1000;
-    const s = new ConversationSessions(ttl, 100);
-    s.set("t", "sess", 0);
-    s.set("t", "sess", 900); // refresh keeps it alive
-    expect(s.get("t", 1800)).toBe("sess");
+  it("omits memory when memoryEnabled is false", async () => {
+    getConfigMock.mockReturnValue({
+      slack: { memoryEnabled: false, chatModel: null, chatEffort: null },
+    });
+    runClaudeMock.mockReturnValue(
+      fakeProc({ sessionId: "s", resultText: "ok", events: [complete(0)] }),
+    );
+
+    await converse("t", "hi", { userId: "U9" });
+
+    expect(ensureMemoryMock).not.toHaveBeenCalled();
+    expect(lastPrompt()).not.toContain("Your memory about this user");
   });
 
-  it("evicts the oldest thread when over the size cap", () => {
-    const s = new ConversationSessions(1_000_000, 2);
-    s.set("a", "sa", 100);
-    s.set("b", "sb", 200);
-    s.set("c", "sc", 300); // over cap → oldest ("a") evicted
-    expect(s.size).toBe(2);
-    expect(s.get("a", 300)).toBeUndefined();
-    expect(s.get("b", 300)).toBe("sb");
-    expect(s.get("c", 300)).toBe("sc");
+  it("omits memory when the user id is unknown", async () => {
+    runClaudeMock.mockReturnValue(
+      fakeProc({ sessionId: "s", resultText: "ok", events: [complete(0)] }),
+    );
+
+    await converse("t", "hi", {});
+
+    expect(ensureMemoryMock).not.toHaveBeenCalled();
+    expect(lastPrompt()).not.toContain("Your memory about this user");
   });
 
-  it("clear() drops all sessions", () => {
-    const s = new ConversationSessions();
-    s.set("a", "sa", 0);
-    s.set("b", "sb", 0);
-    s.clear();
-    expect(s.size).toBe(0);
+  it("retries fresh when a resumed session fails (stale session id)", async () => {
+    setSession("thread-1", "old-sess", Date.now());
+    runClaudeMock
+      .mockReturnValueOnce(fakeProc({ resultText: undefined, events: [complete(1)] }))
+      .mockReturnValueOnce(
+        fakeProc({ sessionId: "new-sess", resultText: "recovered", events: [complete(0)] }),
+      );
+
+    const reply = await converse("thread-1", "hi", { userId: "U1" });
+
+    expect(reply).toBe("recovered");
+    expect(runClaudeMock).toHaveBeenCalledTimes(2);
+    expect(callResume(0)).toBe("old-sess"); // first attempt resumed
+    expect(callResume(1)).toBeUndefined(); // retry is fresh
+    expect(getSession("thread-1", Date.now())).toBe("new-sess");
+  });
+
+  it("does not retry a fresh (non-resume) first turn that fails", async () => {
+    runClaudeMock.mockReturnValue(fakeProc({ resultText: undefined, events: [complete(1)] }));
+
+    await converse("thread-x", "hi", { userId: "U1" });
+
+    expect(runClaudeMock).toHaveBeenCalledTimes(1);
   });
 });

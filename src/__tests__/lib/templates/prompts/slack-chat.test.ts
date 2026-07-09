@@ -10,6 +10,13 @@ describe("getSlackChatSystemPrompt", () => {
     expect(sys).toMatch(/git/);
     expect(sys).toMatch(/MCP/);
   });
+
+  it("carves out the memories table as the one permitted write", () => {
+    const sys = getSlackChatSystemPrompt();
+    expect(sys).toMatch(/MEMORY EXCEPTION/);
+    expect(sys).toContain("memories");
+    expect(sys).toMatch(/EXPLICITLY/);
+  });
 });
 
 describe("buildSlackChatPrompt", () => {
@@ -26,7 +33,9 @@ describe("buildSlackChatPrompt", () => {
   });
 
   it("folds thread context into the first turn when provided", () => {
-    const out = buildSlackChatPrompt("/ws", "summarize this thread", true, "@U1: hello\n@U2: world");
+    const out = buildSlackChatPrompt("/ws", "summarize this thread", true, {
+      threadContext: "@U1: hello\n@U2: world",
+    });
     expect(out).toContain("Slack thread so far");
     expect(out).toContain("@U1: hello");
     expect(out).toContain("@U2: world");
@@ -35,11 +44,47 @@ describe("buildSlackChatPrompt", () => {
   });
 
   it("ignores empty thread context on the first turn", () => {
-    const out = buildSlackChatPrompt("/ws", "hi", true, "   ");
+    const out = buildSlackChatPrompt("/ws", "hi", true, { threadContext: "   " });
     expect(out).not.toContain("Slack thread so far");
   });
 
   it("ignores thread context on resume turns", () => {
-    expect(buildSlackChatPrompt("/ws", "hi", false, "@U1: ctx")).toBe("hi");
+    expect(buildSlackChatPrompt("/ws", "hi", false, { threadContext: "@U1: ctx" })).toBe("hi");
+  });
+
+  describe("memory context", () => {
+    it("folds the memory DB path and user id into the first turn", () => {
+      const out = buildSlackChatPrompt("/ws", "hi", true, {
+        memoryDbPath: "/ws/.ai-workspace/slack-memory.sqlite",
+        userId: "U123",
+      });
+      expect(out).toContain("Your memory about this user");
+      expect(out).toContain("/ws/.ai-workspace/slack-memory.sqlite");
+      expect(out).toContain("U123");
+      expect(out).toContain("memories");
+      // Scoped query for recall, scoped insert for remembering.
+      expect(out).toMatch(/SELECT content FROM memories WHERE user_id='U123'/);
+      expect(out).toMatch(/INSERT INTO memories\(user_id, content\)/);
+    });
+
+    it("omits memory when the user id is missing", () => {
+      const out = buildSlackChatPrompt("/ws", "hi", true, {
+        memoryDbPath: "/ws/.ai-workspace/slack-memory.sqlite",
+      });
+      expect(out).not.toContain("Your memory about this user");
+    });
+
+    it("omits memory when the DB path is missing", () => {
+      const out = buildSlackChatPrompt("/ws", "hi", true, { userId: "U123" });
+      expect(out).not.toContain("Your memory about this user");
+    });
+
+    it("does not fold memory into resume turns", () => {
+      const out = buildSlackChatPrompt("/ws", "hi", false, {
+        memoryDbPath: "/ws/.ai-workspace/slack-memory.sqlite",
+        userId: "U123",
+      });
+      expect(out).toBe("hi");
+    });
   });
 });

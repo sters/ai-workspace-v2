@@ -308,6 +308,7 @@ export function mergeConfig(
       allowedUserIds: env.slack?.allowedUserIds ?? file.slack?.allowedUserIds ?? defaults.slack.allowedUserIds,
       chatModel: pick(env.slack?.chatModel, file.slack?.chatModel, defaults.slack.chatModel),
       chatEffort: pick(env.slack?.chatEffort, file.slack?.chatEffort, defaults.slack.chatEffort),
+      memoryEnabled: pick(env.slack?.memoryEnabled, file.slack?.memoryEnabled, defaults.slack.memoryEnabled),
     },
   };
 }

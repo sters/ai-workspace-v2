@@ -782,6 +782,7 @@ describe("migrateConfigContent", () => {
       "  allowedUserIds: []",
       "  chatModel: sonnet",
       "  chatEffort: medium",
+      "  memoryEnabled: true",
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
@@ -913,6 +914,7 @@ describe("migrateConfigContent", () => {
       "  allowedUserIds: []",
       "  chatModel: sonnet",
       "  chatEffort: medium",
+      "  memoryEnabled: true",
       "",
     ].join("\n");
     const result = migrateConfigContent(content);

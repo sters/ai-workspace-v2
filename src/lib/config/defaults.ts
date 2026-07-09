@@ -50,6 +50,7 @@ export const CONFIG_DEFAULTS: AppConfig = {
     allowedUserIds: [],
     chatModel: "sonnet",
     chatEffort: "medium",
+    memoryEnabled: true,
   },
 };
 
@@ -145,6 +146,7 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "allowedUserIds", section: "slack", defaultLine: "#   allowedUserIds: []              # Slack user IDs allowed to invoke commands; empty = none" },
   { key: "chatModel", section: "slack", defaultLine: "#   chatModel: sonnet               # model for read-only conversation (non-init mentions); null = CLI default" },
   { key: "chatEffort", section: "slack", defaultLine: "#   chatEffort: medium              # conversation effort level (low / medium / high / max, null = CLI default)" },
+  { key: "memoryEnabled", section: "slack", defaultLine: "#   memoryEnabled: true             # per-user memory the conversation can read/write via sqlite3" },
 ];
 
 /**

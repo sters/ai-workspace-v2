@@ -10,6 +10,7 @@
 
 import { setWorkspaceRoot, getConfig } from "../src/lib/config";
 import { startSlackServer } from "../src/lib/slack-server";
+import { ensureSlackMemoryDb } from "../src/lib/slack-server/memory-db";
 
 const root = process.env.AIW_WORKSPACE_ROOT;
 if (!root) {
@@ -28,6 +29,11 @@ if (!cfg.slack.botToken || !cfg.slack.appToken) {
     "[slack-server] botToken or appToken is empty after env substitution; exiting (set AIW_SLACK_BOT_TOKEN / AIW_SLACK_APP_TOKEN or fill in config.yml)",
   );
   process.exit(0);
+}
+
+if (cfg.slack.memoryEnabled) {
+  const memPath = ensureSlackMemoryDb(root);
+  console.log(`[slack-server] per-user conversation memory enabled at ${memPath}`);
 }
 
 const running = await startSlackServer({

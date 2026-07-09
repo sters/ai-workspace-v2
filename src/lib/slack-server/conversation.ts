@@ -2,9 +2,9 @@
  * Free-form, read-only Slack conversation backed by the Claude CLI.
  *
  * Each Slack thread maps to one Claude CLI session so follow-up messages in
- * the same thread continue the conversation (via `--resume`). Sessions are
- * held in memory only — if the slack-server process restarts, threads start
- * fresh, which is acceptable for a chat surface.
+ * the same thread continue the conversation (via `--resume`). The mapping is
+ * persisted in SQLite (`slack_conversation_sessions`, see
+ * `@/lib/db/slack-sessions`) so a thread survives a slack-server restart.
  *
  * The session inherits the ambient Claude permissions of the host (the same
  * `~/.claude/settings.json` every other operation runs under), so Bash, git,
@@ -12,80 +12,23 @@
  * Read-only behavior is NOT enforced at the tool layer — it is enforced by
  * the system prompt (`getSlackChatSystemPrompt`), see `slack-chat.ts`.
  * Mutations should still go through the WebUI or `init`.
+ *
+ * The one exception is per-user memory: when `slack.memoryEnabled` is set and a
+ * Slack user id is known, the conversation is pointed at a dedicated SQLite
+ * file (`@/lib/slack-server/memory-db`) it may read/write via `sqlite3` to
+ * recall and persist facts across threads. The prompt scopes all access to the
+ * current user's rows.
  */
 
 import { runClaude } from "@/lib/claude";
 import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
+import { deleteSession, getSession, setSession } from "@/lib/db/slack-sessions";
 import { buildSlackChatPrompt } from "@/lib/templates/prompts";
 import { ensureGlobalSystemPrompt } from "@/lib/workspace/prompts";
+import { ensureSlackMemoryDb } from "./memory-db";
 
-/** How long a thread's session is kept before it is considered stale. */
-const SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
-/** Cap on tracked threads to bound memory; oldest is evicted past this. */
-const MAX_SESSIONS = 200;
 /** Kill a conversation turn that runs longer than this. */
 const TURN_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
-
-interface SessionEntry {
-  sessionId: string;
-  lastActive: number;
-}
-
-/**
- * In-memory map of Slack thread key → Claude CLI session id, with TTL and a
- * size cap. Pure aside from the injected `now`, so eviction is unit-testable.
- */
-export class ConversationSessions {
-  private readonly map = new Map<string, SessionEntry>();
-
-  constructor(
-    private readonly ttlMs: number = SESSION_TTL_MS,
-    private readonly maxEntries: number = MAX_SESSIONS,
-  ) {}
-
-  /** Return the live session id for a thread, or undefined if absent/expired. */
-  get(key: string, now: number): string | undefined {
-    this.prune(now);
-    return this.map.get(key)?.sessionId;
-  }
-
-  /** Record (or refresh) the session id for a thread. */
-  set(key: string, sessionId: string, now: number): void {
-    this.prune(now);
-    this.map.set(key, { sessionId, lastActive: now });
-    if (this.map.size > this.maxEntries) this.evictOldest();
-  }
-
-  /** Number of tracked threads (mainly for tests). */
-  get size(): number {
-    return this.map.size;
-  }
-
-  /** Drop all tracked sessions. */
-  clear(): void {
-    this.map.clear();
-  }
-
-  private prune(now: number): void {
-    for (const [key, entry] of this.map) {
-      if (now - entry.lastActive > this.ttlMs) this.map.delete(key);
-    }
-  }
-
-  private evictOldest(): void {
-    let oldestKey: string | undefined;
-    let oldest = Infinity;
-    for (const [key, entry] of this.map) {
-      if (entry.lastActive < oldest) {
-        oldest = entry.lastActive;
-        oldestKey = key;
-      }
-    }
-    if (oldestKey !== undefined) this.map.delete(oldestKey);
-  }
-}
-
-const sessions = new ConversationSessions();
 
 /**
  * Whether a live (non-expired) CLI session already exists for a thread. Used
@@ -93,15 +36,36 @@ const sessions = new ConversationSessions();
  * whether to fetch and fold in the thread transcript).
  */
 export function hasThreadSession(threadKey: string): boolean {
-  return sessions.get(threadKey, Date.now()) !== undefined;
+  return getSession(threadKey, Date.now()) !== undefined;
+}
+
+/** Options for a conversation turn. */
+export interface ConverseOptions {
+  /** Slack user id of the mention author, used to scope memory. */
+  userId?: string;
+  /** Transcript of the surrounding Slack thread, folded into the first turn. */
+  threadContext?: string;
+}
+
+interface TurnResult {
+  text: string;
+  /** Whether the turn produced a usable answer. */
+  ok: boolean;
+  /**
+   * Why the turn failed. `"error"` (fatal error or non-zero exit with no
+   * output) is worth a fresh retry when we were resuming a session that may no
+   * longer exist; `"timeout"` is not (it would just double the wait).
+   */
+  reason?: "error" | "timeout";
 }
 
 /**
  * Answer one conversation turn for the given Slack thread.
  *
  * `threadKey` should be stable per Slack thread (e.g. `thread_ts ?? ts`). The
- * first turn sends full instructions (and any `threadContext`); resume turns
- * send only the message and rely on the CLI session for context.
+ * first turn sends full instructions (working dir, memory, any thread
+ * transcript); resume turns send only the message and rely on the CLI session
+ * for context.
  *
  * Returns the assistant's reply text. Never throws — on failure it returns a
  * short human-readable error string suitable for posting to Slack.
@@ -109,58 +73,113 @@ export function hasThreadSession(threadKey: string): boolean {
 export async function converse(
   threadKey: string,
   message: string,
-  threadContext?: string,
+  opts: ConverseOptions = {},
 ): Promise<string> {
   const now = Date.now();
-  const resumeSessionId = sessions.get(threadKey, now);
-  const isFirstTurn = resumeSessionId === undefined;
+  const resumeSessionId = getSession(threadKey, now);
   const workspaceRoot = getResolvedWorkspaceRoot();
-  const prompt = buildSlackChatPrompt(
-    workspaceRoot,
-    message,
-    isFirstTurn,
-    isFirstTurn ? threadContext : undefined,
-  );
+  const config = getConfig();
 
-  const { chatModel, chatEffort } = getConfig().slack;
+  // Memory DB path is only needed when building a first-turn prompt, so ensure
+  // it lazily (and never on plain resume turns, which don't fold it in).
+  let memoryDbPath: string | undefined;
+  const memoryOpts = (): { memoryDbPath?: string; userId?: string } => {
+    if (!config.slack.memoryEnabled || !opts.userId) return {};
+    if (!memoryDbPath) memoryDbPath = ensureSlackMemoryDb(workspaceRoot);
+    return { memoryDbPath, userId: opts.userId };
+  };
 
+  const runAttempt = (resume: string | undefined): Promise<TurnResult> => {
+    const isFirstTurn = resume === undefined;
+    const prompt = buildSlackChatPrompt(workspaceRoot, message, isFirstTurn, {
+      threadContext: opts.threadContext,
+      ...memoryOpts(),
+    });
+    return runTurn(threadKey, prompt, resume, config);
+  };
+
+  let result = await runAttempt(resumeSessionId);
+
+  // The persisted session id may point at a CLI session that no longer exists
+  // (e.g. after a restart, or once Claude pruned it). Drop it and retry once as
+  // a fresh conversation so the thread doesn't get wedged.
+  if (!result.ok && result.reason === "error" && resumeSessionId !== undefined) {
+    deleteSession(threadKey);
+    result = await runAttempt(undefined);
+  }
+
+  return result.text;
+}
+
+function runTurn(
+  threadKey: string,
+  prompt: string,
+  resumeSessionId: string | undefined,
+  config: ReturnType<typeof getConfig>,
+): Promise<TurnResult> {
   const proc = runClaude("slack-chat", prompt, {
-    cwd: workspaceRoot,
+    cwd: getResolvedWorkspaceRoot(),
     // No allowedTools/addDirs: inherit the host's ambient Claude permissions
-    // (same as every other operation). Read-only is enforced by the system
-    // prompt below, not at the tool layer.
+    // (same as every other operation). Read-only (plus the memory carve-out) is
+    // enforced by the system prompt below, not at the tool layer.
     appendSystemPromptFile: ensureGlobalSystemPrompt("slack-chat"),
     resumeSessionId,
     skipAskUserQuestion: true,
-    model: chatModel ?? undefined,
-    effort: chatEffort ?? undefined,
+    model: config.slack.chatModel ?? undefined,
+    effort: config.slack.chatEffort ?? undefined,
   });
 
-  return await new Promise<string>((resolve) => {
+  return new Promise<TurnResult>((resolve) => {
     let settled = false;
-    const finish = (text: string) => {
+    const finish = (result: TurnResult) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve(text);
+      resolve(result);
     };
 
     const timer = setTimeout(() => {
       proc.kill();
-      finish("Sorry, that took too long and I gave up. Please try a narrower question.");
+      finish({
+        ok: false,
+        reason: "timeout",
+        text: "Sorry, that took too long and I gave up. Please try a narrower question.",
+      });
     }, TURN_TIMEOUT_MS);
 
     proc.onEvent((event) => {
+      if (event.type === "error") {
+        finish({ ok: false, reason: "error", text: "Sorry, something went wrong while I was thinking." });
+        return;
+      }
       if (event.type !== "complete") return;
+
       const sessionId = proc.getSessionId();
-      if (sessionId) sessions.set(threadKey, sessionId, Date.now());
+      if (sessionId) setSession(threadKey, sessionId, Date.now());
       const text = proc.getResultText()?.trim();
-      finish(text && text.length > 0 ? text : "(no response)");
+      if (text && text.length > 0) {
+        finish({ ok: true, text });
+        return;
+      }
+      // No output. A non-zero exit usually means the turn genuinely failed
+      // (e.g. a stale --resume target); flag it so the caller can retry fresh.
+      const failed = exitCodeOf(event.data) !== 0;
+      finish(
+        failed
+          ? { ok: false, reason: "error", text: "Sorry, something went wrong while I was thinking." }
+          : { ok: true, text: "(no response)" },
+      );
     });
   });
 }
 
-/** Reset the in-memory session map. For tests only. */
-export function _resetConversationSessions(): void {
-  sessions.clear();
+/** Best-effort parse of `{ exitCode }` from a `complete` event's data. */
+function exitCodeOf(data: unknown): number {
+  if (typeof data !== "string") return 0;
+  try {
+    const parsed = JSON.parse(data) as { exitCode?: unknown };
+    return typeof parsed.exitCode === "number" ? parsed.exitCode : 0;
+  } catch {
+    return 0;
+  }
 }
