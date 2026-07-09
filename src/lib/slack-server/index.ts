@@ -172,15 +172,38 @@ async function handleConversation(
     );
   }
 
+  // While the turn runs, edit the placeholder in place with a snapshot of the
+  // assistant's progress so a long investigation reads as a live status line
+  // rather than a silent wait. Guarded by `finished` so a late in-flight update
+  // can't clobber the final answer.
+  let finished = false;
+  const onProgress = async (progress: string): Promise<void> => {
+    if (finished || !placeholderTs) return;
+    try {
+      await client.chat.update({
+        channel: mention.channel,
+        ts: placeholderTs,
+        text: formatProgress(progress),
+      });
+    } catch (err) {
+      console.warn(
+        "[slack-server] could not update progress:",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  };
+
   let reply: string;
   try {
     reply = await converse(threadTs, message, {
       userId,
       threadContext: threadContext || undefined,
+      onProgress,
     });
   } catch (err) {
     reply = `Sorry, something went wrong: ${err instanceof Error ? err.message : String(err)}`;
   }
+  finished = true;
 
   if (placeholderTs) {
     try {
@@ -195,6 +218,24 @@ async function handleConversation(
   }
 
   await client.chat.postMessage({ channel: mention.channel, thread_ts: threadTs, text: reply });
+}
+
+/** Safety cap on the summary length (it's already a one-liner from the model). */
+const PROGRESS_MAX_CHARS = 300;
+
+/**
+ * Render an interim progress line for the Slack status message. `summary` is a
+ * one-line status from the progress model; falls back to a bare "still working"
+ * marker when it's empty (nothing said yet, summarization disabled, or failed).
+ */
+function formatProgress(summary: string): string {
+  const trimmed = summary.trim();
+  if (!trimmed) return "⏳ Still working…";
+  const clipped =
+    trimmed.length > PROGRESS_MAX_CHARS
+      ? trimmed.slice(0, PROGRESS_MAX_CHARS) + "…"
+      : trimmed;
+  return `⏳ ${clipped}`;
 }
 
 /**

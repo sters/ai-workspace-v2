@@ -84,6 +84,9 @@ export function generateDefaultConfigContent(): string {
     "#   allowedUserIds: []              # Slack user IDs allowed to invoke commands; empty = none",
     "#   chatModel: sonnet               # model for read-only conversation (non-init mentions); null = CLI default",
     "#   chatEffort: medium              # conversation effort level (low / medium / high / max, null = CLI default)",
+    "#   chatHeartbeatMs: 60000          # post interim progress to the thread every N ms while a turn runs",
+    "#   chatMaxTurnMs: 1080000          # hard cap per turn (ms) before giving up (18 min)",
+    "#   chatProgressModel: haiku        # model that summarizes interim progress to one line; null = disable",
     "#   memoryEnabled: true             # per-user memory the conversation can read/write via sqlite3",
     "",
   ];

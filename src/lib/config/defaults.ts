@@ -50,6 +50,9 @@ export const CONFIG_DEFAULTS: AppConfig = {
     allowedUserIds: [],
     chatModel: "sonnet",
     chatEffort: "medium",
+    chatHeartbeatMs: 1 * 60 * 1000,
+    chatMaxTurnMs: 18 * 60 * 1000,
+    chatProgressModel: "haiku",
     memoryEnabled: true,
   },
 };
@@ -146,6 +149,9 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "allowedUserIds", section: "slack", defaultLine: "#   allowedUserIds: []              # Slack user IDs allowed to invoke commands; empty = none" },
   { key: "chatModel", section: "slack", defaultLine: "#   chatModel: sonnet               # model for read-only conversation (non-init mentions); null = CLI default" },
   { key: "chatEffort", section: "slack", defaultLine: "#   chatEffort: medium              # conversation effort level (low / medium / high / max, null = CLI default)" },
+  { key: "chatHeartbeatMs", section: "slack", defaultLine: "#   chatHeartbeatMs: 60000          # post interim progress to the thread every N ms while a turn runs" },
+  { key: "chatMaxTurnMs", section: "slack", defaultLine: "#   chatMaxTurnMs: 1080000          # hard cap per turn (ms) before giving up (18 min)" },
+  { key: "chatProgressModel", section: "slack", defaultLine: "#   chatProgressModel: haiku        # model that summarizes interim progress to one line; null = disable" },
   { key: "memoryEnabled", section: "slack", defaultLine: "#   memoryEnabled: true             # per-user memory the conversation can read/write via sqlite3" },
 ];
 
