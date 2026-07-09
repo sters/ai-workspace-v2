@@ -1,15 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { buildSlackChatPrompt } from "@/lib/templates/prompts/slack-chat";
+import { buildSlackChatPrompt, getSlackChatSystemPrompt } from "@/lib/templates/prompts/slack-chat";
+
+describe("getSlackChatSystemPrompt", () => {
+  it("strongly forbids state-changing actions", () => {
+    const sys = getSlackChatSystemPrompt();
+    expect(sys).toContain("READ-ONLY");
+    expect(sys).toMatch(/NEVER/);
+    // Covers the three tool families that can mutate state.
+    expect(sys).toMatch(/git/);
+    expect(sys).toMatch(/MCP/);
+  });
+});
 
 describe("buildSlackChatPrompt", () => {
   it("returns only the message on resume turns", () => {
     expect(buildSlackChatPrompt("/ws", "hi again", false)).toBe("hi again");
   });
 
-  it("includes instructions and the message on the first turn", () => {
+  it("includes the working directory and the message on the first turn", () => {
     const out = buildSlackChatPrompt("/ws", "what is up?", true);
     expect(out).toContain("/ws");
-    expect(out).toContain("READ-ONLY");
+    expect(out).toContain("repositories/");
     expect(out).toContain("what is up?");
     expect(out).not.toContain("Slack thread so far");
   });

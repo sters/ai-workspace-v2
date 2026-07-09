@@ -29,7 +29,7 @@ export { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildR
 export { getCreateTodoPlannerSystemPrompt, buildCreateTodoFromReviewPrompt } from "./create-todo-planner";
 export { getSearchSystemPrompt, buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "./search";
 export { getQuickAskSystemPrompt, buildQuickAskPrompt } from "./quick-ask";
-export { buildSlackChatPrompt } from "./slack-chat";
+export { buildSlackChatPrompt, getSlackChatSystemPrompt } from "./slack-chat";
 export { getRepoConstraintsSystemPrompt, buildRepoConstraintsPrompt } from "./repo-constraints";
 export {
   getBestOfNReviewerSystemPrompt,
