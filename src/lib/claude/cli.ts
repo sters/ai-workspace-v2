@@ -435,8 +435,8 @@ export function runClaude(
     })();
   }
 
-  // Initial spawn
-  spawnAndStream(prompt);
+  // Initial spawn (resume an existing session when requested, for multi-turn conversations)
+  spawnAndStream(prompt, options?.resumeSessionId);
 
   return {
     id: operationId,
@@ -477,6 +477,7 @@ export function runClaude(
       return true;
     },
     getResultText: () => resultText,
+    getSessionId: () => sessionId,
   };
 }
 

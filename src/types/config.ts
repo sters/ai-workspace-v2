@@ -94,6 +94,13 @@ export interface AppConfig {
      * non-allowed users are silently ignored.
      */
     allowedUserIds: string[];
+    /**
+     * Model for the read-only conversation (mentions that aren't `init`/`help`).
+     * null = CLI default. The tool set is always read-only and not configurable.
+     */
+    chatModel: ClaudeModel | null;
+    /** Claude CLI --effort level for the read-only conversation. null = CLI default. */
+    chatEffort: ClaudeEffort | null;
   };
 }
 

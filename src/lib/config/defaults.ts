@@ -48,6 +48,8 @@ export const CONFIG_DEFAULTS: AppConfig = {
     botToken: "",
     appToken: "",
     allowedUserIds: [],
+    chatModel: "sonnet",
+    chatEffort: "medium",
   },
 };
 
@@ -141,6 +143,8 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "botToken", section: "slack", defaultLine: "#   botToken: \"{ENV:AIW_SLACK_BOT_TOKEN}\"   # xoxb-... ; supports {ENV:VAR} substitution" },
   { key: "appToken", section: "slack", defaultLine: "#   appToken: \"{ENV:AIW_SLACK_APP_TOKEN}\"   # xapp-... ; Socket Mode app-level token" },
   { key: "allowedUserIds", section: "slack", defaultLine: "#   allowedUserIds: []              # Slack user IDs allowed to invoke commands; empty = none" },
+  { key: "chatModel", section: "slack", defaultLine: "#   chatModel: sonnet               # model for read-only conversation (non-init mentions); null = CLI default" },
+  { key: "chatEffort", section: "slack", defaultLine: "#   chatEffort: medium              # conversation effort level (low / medium / high / max, null = CLI default)" },
 ];
 
 /**

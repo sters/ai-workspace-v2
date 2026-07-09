@@ -780,6 +780,8 @@ describe("migrateConfigContent", () => {
       "  botToken: \"{ENV:AIW_SLACK_BOT_TOKEN}\"",
       "  appToken: \"{ENV:AIW_SLACK_APP_TOKEN}\"",
       "  allowedUserIds: []",
+      "  chatModel: sonnet",
+      "  chatEffort: medium",
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
@@ -909,6 +911,8 @@ describe("migrateConfigContent", () => {
       "  botToken: \"{ENV:AIW_SLACK_BOT_TOKEN}\"",
       "  appToken: \"{ENV:AIW_SLACK_APP_TOKEN}\"",
       "  allowedUserIds: []",
+      "  chatModel: sonnet",
+      "  chatEffort: medium",
       "",
     ].join("\n");
     const result = migrateConfigContent(content);

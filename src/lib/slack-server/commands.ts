@@ -8,19 +8,27 @@
  * Default `init` triggers the autonomous pipeline starting from init. With
  * `--only`, only the init operation runs (no autonomous chain). The
  * description may be empty; the handler can supply it from thread context.
+ *
+ * Anything that is neither `init` nor `help` is classified as free-form
+ * conversation (`kind: "chat"`) so the handler can hand it to a read-only
+ * Claude query instead of rejecting it.
  */
 
 export type Command = { op: "init"; only: boolean; description: string };
 
 export type ParseResult =
   | { ok: true; command: Command }
-  | { ok: false; reply: string };
+  | { ok: false; kind: "usage"; reply: string }
+  | { ok: false; kind: "chat"; message: string };
 
 export const USAGE = [
   "Usage:",
   "  init <description text...>           # runs autonomous pipeline starting from init",
   "  init --only <description text...>    # runs only the init operation",
   "  help",
+  "",
+  "Anything else you say is answered as a read-only conversation (I can read",
+  "and search the workspace and repos, but can't change anything).",
   "",
   "Tip: post the mention inside an existing thread to fold the thread's",
   "messages into the description automatically.",
@@ -39,17 +47,18 @@ function stripMentions(input: string): string {
 export function parseCommand(rawText: string): ParseResult {
   const stripped = stripMentions(rawText).trim();
   if (stripped === "" || stripped === "help") {
-    return { ok: false, reply: USAGE };
+    return { ok: false, kind: "usage", reply: USAGE };
   }
 
   // Split off the leading op token.
   const opMatch = stripped.match(/^(\S+)(?:\s+([\s\S]*))?$/);
-  if (!opMatch) return { ok: false, reply: USAGE };
+  if (!opMatch) return { ok: false, kind: "usage", reply: USAGE };
   const op = opMatch[1];
   const rest = opMatch[2] ?? "";
 
+  // Everything that isn't the `init` command is free-form conversation.
   if (op !== "init") {
-    return { ok: false, reply: `Unknown command: ${op}\n\n${USAGE}` };
+    return { ok: false, kind: "chat", message: stripped };
   }
 
   return parseInit(rest);
@@ -75,7 +84,7 @@ function parseInit(rest: string): ParseResult {
   // Reject any unknown -- flags.
   const stray = working.match(/(?:^|\s)(--\S+)/);
   if (stray) {
-    return { ok: false, reply: `Unknown flag: ${stray[1]}\n\n${USAGE}` };
+    return { ok: false, kind: "usage", reply: `Unknown flag: ${stray[1]}\n\n${USAGE}` };
   }
 
   return { ok: true, command: { op: "init", only, description: working.trim() } };

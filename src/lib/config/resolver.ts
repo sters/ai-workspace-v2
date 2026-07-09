@@ -306,6 +306,8 @@ export function mergeConfig(
       appToken: pick(env.slack?.appToken, file.slack?.appToken, defaults.slack.appToken),
       // Arrays: file replaces defaults entirely (no per-element merge).
       allowedUserIds: env.slack?.allowedUserIds ?? file.slack?.allowedUserIds ?? defaults.slack.allowedUserIds,
+      chatModel: pick(env.slack?.chatModel, file.slack?.chatModel, defaults.slack.chatModel),
+      chatEffort: pick(env.slack?.chatEffort, file.slack?.chatEffort, defaults.slack.chatEffort),
     },
   };
 }
