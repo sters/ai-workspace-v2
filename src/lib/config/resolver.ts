@@ -278,11 +278,6 @@ export function mergeConfig(
     chat: {
       model: pick(env.chat?.model, file.chat?.model, defaults.chat.model),
     },
-    quickAsk: {
-      model: pick(env.quickAsk?.model, file.quickAsk?.model, defaults.quickAsk.model),
-      effort: pick(env.quickAsk?.effort, file.quickAsk?.effort, defaults.quickAsk.effort),
-      allowedTools: (env.quickAsk?.allowedTools ?? file.quickAsk?.allowedTools ?? defaults.quickAsk.allowedTools),
-    },
     // openers is an array — file fully replaces defaults if present (no per-entry merging).
     openers: env.openers ?? file.openers ?? defaults.openers,
     suggest: {

@@ -8,8 +8,6 @@ import { Input } from "@/components/shared/forms/input";
 import { Spinner } from "@/components/shared/feedback/spinner";
 import { useMemoContent } from "@/hooks/use-workspace";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
-import { useStreamingFetch } from "@/hooks/use-streaming-fetch";
-import { extractAnswer } from "@/lib/parsers/stream";
 import { postJson } from "@/lib/api";
 
 const AUTO_SAVE_INTERVAL_MS = 60_000;
@@ -26,14 +24,12 @@ export function MemoEditor({
 }) {
   const { content: initialContent, isLoading } = useMemoContent(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
-  const { events, isRunning, run, cancel, reset } = useStreamingFetch();
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const isDirty = useRef(false);
   const isSaving = useRef(false);
   const contentRef = useRef("");
   const initializedRef = useRef(false);
-  const pendingPlaceholderRef = useRef<string | null>(null);
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [hasSelection, setHasSelection] = useState(false);
@@ -108,30 +104,6 @@ export function MemoEditor({
     return () => window.removeEventListener("beforeunload", handler);
   }, [workspaceName]);
 
-  // Replace placeholder when Claude streaming completes
-  useEffect(() => {
-    if (!isRunning && pendingPlaceholderRef.current && events.length > 0) {
-      const answer = extractAnswer(events);
-      const editor = editorRef.current;
-      const model = editor?.getModel();
-      if (answer && editor && model) {
-        const placeholder = `{TO_BE_REPLACED:${pendingPlaceholderRef.current}}`;
-        const matches = model.findMatches(placeholder, false, false, true, null, false);
-        if (matches.length > 0) {
-          const range = matches[0].range;
-          editor.executeEdits("memo-ask-claude", [
-            { range, text: answer },
-          ]);
-          contentRef.current = model.getValue();
-          contentCache.set(workspaceName, contentRef.current);
-          isDirty.current = true;
-        }
-      }
-      pendingPlaceholderRef.current = null;
-      reset();
-    }
-  }, [isRunning, events, reset, workspaceName]);
-
   const handleEditorChange = useCallback((value: string | undefined) => {
     contentRef.current = value ?? "";
     contentCache.set(workspaceName, contentRef.current);
@@ -178,45 +150,6 @@ export function MemoEditor({
     });
   }, [getSelectedText, buildPrompt, clearInputs, saveMemo, startAndNavigate, workspacePath]);
 
-  // Ask Claude button handler
-  const handleAskClaude = useCallback(() => {
-    const text = getSelectedText();
-    const editor = editorRef.current;
-    const model = editor?.getModel();
-    if (!text || !editor || !model) return;
-
-    const question = buildPrompt(text);
-
-    const uuid = crypto.randomUUID();
-    const placeholder = `{TO_BE_REPLACED:${uuid}}`;
-    const selection = editor.getSelection();
-    if (!selection) return;
-
-    // Insert placeholder below the selection
-    const endLine = selection.endLineNumber;
-    const endCol = model.getLineMaxColumn(endLine);
-    editor.executeEdits("memo-ask-claude", [
-      {
-        range: {
-          startLineNumber: endLine,
-          startColumn: endCol,
-          endLineNumber: endLine,
-          endColumn: endCol,
-        },
-        text: `\n\n${placeholder}\n`,
-      },
-    ]);
-    contentRef.current = model.getValue();
-    isDirty.current = true;
-
-    pendingPlaceholderRef.current = uuid;
-    clearInputs();
-    run("/api/operations/quick-ask", {
-      workspace: workspaceName,
-      question,
-    });
-  }, [getSelectedText, buildPrompt, clearInputs, workspaceName, run]);
-
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
@@ -234,13 +167,7 @@ export function MemoEditor({
           type="text"
           value={askInstruction}
           onChange={(e) => setAskInstruction(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing && hasSelection && !isRunning) {
-              e.preventDefault();
-              handleAskClaude();
-            }
-          }}
-          disabled={!hasSelection || isRunning}
+          disabled={!hasSelection}
           placeholder="Additional instruction (optional)"
           className="w-64 px-2 py-1 text-xs"
         />
@@ -250,19 +177,6 @@ export function MemoEditor({
           disabled={!hasSelection}
         >
           Update TODO
-        </Button>
-        <Button
-          variant="outline"
-          onClick={isRunning ? cancel : handleAskClaude}
-          disabled={!isRunning && !hasSelection}
-        >
-          {isRunning ? (
-            <span className="flex items-center gap-1">
-              <Spinner /> Cancel
-            </span>
-          ) : (
-            "Ask Claude"
-          )}
         </Button>
         <div className="ml-auto text-xs text-muted-foreground">
           {saveStatus === "saving" && "Saving..."}

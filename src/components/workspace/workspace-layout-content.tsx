@@ -20,7 +20,7 @@ const BASE_TABS = [
   { label: "Research", segment: "research", href: "research", taskType: "research" },
   { label: "History", segment: "history", href: "history" },
   { label: "Operations", segment: "operations", href: "operations" },
-  { label: "Chat", segment: "chat", href: "chat/quick" },
+  { label: "Chat", segment: "chat", href: "chat/interactive" },
 ] as const;
 
 export function WorkspaceLayoutContent({

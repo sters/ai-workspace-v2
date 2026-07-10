@@ -72,52 +72,22 @@ describe("mergeConfig", () => {
     expect(result.chat.model).toBeNull();
   });
 
-  it("defaults quickAsk.model to sonnet", () => {
-    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
-    expect(result.quickAsk.model).toBe("sonnet");
-  });
-
-  it("defaults quickAsk.effort to medium", () => {
-    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
-    expect(result.quickAsk.effort).toBe("medium");
-  });
-
-  it("file config overrides chat.model and quickAsk.model", () => {
+  it("file config overrides chat.model", () => {
     const result = mergeConfig(
       CONFIG_DEFAULTS,
-      { chat: { model: "opus" }, quickAsk: { model: "haiku" } } as Partial<AppConfig>,
+      { chat: { model: "opus" } } as Partial<AppConfig>,
       {},
     );
     expect(result.chat.model).toBe("opus");
-    expect(result.quickAsk.model).toBe("haiku");
   });
 
-  it("file config overrides quickAsk.effort", () => {
+  it("file config can null out chat.model", () => {
     const result = mergeConfig(
       CONFIG_DEFAULTS,
-      { quickAsk: { effort: "high" } } as Partial<AppConfig>,
-      {},
-    );
-    expect(result.quickAsk.effort).toBe("high");
-  });
-
-  it("file config can null out chat.model and quickAsk.model", () => {
-    const result = mergeConfig(
-      CONFIG_DEFAULTS,
-      { chat: { model: null }, quickAsk: { model: null } } as Partial<AppConfig>,
+      { chat: { model: null } } as Partial<AppConfig>,
       {},
     );
     expect(result.chat.model).toBeNull();
-    expect(result.quickAsk.model).toBeNull();
-  });
-
-  it("file config can null out quickAsk.effort", () => {
-    const result = mergeConfig(
-      CONFIG_DEFAULTS,
-      { quickAsk: { effort: null } } as Partial<AppConfig>,
-      {},
-    );
-    expect(result.quickAsk.effort).toBeNull();
   });
 
   it("defaults suggest.enabled to true", () => {

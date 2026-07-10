@@ -55,8 +55,6 @@ export {
   getSearchSystemPrompt,
   buildSearchPrompt,
   DEEP_SEARCH_SCHEMA,
-  getQuickAskSystemPrompt,
-  buildQuickAskPrompt,
   getRepoConstraintsSystemPrompt,
   buildRepoConstraintsPrompt,
   getBestOfNReviewerSystemPrompt,
