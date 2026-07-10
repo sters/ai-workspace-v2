@@ -46,7 +46,6 @@ import {
   getChatSystemPrompt,
   getReviewChatSystemPrompt,
   getResearchChatSystemPrompt,
-  getQuickAskSystemPrompt,
   getSlackChatSystemPrompt,
 } from "@/lib/templates/prompts";
 
@@ -82,7 +81,6 @@ const SYSTEM_PROMPTS: Record<string, () => string> = {
   "chat.md": getChatSystemPrompt,
   "review-chat.md": getReviewChatSystemPrompt,
   "research-chat.md": getResearchChatSystemPrompt,
-  "quick-ask.md": getQuickAskSystemPrompt,
   "slack-chat.md": getSlackChatSystemPrompt,
 };
 

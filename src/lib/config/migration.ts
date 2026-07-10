@@ -8,7 +8,7 @@ import {
   OVERRIDABLE_SETTINGS_KEYS,
 } from "./defaults";
 
-const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "quickAsk", "suggest", "hooks", "slack"]);
+const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "suggest", "hooks", "slack"]);
 
 // ---------------------------------------------------------------------------
 // Config file generation
@@ -58,11 +58,6 @@ export function generateDefaultConfigContent(): string {
     "",
     "# chat:",
     "#   model: null                    # default model for interactive chat (null = CLI default)",
-    "",
-    "# quickAsk:",
-    "#   model: sonnet                  # default model for quick-ask (null = CLI default)",
-    "#   effort: medium                 # effort level (low / medium / high / max, null = CLI default)",
-    "#   allowedTools: [Read, Glob, Grep, WebFetch, WebSearch]  # null = no restriction",
     "",
     "# openers:",
     "#   - name: Editor (VSCode)",

@@ -28,7 +28,6 @@ export { getInitReadmeSystemPrompt, buildInitAnalyzeAndReadmePrompt, INIT_ANALYS
 export { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildReviewChatPrompt, getResearchChatSystemPrompt, buildResearchChatPrompt } from "./chat";
 export { getCreateTodoPlannerSystemPrompt, buildCreateTodoFromReviewPrompt } from "./create-todo-planner";
 export { getSearchSystemPrompt, buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "./search";
-export { getQuickAskSystemPrompt, buildQuickAskPrompt } from "./quick-ask";
 export { buildSlackChatPrompt, getSlackChatSystemPrompt } from "./slack-chat";
 export { getRepoConstraintsSystemPrompt, buildRepoConstraintsPrompt } from "./repo-constraints";
 export {

@@ -48,16 +48,6 @@ export interface AppConfig {
     model: ClaudeModel | null;
   };
 
-  /** Settings for the one-shot quick-ask feature. */
-  quickAsk: {
-    /** Default Claude model. null = CLI default. */
-    model: ClaudeModel | null;
-    /** Claude CLI --effort level. null = CLI default. */
-    effort: ClaudeEffort | null;
-    /** Restrict Claude to these tools. null = no restriction. */
-    allowedTools: string[] | null;
-  };
-
   /** External tools that can open a workspace path (editor, terminal, etc.). */
   openers: Opener[];
 

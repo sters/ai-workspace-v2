@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const SUB_TABS = [
-  { label: "Quick Ask", segment: "quick" },
   { label: "Interactive Chat", segment: "interactive" },
 ] as const;
 
