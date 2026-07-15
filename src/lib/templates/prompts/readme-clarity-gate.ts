@@ -10,6 +10,16 @@
 
 import type { ReadmeClarityGateInput } from "@/types/prompts";
 
+/** Phase label for the clarity gate (set in `src/lib/pipelines/autonomous.ts`).
+ * Shared so the Slack notifier can locate the gate's result event. */
+export const README_CLARITY_PHASE_LABEL = "Analyze README clarity";
+
+/** Prefix of the `emitResult` message the clarity gate emits when it STOPS the
+ * run. The Slack notifier matches on this to relay the stop reason instead of
+ * the default "no PRs created" message. Keep in sync with the emit site. */
+export const README_CLARITY_STOP_PREFIX =
+  "**Stopping: the drafted README is too unclear to implement autonomously.**";
+
 export const README_CLARITY_GATE_SCHEMA = {
   type: "object",
   properties: {

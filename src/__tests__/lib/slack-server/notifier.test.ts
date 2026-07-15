@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   extractCreatedPrs,
   buildCompletionMessage,
+  extractClarityGateStop,
 } from "@/lib/slack-server/notifier";
+import {
+  README_CLARITY_PHASE_LABEL,
+  README_CLARITY_STOP_PREFIX,
+} from "@/lib/templates/prompts/readme-clarity-gate";
 import type { OperationEvent } from "@/types/operation";
 
 function ev(data: string, phaseLabel?: string): OperationEvent {
@@ -168,6 +173,50 @@ describe("extractCreatedPrs", () => {
       bashResult("tu_1", "https://github.com/sters/ai-workspace-v2/pull/2"),
     ]);
     expect(out.map((p) => p.url)).toEqual(["https://github.com/sters/ai-workspace-v2/pull/2"]);
+  });
+});
+
+/** Build a function-phase `emitResult` event (as `context-builder` emits it). */
+function resultEvent(result: string, phaseLabel?: string): OperationEvent {
+  return ev(
+    JSON.stringify({ type: "result", subtype: "success", result }),
+    phaseLabel,
+  );
+}
+
+describe("extractClarityGateStop", () => {
+  it("returns the stop message when the clarity gate halted the run", () => {
+    const msg = `${README_CLARITY_STOP_PREFIX} Goal is a placeholder.\n\nNo code was changed. Refine ... update-readme ...`;
+    const out = extractClarityGateStop([
+      resultEvent(msg, README_CLARITY_PHASE_LABEL),
+    ]);
+    expect(out).toBe(msg);
+  });
+
+  it("returns null when the gate proceeded (result is not a stop)", () => {
+    const out = extractClarityGateStop([
+      resultEvent("**README is clear enough to proceed.** looks good", README_CLARITY_PHASE_LABEL),
+    ]);
+    expect(out).toBeNull();
+  });
+
+  it("ignores a stop-looking result from a different phase", () => {
+    const out = extractClarityGateStop([
+      resultEvent(`${README_CLARITY_STOP_PREFIX} spoofed`, "Cycle 1: Gate"),
+    ]);
+    expect(out).toBeNull();
+  });
+
+  it("returns null when there are no events", () => {
+    expect(extractClarityGateStop([])).toBeNull();
+  });
+
+  it("tolerates non-JSON event data", () => {
+    const out = extractClarityGateStop([
+      ev("not-json", README_CLARITY_PHASE_LABEL),
+      resultEvent(`${README_CLARITY_STOP_PREFIX} real`, README_CLARITY_PHASE_LABEL),
+    ]);
+    expect(out).toBe(`${README_CLARITY_STOP_PREFIX} real`);
   });
 });
 
