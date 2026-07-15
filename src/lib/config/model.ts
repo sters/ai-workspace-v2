@@ -26,6 +26,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.BEST_OF_N_REVIEWER]: "sonnet",
   [STEP_TYPES.SUGGEST_WORKSPACE]: "sonnet",
   [STEP_TYPES.AUTONOMOUS_GATE]: "sonnet",
+  [STEP_TYPES.README_CLARITY_GATE]: "sonnet",
 
   // Haiku — simple extraction, aggregation, verification tasks
   [STEP_TYPES.COLLECT_REVIEWS]: "haiku",

@@ -34,9 +34,17 @@ This workspace is a git repository. Changes to \`README.md\`, \`TODO-*.md\`, and
 
 <!-- Fill in before running setup-repository.sh -->
 
-## Objective
+## Goal
 
-<!-- Describe what needs to be accomplished -->
+<!-- The end state that defines success. What must be true when this task is done. -->
+
+## Non-Goal
+
+<!-- Explicitly out of scope. What this task will NOT do, and actions agents must NOT attempt on their own (e.g. production release, infra/DB changes, anything irreversible). Only list exclusions grounded in the request or standard safety — do not narrow intent by inventing out-of-scope items. -->
+
+## Assumptions
+
+<!-- Facts that could NOT be confirmed from the request or linked resources but had to be assumed to fill in the sections above. Mark each item as "- (assumption) ..." so a human can catch and correct wrong guesses. Leave empty if nothing was assumed. -->
 
 ## Context
 
@@ -44,7 +52,16 @@ This workspace is a git repository. Changes to \`README.md\`, \`TODO-*.md\`, and
 
 ## Requirements
 
-<!-- Specific requirements and acceptance criteria -->
+<!-- Specific functional/technical requirements the implementation must meet. -->
+
+## Acceptance Criteria
+
+<!-- Observable, checkable conditions that define "done". Each item is a checkbox tagged (auto) or (manual):
+  - (auto): an agent can verify it with evidence (command exit code, code presence, API behavior). Write these to be objectively verifiable.
+  - (manual): requires a human to confirm (e.g. visual QA in dev, staging sign-off). Agents never attempt these; they are handed off.
+  Put actions an agent must not perform under Non-Goal, not here. -->
+
+- [ ] (auto)
 
 ## Repository Constraints
 

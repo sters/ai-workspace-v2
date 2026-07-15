@@ -206,8 +206,11 @@ export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
 | Satisfied | {count} |
 | Unsatisfied | {count} |
 | Partial | {count} |
+| Pending Human | {count} |
 
-**Satisfaction Rate**: {pct}% ({satisfied} / {total})
+**Satisfaction Rate**: {pct}% ({satisfied} / {auto_total})
+
+{Pending Human items as a checklist, if any — labeled "Manual verification needed"}
 
 ## Top Priority Issues
 
@@ -230,14 +233,21 @@ export const README_VERIFICATION_REPORT_TEMPLATE = `# README Verification: {repo
 | Satisfied | {count} |
 | Unsatisfied | {count} |
 | Partial | {count} |
+| Pending Human | {count} |
 
-**Satisfaction Rate**: {pct}% ({satisfied} / {total})
+**Satisfaction Rate**: {pct}% ({satisfied} / {auto_total})
+
+_Satisfaction Rate counts only agent-verifiable (auto) criteria. Pending Human items are handed off, not failures._
 
 ## {Extracted Requirement}
 
-- **Status**: {SATISFIED/PARTIAL/UNSATISFIED}
+- **Status**: {SATISFIED/PARTIAL/UNSATISFIED/PENDING-HUMAN}
 - **Evidence**: {file paths, code references}
 - **Notes**: {additional context}
+
+## Manual Verification / Handoff
+
+<!-- List every (manual) acceptance criterion here so a human knows what still needs confirmation. Omit the section if there are none. -->
 
 ## Recommendations
 `;

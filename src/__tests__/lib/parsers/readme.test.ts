@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { parseReadmeMeta, normalizeRepoPath, denormalizeRepoPath } from "@/lib/parsers/readme";
+import {
+  parseReadmeMeta,
+  parseAcceptanceCriteria,
+  normalizeRepoPath,
+  denormalizeRepoPath,
+} from "@/lib/parsers/readme";
 
 describe("parseReadmeMeta", () => {
   const sampleReadme = `# Task: Implement authentication flow
@@ -122,6 +127,88 @@ describe("parseReadmeMeta", () => {
     expect(meta.repositories).toHaveLength(3);
     expect(meta.repositories[2].alias).toBe("repo3");
     expect(meta.repositories[2].baseBranch).toBe("release");
+  });
+});
+
+describe("parseAcceptanceCriteria", () => {
+  it("parses auto/manual tagged checkboxes", () => {
+    const content = `# Task: Something
+
+## Acceptance Criteria
+
+- [ ] (auto) \`bun run test\` exits 0
+- [x] (auto) /api/foo returns 200
+- [ ] (manual) Open /dashboard in dev and confirm the panel renders
+
+## Repository Constraints
+`;
+    const ac = parseAcceptanceCriteria(content);
+    expect(ac).toHaveLength(3);
+    expect(ac[0]).toEqual({ text: "`bun run test` exits 0", kind: "auto", checked: false });
+    expect(ac[1]).toEqual({ text: "/api/foo returns 200", kind: "auto", checked: true });
+    expect(ac[2]).toEqual({
+      text: "Open /dashboard in dev and confirm the panel renders",
+      kind: "manual",
+      checked: false,
+    });
+  });
+
+  it("defaults an untagged criterion to auto", () => {
+    const content = `## Acceptance Criteria
+
+- [ ] Login flow works end to end
+`;
+    const ac = parseAcceptanceCriteria(content);
+    expect(ac).toHaveLength(1);
+    expect(ac[0]).toEqual({ text: "Login flow works end to end", kind: "auto", checked: false });
+  });
+
+  it("accepts uppercase X and asterisk bullets", () => {
+    const content = `## Acceptance Criteria
+
+* [X] (manual) Screenshot approved
+`;
+    const ac = parseAcceptanceCriteria(content);
+    expect(ac).toEqual([{ text: "Screenshot approved", kind: "manual", checked: true }]);
+  });
+
+  it("ignores checkboxes outside the Acceptance Criteria section", () => {
+    const content = `## Requirements
+
+- [ ] (auto) not a criterion, wrong section
+
+## Acceptance Criteria
+
+- [ ] (auto) real criterion
+
+## Related Resources
+
+- [ ] (manual) also ignored
+`;
+    const ac = parseAcceptanceCriteria(content);
+    expect(ac).toEqual([{ text: "real criterion", kind: "auto", checked: false }]);
+  });
+
+  it("drops the empty tagged placeholder line from a fresh template", () => {
+    const content = `## Acceptance Criteria
+
+- [ ] (auto)
+`;
+    expect(parseAcceptanceCriteria(content)).toEqual([]);
+  });
+
+  it("returns empty when there is no Acceptance Criteria section", () => {
+    expect(parseAcceptanceCriteria("# Task: x\n\n## Goal\n\nDo the thing")).toEqual([]);
+  });
+
+  it("ignores placeholder comment lines and blanks", () => {
+    const content = `## Acceptance Criteria
+
+<!-- (auto): verifiable by an agent -->
+- [ ] (auto) something real
+`;
+    const ac = parseAcceptanceCriteria(content);
+    expect(ac).toEqual([{ text: "something real", kind: "auto", checked: false }]);
   });
 });
 

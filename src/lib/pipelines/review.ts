@@ -1,7 +1,7 @@
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { getReadme } from "@/lib/workspace/reader";
-import { parseReadmeMeta, parseConstraints } from "@/lib/parsers/readme";
+import { parseReadmeMeta, parseConstraints, parseAcceptanceCriteria } from "@/lib/parsers/readme";
 import {
   listWorkspaceRepos,
   detectBaseBranch,
@@ -48,6 +48,12 @@ export async function buildReviewPipeline(input: {
 
   // Parse constraints from README for programmatic verification
   const allConstraints = parseConstraints(readmeContent);
+
+  // Pre-render the Acceptance Criteria checklist so the README verifier gets an
+  // unambiguous auto/manual split instead of re-parsing prose.
+  const acceptanceCriteria = parseAcceptanceCriteria(readmeContent)
+    .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
+    .join("\n");
 
   // Build review + verify children for phase 1 (parallel)
   const reviewChildren: GroupChild[] = [];
@@ -140,6 +146,7 @@ export async function buildReviewPipeline(input: {
         baseBranch,
         reviewTimestamp,
         readmeContent,
+        acceptanceCriteria,
         worktreePath: repo.worktreePath,
         repoChanges: repoChangesText,
         verifyFilePath: path.join(reviewDir, readmeVerifyFileName),

@@ -1,7 +1,7 @@
 import { getReviewSessions, getReviewDetail, getTodos, getReadme } from "@/lib/workspace/reader";
 import { stripCompletedTodosFromWorkspace } from "@/lib/workspace/todo-cleanup";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
-import { readWorkspaceReadme } from "@/lib/parsers/readme";
+import { readWorkspaceReadme, parseAcceptanceCriteria } from "@/lib/parsers/readme";
 import { syncReadmeRepositories } from "./actions/ensure-repositories";
 import { buildInitTodoAnalysisPhases } from "./actions/init-todo-analysis";
 import { buildInitPipeline } from "./init";
@@ -12,6 +12,7 @@ import { buildUpdateTodoPipeline } from "./update-todo";
 import { runSubPhases } from "./actions/run-sub-phases";
 import { resolveWorkspace } from "./actions/resolve-workspace";
 import { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "@/lib/templates/prompts/autonomous-gate";
+import { buildReadmeClarityGatePrompt, README_CLARITY_GATE_SCHEMA } from "@/lib/templates/prompts/readme-clarity-gate";
 import { getWorkspaceDir } from "@/lib/config";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import path from "node:path";
@@ -72,6 +73,9 @@ async function runAutonomousGate(
 
   // Get README
   const readmeContent = (await getReadme(workspace)) ?? "";
+  const acceptanceCriteria = parseAcceptanceCriteria(readmeContent)
+    .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
+    .join("\n");
 
   // Build gate prompt
   const prompt = buildAutonomousGatePrompt({
@@ -80,6 +84,7 @@ async function runAutonomousGate(
     reviewFiles: reviewDetail.files,
     todoFiles,
     readmeContent,
+    acceptanceCriteria,
     loopIteration,
     maxLoops,
     previousGateResults,
@@ -140,6 +145,10 @@ export function buildAutonomousPipeline(input: {
   const phases: PipelinePhase[] = [];
   const skip = { skipAskUserQuestion: true } as const;
   const gateHistory: { cycle: number; reason: string; fixableIssues: string[] }[] = [];
+  // For a fresh `init` run, gate the first cycle behind a README clarity check
+  // instead of queueing it upfront: the check appends the cycle only when the
+  // drafted README is a clear enough "done" contract to implement autonomously.
+  const initClarityGated = startWith === "init" && !input.resumeCycles;
 
   // ------------------------------------------------------------------
   // Leading phases: init, update-todo, or skip straight to execute
@@ -268,6 +277,9 @@ export function buildAutonomousPipeline(input: {
   if (startWith === "init") {
     const initPhases = buildInitPipeline(description ?? "", interactionLevel);
     phases.push(...initPhases);
+    if (initClarityGated) {
+      phases.push(buildReadmeClarityGatePhase());
+    }
   } else {
     // Prepend salvage phases for non-init paths.
     // On resume, only include them if the saved phase structure had them.
@@ -424,6 +436,86 @@ export function buildAutonomousPipeline(input: {
     };
   }
 
+  // README clarity gate (init path only): decide whether the drafted README is
+  // a clear enough contract to implement autonomously. If yes, append cycle 1.
+  // If too vague, stop the run and recommend the human refine it via update-readme.
+  function buildReadmeClarityGatePhase(): PipelinePhase {
+    return {
+      kind: "function",
+      label: "Analyze README clarity",
+      timeoutMs: 10 * 60 * 1000,
+      maxRetries: 0,
+      fn: async (ctx) => {
+        if (ctx.signal.aborted) return false;
+        const ws = resolveWorkspace(ctx.operationId, workspace);
+        if (!ws) {
+          ctx.emitStatus("No workspace found — cannot analyze README clarity");
+          return false;
+        }
+
+        const appendCycleOne = () => {
+          ctx.appendPhases([
+            buildCycleExecutePhase(1),
+            buildCycleReviewPhase(1),
+            buildCycleGatePhase(1),
+          ]);
+        };
+
+        const readmeContent = (await getReadme(ws)) ?? "";
+        const acceptanceCriteria = parseAcceptanceCriteria(readmeContent)
+          .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
+          .join("\n");
+
+        const wsPath = path.join(getWorkspaceDir(), ws);
+        let resultText = "";
+        const ok = await ctx.runChild(
+          "README Clarity Gate",
+          buildReadmeClarityGatePrompt({ workspaceName: ws, readmeContent, acceptanceCriteria }),
+          {
+            jsonSchema: README_CLARITY_GATE_SCHEMA,
+            stepType: STEP_TYPES.README_CLARITY_GATE,
+            appendSystemPromptFile: ensureSystemPrompt(wsPath, "readme-clarity-gate"),
+            onResultText: (text) => { resultText = text; },
+            skipAskUserQuestion: true,
+          },
+        );
+
+        // Fail open: a judge hiccup should not block an otherwise-legitimate run.
+        if (!ok || !resultText) {
+          ctx.emitStatus("README clarity check did not return a verdict — proceeding");
+          appendCycleOne();
+          return true;
+        }
+
+        let parsed: { sufficient?: boolean; reason?: string; missing?: string[] };
+        try {
+          parsed = JSON.parse(resultText);
+        } catch {
+          ctx.emitStatus("Could not parse README clarity verdict — proceeding");
+          appendCycleOne();
+          return true;
+        }
+        const sufficient = parsed.sufficient !== false;
+        const reason = parsed.reason ?? "";
+        const missing = Array.isArray(parsed.missing) ? parsed.missing : [];
+
+        if (sufficient) {
+          ctx.emitResult(`**README is clear enough to proceed.**${reason ? ` ${reason}` : ""}`);
+          appendCycleOne();
+          return true;
+        }
+
+        // Too unclear: stop here and recommend refining the README.
+        const missingList = missing.length > 0 ? `\n\nMissing / unclear:\n- ${missing.join("\n- ")}` : "";
+        ctx.emitResult(
+          `**Stopping: the drafted README is too unclear to implement autonomously.**${reason ? ` ${reason}` : ""}${missingList}\n\n` +
+            "No code was changed. Refine the workspace README (Goal / Non-Goal / Acceptance Criteria) — e.g. via an **update-readme** operation — then re-run the autonomous flow.",
+        );
+        return true;
+      },
+    };
+  }
+
   // Helper to build the Create PR phase
   function buildCreatePrPhase(): PipelinePhase {
     return {
@@ -454,11 +546,13 @@ export function buildAutonomousPipeline(input: {
         phases.push(buildCycleUpdateTodoPhase(cycle, []));
       }
     }
-  } else {
+  } else if (!initClarityGated) {
     phases.push(buildCycleExecutePhase(1));
     phases.push(buildCycleReviewPhase(1));
     phases.push(buildCycleGatePhase(1));
   }
+  // When initClarityGated, the README clarity gate appends cycle 1 (or stops
+  // the run and recommends update-readme) after the README is drafted.
 
   // For resume: if "Create PR" was dynamically appended before crash, include it
   if (input.resumeWithCreatePr) {

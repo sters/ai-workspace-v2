@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { WorkspaceMeta } from "@/types/workspace";
+import type { AcceptanceCriterion, WorkspaceMeta } from "@/types/workspace";
 
 export interface RepoConstraint {
   label: string;
@@ -67,6 +67,33 @@ export function parseReadmeMeta(content: string): WorkspaceMeta {
     date: dateMatch?.[1] ?? "",
     repositories,
   };
+}
+
+/**
+ * Extract the `## Acceptance Criteria` checklist. Each item is a checkbox
+ * optionally tagged `(auto)` or `(manual)`; untagged items default to `auto`
+ * (held to evidence) so a malformed README never silently lets work pass.
+ */
+export function parseAcceptanceCriteria(content: string): AcceptanceCriterion[] {
+  const startMatch = content.match(/^##\s+Acceptance Criteria\s*$/m);
+  if (!startMatch) return [];
+
+  const startIdx = startMatch.index! + startMatch[0].length;
+  const endMatch = content.slice(startIdx).match(/\n## |\n# /);
+  const section = endMatch
+    ? content.slice(startIdx, startIdx + endMatch.index!)
+    : content.slice(startIdx);
+
+  const itemPattern = /^\s*[-*]\s*\[([ xX~!])\]\s*(?:\((auto|manual)\)\s*)?(.*?)\s*$/gm;
+  const results: AcceptanceCriterion[] = [];
+  let match;
+  while ((match = itemPattern.exec(section)) !== null) {
+    const checked = match[1].toLowerCase() === "x";
+    const kind = match[2] === "manual" ? "manual" : "auto";
+    const text = match[3].trim();
+    if (text) results.push({ text, kind, checked });
+  }
+  return results;
 }
 
 export function parseConstraints(content: string): RepoConstraints[] {
