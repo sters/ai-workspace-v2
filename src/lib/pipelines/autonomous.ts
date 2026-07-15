@@ -12,7 +12,7 @@ import { buildUpdateTodoPipeline } from "./update-todo";
 import { runSubPhases } from "./actions/run-sub-phases";
 import { resolveWorkspace } from "./actions/resolve-workspace";
 import { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "@/lib/templates/prompts/autonomous-gate";
-import { buildReadmeClarityGatePrompt, README_CLARITY_GATE_SCHEMA } from "@/lib/templates/prompts/readme-clarity-gate";
+import { buildReadmeClarityGatePrompt, README_CLARITY_GATE_SCHEMA, README_CLARITY_PHASE_LABEL, README_CLARITY_STOP_PREFIX } from "@/lib/templates/prompts/readme-clarity-gate";
 import { getWorkspaceDir } from "@/lib/config";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import path from "node:path";
@@ -442,7 +442,7 @@ export function buildAutonomousPipeline(input: {
   function buildReadmeClarityGatePhase(): PipelinePhase {
     return {
       kind: "function",
-      label: "Analyze README clarity",
+      label: README_CLARITY_PHASE_LABEL,
       timeoutMs: 10 * 60 * 1000,
       maxRetries: 0,
       fn: async (ctx) => {
@@ -508,7 +508,7 @@ export function buildAutonomousPipeline(input: {
         // Too unclear: stop here and recommend refining the README.
         const missingList = missing.length > 0 ? `\n\nMissing / unclear:\n- ${missing.join("\n- ")}` : "";
         ctx.emitResult(
-          `**Stopping: the drafted README is too unclear to implement autonomously.**${reason ? ` ${reason}` : ""}${missingList}\n\n` +
+          `${README_CLARITY_STOP_PREFIX}${reason ? ` ${reason}` : ""}${missingList}\n\n` +
             "No code was changed. Refine the workspace README (Goal / Non-Goal / Acceptance Criteria) — e.g. via an **update-readme** operation — then re-run the autonomous flow.",
         );
         return true;

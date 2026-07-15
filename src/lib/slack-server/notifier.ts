@@ -4,6 +4,7 @@ import { getEvents } from "@/lib/db/events";
 import { getOperation } from "@/lib/db/operations";
 import { listReadyNotifications, deleteNotification } from "@/lib/db/slack-notifications";
 import { extractPrUrls, type PrUrlInfo } from "@/lib/workspace/pr-url";
+import { README_CLARITY_PHASE_LABEL, README_CLARITY_STOP_PREFIX } from "@/lib/templates/prompts/readme-clarity-gate";
 
 /** Phase label set by the autonomous pipeline for the Create PR step
  * (`src/lib/pipelines/autonomous.ts`, `buildCreatePrPhase`). Filtering by
@@ -55,11 +56,14 @@ export function startNotifier(opts: NotifierOptions): Notifier {
           const events = getEvents(row.operationId);
           const op = getOperation(row.operationId);
           const inputDescription = op?.inputs?.description;
+          // A README-clarity-gate stop means the run halted before doing any
+          // work — relay that reason instead of the misleading "no PRs" message.
+          const clarityStop = extractClarityGateStop(events);
           const prs = extractCreatedPrs(events, { inputDescription });
           await opts.client.chat.postMessage({
             channel: row.channel,
             thread_ts: row.threadTs,
-            text: buildCompletionMessage(prs),
+            text: clarityStop ?? buildCompletionMessage(prs),
           });
         }
         // status === "failed": silently drop per product decision
@@ -145,6 +149,31 @@ export function extractCreatedPrs(
 
   const inputUrls = new Set(extractPrUrls(opts.inputDescription).map((p) => p.url));
   return candidates.filter((p) => !inputUrls.has(p.url));
+}
+
+/**
+ * Detect a README-clarity-gate stop in an autonomous run's events. The gate
+ * emits an `emitResult` (`{type:"result", result}`) tagged with its phase label
+ * whose text starts with {@link README_CLARITY_STOP_PREFIX} when it halts the
+ * run for an unclear README. Returns that full message (reason + handoff) so the
+ * notifier can post it, or `null` if the run wasn't stopped by the gate.
+ */
+export function extractClarityGateStop(events: OperationEvent[]): string | null {
+  for (const e of events) {
+    if (e.phaseLabel !== README_CLARITY_PHASE_LABEL) continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(e.data);
+    } catch {
+      continue;
+    }
+    if (!parsed || typeof parsed !== "object") continue;
+    const p = parsed as { type?: unknown; result?: unknown };
+    if (p.type === "result" && typeof p.result === "string" && p.result.startsWith(README_CLARITY_STOP_PREFIX)) {
+      return p.result;
+    }
+  }
+  return null;
 }
 
 interface ParsedBlock {
