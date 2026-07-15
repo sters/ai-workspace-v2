@@ -68,8 +68,30 @@ Edit the README template provided in the user prompt and return the full edited 
 
 1. **Rewrite the \`# Task:\` heading** to a concise, descriptive title (not the raw URL or description). Under 80 characters, natural language. For example: \`# Task: Add pagination to user search API\`
 2. **Update \`**Task Type**\` and \`**Ticket ID**\`** fields based on your analysis
-3. **Fill in** Objective, Context, Requirements, and Related Resources based on the description
+3. **Fill in** Goal, Non-Goal, Context, Requirements, Acceptance Criteria, and Related Resources based on the description (Assumptions only if you had to assume something — see below)
 4. **If the description is a URL**, fetch it and extract details to populate the README sections
+
+#### Defining "done" (Goal / Non-Goal / Acceptance Criteria)
+
+A later verification phase and the autonomous gate judge completion against these sections, treating them as the authoritative contract. That makes fabricated content dangerous — a plausible-but-wrong criterion gets enforced with false rigor. So:
+
+- **Ground everything in the source.** Only write Goal / Non-Goal / Acceptance Criteria that the description (and any linked ticket/PR you fetch) actually supports. Do NOT invent specifics the source doesn't imply.
+- **Under-specify rather than mis-specify.** If the description is too vague to write concrete, grounded criteria, write a minimal honest set (e.g. \`- [ ] (auto) The change described in the Initial Request is implemented and existing lint/test/build pass\`) instead of fabricating detailed criteria. A short, correct contract is better than a long, wrong one — a later phase and human README review refine it.
+- **Record assumptions, don't launder them.** Any fact you could not confirm from the source but had to assume in order to fill a section goes under \`## Assumptions\` as \`- (assumption) ...\`. Never state an inferred requirement as if it were confirmed. Leave \`## Assumptions\` empty if you assumed nothing.
+- When the interaction level allows asking (MID/HIGH) and you cannot write grounded acceptance criteria without guessing, prefer AskUserQuestion over inventing them.
+
+Then, per section:
+
+- **Goal**: the end state that defines success — what must be true when the task is done.
+- **Non-Goal**: what is explicitly out of scope, AND any action an agent must NOT perform on its own. Deploying to production, running migrations against real environments, force-pushing, dropping data, or anything irreversible belongs here — never as an Acceptance Criteria item.
+- **Acceptance Criteria**: observable, checkable conditions written as tagged checkboxes. Tag each item:
+  - \`(auto)\` — an agent can verify it with concrete evidence: a command exiting 0, an API returning an expected response, specific code/tests existing. Write these to be objectively verifiable, not vague ("UX feels better" is not acceptable — "\`bun run test\` passes" is). Only unmet \`(auto)\` criteria will keep the autonomous loop running.
+  - \`(manual)\` — requires a human to confirm and cannot be verified by an agent: visual QA by opening a screen in dev, staging sign-off, manual exploratory testing. These are handed off to a human and never block completion.
+  - Example:
+    - \`- [ ] (auto) \\\`bun run test\\\` exits 0\`
+    - \`- [ ] (auto) GET /api/users supports \\\`?page=\\\` and returns paginated results\`
+    - \`- [ ] (manual) Open the user search screen in dev and confirm pagination controls render correctly\`
+  - Include at least one \`(auto)\` criterion whenever the task involves code changes. Keep the list short and concrete; drop the placeholder \`- [ ] (auto)\` line if it stays empty.
 5. **List repositories** in the Repositories section using one of two formats:
    - **Single worktree per repo (default):**
      \`- **repoName**: \\\`repoPath\\\` (base: \\\`main\\\`)\`
@@ -102,7 +124,7 @@ The user prompt will specify one of three interaction levels. Follow the policy 
 
 ### Language (CRITICAL)
 
-- **Always write all output (README content, slug, ticket title, etc.) in English.** This rule is absolute and applies to **every** field of the README you produce: \`# Task:\` heading, Objective, Context, Requirements, Acceptance Criteria, headings, bullet points, and any prose.
+- **Always write all output (README content, slug, ticket title, etc.) in English.** This rule is absolute and applies to **every** field of the README you produce: \`# Task:\` heading, Goal, Non-Goal, Context, Requirements, Acceptance Criteria, headings, bullet points, and any prose.
 - This rule applies **regardless of**:
   - The language of the user's description (Japanese, Chinese, Korean, etc.)
   - The language of any URL content you fetch (Jira tickets, Notion pages, GitHub issues, etc.) — if the source is in Japanese, **translate it to English** when populating the README.
@@ -112,7 +134,7 @@ The user prompt will specify one of three interaction levels. Follow the policy 
   - The user has explicitly requested non-English output (e.g., "日本語で書いて", "write in Japanese"). A description that *happens to be* in Japanese is NOT an explicit request — the user must directly ask for non-English output.
 - Examples:
   - User description in Japanese asking to fix a bug → README body in **English**, translating the Japanese context.
-  - Jira ticket fetched returns Japanese content → Extract the meaning and write the Objective/Context/Requirements **in English**.
+  - Jira ticket fetched returns Japanese content → Extract the meaning and write the Goal/Context/Requirements **in English**.
   - User says "READMEは日本語で書いて" → write README in Japanese (explicit request).
 
 ### Important Notes
@@ -127,7 +149,7 @@ The user prompt will specify one of three interaction levels. Follow the policy 
   - Include the PR URL in the "Related Resources" section of the README
   - Do NOT omit the PR URL from the README body — the system uses it to resolve branch info automatically
   - **If taskType is "review"** (PR review workspace):
-    - **Requirements must describe what the PR is trying to achieve** (the PR's goals and acceptance criteria), NOT what the reviewer should do. A later verification phase checks whether these requirements are satisfied by the code changes. For example:
+    - **Goal and Acceptance Criteria must describe what the PR is trying to achieve** (the PR's intent and the conditions it must satisfy), NOT what the reviewer should do. A later verification phase checks whether these are satisfied by the code changes. For example, as \`(auto)\` Acceptance Criteria:
       - GOOD: "SupportRequest table is correctly defined with proper keys and indexes"
       - GOOD: "gRPC endpoint returns proper error codes for invalid input"
       - BAD: "Review all 24 changed files for correctness"
@@ -155,6 +177,6 @@ ${input.readmeTemplate}
 
 ## Language Reminder
 
-Write the README content in **English**, even if the description above (or any URL you fetch) is in Japanese or another language. The \`## Initial Request\` section keeps the raw description; everything else (Objective, Context, Requirements, Acceptance Criteria, headings, bullets) must be in English. Translate non-English source material as you populate the README. Only switch languages if the user explicitly asks for non-English output.
+Write the README content in **English**, even if the description above (or any URL you fetch) is in Japanese or another language. The \`## Initial Request\` section keeps the raw description; everything else (Goal, Non-Goal, Context, Requirements, Acceptance Criteria, headings, bullets) must be in English. Translate non-English source material as you populate the README. Only switch languages if the user explicitly asks for non-English output.
 `;
 }

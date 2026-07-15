@@ -48,7 +48,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
 1. **Read Each Review File**:
    - Code Reviews: Extract repository name, overall assessment, critical/warning/suggestion counts, and individual warning descriptions
    - TODO Verifications: Extract verified/unverified/partial/incomplete/skipped counts and completion rate
-   - README Verifications: Extract satisfied/unsatisfied/partial counts and satisfaction rate
+   - README Verifications: Extract satisfied/unsatisfied/partial/pending-human counts and satisfaction rate. PENDING-HUMAN items are (manual) acceptance criteria awaiting human confirmation — collect their descriptions
    - Constraint Verifications: Extract pass/fail/skipped/pre-existing status per constraint with exit codes and duration
 
 2. **Create Summary Report** at the specified path following the template structure:
@@ -57,7 +57,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
    - Code Review metrics as a table (Overall Assessment, Critical Issues, Warnings, Suggestions)
    - Warning descriptions as a numbered list directly after the Code Review table (no separate heading)
    - TODO Verification status as a table with completion rate
-   - README Verification status as a table with satisfaction rate
+   - README Verification status as a table with satisfaction rate (satisfaction rate is over auto/agent-verifiable criteria only). If any PENDING-HUMAN items exist, list them as a "Manual verification needed" checklist so a human knows what to confirm — these are handoffs, not failures
    - Constraint Verification results as a table per repository (Constraint, Status, Exit Code, Duration). If ANY constraint has status FAIL, add it as a **Critical Issue**. SKIPPED and PRE-EXISTING constraints are informational — note them but do NOT flag as critical
    - Do NOT include an Aggregate Statistics section
 

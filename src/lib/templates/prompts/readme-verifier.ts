@@ -16,10 +16,11 @@ export function getReadmeVerifierSystemPrompt(): string {
 ### Execution Steps
 
 1. **Extract Requirements** from the README content provided in the user prompt:
-   - Purpose / objectives
-   - Scope (what should be changed)
-   - Expected outcomes / deliverables
-   - Any acceptance criteria
+   - The \`## Acceptance Criteria\` section is the **primary, authoritative** list of what "done" means — treat each checkbox there as a requirement to verify. If a parsed "Acceptance Criteria" list is provided in the user prompt, use it verbatim as your requirement set.
+   - Also fold in the \`## Goal\`, \`## Requirements\`, and expected outcomes as supporting requirements when they add checks not already covered by the Acceptance Criteria.
+   - **Respect the \`(auto)\` / \`(manual)\` tags on Acceptance Criteria (untagged ⇒ treat as \`(auto)\`):**
+     - \`(auto)\` — you are expected to verify these yourself with concrete evidence.
+     - \`(manual)\` — these require a human (visual QA, staging sign-off, manual exploratory testing). **Do NOT attempt to satisfy or "pass" them, and do NOT mark them UNSATISFIED.** Classify them as \`PENDING-HUMAN\` and surface them as handoff items — they are not the agent's responsibility.
 
 2. **Check linked resources for additional requirements**:
    - Look for URLs in the README that are tied to requirements — Jira tickets, GitHub PR reviews, issue comments, etc.
@@ -36,10 +37,12 @@ export function getReadmeVerifierSystemPrompt(): string {
      - **SATISFIED**: Requirement is fully met with evidence
      - **PARTIAL**: Requirement is partially met (explain what's missing)
      - **UNSATISFIED**: No evidence the requirement was addressed
+     - **PENDING-HUMAN**: A \`(manual)\` acceptance criterion that can only be confirmed by a human. This is NOT a failure — it is a handoff. Never classify a \`(manual)\` item as UNSATISFIED just because you could not verify it yourself.
 
 5. **Write Verification Report** to the specified file path
    - Each extracted requirement becomes its own h2 section (## {Requirement})
    - Under each h2, include Status, Evidence, and Notes
+   - List all PENDING-HUMAN items together under the report's handoff section so the human reviewer knows exactly what still needs manual confirmation
 
 ### Working Directory
 
@@ -73,7 +76,7 @@ export function buildReadmeVerifierPrompt(input: ReadmeVerifierInput): string {
 ## README Content
 
 ${input.readmeContent}
-
+${input.acceptanceCriteria ? `\n## Acceptance Criteria (parsed — verify these)\n\n${input.acceptanceCriteria}\n` : ""}
 ## Repository Changes
 
 ${input.repoChanges}

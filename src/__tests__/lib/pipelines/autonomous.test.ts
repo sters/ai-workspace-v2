@@ -56,6 +56,7 @@ vi.mock("@/lib/parsers/readme", () => ({
     meta: { title: "t", taskType: "feature", ticketId: "", date: "", repositories: [] },
   })),
   denormalizeRepoPath: (s: string) => s.replace("___", ":"),
+  parseAcceptanceCriteria: vi.fn(() => []),
 }));
 vi.mock("@/lib/pipelines/actions/setup-repository", () => ({
   setupRepository: vi.fn(() => ({
@@ -213,6 +214,95 @@ describe("buildAutonomousPipeline", () => {
       const labels = phases.map((p) => p.kind === "function" && p.label);
       expect(labels).not.toContain("Ensure repositories");
       expect(labels).not.toContain("Ensure TODOs");
+    });
+
+    it("gates the first cycle behind a README clarity check when startWith is init", () => {
+      mockBuildInit.mockReturnValue([]);
+      const phases = buildAutonomousPipeline({
+        startWith: "init",
+        description: "Test description",
+      });
+      const labels = phases.map((p) => p.kind === "function" && p.label);
+      // Cycle 1 is NOT queued upfront — the clarity gate appends it after the README is drafted.
+      expect(labels).toContain("Analyze README clarity");
+      expect(labels).not.toContain("Cycle 1: Execute");
+    });
+  });
+
+  describe("README clarity gate", () => {
+    function getClarityGatePhase() {
+      mockBuildInit.mockReturnValue([]);
+      const phases = buildAutonomousPipeline({
+        startWith: "init",
+        description: "Test description",
+      });
+      const phase = phases.find((p) => p.kind === "function" && p.label === "Analyze README clarity");
+      if (!phase || phase.kind !== "function") throw new Error("clarity gate phase not found");
+      return phase;
+    }
+
+    it("appends Cycle 1 when the README is judged sufficient", async () => {
+      const phase = getClarityGatePhase();
+      const appended: PipelinePhase[] = [];
+      const ctx = createMockCtx({
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appended.push(...p); }),
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "README Clarity Gate") {
+            opts.onResultText(JSON.stringify({ sufficient: true, reason: "clear", missing: [] }));
+          }
+          return true;
+        }),
+      });
+      const result = await phase.fn(ctx);
+
+      expect(result).toBe(true);
+      expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
+        "Cycle 1: Execute",
+        "Cycle 1: Review",
+        "Cycle 1: Gate",
+      ]);
+    });
+
+    it("stops and recommends refining the README when judged insufficient", async () => {
+      const phase = getClarityGatePhase();
+      const appended: PipelinePhase[] = [];
+      const ctx = createMockCtx({
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appended.push(...p); }),
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "README Clarity Gate") {
+            opts.onResultText(JSON.stringify({
+              sufficient: false,
+              reason: "Goal is a placeholder",
+              missing: ["Concrete goal", "At least one auto acceptance criterion"],
+            }));
+          }
+          return true;
+        }),
+      });
+      const result = await phase.fn(ctx);
+
+      // Graceful stop: no cycle phases appended, run ends without touching code.
+      expect(result).toBe(true);
+      expect(appended).toHaveLength(0);
+      expect(ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("too unclear"));
+      expect(ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("update-readme"));
+    });
+
+    it("fails open (proceeds) when the clarity judge returns no verdict", async () => {
+      const phase = getClarityGatePhase();
+      const appended: PipelinePhase[] = [];
+      const ctx = createMockCtx({
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appended.push(...p); }),
+        // default runChild returns true but never calls onResultText → empty verdict
+      });
+      const result = await phase.fn(ctx);
+
+      expect(result).toBe(true);
+      expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
+        "Cycle 1: Execute",
+        "Cycle 1: Review",
+        "Cycle 1: Gate",
+      ]);
     });
   });
 

@@ -52,6 +52,18 @@ Before deciding \`shouldLoop\`, cross-check the review files against the TODO fi
 4. If \`fixableIssues\` ends up empty but you concluded \`shouldLoop: true\` because of this audit, populate \`fixableIssues\` with the unresolved findings — empty + loop is invalid.
 
 Type/schema consistency findings (signed vs unsigned int widths, optional vs required, repeated vs scalar, naming style across sibling fields) MUST be treated as Should Fix at minimum — they are the most common class of silently-dropped review feedback and break wire compatibility downstream.
+
+### Acceptance Criteria (defines "done")
+
+The workspace README's \`## Acceptance Criteria\` section (also provided pre-parsed) is the contract for completion. Each item is tagged \`(auto)\` or \`(manual)\` — untagged items count as \`(auto)\`.
+
+- **\`(auto)\` criteria** are agent-verifiable and DO gate the loop. If the README verification (or the review) shows an \`(auto)\` criterion is UNSATISFIED or PARTIAL and it is addressable by changing code, set \`shouldLoop: true\` and add it to \`fixableIssues\`. Do NOT proceed to PR while an unmet, actionable \`(auto)\` criterion remains.
+- **\`(manual)\` criteria** (visual QA in dev, staging sign-off, manual exploratory testing) are handed off to a human. They **NEVER** gate the loop and are **NEVER** something to attempt:
+  - Do NOT set \`shouldLoop: true\` solely because a \`(manual)\` / PENDING-HUMAN criterion is not confirmed.
+  - Do NOT set \`giveUp: true\` solely because remaining work is manual — that is expected handoff, not a failure. Note the pending manual items in \`reason\` instead.
+  - Do NOT instruct the executor to perform a manual/handoff action or anything the README lists under \`## Non-Goal\` (e.g. production release, infra/DB changes, irreversible operations).
+- When all actionable \`(auto)\` criteria are satisfied and no Must/Should-Fix findings remain, set \`shouldLoop: false, giveUp: false\` and proceed to PR **even if \`(manual)\` items are still pending** — mention the pending handoff in \`reason\`.
+- The README's \`## Assumptions\` section lists things the init phase could NOT confirm and had to guess. Treat them as **unverified context, not fact.** Do not rely on an assumption to justify skipping work, and when you use "out-of-scope per the README" to dismiss a finding, that exclusion must be **explicitly stated in \`## Non-Goal\`** — never inferred from an assumption or absence.
 4. Examples of issues that **should** trigger a loop:
    - Typos, naming inconsistencies, stale references
    - Poor struct/type layouts, suboptimal data structures
@@ -131,7 +143,7 @@ ${input.previousGateResults
 ## Workspace README
 
 ${input.readmeContent}
-
+${input.acceptanceCriteria ? `\n## Acceptance Criteria (parsed)\n\n${input.acceptanceCriteria}\n` : ""}
 ${previousGateSection}## Review Summary (SUMMARY.md)
 
 ${input.reviewSummary}

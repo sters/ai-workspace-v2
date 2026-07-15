@@ -32,6 +32,20 @@ export interface WorkspaceMeta {
   repositories: { alias: string; path: string; baseBranch: string }[];
 }
 
+/**
+ * A single Acceptance Criteria item from the README's `## Acceptance Criteria`
+ * section. `kind` distinguishes what an agent may do about it:
+ * - "auto": the agent can verify it with evidence (command exit code, code
+ *   presence, API behavior). Only unmet `auto` criteria gate the autonomous loop.
+ * - "manual": requires a human to confirm (visual QA, staging sign-off). Agents
+ *   never attempt these; they are surfaced as a handoff checklist.
+ */
+export interface AcceptanceCriterion {
+  text: string;
+  kind: "auto" | "manual";
+  checked: boolean;
+}
+
 export interface ReviewSession {
   timestamp: string;
   repos: number;

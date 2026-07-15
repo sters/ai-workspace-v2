@@ -20,6 +20,7 @@ export const STEP_TYPES = {
   PLAN_TODO_FROM_REVIEW: "plan-todo-from-review",
   DEEP_SEARCH: "deep-search",
   AUTONOMOUS_GATE: "autonomous-gate",
+  README_CLARITY_GATE: "readme-clarity-gate",
   BEST_OF_N_REVIEWER: "best-of-n-reviewer",
   BEST_OF_N_SYNTHESIZER: "best-of-n-synthesizer",
   AGGREGATE_SUGGESTIONS: "aggregate-suggestions",

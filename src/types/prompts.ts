@@ -87,6 +87,8 @@ export interface ReadmeVerifierInput extends RepoPromptInput {
   readmeContent: string;
   repoChanges: string;
   verifyFilePath: string;
+  /** Pre-rendered Acceptance Criteria checklist parsed from the README, or "" when absent. */
+  acceptanceCriteria?: string;
 }
 
 export interface PRCreatorInput extends RepoPromptInput {
@@ -213,9 +215,18 @@ export interface AutonomousGateInput {
   reviewFiles: { name: string; content: string }[];
   todoFiles: { repoName: string; content: string }[];
   readmeContent: string;
+  /** Pre-rendered Acceptance Criteria checklist parsed from the README, or "" when absent. */
+  acceptanceCriteria?: string;
   loopIteration: number;
   maxLoops: number;
   previousGateResults?: { cycle: number; reason: string; fixableIssues: string[] }[];
+}
+
+export interface ReadmeClarityGateInput {
+  workspaceName: string;
+  readmeContent: string;
+  /** Pre-rendered Acceptance Criteria checklist parsed from the README, or "" when absent. */
+  acceptanceCriteria?: string;
 }
 
 export interface WorkspaceSuggesterInput {
