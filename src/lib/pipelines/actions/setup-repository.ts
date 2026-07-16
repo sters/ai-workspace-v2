@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
-import { exec, repoDir, detectBaseBranch } from "@/lib/workspace/helpers";
+import { exec, repoDir, detectBaseBranch, remoteBranchExists } from "@/lib/workspace/helpers";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 
 export function setupRepository(
@@ -53,8 +53,20 @@ export function setupRepository(
     } catch (err) { console.debug("[setup] set-head failed (non-critical):", err); }
   }
 
-  // Detect base branch
-  const baseBranch = baseBranchOverride ?? detectBaseBranch(repoAbsPath);
+  // Detect base branch. A README-declared override (e.g. `main`) may not match
+  // the repo's actual default branch (e.g. `master`); trusting it blindly makes
+  // the later `worktree add ... origin/<branch>` fail with `invalid reference`.
+  // So if the override doesn't exist on the remote, fall back to the detected default.
+  let baseBranch = baseBranchOverride ?? detectBaseBranch(repoAbsPath);
+  if (baseBranchOverride && !remoteBranchExists(repoAbsPath, baseBranch)) {
+    const detected = detectBaseBranch(repoAbsPath);
+    if (detected !== baseBranch) {
+      emitStatus(
+        `Declared base branch origin/${baseBranch} not found; using detected default branch ${detected}`,
+      );
+      baseBranch = detected;
+    }
+  }
   emitStatus(`Base branch: ${baseBranch}`);
 
   // Create worktree — use absolute path so git -C doesn't resolve it
