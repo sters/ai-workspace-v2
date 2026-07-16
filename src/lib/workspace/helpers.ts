@@ -95,6 +95,22 @@ export function listStaleWorkspaces(days: number): StaleWorkspace[] {
 // Git branch detection
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether `origin/<branch>` exists as a remote-tracking ref in the repo.
+ * Used to validate a declared/override base branch before it's handed to
+ * `git worktree add`, which fails hard on a missing ref.
+ */
+export function remoteBranchExists(repoAbsPath: string, branch: string): boolean {
+  try {
+    exec(
+      `git -C "${repoAbsPath}" show-ref --verify --quiet "refs/remotes/origin/${branch}"`,
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function detectBaseBranch(repoAbsPath: string): string {
   // 1. symbolic-ref
   try {
