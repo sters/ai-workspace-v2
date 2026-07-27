@@ -10,6 +10,21 @@ describe("getExecutorSystemPrompt", () => {
     const prompt = getExecutorSystemPrompt();
     expect(prompt).toMatch(/do not.*create.*pull request/i);
   });
+
+  it("forbids pushing to remote unconditionally, without an 'if requested' escape hatch", () => {
+    const prompt = getExecutorSystemPrompt();
+    expect(prompt).toMatch(/do not.*push/i);
+    // A conditional ban reads as satisfied by any TODO that mentions a PR, which
+    // is exactly what Address-PR-Reviews TODOs look like.
+    expect(prompt).not.toMatch(/push[^\n]*unless (explicitly )?requested/i);
+  });
+
+  it("forbids inspecting remote PR / CI state", () => {
+    const prompt = getExecutorSystemPrompt();
+    expect(prompt).toContain("gh pr view");
+    expect(prompt).toContain("gh pr checks");
+    expect(prompt).toContain("gh run view");
+  });
 });
 
 describe("buildExecutorPrompt", () => {
