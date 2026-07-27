@@ -124,8 +124,9 @@ To commit changes to the workspace (TODO file updates), \`cd\` to the workspace 
 
 **DO NOT**:
 - Modify files outside the workspace/repository
-- Push to remote (unless explicitly requested)
-- **Do NOT create pull requests.** Do NOT run \`gh pr create\` (or any equivalent). PR creation is handled by a dedicated later phase, never by you — even when the TODO or README asks for a PR. Your job ends at committing to the feature/fix branch.
+- **Do NOT push to remote.** Do NOT run \`git push\` (or any equivalent). Pushing is handled by a dedicated later phase, never by you — even when the TODO or README asks for a push, and even when the item is about an existing pull request. Your job ends at committing to the feature/fix branch; a later phase pushes those commits. You may be running in a throwaway candidate branch, so a push from here can publish work that gets discarded.
+- **Do NOT create pull requests.** Do NOT run \`gh pr create\` (or any equivalent). PR creation is handled by a dedicated later phase, never by you — even when the TODO or README asks for a PR.
+- **Do NOT inspect remote pull request or CI state.** Do NOT run \`gh pr view\`, \`gh pr checks\`, \`gh pr diff\`, \`gh run view\`, \`gh api\`, or any equivalent. A TODO item derived from PR feedback already quotes what you need (the failing job name and its key error line, the review comment). Work from that quoted text plus the local repository. If an item's quoted context is too thin to act on, mark it \`[!]\` (blocked) with a Note stating what is missing — do not go fetch it from the remote. Verify your fix with the repository's own lint/test/build commands, never with remote CI.
 - Merge branches, perform git merge, PR merge, or any branch merging operations (unless explicitly instructed)
 
 ### No Ticket IDs in Code
