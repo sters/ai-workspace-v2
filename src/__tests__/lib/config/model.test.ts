@@ -155,6 +155,29 @@ describe("resolveModel", () => {
     expect(resolveModel("review", "coordinate-todos")).toBe("opus");
   });
 
+  it("uses opus for research and the two workspace-document rewrites", () => {
+    setConfig({});
+    expect(resolveModel("execute", "research")).toBe("opus");
+    expect(resolveModel("update-todo", "update-todo")).toBe("opus");
+    expect(resolveModel("update-readme", "update-readme")).toBe("opus");
+  });
+
+  it("uses sonnet for the file-candidate synthesizer", () => {
+    setConfig({});
+    // Only used for markdown candidates; code candidates are merged by the
+    // best-of-n reviewer itself.
+    expect(resolveModel("execute", "best-of-n-synthesizer")).toBe("sonnet");
+  });
+
+  it("uses sonnet for the cheap extraction steps (no haiku tier)", () => {
+    setConfig({});
+    expect(resolveModel("review", "collect-reviews")).toBe("sonnet");
+    expect(resolveModel("review", "verify-todo")).toBe("sonnet");
+    expect(resolveModel("search", "deep-search")).toBe("sonnet");
+    expect(resolveModel("execute", "aggregate-suggestions")).toBe("sonnet");
+    expect(resolveModel("execute", "prune-suggestions")).toBe("sonnet");
+  });
+
   it("falls back to global when operation type has no model", () => {
     setConfig({
       operations: {

@@ -136,21 +136,25 @@ describe("migration: model support", () => {
   it("documents the built-in step effort defaults", () => {
     const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
     expect(result).toContain("#   # Built-in step effort defaults");
-    expect(result).toContain("#   #   xhigh:  execute");
+    expect(result).toMatch(/# {3}# {3}high: +analyze-readme/);
+    expect(result).toMatch(/# {3}# {3}medium: plan-todo-from-review/);
     expect(result).toMatch(/# {3}# {3}low: +collect-reviews/);
+    // xhigh/max are config-only escape hatches, never advertised as defaults.
+    expect(result).not.toMatch(/# {3}# {3}xhigh:/);
   });
 
-  it("documents opus step model defaults accurately", () => {
+  it("documents step model defaults accurately", () => {
     const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
-    // These steps moved to opus; the hint block used to list them under sonnet.
+    // These steps are opus; the hint block used to list them under sonnet.
     expect(result).toMatch(/# {3}# {3}opus: +analyze-readme/);
     expect(result).toContain("code-review");
-    const sonnetLine = result
-      .split("\n")
-      .find((l) => l.includes("#   #   sonnet:"));
+    const hintLines = result.split("\n");
+    const sonnetLine = hintLines.find((l) => l.includes("#   #   sonnet:"));
     expect(sonnetLine).toBeDefined();
     expect(sonnetLine).not.toContain("code-review");
     expect(sonnetLine).not.toContain("verify-readme");
+    // The haiku tier is gone from the model defaults entirely.
+    expect(hintLines.some((l) => l.includes("#   #   haiku:"))).toBe(false);
   });
 });
 
@@ -224,7 +228,7 @@ describe("migration: old config upgrade", () => {
     let end = markerIdx + 1;
     while (end < lines.length && lines[end].startsWith("#   #")) end++;
     const hintBlockLength = end - markerIdx;
-    expect(hintBlockLength).toBe(27); // marker + hint lines
+    expect(hintBlockLength).toBe(29); // marker + hint lines
   });
 
   it("is idempotent: migrating generated default content is a no-op", () => {
