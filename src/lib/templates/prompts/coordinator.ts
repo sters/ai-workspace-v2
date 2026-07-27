@@ -4,6 +4,7 @@
  */
 
 import type { CoordinatorInput } from "@/types/prompts";
+import { NO_CD_RULES, SUBAGENT_DELEGATION_POLICY } from "./shared";
 
 export function getCoordinatorSystemPrompt(): string {
   return COORDINATOR_INSTRUCTIONS;
@@ -74,9 +75,9 @@ const COORDINATOR_INSTRUCTIONS = `You are a specialized agent for coordinating T
 
 6. **Commit changes** to the workspace git repository
 
-### Working Directory Rules
+${SUBAGENT_DELEGATION_POLICY}
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+${NO_CD_RULES}
 
 ### Language
 

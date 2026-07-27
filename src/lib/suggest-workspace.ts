@@ -14,7 +14,7 @@ import { insertSuggestion } from "@/lib/db";
 import { flushEvents } from "@/lib/db/event-buffer";
 import { readOperationLog } from "@/lib/operation-store";
 import { parseStreamEvent } from "@/lib/parsers/stream";
-import { getConfig, resolveModel, getWorkspaceDir } from "@/lib/config";
+import { getConfig, resolveEffort, resolveModel, getWorkspaceDir } from "@/lib/config";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { OperationType } from "@/types/operation";
 import path from "node:path";
@@ -106,11 +106,13 @@ async function runSuggester(
 
   const wsPath = path.join(getWorkspaceDir(), workspace);
   const model = resolveModel(parentOperationType, STEP_TYPES.SUGGEST_WORKSPACE);
+  const effort = resolveEffort(parentOperationType, STEP_TYPES.SUGGEST_WORKSPACE);
   const proc = runClaude(suggestOpId, prompt, {
     jsonSchema: WORKSPACE_SUGGESTION_SCHEMA,
     skipAskUserQuestion: true,
     appendSystemPromptFile: ensureSystemPrompt(wsPath, "workspace-suggester"),
     model,
+    effort,
   });
 
   // Wait for completion with timeout

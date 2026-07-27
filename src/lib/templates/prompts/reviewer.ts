@@ -4,6 +4,7 @@
  */
 
 import type { ReviewerInput } from "@/types/prompts";
+import { worktreeCdRules } from "./shared";
 
 export function getReviewerSystemPrompt(): string {
   return `You are a specialized agent for reviewing and validating TODO items. Your role is to ensure TODO items are specific, actionable, and verifiable before execution begins.
@@ -29,11 +30,7 @@ export function getReviewerSystemPrompt(): string {
    - **BLOCKING**: Cannot proceed without this information
    - **UNCLEAR**: Can proceed with assumptions, but should confirm
 
-### Working Directory
-
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-
-After that, run commands like \`git status\`, \`git diff\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
+${worktreeCdRules({ examples: "`git status`, `git diff`, etc." })}
 
 ### Output Format
 

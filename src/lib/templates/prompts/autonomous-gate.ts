@@ -38,12 +38,36 @@ export function getAutonomousGateSystemPrompt(): string {
 1. Examine **all** issues in the review results at every severity level — critical, major, warnings, **and suggestions**.
 2. For each issue, ask: **"Is this a reasonable point that can be addressed by changing the code?"** If yes, it should be fixed — regardless of the severity label.
 3. **Do NOT skip issues just because they are labeled "Suggestion" or "nice-to-have".** If the fix is straightforward and improves code quality, treat it as actionable.
+4. Examples of issues that **should** trigger a loop (illustrative, not an exhaustive list — anything comparable counts):
+   - Typos, naming inconsistencies, stale references
+   - Poor struct/type layouts, suboptimal data structures
+   - Duplicated code or content that should be consolidated
+   - Missing or incorrect documentation in changed files
+   - Code style or readability improvements in touched code
+   - Insufficient test coverage for new or changed code
+   - Comments or naming that don't match surrounding code conventions
+   - Lint or test failures
+   - Any suggestion that would meaningfully improve the quality of the changed code
+5. The **only** issues that should NOT trigger a loop are:
+   - Issues in files that were **not touched at all** and are completely unrelated to the task
+   - Vague or subjective opinions with no concrete action (e.g., "consider rethinking the architecture")
+   - Feature requests that go beyond the scope of the current task
+   - Low-confidence findings that fail the confidence rules below
+
+### Confidence Filtering (you are the filter)
+
+The review phase is instructed to prioritize **coverage over filtering** — it reports findings it is unsure about on purpose, annotated \`(Confidence: high|medium|low)\`. Converting that into a decision is YOUR job:
+
+- **high / medium confidence** — treat normally under all the rules in this prompt.
+- **low confidence** — does NOT by itself justify a loop. Include it only when the fix is small and obviously safe, or when more than one review file reports the same thing. Otherwise say so in \`reason\` and let it go: looping on speculation is how a run burns its cycles without converging.
+- **no annotation** — treat as medium.
+- Confidence is independent of severity. A low-confidence "Critical" is a suspicion, not a blocker; a high-confidence "Suggestion" is a real, actionable finding.
 
 ### Must Fix / Should Fix Audit (HARD BLOCKER)
 
 Before deciding \`shouldLoop\`, cross-check the review files against the TODO files:
 
-1. Enumerate every finding in the review labeled **Critical / Must Fix / Should Fix** (or equivalent severity — "Warning" with a concrete code change attached counts; vague opinions do not).
+1. Enumerate every finding in the review labeled **Critical / Must Fix / Should Fix** (or equivalent severity — "Warning" with a concrete code change attached counts; vague opinions and low-confidence suspicions do not).
 2. For each such finding, look for a corresponding TODO item across all TODO files:
    - **Pending** (\`[ ]\`) item describing the same change → finding is queued, but not yet done → \`shouldLoop: true\`.
    - **Completed** (\`[x]\`) item that should have fixed it, but the review STILL reports the issue → fix didn't actually land → \`shouldLoop: true\` and list the finding in \`fixableIssues\`.
@@ -64,20 +88,6 @@ The workspace README's \`## Acceptance Criteria\` section (also provided pre-par
   - Do NOT instruct the executor to perform a manual/handoff action or anything the README lists under \`## Non-Goal\` (e.g. production release, infra/DB changes, irreversible operations).
 - When all actionable \`(auto)\` criteria are satisfied and no Must/Should-Fix findings remain, set \`shouldLoop: false, giveUp: false\` and proceed to PR **even if \`(manual)\` items are still pending** — mention the pending handoff in \`reason\`.
 - The README's \`## Assumptions\` section lists things the init phase could NOT confirm and had to guess. Treat them as **unverified context, not fact.** Do not rely on an assumption to justify skipping work, and when you use "out-of-scope per the README" to dismiss a finding, that exclusion must be **explicitly stated in \`## Non-Goal\`** — never inferred from an assumption or absence.
-4. Examples of issues that **should** trigger a loop:
-   - Typos, naming inconsistencies, stale references
-   - Poor struct/type layouts, suboptimal data structures
-   - Duplicated code or content that should be consolidated
-   - Missing or incorrect documentation in changed files
-   - Code style or readability improvements in touched code
-   - Insufficient test coverage for new or changed code
-   - Comments or naming that don't match surrounding code conventions
-   - Lint or test failures
-   - Any suggestion that would meaningfully improve the quality of the changed code
-5. The **only** issues that should NOT trigger a loop are:
-   - Issues in files that were **not touched at all** and are completely unrelated to the task
-   - Vague or subjective opinions with no concrete action (e.g., "consider rethinking the architecture")
-   - Feature requests that go beyond the scope of the current task
 
 ### Stagnation Detection & Give Up
 

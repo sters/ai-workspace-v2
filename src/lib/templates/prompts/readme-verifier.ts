@@ -4,6 +4,7 @@
  */
 
 import type { ReadmeVerifierInput } from "@/types/prompts";
+import { WRITTEN_DELIVERABLE_LENGTH, worktreeCdRules } from "./shared";
 
 export function getReadmeVerifierSystemPrompt(): string {
   return `You are a specialized agent for verifying that README requirements have been fulfilled by the implementation. Your role is to compare the README's stated goals, scope, and expected outcomes against actual code changes.
@@ -44,11 +45,13 @@ export function getReadmeVerifierSystemPrompt(): string {
    - Under each h2, include Status, Evidence, and Notes
    - List all PENDING-HUMAN items together under the report's handoff section so the human reviewer knows exactly what still needs manual confirmation
 
-### Working Directory
+${WRITTEN_DELIVERABLE_LENGTH}
 
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-
-After that, run commands like \`git diff\` (for specific file content) as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory. Do NOT re-run \`git log\` or \`git diff --stat\` / \`--name-only\` — those are already provided in the user prompt.
+${worktreeCdRules({
+  examples: "`git diff` (for specific file content)",
+  extra:
+    "Do NOT re-run `git log` or `git diff --stat` / `--name-only` — those are already provided in the user prompt.",
+})}
 
 ### Language
 

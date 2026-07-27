@@ -25,13 +25,13 @@ export const REVIEW_REPORT_TEMPLATE = `# Code Review: {repository_name}
 **Summary**: {What changed}
 
 #### Critical Issues
-- {Issue description}
+- {Issue description} (Confidence: high|medium|low)
 
 #### Warnings
-- {Warning description}
+- {Warning description} (Confidence: high|medium|low)
 
 #### Suggestions
-- {Suggestion}
+- {Suggestion} (Confidence: high|medium|low)
 
 #### Positive Feedback
 - {Good practice}
@@ -184,8 +184,9 @@ export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
 | Critical Issues | {count} |
 | Warnings | {count} |
 | Suggestions | {count} |
+| Low-Confidence Findings | {count} |
 
-{Warning descriptions as numbered list, no heading needed}
+{Warning descriptions as numbered list with their (Confidence: ...) annotations preserved, no heading needed}
 
 #### TODO Verification
 

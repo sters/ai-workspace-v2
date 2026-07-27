@@ -83,6 +83,7 @@ export const OVERRIDABLE_SETTINGS_KEYS = new Set<keyof OperationTypeSettings>([
   "bestOfN",
   "batchSize",
   "model",
+  "effort",
   "steps",
 ]);
 
@@ -115,6 +116,7 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "bestOfN", section: "operations", defaultLine: "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates" },
   { key: "batchSize", section: "operations", defaultLine: "#   batchSize: 10                  # TODO groups per batch in execute operations" },
   { key: "model", section: "operations", defaultLine: "#   model: null                    # null = CLI default (opus / sonnet / haiku)" },
+  { key: "effort", section: "operations", defaultLine: "#   effort: null                   # null = per-step default (low / medium / high / xhigh / max)" },
   { key: "chat", section: null, defaultLine: "# chat:" },
   { key: "model", section: "chat", defaultLine: "#   model: null                    # default model for interactive chat (null = CLI default)" },
   {

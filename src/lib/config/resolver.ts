@@ -273,6 +273,11 @@ export function mergeConfig(
         file.operations?.model,
         defaults.operations.model,
       ),
+      effort: pick(
+        env.operations?.effort,
+        file.operations?.effort,
+        defaults.operations.effort,
+      ),
       typeOverrides: mergedTypeOverrides,
     },
     chat: {
@@ -329,6 +334,7 @@ export function getOperationConfig(type: OperationType): OperationTypeSettings {
     bestOfN: overrides?.bestOfN ?? cfg.operations.bestOfN,
     batchSize: overrides?.batchSize ?? cfg.operations.batchSize,
     model: overrides?.model ?? cfg.operations.model,
+    effort: overrides?.effort ?? cfg.operations.effort,
     steps: overrides?.steps,
   };
 }

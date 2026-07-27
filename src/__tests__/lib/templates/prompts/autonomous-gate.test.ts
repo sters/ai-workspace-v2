@@ -113,6 +113,30 @@ describe("buildAutonomousGatePrompt", () => {
     expect(systemPrompt).toContain("suboptimal data structures");
   });
 
+  it("marks the loop-trigger examples as non-exhaustive", () => {
+    // Claude follows enumerations literally, so an unlabelled list reads as closed.
+    const systemPrompt = getAutonomousGateSystemPrompt();
+    expect(systemPrompt).toMatch(/not an exhaustive list|illustrative/i);
+  });
+
+  it("keeps the Decision Criteria list contiguously numbered", () => {
+    const systemPrompt = getAutonomousGateSystemPrompt();
+    const section = systemPrompt.slice(
+      systemPrompt.indexOf("### Decision Criteria"),
+      systemPrompt.indexOf("### Confidence Filtering"),
+    );
+    const numbers = [...section.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
+    expect(numbers).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("treats low-confidence findings as insufficient grounds for a loop", () => {
+    const systemPrompt = getAutonomousGateSystemPrompt();
+    expect(systemPrompt).toContain("### Confidence Filtering");
+    expect(systemPrompt).toMatch(/low confidence.*does NOT by itself justify a loop/is);
+    expect(systemPrompt).toMatch(/no annotation.*treat as medium/is);
+    expect(systemPrompt).toMatch(/coverage over filtering/i);
+  });
+
   it("includes give-up instructions for stagnation detection", () => {
     const systemPrompt = getAutonomousGateSystemPrompt();
     expect(systemPrompt).toContain("giveUp");

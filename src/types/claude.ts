@@ -15,6 +15,8 @@ export const CLAUDE_EFFORTS = {
   LOW: "low",
   MEDIUM: "medium",
   HIGH: "high",
+  /** Recommended for the hardest coding / agentic work. */
+  XHIGH: "xhigh",
   MAX: "max",
 } as const;
 

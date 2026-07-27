@@ -5,6 +5,7 @@ import type { InteractionLevel } from "./prompts";
 /** Per-step settings within an operation type override. */
 export interface StepSettings {
   model?: ClaudeModel;
+  effort?: ClaudeEffort;
 }
 
 /** Settings that can be overridden per operation type. */
@@ -18,7 +19,9 @@ export interface OperationTypeSettings {
   batchSize: number;
   /** Default Claude model for this operation type. */
   model?: ClaudeModel;
-  /** Per-step model overrides within this operation type. */
+  /** Default Claude CLI --effort level for this operation type. */
+  effort?: ClaudeEffort;
+  /** Per-step model / effort overrides within this operation type. */
   steps?: Record<string, StepSettings>;
 }
 
