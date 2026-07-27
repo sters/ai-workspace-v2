@@ -25,6 +25,32 @@ const DEFAULT_MAX_LOOPS = 10;
 const DEFAULT_UPDATE_TODO_INSTRUCTION =
   "Update TODO item statuses to reflect current implementation progress.";
 
+/**
+ * Wall-clock budgets for the cycle phases.
+ *
+ * Each cycle phase runs a whole sub-pipeline through `runSubPhases`, which
+ * **ignores** the sub-phases' own `timeoutMs` — so the budget here is the only
+ * one that applies, and it has to cover every sub-phase end to end, not just
+ * the slowest one. A wrapper tighter than the pipeline it wraps fires first and
+ * makes the sub-pipeline's own budgeting dead code.
+ *
+ * These are deliberately generous rather than tuned: overshooting costs nothing
+ * (a phase that finishes early just proceeds), while undershooting is expensive
+ * twice over, because `execute-phases.ts` retries a timed-out phase on the same
+ * budget — so it times out again, up to `maxRetries` times, re-running every
+ * Claude child from scratch each time.
+ */
+const CYCLE_BUDGETS_MS = {
+  /** `execute.ts` budgets `maxBatches * 20min + 5min`; batch count is unknown until run time, 3 is routine. */
+  execute: 70 * 60 * 1000,
+  /** `review.ts`: reviewer group (scales with repo count) + constraints (10min) + collect (20min). */
+  review: 45 * 60 * 1000,
+  /** One `autonomous-gate` child over the review summary; measured well under a minute. */
+  gate: 10 * 60 * 1000,
+  /** `update-todo.ts`: one updater child, plus up to 60min on the best-of-N path. */
+  updateTodo: 30 * 60 * 1000,
+} as const;
+
 interface AutonomousGateResult {
   shouldLoop: boolean;
   giveUp: boolean;
@@ -295,7 +321,7 @@ export function buildAutonomousPipeline(input: {
     phases.push({
       kind: "function",
       label: "Update TODOs",
-      timeoutMs: 25 * 60 * 1000,
+      timeoutMs: CYCLE_BUDGETS_MS.updateTodo,
       fn: async (ctx) => {
         const ws = workspace!;
         const stripped = await stripCompletedTodosFromWorkspace(ws, repo);
@@ -321,7 +347,7 @@ export function buildAutonomousPipeline(input: {
     return {
       kind: "function",
       label: `Cycle ${loopNumber}: Execute`,
-      timeoutMs: 25 * 60 * 1000,
+      timeoutMs: CYCLE_BUDGETS_MS.execute,
       fn: async (ctx) => {
         if (ctx.signal.aborted) return false;
         const ws = resolveWorkspace(ctx.operationId, workspace);
@@ -340,7 +366,7 @@ export function buildAutonomousPipeline(input: {
     return {
       kind: "function",
       label: `Cycle ${loopNumber}: Review`,
-      timeoutMs: 15 * 60 * 1000,
+      timeoutMs: CYCLE_BUDGETS_MS.review,
       fn: async (ctx) => {
         if (ctx.signal.aborted) return false;
         const ws = resolveWorkspace(ctx.operationId, workspace);
@@ -359,7 +385,7 @@ export function buildAutonomousPipeline(input: {
     return {
       kind: "function",
       label: `Cycle ${loopNumber}: Gate`,
-      timeoutMs: 10 * 60 * 1000,
+      timeoutMs: CYCLE_BUDGETS_MS.gate,
       fn: async (ctx) => {
         if (ctx.signal.aborted) return false;
         const ws = resolveWorkspace(ctx.operationId, workspace);
@@ -408,7 +434,7 @@ export function buildAutonomousPipeline(input: {
     return {
       kind: "function",
       label: `Cycle ${loopNumber}: Update TODO`,
-      timeoutMs: 15 * 60 * 1000,
+      timeoutMs: CYCLE_BUDGETS_MS.updateTodo,
       fn: async (ctx) => {
         if (ctx.signal.aborted) return false;
         const ws = resolveWorkspace(ctx.operationId, workspace);

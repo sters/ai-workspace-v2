@@ -111,7 +111,7 @@ describe("triggerWorkspaceSuggestion", () => {
     expect(suggestions[0].sourceOperationId).toBe("op-1");
   });
 
-  it("passes a resolved model to runClaude (default sonnet)", async () => {
+  it("passes a resolved model to runClaude (default opus)", async () => {
     mockGetResultText.mockReturnValue(JSON.stringify({ suggestions: [] }));
     mockOnEvent.mockImplementation((handler: (event: { type: string }) => void) => {
       setTimeout(() => handler({ type: "complete" }), 10);
@@ -125,7 +125,7 @@ describe("triggerWorkspaceSuggestion", () => {
     const lastCall = mockRunClaude.mock.calls.at(-1);
     expect(lastCall).toBeDefined();
     const options = lastCall?.[2] as { model?: string } | undefined;
-    expect(options?.model).toBe("sonnet");
+    expect(options?.model).toBe("opus");
   });
 
   it("passes a resolved effort to runClaude (default medium)", async () => {

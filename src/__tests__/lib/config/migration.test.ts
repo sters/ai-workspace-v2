@@ -133,28 +133,32 @@ describe("migration: model support", () => {
     expect(result).toContain("#   #       effort: low");
   });
 
-  it("documents the built-in step effort defaults", () => {
+  it("documents the four rungs of the model+effort ladder", () => {
     const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
-    expect(result).toContain("#   # Built-in step effort defaults");
-    expect(result).toMatch(/# {3}# {3}high: +analyze-readme/);
-    expect(result).toMatch(/# {3}# {3}medium: plan-todo-from-review/);
-    expect(result).toMatch(/# {3}# {3}low: +collect-reviews/);
+    expect(result).toContain("#   # Built-in step defaults");
+    expect(result).toContain("four rungs");
+    expect(result).toMatch(/# {3}# {3}opus \/ high {3}—/);
+    expect(result).toMatch(/# {3}# {3}opus \/ medium —/);
+    expect(result).toMatch(/# {3}# {3}opus \/ low {4}—/);
+    expect(result).toMatch(/# {3}# {3}sonnet \/ low {2}—/);
+    // A fifth rung in the docs would mean the ladder drifted from the code.
+    expect(result).not.toMatch(/sonnet \/ (medium|high)/);
     // xhigh/max are config-only escape hatches, never advertised as defaults.
-    expect(result).not.toMatch(/# {3}# {3}xhigh:/);
+    expect(result).not.toMatch(/opus \/ (xhigh|max)/);
+    // The haiku tier is gone from the defaults entirely.
+    expect(result).not.toMatch(/# {3}# {3}haiku/);
   });
 
-  it("documents step model defaults accurately", () => {
+  it("lists each step under exactly one rung", () => {
     const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
-    // These steps are opus; the hint block used to list them under sonnet.
-    expect(result).toMatch(/# {3}# {3}opus: +analyze-readme/);
-    expect(result).toContain("code-review");
-    const hintLines = result.split("\n");
-    const sonnetLine = hintLines.find((l) => l.includes("#   #   sonnet:"));
-    expect(sonnetLine).toBeDefined();
-    expect(sonnetLine).not.toContain("code-review");
-    expect(sonnetLine).not.toContain("verify-readme");
-    // The haiku tier is gone from the model defaults entirely.
-    expect(hintLines.some((l) => l.includes("#   #   haiku:"))).toBe(false);
+    // code-review earns the top rung; the mechanical steps must not appear there.
+    const rungLines = result.split("\n");
+    const topRung = rungLines.findIndex((l) => l.includes("opus / high"));
+    const nextRung = rungLines.findIndex((l) => l.includes("opus / medium"));
+    const topBlock = rungLines.slice(topRung, nextRung).join("\n");
+    expect(topBlock).toContain("code-review");
+    expect(topBlock).not.toContain("collect-reviews");
+    expect(topBlock).not.toContain("verify-todo");
   });
 });
 
@@ -214,21 +218,26 @@ describe("migration: old config upgrade", () => {
     ].join("\n");
     const result = migrateConfigContent(input);
     // New hint lines should be present
-    expect(result).toContain("#   # Built-in step model defaults");
-    expect(result).toContain("#   # Built-in step effort defaults");
+    expect(result).toContain("#   # Built-in step defaults");
+    expect(result).toContain("four rungs");
     expect(result).toContain("#   #   model: sonnet");
     expect(result).toContain("#   #   effort: high");
     expect(result).toContain("#   #       effort: low");
     // Exactly one hint block survives (the stale one is removed, not duplicated)
     const lines = result.split("\n");
     expect(lines.filter((l) => l.includes("Per-operation-type overrides"))).toHaveLength(1);
-    const markerIdx = lines.findIndex((l) => l.includes("Built-in step model defaults"));
-    expect(markerIdx).toBeGreaterThan(-1);
-    // Count consecutive #   # lines after marker
-    let end = markerIdx + 1;
-    while (end < lines.length && lines[end].startsWith("#   #")) end++;
-    const hintBlockLength = end - markerIdx;
-    expect(hintBlockLength).toBe(31); // marker + hint lines
+    // The migrated block must match the freshly generated one exactly. Asserting
+    // equality rather than a line count keeps this from needing an edit every
+    // time a step moves between rungs.
+    const hintBlock = (content: string) => {
+      const ls = content.split("\n");
+      const start = ls.findIndex((l) => l.includes("Built-in step defaults"));
+      let end = start + 1;
+      while (end < ls.length && ls[end].startsWith("#   #")) end++;
+      return ls.slice(start, end);
+    };
+    expect(hintBlock(result).length).toBeGreaterThan(1);
+    expect(hintBlock(result)).toEqual(hintBlock(generateDefaultConfigContent()));
   });
 
   it("is idempotent: migrating generated default content is a no-op", () => {
