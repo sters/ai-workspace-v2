@@ -276,7 +276,7 @@ export function parseStreamEvent(raw: string): LogEntry[] {
     } else if (parsed.subtype === "init") {
       entries.push({
         kind: "system",
-        content: `Session initialized (model: ${parsed.model ?? "unknown"}, session: ${parsed.session_id ?? "unknown"})`,
+        content: `Session initialized (model: ${parsed.model ?? "unknown"}, effort: ${parsed.effort ?? "default"}, session: ${parsed.session_id ?? "unknown"})`,
       });
     } else if (parsed.subtype === "task_started") {
       entries.push({
