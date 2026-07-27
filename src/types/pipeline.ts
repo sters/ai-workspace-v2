@@ -21,7 +21,10 @@ export const STEP_TYPES = {
   DEEP_SEARCH: "deep-search",
   AUTONOMOUS_GATE: "autonomous-gate",
   README_CLARITY_GATE: "readme-clarity-gate",
+  /** Code candidates: picks a winner AND merges implementations in the worktree. */
   BEST_OF_N_REVIEWER: "best-of-n-reviewer",
+  /** Markdown candidates: picks a winner / decides to synthesize, writes nothing. */
+  BEST_OF_N_FILE_REVIEWER: "best-of-n-file-reviewer",
   BEST_OF_N_SYNTHESIZER: "best-of-n-synthesizer",
   AGGREGATE_SUGGESTIONS: "aggregate-suggestions",
   PRUNE_SUGGESTIONS: "prune-suggestions",

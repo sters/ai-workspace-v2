@@ -228,7 +228,7 @@ describe("migration: old config upgrade", () => {
     let end = markerIdx + 1;
     while (end < lines.length && lines[end].startsWith("#   #")) end++;
     const hintBlockLength = end - markerIdx;
-    expect(hintBlockLength).toBe(29); // marker + hint lines
+    expect(hintBlockLength).toBe(31); // marker + hint lines
   });
 
   it("is idempotent: migrating generated default content is a no-op", () => {

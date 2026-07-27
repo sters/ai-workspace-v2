@@ -162,11 +162,13 @@ describe("resolveModel", () => {
     expect(resolveModel("update-readme", "update-readme")).toBe("opus");
   });
 
-  it("uses sonnet for the file-candidate synthesizer", () => {
+  it("tiers the best-of-n steps by whether they merge code or markdown", () => {
     setConfig({});
-    // Only used for markdown candidates; code candidates are merged by the
-    // best-of-n reviewer itself.
-    expect(resolveModel("execute", "best-of-n-synthesizer")).toBe("sonnet");
+    // The code-candidate reviewer also performs the merge in the worktree.
+    expect(resolveModel("execute", "best-of-n-reviewer")).toBe("opus");
+    // The markdown ones only pick and splice documents.
+    expect(resolveModel("init", "best-of-n-file-reviewer")).toBe("sonnet");
+    expect(resolveModel("init", "best-of-n-synthesizer")).toBe("sonnet");
   });
 
   it("uses sonnet for the cheap extraction steps (no haiku tier)", () => {
