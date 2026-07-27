@@ -134,6 +134,10 @@ describe("runBestOfNFiles", () => {
       (call) => call[0] === "Best-of-N File Reviewer",
     );
     expect(reviewerCall).toBeDefined();
+    // Markdown candidates are tiered separately from code candidates.
+    expect((reviewerCall![2] as { stepType?: string }).stepType).toBe(
+      "best-of-n-file-reviewer",
+    );
   });
 
   it("passes candidate dir to buildChildren", async () => {

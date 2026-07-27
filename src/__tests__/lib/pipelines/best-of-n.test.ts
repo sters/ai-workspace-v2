@@ -238,6 +238,38 @@ describe("buildBestOfNPipeline", () => {
     });
   });
 
+  describe("Phase 4: Review", () => {
+    it("tags the reviewer child with the code-candidate step type", async () => {
+      // The code-path reviewer also merges implementations across worktrees, so
+      // it is tiered separately from the markdown file reviewer.
+      const subWTs = makeSubWorktrees(repos, 2);
+      mockCreateSubWorktrees.mockReturnValue(subWTs);
+
+      const phases = await buildBestOfNPipeline({
+        workspace: "ws",
+        n: 2,
+        operationType: "execute",
+        buildCandidatePhases: async () => [{
+          kind: "function" as const,
+          label: "phase",
+          fn: async () => true,
+        }],
+        repos,
+      });
+
+      await (phases[0] as { fn: (ctx: PhaseFunctionContext) => Promise<boolean> }).fn(makeMockCtx());
+      await (phases[1] as { fn: (ctx: PhaseFunctionContext) => Promise<boolean> }).fn(makeMockCtx());
+
+      const runChild = vi.fn(async () => true);
+      const ctx = makeMockCtx({ runChild });
+      await (phases[3] as { fn: (ctx: PhaseFunctionContext) => Promise<boolean> }).fn(ctx);
+
+      expect(runChild).toHaveBeenCalled();
+      const options = runChild.mock.calls[0][2] as { stepType?: string };
+      expect(options.stepType).toBe("best-of-n-reviewer");
+    });
+  });
+
   describe("confirm option", () => {
     it("asks user and proceeds with Best-of-N when confirmed", async () => {
       const subWTs = makeSubWorktrees(repos, 2);

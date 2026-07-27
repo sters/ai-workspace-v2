@@ -32,6 +32,10 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   // done-contract the verifier and gate enforce.
   [STEP_TYPES.UPDATE_TODO]: "opus",
   [STEP_TYPES.UPDATE_README]: "opus",
+  // Not just a decision: on `synthesize` this same call merges the candidates'
+  // implementations into the original worktree, and everything downstream
+  // builds on the result.
+  [STEP_TYPES.BEST_OF_N_REVIEWER]: "opus",
 
   // Sonnet — everything else, from procedural work down to plain extraction.
   // There is no haiku tier: a current-generation Sonnet at low effort beats a
@@ -39,9 +43,9 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   // extraction steps feed the autonomous gate, where a silent misread is
   // expensive. Cost is controlled through effort instead (see below).
   [STEP_TYPES.CREATE_PR]: "sonnet",
-  [STEP_TYPES.BEST_OF_N_REVIEWER]: "sonnet",
-  // Only reached for markdown candidates (`best-of-n-files.ts`); code
-  // candidates are merged by the best-of-n reviewer in its own worktree.
+  // The markdown best-of-N pair (`best-of-n-files.ts`): pick a winner, then
+  // splice documents together. No code is involved in either.
+  [STEP_TYPES.BEST_OF_N_FILE_REVIEWER]: "sonnet",
   [STEP_TYPES.BEST_OF_N_SYNTHESIZER]: "sonnet",
   [STEP_TYPES.SUGGEST_WORKSPACE]: "sonnet",
   [STEP_TYPES.AUTONOMOUS_GATE]: "sonnet",
@@ -80,6 +84,7 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   [STEP_TYPES.CODE_REVIEW]: "high",
   [STEP_TYPES.COORDINATE_TODOS]: "high",
   [STEP_TYPES.UPDATE_README]: "high",
+  [STEP_TYPES.BEST_OF_N_REVIEWER]: "high",
   [STEP_TYPES.AUTONOMOUS_GATE]: "high",
 
   [STEP_TYPES.PLAN_TODO_FROM_REVIEW]: "medium",
@@ -88,7 +93,7 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // Same shape as plan-todo-from-review: turn review findings into TODO items.
   [STEP_TYPES.UPDATE_TODO]: "medium",
   [STEP_TYPES.CREATE_PR]: "medium",
-  [STEP_TYPES.BEST_OF_N_REVIEWER]: "medium",
+  [STEP_TYPES.BEST_OF_N_FILE_REVIEWER]: "medium",
   [STEP_TYPES.BEST_OF_N_SYNTHESIZER]: "medium",
   [STEP_TYPES.README_CLARITY_GATE]: "medium",
   [STEP_TYPES.SUGGEST_WORKSPACE]: "medium",

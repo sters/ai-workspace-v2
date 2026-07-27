@@ -183,7 +183,7 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
     let reviewResultText: string | undefined;
     const reviewOk = await ctx.runChild("Best-of-N File Reviewer", reviewPrompt, {
       jsonSchema: BEST_OF_N_REVIEW_SCHEMA as unknown as Record<string, unknown>,
-      stepType: STEP_TYPES.BEST_OF_N_REVIEWER,
+      stepType: STEP_TYPES.BEST_OF_N_FILE_REVIEWER,
       appendSystemPromptFile: ensureGlobalSystemPrompt("best-of-n-file-reviewer"),
       onResultText: (text) => { reviewResultText = text; },
     });

@@ -104,12 +104,14 @@ describe("resolveEffort", () => {
     expect(resolveEffort("autonomous", "autonomous-gate")).toBe("high");
     expect(resolveEffort("execute", "research")).toBe("high");
     expect(resolveEffort("update-readme", "update-readme")).toBe("high");
+    // Decides AND merges implementations across candidate worktrees.
+    expect(resolveEffort("execute", "best-of-n-reviewer")).toBe("high");
   });
 
   it("uses medium for bounded translation and checklist steps", () => {
     setConfig({});
     expect(resolveEffort("create-pr", "create-pr")).toBe("medium");
-    expect(resolveEffort("execute", "best-of-n-reviewer")).toBe("medium");
+    expect(resolveEffort("init", "best-of-n-file-reviewer")).toBe("medium");
     expect(resolveEffort("autonomous", "readme-clarity-gate")).toBe("medium");
     expect(resolveEffort("execute", "suggest-workspace")).toBe("medium");
     expect(resolveEffort("execute", "prune-suggestions")).toBe("medium");
