@@ -4,6 +4,7 @@
  */
 
 import type { PRCreatorInput } from "@/types/prompts";
+import { worktreeCdRules } from "./shared";
 
 export function getPRCreatorSystemPrompt(): string {
   return `You are a specialized agent for creating or updating a pull request for a repository.
@@ -53,12 +54,11 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 7. **Update** PR using \`gh pr edit\`
 8. **Preserve the current draft/ready state** — do NOT run \`gh pr ready\` or \`gh pr ready --undo\`. Ignore the \`Draft:\` field below when updating; it only applies to newly created PRs.
 
-### Working Directory
-
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-
-After that, run commands like \`git push\`, \`gh pr create\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
-The workspace directory is also available via \`--add-dir\` for reading workspace artifacts.
+${worktreeCdRules({
+  examples: "`git push`, `gh pr create`, etc.",
+  extra:
+    "The workspace directory is also available via `--add-dir` for reading workspace artifacts.",
+})}
 
 ### Language
 

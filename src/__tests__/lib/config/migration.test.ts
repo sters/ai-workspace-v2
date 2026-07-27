@@ -118,7 +118,7 @@ describe("migration: model support", () => {
     expect(result).toContain("#   disableAccessLog");
   });
 
-  it("type override hints include model and steps", () => {
+  it("type override hints include model, effort and steps", () => {
     const input = [
       "operations:",
       "  maxConcurrent: 3",
@@ -126,9 +126,31 @@ describe("migration: model support", () => {
     ].join("\n");
     const result = migrateConfigContent(input);
     expect(result).toContain("#   #   model: sonnet");
+    expect(result).toContain("#   #   effort: high");
     expect(result).toContain("#   #   steps:");
     expect(result).toContain("#   #     <step-type>:");
     expect(result).toContain("#   #       model: haiku");
+    expect(result).toContain("#   #       effort: low");
+  });
+
+  it("documents the built-in step effort defaults", () => {
+    const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
+    expect(result).toContain("#   # Built-in step effort defaults");
+    expect(result).toContain("#   #   xhigh:  execute");
+    expect(result).toMatch(/# {3}# {3}low: +collect-reviews/);
+  });
+
+  it("documents opus step model defaults accurately", () => {
+    const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
+    // These steps moved to opus; the hint block used to list them under sonnet.
+    expect(result).toMatch(/# {3}# {3}opus: +analyze-readme/);
+    expect(result).toContain("code-review");
+    const sonnetLine = result
+      .split("\n")
+      .find((l) => l.includes("#   #   sonnet:"));
+    expect(sonnetLine).toBeDefined();
+    expect(sonnetLine).not.toContain("code-review");
+    expect(sonnetLine).not.toContain("verify-readme");
   });
 });
 
@@ -148,15 +170,36 @@ describe("migration: old config upgrade", () => {
     expect(result).toContain("#   model:");
   });
 
-  it("replaces old 6-line hint block with new 15-line hint block", () => {
-    const oldHint = [
-      "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
-      "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
-      "#   #   claudeTimeoutMinutes: 20",
-      "#   #   functionTimeoutMinutes: 3",
-      "#   #   defaultInteractionLevel: mid",
-      "#   #   bestOfN: 0",
-    ];
+  it.each([
+    {
+      name: "pre-model hint block",
+      oldHint: [
+        "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
+        "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
+        "#   #   claudeTimeoutMinutes: 20",
+        "#   #   functionTimeoutMinutes: 3",
+        "#   #   defaultInteractionLevel: mid",
+        "#   #   bestOfN: 0",
+      ],
+    },
+    {
+      name: "pre-effort hint block",
+      oldHint: [
+        "#   # Built-in step defaults (override via steps.<step-type>.model):",
+        "#   #   sonnet: create-pr, coordinate-todos, review-todos, best-of-n-reviewer,",
+        "#   #           plan-todo-from-review, discover-constraints, autonomous-gate,",
+        "#   #           verify-readme, code-review",
+        "#   #   haiku:  collect-reviews, verify-todo, deep-search",
+        "#   #   (all others: CLI default)",
+        "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
+        "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
+        "#   #   model: sonnet",
+        "#   #   steps:",
+        "#   #     <step-type>:",
+        "#   #       model: haiku",
+      ],
+    },
+  ])("replaces the $name with the current hint block", ({ oldHint }) => {
     const input = [
       "operations:",
       "  bestOfN: 0",
@@ -167,20 +210,21 @@ describe("migration: old config upgrade", () => {
     ].join("\n");
     const result = migrateConfigContent(input);
     // New hint lines should be present
-    expect(result).toContain("#   # Built-in step defaults");
+    expect(result).toContain("#   # Built-in step model defaults");
+    expect(result).toContain("#   # Built-in step effort defaults");
     expect(result).toContain("#   #   model: sonnet");
-    expect(result).toContain("#   #   steps:");
-    expect(result).toContain("#   #     <step-type>:");
-    expect(result).toContain("#   #       model: haiku");
-    // Block starts with "Built-in step defaults" marker
+    expect(result).toContain("#   #   effort: high");
+    expect(result).toContain("#   #       effort: low");
+    // Exactly one hint block survives (the stale one is removed, not duplicated)
     const lines = result.split("\n");
-    const markerIdx = lines.findIndex((l) => l.includes("Built-in step defaults"));
+    expect(lines.filter((l) => l.includes("Per-operation-type overrides"))).toHaveLength(1);
+    const markerIdx = lines.findIndex((l) => l.includes("Built-in step model defaults"));
     expect(markerIdx).toBeGreaterThan(-1);
     // Count consecutive #   # lines after marker
     let end = markerIdx + 1;
     while (end < lines.length && lines[end].startsWith("#   #")) end++;
     const hintBlockLength = end - markerIdx;
-    expect(hintBlockLength).toBe(17); // marker + hint lines
+    expect(hintBlockLength).toBe(27); // marker + hint lines
   });
 
   it("is idempotent: migrating generated default content is a no-op", () => {

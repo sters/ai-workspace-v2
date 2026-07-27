@@ -31,8 +31,8 @@ export {
   _setConfigFilePath,
 } from "./resolver";
 
-// Model resolution
-export { resolveModel } from "./model";
+// Model / effort resolution
+export { resolveModel, resolveEffort, STEP_DEFAULT_MODELS, STEP_DEFAULT_EFFORTS } from "./model";
 
 // Migration & generation
 export {

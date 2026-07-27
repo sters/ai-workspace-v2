@@ -128,6 +128,20 @@ describe("triggerWorkspaceSuggestion", () => {
     expect(options?.model).toBe("sonnet");
   });
 
+  it("passes a resolved effort to runClaude (default medium)", async () => {
+    mockGetResultText.mockReturnValue(JSON.stringify({ suggestions: [] }));
+    mockOnEvent.mockImplementation((handler: (event: { type: string }) => void) => {
+      setTimeout(() => handler({ type: "complete" }), 10);
+    });
+
+    const { triggerWorkspaceSuggestion } = await import("@/lib/suggest-workspace");
+    triggerWorkspaceSuggestion("test-ws", "op-1", "execute");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const options = mockRunClaude.mock.calls.at(-1)?.[2] as { effort?: string } | undefined;
+    expect(options?.effort).toBe("medium");
+  });
+
   it("builds the prompt from the operation transcript digest", async () => {
     mockGetResultText.mockReturnValue(JSON.stringify({ suggestions: [] }));
     mockOnEvent.mockImplementation((handler: (event: { type: string }) => void) => {

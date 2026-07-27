@@ -1,4 +1,4 @@
-import type { ClaudeModel } from "@/types/claude";
+import type { ClaudeEffort, ClaudeModel } from "@/types/claude";
 import type { OperationType } from "@/types/operation";
 import type { StepType } from "@/types/pipeline";
 import { STEP_TYPES } from "@/types/pipeline";
@@ -36,6 +36,34 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
 };
 
 /**
+ * Code-level default `--effort` levels per step type.
+ *
+ * Only steps that should deviate from the CLI default are listed — an absent
+ * entry means "let the CLI decide". Effort is the primary cost/latency dial
+ * (more so than the model tier), so mechanical steps run cheap and the
+ * hardest agentic step runs at `xhigh`. Decision-critical steps whose mistakes
+ * cost a whole pipeline cycle (the autonomous gate, code review) are
+ * deliberately left on the default rather than downgraded.
+ */
+export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
+  // xhigh — long-horizon multi-file coding, the hardest work in the pipeline.
+  [STEP_TYPES.EXECUTE]: "xhigh",
+
+  // medium — procedural or structured steps with a narrow decision space.
+  [STEP_TYPES.CREATE_PR]: "medium",
+  [STEP_TYPES.BEST_OF_N_REVIEWER]: "medium",
+  [STEP_TYPES.README_CLARITY_GATE]: "medium",
+  [STEP_TYPES.SUGGEST_WORKSPACE]: "medium",
+  [STEP_TYPES.PRUNE_SUGGESTIONS]: "medium",
+
+  // low — extraction, aggregation, and existence-check work.
+  [STEP_TYPES.COLLECT_REVIEWS]: "low",
+  [STEP_TYPES.VERIFY_TODO]: "low",
+  [STEP_TYPES.DEEP_SEARCH]: "low",
+  [STEP_TYPES.AGGREGATE_SUGGESTIONS]: "low",
+};
+
+/**
  * Resolve the Claude model to use for a given operation type and step.
  *
  * Priority (highest to lowest):
@@ -70,6 +98,46 @@ export function resolveModel(
 
   if (stepType) {
     return STEP_DEFAULT_MODELS[stepType];
+  }
+
+  return undefined;
+}
+
+/**
+ * Resolve the Claude CLI `--effort` level for a given operation type and step.
+ *
+ * Mirrors `resolveModel`'s priority chain:
+ * 1. `explicitEffort` — phase/child direct override
+ * 2. `config.operations.typeOverrides[operationType].steps[stepType].effort`
+ * 3. `config.operations.typeOverrides[operationType].effort`
+ * 4. `config.operations.effort`
+ * 5. `STEP_DEFAULT_EFFORTS[stepType]` — code-level step defaults
+ * 6. `undefined` — let CLI use its default
+ */
+export function resolveEffort(
+  operationType: OperationType,
+  stepType?: StepType,
+  explicitEffort?: ClaudeEffort,
+): ClaudeEffort | undefined {
+  if (explicitEffort) return explicitEffort;
+
+  const cfg = getConfig();
+  const typeOverride = cfg.operations.typeOverrides?.[operationType];
+
+  if (stepType && typeOverride?.steps?.[stepType]?.effort) {
+    return typeOverride.steps[stepType].effort;
+  }
+
+  if (typeOverride?.effort) {
+    return typeOverride.effort;
+  }
+
+  if (cfg.operations.effort) {
+    return cfg.operations.effort;
+  }
+
+  if (stepType) {
+    return STEP_DEFAULT_EFFORTS[stepType];
   }
 
   return undefined;

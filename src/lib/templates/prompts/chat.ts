@@ -12,13 +12,12 @@ export function getChatSystemPrompt(): string {
 
 The initial user message embeds the current README and TODO summary as REFERENCE MATERIAL only.
 
-CRITICAL startup behavior:
-- Your first Bash tool call MUST be \`cd <workspace path from the user prompt>\` alone, with no other commands and no \`&&\`/\`;\`.
-- After the cd, reply with at most one short sentence (e.g. "Ready.") and stop. Wait for the user's next message.
-- Do NOT analyze, summarize, or comment on the embedded README/TODO/review content.
-- Do NOT propose next steps, surface "blocked" tasks, or offer to take actions.
-- Do NOT run any verification commands at startup (no git status, git log, gh pr, ls, cat, Read, Grep, Glob, etc.).
-- Only read additional files or run commands when the user explicitly asks you to.`;
+Your first turn consists of exactly two things:
+
+1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
+2. One short sentence, e.g. "Ready." — then stop and wait for the user's next message.
+
+Treat the embedded README/TODO/review content as silent reference: it is there so you don't have to read it later, not as a topic to open with. Investigating (Read/Grep/Glob, git status, git log, gh pr, ls), summarizing that content, and proposing next steps all belong to later turns, only once the user asks — that is what the rest of the conversation is for.`;
 }
 
 /** Format TODO files into a concise summary string. */
@@ -74,10 +73,12 @@ export function getReviewChatSystemPrompt(): string {
 
 The initial user message includes the current README, TODO summary, and review summary so you have context for the discussion.
 
-Startup behavior:
-- Your first Bash tool call MUST be \`cd <workspace path from the user prompt>\` alone, with no other commands.
-- After cd, give a brief acknowledgement (1-2 sentences) about the review topic and wait for the user's question.
-- Do NOT proactively read additional files (Read/Glob/Grep) or run verification commands (git status, git log, gh pr) at startup. Only do so when the user explicitly asks.`;
+Your first turn consists of exactly two things:
+
+1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command.
+2. A brief acknowledgement (1-2 sentences) about the review topic, then wait for the user's question.
+
+The context you need for that acknowledgement is already in this message. Reach for files (Read/Glob/Grep) or verification commands (git status, git log, gh pr) once the user's question calls for them.`;
 }
 
 /**
@@ -123,10 +124,12 @@ export function getResearchChatSystemPrompt(): string {
 
 The initial user message includes the current README, TODO summary, and research summary so you have context for the discussion.
 
-Startup behavior:
-- Your first Bash tool call MUST be \`cd <workspace path from the user prompt>\` alone, with no other commands.
-- After cd, give a brief acknowledgement (1-2 sentences) about the research topic and wait for the user's question.
-- Do NOT proactively read additional files (Read/Glob/Grep) or run verification commands (git status, git log, gh pr) at startup. Only do so when the user explicitly asks.`;
+Your first turn consists of exactly two things:
+
+1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command.
+2. A brief acknowledgement (1-2 sentences) about the research topic, then wait for the user's question.
+
+The context you need for that acknowledgement is already in this message. Reach for files (Read/Glob/Grep) or verification commands (git status, git log, gh pr) once the user's question calls for them.`;
 }
 
 /**
@@ -180,7 +183,7 @@ function workingDirectorySection(workspacePath: string): string {
     `cd ${workspacePath}`,
     "```",
     "",
-    "Do NOT combine cd with other commands. After the cd, follow the startup behavior in the system prompt (brief acknowledgement, then wait for the user).",
+    "Issue it on its own, then follow the first-turn shape in the system prompt (brief acknowledgement, then wait for the user).",
     "",
   ].join("\n");
 }

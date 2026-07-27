@@ -15,6 +15,11 @@ import type {
   ResearchRecommendationsCrossInput,
   ResearchIntegrationInput,
 } from "@/types/prompts";
+import {
+  NO_CD_RULES,
+  SUBAGENT_DELEGATION_POLICY,
+  WRITTEN_DELIVERABLE_LENGTH,
+} from "./shared";
 
 // ---------------------------------------------------------------------------
 // Phase 1 — Findings (user prompts: dynamic data only)
@@ -191,9 +196,11 @@ const RESEARCH_SHARED_RULES = `### Language
 - **Always write all output (findings, recommendations, summaries) in English**, regardless of the language used in the workspace README.
 - Only use a non-English language if the user explicitly requests it.
 
-### Working Directory Rules
+${WRITTEN_DELIVERABLE_LENGTH}
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+${SUBAGENT_DELEGATION_POLICY}
+
+${NO_CD_RULES}
 
 ### Scope
 

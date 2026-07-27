@@ -4,6 +4,7 @@
  */
 
 import type { TodoVerifierInput } from "@/types/prompts";
+import { WRITTEN_DELIVERABLE_LENGTH, worktreeCdRules } from "./shared";
 
 export function getTodoVerifierSystemPrompt(): string {
   return `You are a specialized agent for verifying that TODO items have been properly completed. Your role is to compare the TODO file against actual code changes and confirm each item was addressed.
@@ -30,11 +31,9 @@ export function getTodoVerifierSystemPrompt(): string {
 
 5. **Write Verification Report** to the specified file path
 
-### Working Directory
+${WRITTEN_DELIVERABLE_LENGTH}
 
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-
-After that, run commands like \`git diff\` as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
+${worktreeCdRules({ examples: "`git diff`" })}
 
 ### Language
 

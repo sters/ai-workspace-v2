@@ -38,23 +38,9 @@ export function generateDefaultConfigContent(): string {
     "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates",
     "#   batchSize: 10                  # TODO groups per batch in execute operations",
     "#   model: null                    # null = CLI default (opus / sonnet / haiku)",
-    "#   # Built-in step defaults (override via steps.<step-type>.model):",
-    "#   #   sonnet: create-pr, coordinate-todos, review-todos, best-of-n-reviewer,",
-    "#   #           plan-todo-from-review, discover-constraints, autonomous-gate,",
-    "#   #           verify-readme, code-review",
-    "#   #   haiku:  collect-reviews, verify-todo, deep-search",
-    "#   #   (all others: CLI default)",
-    "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
-    "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
-    "#   #   claudeTimeoutMinutes: 20",
-    "#   #   functionTimeoutMinutes: 3",
-    "#   #   defaultInteractionLevel: mid",
-    "#   #   bestOfN: 0",
-    "#   #   batchSize: 10",
-    "#   #   model: sonnet",
-    "#   #   steps:",
-    "#   #     <step-type>:",
-    "#   #       model: haiku",
+    "#   effort: null                   # null = per-step default (low / medium / high / xhigh / max)",
+    // Same block the migrator maintains, so a generated file needs no migration.
+    ...TYPE_OVERRIDE_HINT_LINES,
     "",
     "# chat:",
     "#   model: null                    # default model for interactive chat (null = CLI default)",
@@ -186,16 +172,32 @@ export function migrateConfigContent(content: string): string {
   return lines.join("\n");
 }
 
-/** Per-type override hint comment markers (current + legacy, used to detect existing hint blocks). */
-const TYPE_OVERRIDE_HINT_MARKER = "Built-in step defaults";
-const TYPE_OVERRIDE_HINT_MARKER_LEGACY = "Per-operation-type overrides";
+/**
+ * Per-type override hint comment markers. The first entry is the current
+ * marker; the rest are markers used by older versions, kept so an existing
+ * config file's stale block is recognized and replaced rather than duplicated.
+ */
+const TYPE_OVERRIDE_HINT_MARKERS = [
+  "Built-in step model defaults",
+  "Built-in step defaults",
+  "Per-operation-type overrides",
+];
 
+/** Canonical hint block. Mirrors `STEP_DEFAULT_MODELS` / `STEP_DEFAULT_EFFORTS`. */
 const TYPE_OVERRIDE_HINT_LINES = [
-  "#   # Built-in step defaults (override via steps.<step-type>.model):",
-  "#   #   sonnet: create-pr, coordinate-todos, review-todos, best-of-n-reviewer,",
-  "#   #           plan-todo-from-review, discover-constraints, autonomous-gate,",
-  "#   #           verify-readme, code-review",
-  "#   #   haiku:  collect-reviews, verify-todo, deep-search",
+  "#   # Built-in step model defaults (override via steps.<step-type>.model):",
+  "#   #   opus:   analyze-readme, plan-todo, plan-todo-from-review, execute,",
+  "#   #           discover-constraints, verify-readme, code-review, review-todos,",
+  "#   #           coordinate-todos",
+  "#   #   sonnet: create-pr, best-of-n-reviewer, suggest-workspace, autonomous-gate,",
+  "#   #           readme-clarity-gate",
+  "#   #   haiku:  collect-reviews, verify-todo, deep-search, aggregate-suggestions",
+  "#   #   (all others: CLI default)",
+  "#   # Built-in step effort defaults (override via steps.<step-type>.effort):",
+  "#   #   xhigh:  execute",
+  "#   #   medium: create-pr, best-of-n-reviewer, readme-clarity-gate,",
+  "#   #           suggest-workspace, prune-suggestions",
+  "#   #   low:    collect-reviews, verify-todo, deep-search, aggregate-suggestions",
   "#   #   (all others: CLI default)",
   "#   # Per-operation-type overrides (any setting above except maxConcurrent):",
   "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
@@ -205,9 +207,11 @@ const TYPE_OVERRIDE_HINT_LINES = [
   "#   #   bestOfN: 0",
   "#   #   batchSize: 10",
   "#   #   model: sonnet",
+  "#   #   effort: high",
   "#   #   steps:",
   "#   #     <step-type>:",
   "#   #       model: haiku",
+  "#   #       effort: low",
 ];
 
 /**
@@ -226,7 +230,7 @@ function addTypeOverrideHint(lines: string[]): string[] {
 
   // Find and remove any existing hint block (marker line + consecutive `#   #` lines after it).
   // Check both current and legacy markers to handle config files from older versions.
-  for (const marker of [TYPE_OVERRIDE_HINT_MARKER, TYPE_OVERRIDE_HINT_MARKER_LEGACY]) {
+  for (const marker of TYPE_OVERRIDE_HINT_MARKERS) {
     const markerIdx = result.findIndex((line) => line.includes(marker));
     if (markerIdx >= 0) {
       let end = markerIdx + 1;

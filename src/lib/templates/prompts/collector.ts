@@ -4,6 +4,7 @@
  */
 
 import type { CollectorInput } from "@/types/prompts";
+import { NO_CD_RULES, WRITTEN_DELIVERABLE_LENGTH } from "./shared";
 
 export function getCollectorSystemPrompt(): string {
   return COLLECTOR_INSTRUCTIONS;
@@ -46,7 +47,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
 ### Execution Steps
 
 1. **Read Each Review File**:
-   - Code Reviews: Extract repository name, overall assessment, critical/warning/suggestion counts, and individual warning descriptions
+   - Code Reviews: Extract repository name, overall assessment, critical/warning/suggestion counts, and individual warning descriptions. Reviewers annotate findings with \`(Confidence: high|medium|low)\` — **preserve those annotations verbatim** on every finding you carry into the summary, and count how many findings are low-confidence. The autonomous gate uses confidence to decide what is worth another cycle, so stripping it silently promotes speculation to fact
    - TODO Verifications: Extract verified/unverified/partial/incomplete/skipped counts and completion rate
    - README Verifications: Extract satisfied/unsatisfied/partial/pending-human counts and satisfaction rate. PENDING-HUMAN items are (manual) acceptance criteria awaiting human confirmation — collect their descriptions
    - Constraint Verifications: Extract pass/fail/skipped/pre-existing status per constraint with exit codes and duration
@@ -54,16 +55,16 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
 2. **Create Summary Report** at the specified path following the template structure:
    - Per-repository sections with links to all review/verification files
    - If a \`REVIEW-cross-repository.md\` file is present, give it its own "Cross-Repository" section (it reviews issues that span multiple repos, e.g. API/contract mismatches) and surface any of its Critical Issues in the top priority list
-   - Code Review metrics as a table (Overall Assessment, Critical Issues, Warnings, Suggestions)
-   - Warning descriptions as a numbered list directly after the Code Review table (no separate heading)
+   - Code Review metrics as a table (Overall Assessment, Critical Issues, Warnings, Suggestions, Low-Confidence Findings)
+   - Warning descriptions as a numbered list directly after the Code Review table (no separate heading), each keeping its \`(Confidence: ...)\` annotation
    - TODO Verification status as a table with completion rate
    - README Verification status as a table with satisfaction rate (satisfaction rate is over auto/agent-verifiable criteria only). If any PENDING-HUMAN items exist, list them as a "Manual verification needed" checklist so a human knows what to confirm — these are handoffs, not failures
    - Constraint Verification results as a table per repository (Constraint, Status, Exit Code, Duration). If ANY constraint has status FAIL, add it as a **Critical Issue**. SKIPPED and PRE-EXISTING constraints are informational — note them but do NOT flag as critical
    - Do NOT include an Aggregate Statistics section
 
-### Working Directory Rules
+${WRITTEN_DELIVERABLE_LENGTH}
 
-**NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**
+${NO_CD_RULES}
 
 ### Language
 

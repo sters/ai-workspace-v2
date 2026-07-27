@@ -4,7 +4,7 @@ import type { ManagedOperation } from "./types";
 import { emitEvent, emitStatus } from "./events";
 import { wireChild } from "./wire-child";
 import { runClaude } from "@/lib/claude";
-import { resolveModel } from "@/lib/config";
+import { resolveEffort, resolveModel } from "@/lib/config";
 import { Semaphore } from "@/lib/semaphore";
 import { updateOperationWorkspace } from "@/lib/db";
 
@@ -111,9 +111,10 @@ export function buildPhaseFunctionContext(
       const cid = `${operationId}-phase-${phaseIndex}-fn-${childCounter++}`;
       (operation.children ??= []).push({ id: cid, label, status: "running" });
       const model = resolveModel(managed.operation.type, childOptions?.stepType, childOptions?.model);
+      const effort = resolveEffort(managed.operation.type, childOptions?.stepType, childOptions?.effort);
       const claudeOpts: RunClaudeOptions | undefined =
-        (childOptions?.jsonSchema || childOptions?.cwd || childOptions?.addDirs || childOptions?.allowedTools || childOptions?.skipAskUserQuestion || childOptions?.appendSystemPromptFile || model)
-          ? { jsonSchema: childOptions?.jsonSchema, cwd: childOptions?.cwd, addDirs: childOptions?.addDirs, allowedTools: childOptions?.allowedTools, skipAskUserQuestion: childOptions?.skipAskUserQuestion, appendSystemPromptFile: childOptions?.appendSystemPromptFile, model }
+        (childOptions?.jsonSchema || childOptions?.cwd || childOptions?.addDirs || childOptions?.allowedTools || childOptions?.skipAskUserQuestion || childOptions?.appendSystemPromptFile || model || effort)
+          ? { jsonSchema: childOptions?.jsonSchema, cwd: childOptions?.cwd, addDirs: childOptions?.addDirs, allowedTools: childOptions?.allowedTools, skipAskUserQuestion: childOptions?.skipAskUserQuestion, appendSystemPromptFile: childOptions?.appendSystemPromptFile, model, effort }
           : undefined;
       const proc = runClaude(cid, prompt, claudeOpts);
       const result = await wireChild(managed, cid, label, proc, childPhaseExtra);
@@ -142,9 +143,10 @@ export function buildPhaseFunctionContext(
           const cid = `${operationId}-phase-${phaseIndex}-fn-${childCounter++}`;
           (operation.children ??= []).push({ id: cid, label: child.label, status: "running" });
           const model = resolveModel(managed.operation.type, child.stepType, child.model);
+          const effort = resolveEffort(managed.operation.type, child.stepType, child.effort);
           const claudeOpts: RunClaudeOptions | undefined =
-            (child.cwd || child.addDirs || child.allowedTools || child.jsonSchema || child.skipAskUserQuestion || child.appendSystemPromptFile || model)
-              ? { cwd: child.cwd, addDirs: child.addDirs, allowedTools: child.allowedTools, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion, appendSystemPromptFile: child.appendSystemPromptFile, model }
+            (child.cwd || child.addDirs || child.allowedTools || child.jsonSchema || child.skipAskUserQuestion || child.appendSystemPromptFile || model || effort)
+              ? { cwd: child.cwd, addDirs: child.addDirs, allowedTools: child.allowedTools, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion, appendSystemPromptFile: child.appendSystemPromptFile, model, effort }
               : undefined;
           const proc = runClaude(cid, child.prompt, claudeOpts);
           const result = await wireChild(managed, cid, child.label, proc, childPhaseExtra);

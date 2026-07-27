@@ -4,6 +4,9 @@
  */
 
 import type { PlannerInput } from "@/types/prompts";
+import { SUBAGENT_DELEGATION_POLICY, worktreeCdRules } from "./shared";
+
+const PLANNER_CD_RULES = worktreeCdRules({ examples: "`git status`, `git diff`, etc." });
 
 export function getPlannerSystemPrompt(): string {
   return `You are a specialized agent for creating TODO items. Your role is to understand the workspace objectives, assess how much repository analysis is needed, and create actionable TODO items that guide the executor.
@@ -53,11 +56,9 @@ export function getPlannerSystemPrompt(): string {
 
 Write the TODO file to the output directory specified in the user prompt: \`<todo-dir>/TODO-{repository-name}.md\`
 
-### Working Directory
+${SUBAGENT_DELEGATION_POLICY}
 
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-
-After that, run commands like \`git status\`, \`git diff\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
+${PLANNER_CD_RULES}
 
 ### TODO Item Format
 
@@ -172,11 +173,7 @@ export function getResearchPlannerSystemPrompt(): string {
 
 Write the TODO file to the output directory specified in the user prompt: \`<todo-dir>/TODO-{repository-name}.md\`
 
-### Working Directory
-
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
-
-After that, run commands like \`git status\`, \`git diff\`, etc. as separate Bash calls. Do NOT use \`git -C\` — you are already in the repo directory.
+${PLANNER_CD_RULES}
 
 ### TODO Item Format
 

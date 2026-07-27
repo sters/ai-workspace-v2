@@ -1,7 +1,7 @@
-import type { AskQuestion, ClaudeModel } from "./claude";
+import type { AskQuestion, ClaudeEffort, ClaudeModel } from "./claude";
 import type { WorkspaceRepo } from "./workspace";
 
-/** All known step type identifiers for config-based model resolution. */
+/** All known step type identifiers for config-based model / effort resolution. */
 export const STEP_TYPES = {
   CODE_REVIEW: "code-review",
   VERIFY_TODO: "verify-todo",
@@ -47,7 +47,9 @@ export interface GroupChild {
   skipAskUserQuestion?: boolean;
   /** Claude model override for this child. */
   model?: ClaudeModel;
-  /** Step type identifier for config-based model resolution. */
+  /** Claude CLI --effort override for this step. */
+  effort?: ClaudeEffort;
+  /** Step type identifier for config-based model / effort resolution. */
   stepType?: StepType;
   /** Path to a file whose content is appended to Claude's system prompt via --append-system-prompt-file. */
   appendSystemPromptFile?: string;
@@ -70,7 +72,9 @@ export interface PipelinePhaseSingle {
   retryDelayMs?: number;
   /** Claude model override for this phase. */
   model?: ClaudeModel;
-  /** Step type identifier for config-based model resolution. */
+  /** Claude CLI --effort override for this step. */
+  effort?: ClaudeEffort;
+  /** Step type identifier for config-based model / effort resolution. */
   stepType?: StepType;
   /** Path to a file whose content is appended to Claude's system prompt via --append-system-prompt-file. */
   appendSystemPromptFile?: string;
@@ -101,7 +105,9 @@ export interface RunChildOptions {
   skipAskUserQuestion?: boolean;
   /** Claude model override for this child. */
   model?: ClaudeModel;
-  /** Step type identifier for config-based model resolution. */
+  /** Claude CLI --effort override for this step. */
+  effort?: ClaudeEffort;
+  /** Step type identifier for config-based model / effort resolution. */
   stepType?: StepType;
   /** Path to a file whose content is appended to Claude's system prompt via --append-system-prompt-file. */
   appendSystemPromptFile?: string;

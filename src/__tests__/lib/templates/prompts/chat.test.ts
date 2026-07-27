@@ -1,23 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildReviewChatPrompt } from "@/lib/templates/prompts/chat";
+import { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, getResearchChatSystemPrompt, buildReviewChatPrompt } from "@/lib/templates/prompts/chat";
 
 describe("getChatSystemPrompt", () => {
+  const systemPrompt = getChatSystemPrompt();
+
   it("mentions README.md and TODO", () => {
-    const systemPrompt = getChatSystemPrompt();
     expect(systemPrompt).toContain("README.md");
     expect(systemPrompt).toContain("TODO");
   });
 
-  it("forbids startup verification commands and analysis", () => {
-    const systemPrompt = getChatSystemPrompt();
-    expect(systemPrompt).toContain("Do NOT analyze");
-    expect(systemPrompt).toContain("Do NOT run any verification commands");
+  it("spells out the wanted first turn as a positive example", () => {
+    // Positive examples steer better than a stack of "Do NOT" lines.
+    expect(systemPrompt).toContain('"Ready."');
+    expect(systemPrompt).toMatch(/first turn/i);
   });
 
-  it("requires cd as the first Bash call", () => {
-    const systemPrompt = getChatSystemPrompt();
-    expect(systemPrompt).toContain("first Bash tool call MUST be");
+  it("defers reading, analysis and next-step proposals to the user's request", () => {
+    expect(systemPrompt).toMatch(/only (once|when|after) the user asks/i);
+    expect(systemPrompt.toLowerCase()).toContain("silent reference");
+  });
+
+  it("requires a bare cd as the first Bash call", () => {
+    expect(systemPrompt).toMatch(/one Bash call/i);
     expect(systemPrompt).toContain("cd");
+    expect(systemPrompt).toMatch(/`&&`/);
+  });
+
+  it("keeps the negative guidance to a minimum", () => {
+    const doNots = systemPrompt.match(/Do NOT/g) ?? [];
+    expect(doNots.length).toBeLessThanOrEqual(1);
   });
 });
 
@@ -81,10 +92,22 @@ describe("buildInitPrompt", () => {
   });
 });
 
-describe("getReviewChatSystemPrompt", () => {
-  it("instructs not to proactively read files", () => {
-    const systemPrompt = getReviewChatSystemPrompt();
-    expect(systemPrompt).toContain("Do NOT proactively read");
+describe.each([
+  ["review", getReviewChatSystemPrompt(), "review"],
+  ["research", getResearchChatSystemPrompt(), "research"],
+])("%s chat system prompt", (_name, systemPrompt, topic) => {
+  it("asks for a brief acknowledgement of the topic, then a wait", () => {
+    expect(systemPrompt).toMatch(/1-2 sentences/);
+    expect(systemPrompt).toContain(`${topic} topic`);
+  });
+
+  it("ties further tool use to the user's question rather than forbidding it", () => {
+    expect(systemPrompt).toMatch(/once the user's question calls for them/i);
+  });
+
+  it("still requires the bare cd first", () => {
+    expect(systemPrompt).toMatch(/one Bash call/i);
+    expect(systemPrompt).toContain("cd");
   });
 });
 

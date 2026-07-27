@@ -6,6 +6,7 @@
  */
 
 import type { CrossRepositoryReviewerInput } from "@/types/prompts";
+import { REVIEW_COVERAGE_POLICY, WRITTEN_DELIVERABLE_LENGTH } from "./shared";
 
 export function getCrossRepositoryReviewerSystemPrompt(): string {
   return `You are a specialized agent for reviewing changes that span MULTIPLE repositories in a single workspace. Per-repository reviewers already cover each repo in isolation; your job is to catch issues that are only visible when looking at the repositories together.
@@ -36,6 +37,12 @@ export function getCrossRepositoryReviewerSystemPrompt(): string {
    - **Warnings** (should address): drift or inconsistencies likely to cause bugs or confusion.
    - **Suggestions** (nice-to-have): opportunities to share types / extract a common contract.
 5. Write the review report to the specified file path.
+
+${REVIEW_COVERAGE_POLICY}
+
+Coverage here means coverage of **cross-repository** concerns only — reporting everything you find does not license re-reviewing single-repo issues that the per-repository reviewers already cover.
+
+${WRITTEN_DELIVERABLE_LENGTH}
 
 ### Language
 

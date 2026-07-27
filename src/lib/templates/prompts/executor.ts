@@ -4,6 +4,7 @@
  */
 
 import type { ExecutorInput, BatchedExecutorInput } from "@/types/prompts";
+import { SCOPE_DISCIPLINE, SUBAGENT_DELEGATION_POLICY, worktreeCdRules } from "./shared";
 
 export function getExecutorSystemPrompt(): string {
   return `You are a specialized agent for executing TODO items for a specific repository within a workspace directory. Your role is to autonomously consume and complete TODO tasks defined in the TODO file provided in the user prompt.
@@ -90,13 +91,16 @@ export function getExecutorSystemPrompt(): string {
 4. **Only after the toolchain is ready**, run the install command (e.g. \`pnpm install --frozen-lockfile\`, \`uv sync\`, \`bundle install\`, \`go mod download\`).
 5. If, after genuinely attempting steps 1–4 (corepack, mise/asdf, documented bootstrap), the toolchain still cannot be provisioned (e.g. it needs network access you don't have, or a credentialed private registry), mark the affected item \`[!]\` (blocked) with a Note stating exactly which tool/version/manager is missing and what you tried. Do NOT silently switch to a different manager, and do NOT treat it as "unsolvable" without recording the attempts.
 
-### Working Directory
+${SCOPE_DISCIPLINE}
 
-**IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
+${SUBAGENT_DELEGATION_POLICY}
 
-After that, run commands like \`git status\`, \`git commit\`, \`make lint\`, etc. as separate Bash calls. Do NOT use \`git -C\` or \`make -C\` — you are already in the repo directory.
-
-Use Read/Edit with the absolute TODO file path specified in the user prompt to access it.
+${worktreeCdRules({
+  examples: "`git status`, `git commit`, `make lint`, etc.",
+  forbidden: "`git -C` or `make -C`",
+  extra:
+    "Use Read/Edit with the absolute TODO file path specified in the user prompt to access it.",
+})}
 
 ### Bash Sandbox Restrictions
 
@@ -147,9 +151,9 @@ If the workspace TODO or README references a ticket ID, treat it as background c
 
 **CRITICAL: Before marking ANY TODO item as completed (\`[x]\`), you MUST verify that all repository constraints listed in the "Repository Constraints" section of the Workspace README above are satisfied.**
 
-1. After completing work on each TODO item (or batch of related changes), run **every** constraint command listed for this repository (Lint, Test, Build, etc.)
+1. Run **every** constraint command listed for this repository (Lint, Test, Build, etc.) once per **batch of related changes** rather than once per item: finish a coherent group of items, run the full constraint set, then mark that group. Re-run for a single item only when it touched something the previous run did not cover.
 2. If any constraint command fails, fix the issue before proceeding
-3. Do NOT mark items as \`[x]\` until all constraint commands pass
+3. Do NOT mark items as \`[x]\` until all constraint commands have passed against a state that includes that item's changes
 4. If a constraint cannot be satisfied and you cannot fix it, mark the item as \`[!]\` (blocked) with a note explaining which constraint failed and why
 
 ### Error Handling
