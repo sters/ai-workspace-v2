@@ -182,7 +182,7 @@ export function runClaude(
     }
   };
 
-  log(operationId, `starting CLI query — cwd=${options?.cwd ?? getResolvedWorkspaceRoot()}, model=${options?.model ?? "default"}, prompt=${prompt.length}chars`);
+  log(operationId, `starting CLI query — cwd=${options?.cwd ?? getResolvedWorkspaceRoot()}, model=${options?.model ?? "default"}, effort=${options?.effort ?? "default"}, prompt=${prompt.length}chars`);
 
   // Accumulated result text from StructuredOutput tool_use or the "result" event
   let resultText: string | undefined;
@@ -287,6 +287,12 @@ export function runClaude(
           }
 
           for (const parsed of result.values as StreamEvent[]) {
+            // The CLI's init event reports the model but not the effort, so
+            // stamp the level we passed via --effort to keep it visible in the log.
+            if (parsed.type === "system" && parsed.subtype === "init" && options?.effort) {
+              parsed.effort = options.effort;
+            }
+
             // Record session_id from system/init event
             if (parsed.type === "system" && parsed.session_id) {
               if (sessionId !== parsed.session_id) {

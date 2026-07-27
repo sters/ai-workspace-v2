@@ -440,6 +440,21 @@ describe("parseStreamEvent", () => {
       if (entries[0].kind === "system") {
         expect(entries[0].content).toContain("claude-3-opus");
         expect(entries[0].content).toContain("sess-abc");
+        expect(entries[0].content).toContain("effort: default");
+      }
+    });
+
+    it("shows the effort stamped onto the init event", () => {
+      const msg = {
+        type: "system",
+        subtype: "init",
+        model: "claude-3-opus",
+        effort: "xhigh",
+        session_id: "sess-abc",
+      };
+      const entries = parseStreamEvent(JSON.stringify(msg));
+      if (entries[0].kind === "system") {
+        expect(entries[0].content).toContain("effort: xhigh");
       }
     });
 

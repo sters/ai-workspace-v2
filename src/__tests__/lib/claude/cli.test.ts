@@ -556,4 +556,54 @@ describe("runClaude", () => {
     // Complete event should be emitted (no pending ask)
     expect(events.some((e) => e.type === "complete")).toBe(true);
   });
+
+  it("stamps the requested effort onto the system init event", async () => {
+    mockSpawn.mockReturnValue({
+      stdout: createMockStdout([
+        { type: "system", subtype: "init", session_id: "test-session-3", model: "claude-opus-5" },
+        { type: "result", subtype: "success", result: "Done" },
+      ]),
+      stderr: createEmptyStream(),
+      exited: Promise.resolve(0),
+      kill: vi.fn(),
+    });
+
+    const claudeProcess = runClaude("test-op-effort", "test prompt", { effort: "xhigh" });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const events: any[] = [];
+    claudeProcess.onEvent((event) => events.push(event));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const init = events
+      .filter((e) => e.type === "output")
+      .map((e) => JSON.parse(e.data))
+      .find((p) => p.type === "system" && p.subtype === "init");
+    expect(init.effort).toBe("xhigh");
+  });
+
+  it("leaves the init event untouched when no effort was requested", async () => {
+    mockSpawn.mockReturnValue({
+      stdout: createMockStdout([
+        { type: "system", subtype: "init", session_id: "test-session-4", model: "claude-opus-5" },
+        { type: "result", subtype: "success", result: "Done" },
+      ]),
+      stderr: createEmptyStream(),
+      exited: Promise.resolve(0),
+      kill: vi.fn(),
+    });
+
+    const claudeProcess = runClaude("test-op-no-effort", "test prompt");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const events: any[] = [];
+    claudeProcess.onEvent((event) => events.push(event));
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const init = events
+      .filter((e) => e.type === "output")
+      .map((e) => JSON.parse(e.data))
+      .find((p) => p.type === "system" && p.subtype === "init");
+    expect(init.effort).toBeUndefined();
+  });
 });
