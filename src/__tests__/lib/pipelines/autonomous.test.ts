@@ -362,9 +362,33 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      expect(phases[2].kind === "function" && phases[2].timeoutMs).toBe(25 * 60 * 1000);
-      expect(phases[3].kind === "function" && phases[3].timeoutMs).toBe(15 * 60 * 1000);
+      expect(phases[2].kind === "function" && phases[2].timeoutMs).toBe(70 * 60 * 1000);
+      expect(phases[3].kind === "function" && phases[3].timeoutMs).toBe(45 * 60 * 1000);
       expect(phases[4].kind === "function" && phases[4].timeoutMs).toBe(10 * 60 * 1000);
+    });
+
+    // `runSubPhases` ignores each sub-phase's own `timeoutMs`, so the whole
+    // sub-pipeline runs under the wrapping cycle phase's single budget. A
+    // wrapper tighter than the pipeline it wraps fires first, and a timed-out
+    // phase is then retried on the same budget — so it times out again.
+    it("gives each cycle phase a budget covering its whole sub-pipeline", () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const budgetOf = (label: string) => {
+        const phase = phases.find((p) => p.kind === "function" && p.label === label);
+        return phase?.kind === "function" ? phase.timeoutMs : undefined;
+      };
+
+      // execute.ts budgets `maxBatches * 20min + 5min`; 3 batches is routine.
+      expect(budgetOf("Cycle 1: Execute")).toBeGreaterThanOrEqual(
+        3 * 20 * 60 * 1000 + 5 * 60 * 1000,
+      );
+      // review.ts: parallel reviewer group + constraints (10min) + collect (20min).
+      expect(budgetOf("Cycle 1: Review")).toBeGreaterThanOrEqual(
+        (10 + 20 + 10) * 60 * 1000,
+      );
     });
 
     it("returns false when no workspace is found", async () => {

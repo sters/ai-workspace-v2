@@ -8,12 +8,20 @@ import { getConfig } from "./resolver";
  * Code-level default models per step type.
  * These are the lowest-priority defaults — config overrides them.
  *
- * Keep in sync with `STEP_DEFAULT_EFFORTS`: a step listed in one table and not
- * the other is a drift bug, and `effort.test.ts` fails on it.
+ * This table and `STEP_DEFAULT_EFFORTS` are two halves of one ordered ladder,
+ * cheapest rung first:
+ *
+ *   sonnet/low  — purely mechanical: extraction, aggregation, rule application
+ *   opus/low    — a step above mechanical: shallow judgment over a bounded input
+ *   opus/medium — the default rung
+ *   opus/high   — needs real thought: open-ended work with no checklist
+ *
+ * Only those four pairings exist, and `effort.test.ts` fails on a fifth. Keep the
+ * two tables in sync: a step listed in one and not the other is a drift bug.
  */
 export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
-  // Opus — plan-shaped steps that benefit from deep thinking up front,
-  // plus execution/review/coordination steps where quality compounds downstream.
+  // Opus — everything above purely mechanical work, i.e. all three upper rungs.
+  // The effort table is what separates them.
   [STEP_TYPES.ANALYZE_README]: "opus",
   [STEP_TYPES.PLAN_TODO]: "opus",
   [STEP_TYPES.PLAN_TODO_FROM_REVIEW]: "opus",
@@ -36,20 +44,29 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   // implementations into the original worktree, and everything downstream
   // builds on the result.
   [STEP_TYPES.BEST_OF_N_REVIEWER]: "opus",
-
-  // Sonnet — everything else, from procedural work down to plain extraction.
-  // There is no haiku tier: a current-generation Sonnet at low effort beats a
-  // smaller model at high effort on these steps for comparable spend, and the
-  // extraction steps feed the autonomous gate, where a silent misread is
-  // expensive. Cost is controlled through effort instead (see below).
-  [STEP_TYPES.CREATE_PR]: "sonnet",
+  // Decides whether to run another cycle. Not open-ended work — it reads an
+  // already-structured review summary — but it is the only step tiered by
+  // payoff: one short call, and a wrong answer either burns a whole cycle or
+  // stops with work unfinished. Given that it earns `high` effort, it gets opus
+  // too; see the sonnet note below.
+  [STEP_TYPES.AUTONOMOUS_GATE]: "opus",
+  [STEP_TYPES.SUGGEST_WORKSPACE]: "opus",
+  [STEP_TYPES.CREATE_PR]: "opus",
+  [STEP_TYPES.README_CLARITY_GATE]: "opus",
   // The markdown best-of-N pair (`best-of-n-files.ts`): pick a winner, then
   // splice documents together. No code is involved in either.
-  [STEP_TYPES.BEST_OF_N_FILE_REVIEWER]: "sonnet",
-  [STEP_TYPES.BEST_OF_N_SYNTHESIZER]: "sonnet",
-  [STEP_TYPES.SUGGEST_WORKSPACE]: "sonnet",
-  [STEP_TYPES.AUTONOMOUS_GATE]: "sonnet",
-  [STEP_TYPES.README_CLARITY_GATE]: "sonnet",
+  [STEP_TYPES.BEST_OF_N_FILE_REVIEWER]: "opus",
+  [STEP_TYPES.BEST_OF_N_SYNTHESIZER]: "opus",
+
+  // Sonnet — the bottom rung, and only that rung: work with nothing to decide.
+  // It pairs exclusively with `low` effort, which is the whole reason to reach
+  // for the smaller model — cheap throughput on mechanical work. Sonnet at
+  // `medium` or `high` is a rung this ladder does not have: paying more to make
+  // the weaker model think is the wrong trade in both directions, so anything
+  // above mechanical goes to opus instead (`model.test.ts` enforces this).
+  // There is likewise no haiku tier: a current-generation Sonnet at low effort
+  // beats a smaller model at high effort on these steps for comparable spend,
+  // and they feed the autonomous gate, where a silent misread is expensive.
   [STEP_TYPES.PRUNE_SUGGESTIONS]: "sonnet",
   [STEP_TYPES.COLLECT_REVIEWS]: "sonnet",
   [STEP_TYPES.VERIFY_TODO]: "sonnet",
@@ -65,12 +82,21 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
  * cover every `STEP_TYPES` value, so adding a step type forces a tier choice
  * (enforced by `effort.test.ts`).
  *
- * The tiers are about the shape of the work, not its importance:
- *   high   — open-ended investigation, or a judgment the rest of the pipeline
- *            then enforces as fact (the README contract, the loop decision).
- *   medium — bounded translation / checklist work over an input that already
- *            says what needs doing.
- *   low    — extraction and aggregation over already-structured text.
+ * `medium` is the default tier. A step moves off it only for a stated reason:
+ *   high   — genuinely open-ended work: the answer is not latent in the input,
+ *            so more thinking finds more. Kept a minority tier on purpose.
+ *   low    — there is little to think about: extraction, aggregation, or rule
+ *            application over already-structured text.
+ *
+ * Note that a step's *importance* is not a reason for `high`. Nearly every step
+ * here feeds something downstream that treats its output as authoritative, so
+ * "the pipeline enforces this as fact" argues for high everywhere and therefore
+ * discriminates nothing. What earns high is the absence of a checklist:
+ * `code-review` hunts defects nobody has enumerated, `coordinate-todos` reads
+ * the other repos' source to resolve placeholders, `analyze-readme` /
+ * `plan-todo` decide what "done" means and how to get there. `verify-readme`,
+ * by contrast, checks an enumerated Acceptance Criteria list — important, but
+ * bounded.
  *
  * `xhigh` and `max` are intentionally absent: they are worth reaching for on a
  * specific hard workload, measured, via config — not as a blanket default.
@@ -78,27 +104,53 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
 export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   [STEP_TYPES.ANALYZE_README]: "high",
   [STEP_TYPES.PLAN_TODO]: "high",
-  [STEP_TYPES.EXECUTE]: "high",
   [STEP_TYPES.RESEARCH]: "high",
-  [STEP_TYPES.VERIFY_README]: "high",
   [STEP_TYPES.CODE_REVIEW]: "high",
   [STEP_TYPES.COORDINATE_TODOS]: "high",
-  [STEP_TYPES.UPDATE_README]: "high",
   [STEP_TYPES.BEST_OF_N_REVIEWER]: "high",
+  // The one step tiered by payoff rather than shape: it reads an already
+  // structured summary, but it is a single short call and a wrong answer costs a
+  // whole cycle — a needless loop, or stopping with work unfinished.
   [STEP_TYPES.AUTONOMOUS_GATE]: "high",
 
+  // The TODO the executor consumes is already a plan: the planning steps above
+  // decided what to build and later phases verify the result, so this is bounded
+  // implementation, not open-ended investigation. It is also the longest-running
+  // step in the pipeline and runs once per batch per repo, so it dominates both
+  // wall clock and spend.
+  [STEP_TYPES.EXECUTE]: "medium",
+  // Verifies against the enumerated `## Acceptance Criteria` checkboxes, which
+  // the prompt treats as the authoritative requirement set.
+  [STEP_TYPES.VERIFY_README]: "medium",
+  // Applies a requested edit to one document, and is forbidden from touching
+  // code — the same shape as update-todo.
+  [STEP_TYPES.UPDATE_README]: "medium",
   [STEP_TYPES.PLAN_TODO_FROM_REVIEW]: "medium",
-  [STEP_TYPES.DISCOVER_CONSTRAINTS]: "medium",
   [STEP_TYPES.REVIEW_TODOS]: "medium",
   // Same shape as plan-todo-from-review: turn review findings into TODO items.
   [STEP_TYPES.UPDATE_TODO]: "medium",
-  [STEP_TYPES.CREATE_PR]: "medium",
-  [STEP_TYPES.BEST_OF_N_FILE_REVIEWER]: "medium",
-  [STEP_TYPES.BEST_OF_N_SYNTHESIZER]: "medium",
-  [STEP_TYPES.README_CLARITY_GATE]: "medium",
+  // Proposes the candidate work items itself rather than reading them off an
+  // input, so unlike the rung below it there is nothing to translate from.
   [STEP_TYPES.SUGGEST_WORKSPACE]: "medium",
-  [STEP_TYPES.PRUNE_SUGGESTIONS]: "medium",
 
+  // opus/low — a step above mechanical: shallow judgment over a bounded input.
+  // Reads version-pinning files, lockfiles and task runners and copies the
+  // lint/test/build commands into a fixed one-per-line format, but has to decide
+  // *which* package manager and activation command apply.
+  [STEP_TYPES.DISCOVER_CONSTRAINTS]: "low",
+  // Fills a PR template from the diff and README, plus the gh/git mechanics.
+  [STEP_TYPES.CREATE_PR]: "low",
+  // A single yes/no against documented criteria, and deliberately biased toward
+  // proceeding — it is a safety valve, not a quality bar.
+  [STEP_TYPES.README_CLARITY_GATE]: "low",
+  // Pick the best of N markdown candidates, then splice the chosen documents.
+  // Comparative judgment, but over prose, with no code and nothing to merge.
+  [STEP_TYPES.BEST_OF_N_FILE_REVIEWER]: "low",
+  [STEP_TYPES.BEST_OF_N_SYNTHESIZER]: "low",
+
+  // sonnet/low — nothing to decide: extraction, aggregation, rule application.
+  // Applies the prompt's documented rules to an existing suggestion list.
+  [STEP_TYPES.PRUNE_SUGGESTIONS]: "low",
   [STEP_TYPES.COLLECT_REVIEWS]: "low",
   [STEP_TYPES.VERIFY_TODO]: "low",
   [STEP_TYPES.DEEP_SEARCH]: "low",

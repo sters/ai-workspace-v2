@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { resolveModel } from "@/lib/config/model";
+import { resolveEffort, resolveModel, STEP_DEFAULT_EFFORTS, STEP_DEFAULT_MODELS } from "@/lib/config/model";
 import { _resetConfig, _setConfigFilePath } from "@/lib/config/resolver";
+import type { StepType } from "@/types/pipeline";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -114,12 +115,12 @@ describe("resolveModel", () => {
     expect(resolveModel("review", "collect-reviews")).toBe("sonnet");
   });
 
-  it("uses sonnet as the code-level default for suggest-workspace step", () => {
+  it("uses opus as the code-level default for suggest-workspace step", () => {
     setConfig({});
-    // No config, no operation/type model — sonnet should come from STEP_DEFAULT_MODELS
-    expect(resolveModel("execute", "suggest-workspace")).toBe("sonnet");
-    expect(resolveModel("review", "suggest-workspace")).toBe("sonnet");
-    expect(resolveModel("autonomous", "suggest-workspace")).toBe("sonnet");
+    // No config, no operation/type model — opus should come from STEP_DEFAULT_MODELS
+    expect(resolveModel("execute", "suggest-workspace")).toBe("opus");
+    expect(resolveModel("review", "suggest-workspace")).toBe("opus");
+    expect(resolveModel("autonomous", "suggest-workspace")).toBe("opus");
   });
 
   it("allows overriding suggest-workspace model via config.yml", () => {
@@ -133,13 +134,27 @@ describe("resolveModel", () => {
       },
     });
     expect(resolveModel("execute", "suggest-workspace")).toBe("haiku");
-    // Unconfigured parent types still fall back to the sonnet default
-    expect(resolveModel("review", "suggest-workspace")).toBe("sonnet");
+    // Unconfigured parent types still fall back to the code-level default
+    expect(resolveModel("review", "suggest-workspace")).toBe("opus");
   });
 
-  it("uses sonnet as the code-level default for autonomous-gate", () => {
+  it("uses opus for autonomous-gate, the one step tiered by payoff", () => {
     setConfig({});
-    expect(resolveModel("autonomous", "autonomous-gate")).toBe("sonnet");
+    expect(resolveModel("autonomous", "autonomous-gate")).toBe("opus");
+  });
+
+  it("reserves sonnet for the purely mechanical rung", () => {
+    // Sonnet is the bottom rung of the ladder and pairs only with `low` effort;
+    // see the ladder invariant in `effort.test.ts`. Anything above mechanical
+    // work goes to opus, so a sonnet step here is a claim that the work needs no
+    // thought at all.
+    const sonnetSteps = Object.keys(STEP_DEFAULT_MODELS).filter(
+      (step) => STEP_DEFAULT_MODELS[step as StepType] === "sonnet",
+    );
+    expect(sonnetSteps.length).toBeGreaterThan(0);
+    for (const step of sonnetSteps) {
+      expect(STEP_DEFAULT_EFFORTS[step as StepType]).toBe("low");
+    }
   });
 
   it("uses opus as the code-level default for plan-like and heavy-reasoning steps", () => {
@@ -166,9 +181,11 @@ describe("resolveModel", () => {
     setConfig({});
     // The code-candidate reviewer also performs the merge in the worktree.
     expect(resolveModel("execute", "best-of-n-reviewer")).toBe("opus");
-    // The markdown ones only pick and splice documents.
-    expect(resolveModel("init", "best-of-n-file-reviewer")).toBe("sonnet");
-    expect(resolveModel("init", "best-of-n-synthesizer")).toBe("sonnet");
+    // The markdown ones only pick and splice documents, so they drop a rung to
+    // opus/low rather than a model tier.
+    expect(resolveEffort("execute", "best-of-n-reviewer")).toBe("high");
+    expect(resolveEffort("init", "best-of-n-file-reviewer")).toBe("low");
+    expect(resolveEffort("init", "best-of-n-synthesizer")).toBe("low");
   });
 
   it("uses sonnet for the cheap extraction steps (no haiku tier)", () => {
