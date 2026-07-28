@@ -161,8 +161,14 @@ export async function buildReviewPipeline(input: {
   // mismatches, shared-type drift, coordinated migrations — that per-repo
   // reviewers can't see in isolation. Output filename matches the REVIEW-* glob
   // so the collector and autonomous gate pick it up automatically.
+  //
+  // `unshift`, not `push`: it has to be built here because it needs every repo's
+  // diff from the loop above, but the group starts children in array order
+  // behind a FIFO semaphore, and this is the longest-running child of the set
+  // (it reads across all worktrees). Appending it would put the critical path
+  // last in the queue whenever the fan-out exceeds the concurrency limit.
   if (!repository && repos.length > 1) {
-    reviewChildren.push({
+    reviewChildren.unshift({
       label: "review-cross-repository",
       stepType: STEP_TYPES.CODE_REVIEW,
       prompt: buildCrossRepositoryReviewerPrompt({

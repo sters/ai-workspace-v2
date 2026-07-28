@@ -207,6 +207,22 @@ describe("buildReviewPipeline — cross-repository review", () => {
     expect(labels).toContain("review-cross-repository");
   });
 
+  it("puts the cross-repository review first so it is never the one queued", async () => {
+    mockListWorkspaceRepos.mockReturnValue(twoRepos());
+
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const labels = groupPhase.children.map((c) => c.label);
+
+    // The group runs behind a FIFO semaphore that starts children in array
+    // order, so array position decides start order. This child is the longest
+    // running one (it reads across every worktree) and is built last because it
+    // needs each repo's diff, so appending it would reliably park the critical
+    // path at the back of the queue.
+    expect(labels[0]).toBe("review-cross-repository");
+    expect(labels.length).toBeGreaterThan(1);
+  });
+
   it("does NOT add a cross-repository review child for a single-repo workspace", async () => {
     mockListWorkspaceRepos.mockReturnValue([twoRepos()[0]]);
 

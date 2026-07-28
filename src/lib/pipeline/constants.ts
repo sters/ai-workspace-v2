@@ -6,6 +6,22 @@ export function getMaxConcurrentOperations(): number {
   return getConfig().operations.maxConcurrent;
 }
 
+/**
+ * Max Claude children started concurrently within one parallel group.
+ *
+ * Read at call time, and shared by both places that build a group semaphore —
+ * `runGroupPhase` (top-level `kind: "group"` phases) and `ctx.runChildGroup`
+ * (groups run from inside a function phase, which is the path `autonomous`
+ * takes). Those two used to hold independent hardcoded copies of this number,
+ * so raising one silently left the other path capped.
+ *
+ * Clamped to >= 1 because `new Semaphore(n)` throws below that, which would fail
+ * the phase outright rather than degrade.
+ */
+export function getMaxGroupConcurrency(): number {
+  return Math.max(1, Math.floor(getConfig().operations.maxGroupConcurrency));
+}
+
 export class ConcurrencyLimitError extends Error {
   constructor(running: number) {
     super(`Too many concurrent operations (${running}/${getMaxConcurrentOperations()}). Try again later.`);

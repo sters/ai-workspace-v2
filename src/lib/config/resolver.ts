@@ -243,6 +243,11 @@ export function mergeConfig(
         file.operations?.maxConcurrent,
         defaults.operations.maxConcurrent,
       ),
+      maxGroupConcurrency: pick(
+        env.operations?.maxGroupConcurrency,
+        file.operations?.maxGroupConcurrency,
+        defaults.operations.maxGroupConcurrency,
+      ),
       claudeTimeoutMinutes: pick(
         env.operations?.claudeTimeoutMinutes,
         file.operations?.claudeTimeoutMinutes,
