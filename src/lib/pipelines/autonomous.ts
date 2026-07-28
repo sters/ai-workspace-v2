@@ -24,7 +24,7 @@ import {
 import type { KnownFinding } from "@/lib/workspace/known-findings";
 import path from "node:path";
 import { STEP_TYPES } from "@/types/pipeline";
-import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
+import type { GroupChild, PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 
 const DEFAULT_MAX_LOOPS = 10;
@@ -512,11 +512,20 @@ export function buildAutonomousPipeline(input: {
   // README clarity gate (init path only): decide whether the drafted README is
   // a clear enough contract to implement autonomously. If yes, append cycle 1.
   // If too vague, stop the run and recommend the human refine it via update-readme.
+  //
+  // The criteria-feasibility judge runs as a second child of this same phase
+  // rather than as a phase behind it. Both read only the drafted README (plus,
+  // for feasibility, the worktrees) and ask independent questions of it — is the
+  // contract clear, and is each `(auto)` criterion achievable here — so running
+  // them in sequence bought nothing but wall clock. This phase keeps
+  // `README_CLARITY_PHASE_LABEL` so the Slack notifier still finds the stop
+  // message by phase label.
   function buildReadmeClarityGatePhase(): PipelinePhase {
     return {
       kind: "function",
       label: README_CLARITY_PHASE_LABEL,
-      timeoutMs: 10 * 60 * 1000,
+      // Sized to the slower of the two judges, not their sum — they run together.
+      timeoutMs: 15 * 60 * 1000,
       maxRetries: 0,
       fn: async (ctx) => {
         if (ctx.signal.aborted) return false;
@@ -526,15 +535,6 @@ export function buildAutonomousPipeline(input: {
           return false;
         }
 
-        const appendCycleOne = () => {
-          ctx.appendPhases([
-            buildCriteriaFeasibilityPhase(),
-            buildCycleExecutePhase(1),
-            buildCycleReviewPhase(1),
-            buildCycleGatePhase(1),
-          ]);
-        };
-
         const readmeContent = (await getReadme(ws)) ?? "";
         const acceptanceCriteria = parseAcceptanceCriteria(readmeContent)
           .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
@@ -542,49 +542,62 @@ export function buildAutonomousPipeline(input: {
 
         const wsPath = path.join(getWorkspaceDir(), ws);
         let resultText = "";
-        const ok = await ctx.runChild(
-          "README Clarity Gate",
-          buildReadmeClarityGatePrompt({ workspaceName: ws, readmeContent, acceptanceCriteria }),
-          {
-            jsonSchema: README_CLARITY_GATE_SCHEMA,
-            stepType: STEP_TYPES.README_CLARITY_GATE,
-            appendSystemPromptFile: ensureSystemPrompt(wsPath, "readme-clarity-gate"),
-            onResultText: (text) => { resultText = text; },
-            skipAskUserQuestion: true,
-          },
+        const clarityChild: GroupChild = {
+          label: "README Clarity Gate",
+          prompt: buildReadmeClarityGatePrompt({ workspaceName: ws, readmeContent, acceptanceCriteria }),
+          jsonSchema: README_CLARITY_GATE_SCHEMA,
+          stepType: STEP_TYPES.README_CLARITY_GATE,
+          appendSystemPromptFile: ensureSystemPrompt(wsPath, "readme-clarity-gate"),
+          onResultText: (text) => { resultText = text; },
+          skipAskUserQuestion: true,
+        };
+
+        const feasibility = await prepareCriteriaFeasibility(ws);
+        const [clarityOk, feasibilityOk] = await ctx.runChildGroup(
+          feasibility ? [clarityChild, feasibility.child] : [clarityChild],
         );
 
         // Fail open: a judge hiccup should not block an otherwise-legitimate run.
-        if (!ok || !resultText) {
+        let stop: { reason: string; missing: string[] } | null = null;
+        if (!clarityOk || !resultText) {
           ctx.emitStatus("README clarity check did not return a verdict — proceeding");
-          appendCycleOne();
+        } else {
+          let parsed: { sufficient?: boolean; reason?: string; missing?: string[] } | null = null;
+          try {
+            parsed = JSON.parse(resultText);
+          } catch {
+            ctx.emitStatus("Could not parse README clarity verdict — proceeding");
+          }
+          const reason = parsed?.reason ?? "";
+          if (parsed?.sufficient === false) {
+            stop = { reason, missing: Array.isArray(parsed.missing) ? parsed.missing : [] };
+          } else if (parsed) {
+            ctx.emitResult(`**README is clear enough to proceed.**${reason ? ` ${reason}` : ""}`);
+          }
+        }
+
+        if (stop) {
+          // Too unclear: stop here and recommend refining the README. The
+          // feasibility verdict is deliberately discarded — it judged criteria
+          // that are about to be rewritten, so recording it would seed the
+          // ledger with entries about a contract that no longer exists.
+          const missingList =
+            stop.missing.length > 0 ? `\n\nMissing / unclear:\n- ${stop.missing.join("\n- ")}` : "";
+          ctx.emitResult(
+            `${README_CLARITY_STOP_PREFIX}${stop.reason ? ` ${stop.reason}` : ""}${missingList}\n\n` +
+              "No code was changed. Refine the workspace README (Goal / Non-Goal / Acceptance Criteria) — e.g. via an **update-readme** operation — then re-run the autonomous flow.",
+          );
           return true;
         }
 
-        let parsed: { sufficient?: boolean; reason?: string; missing?: string[] };
-        try {
-          parsed = JSON.parse(resultText);
-        } catch {
-          ctx.emitStatus("Could not parse README clarity verdict — proceeding");
-          appendCycleOne();
-          return true;
+        if (feasibility) {
+          await feasibility.apply(ctx, feasibilityOk === true);
         }
-        const sufficient = parsed.sufficient !== false;
-        const reason = parsed.reason ?? "";
-        const missing = Array.isArray(parsed.missing) ? parsed.missing : [];
-
-        if (sufficient) {
-          ctx.emitResult(`**README is clear enough to proceed.**${reason ? ` ${reason}` : ""}`);
-          appendCycleOne();
-          return true;
-        }
-
-        // Too unclear: stop here and recommend refining the README.
-        const missingList = missing.length > 0 ? `\n\nMissing / unclear:\n- ${missing.join("\n- ")}` : "";
-        ctx.emitResult(
-          `${README_CLARITY_STOP_PREFIX}${reason ? ` ${reason}` : ""}${missingList}\n\n` +
-            "No code was changed. Refine the workspace README (Goal / Non-Goal / Acceptance Criteria) — e.g. via an **update-readme** operation — then re-run the autonomous flow.",
-        );
+        ctx.appendPhases([
+          buildCycleExecutePhase(1),
+          buildCycleReviewPhase(1),
+          buildCycleGatePhase(1),
+        ]);
         return true;
       },
     };
@@ -595,6 +608,95 @@ export function buildAutonomousPipeline(input: {
   // known-findings ledger so the reviewers stop re-deriving them and the gate
   // stops looping toward them. Never stops the run — the rest of the contract is
   // still worth implementing.
+  //
+  // Split into a child spec plus the code that applies its verdict so it can run
+  // either as its own phase (non-init paths) or as a sibling of the clarity judge
+  // inside that phase's group (init path). Returns null when there is nothing to
+  // judge, which is the caller's cue to skip the child entirely.
+  async function prepareCriteriaFeasibility(ws: string): Promise<{
+    child: GroupChild;
+    apply: (ctx: PhaseFunctionContext, ok: boolean) => Promise<void>;
+  } | null> {
+    const readmeContent = (await getReadme(ws)) ?? "";
+    const criteria = parseAcceptanceCriteria(readmeContent);
+    const autoCriteria = criteria.filter((c) => c.kind === "auto");
+    if (autoCriteria.length === 0) return null;
+
+    const wsPath = path.join(getWorkspaceDir(), ws);
+    const repos = listWorkspaceRepos(ws);
+    let resultText = "";
+
+    const child: GroupChild = {
+      label: "Criteria Feasibility",
+      prompt: buildCriteriaFeasibilityPrompt({
+        workspaceName: ws,
+        readmeContent,
+        acceptanceCriteria: criteria
+          .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
+          .join("\n"),
+        repos: repos.map((r) => ({ repoName: r.repoName, worktreePath: r.worktreePath })),
+      }),
+      jsonSchema: CRITERIA_FEASIBILITY_SCHEMA,
+      stepType: STEP_TYPES.CRITERIA_FEASIBILITY,
+      addDirs: repos.map((r) => r.worktreePath),
+      appendSystemPromptFile: ensureSystemPrompt(wsPath, "criteria-feasibility"),
+      onResultText: (text) => { resultText = text; },
+      skipAskUserQuestion: true,
+    };
+
+    const apply = async (ctx: PhaseFunctionContext, ok: boolean) => {
+      // Fail open in both directions: a judge hiccup must not stop the run, and
+      // must not silently mark anything unachievable either.
+      if (!ok || !resultText) {
+        ctx.emitStatus("Feasibility check returned no verdict — proceeding with all criteria");
+        return;
+      }
+
+      let parsed: { infeasible?: unknown; reason?: unknown };
+      try {
+        parsed = JSON.parse(resultText);
+      } catch {
+        ctx.emitStatus("Could not parse feasibility verdict — proceeding with all criteria");
+        return;
+      }
+
+      const infeasible = Array.isArray(parsed.infeasible)
+        ? parsed.infeasible.flatMap((entry) => {
+            if (typeof entry !== "object" || entry === null) return [];
+            const { criterion, reason } = entry as Record<string, unknown>;
+            if (typeof criterion !== "string" || criterion.trim() === "") return [];
+            return [{ criterion, reason: typeof reason === "string" ? reason : "" }];
+          })
+        : [];
+
+      if (infeasible.length === 0) {
+        ctx.emitResult(
+          `**All ${autoCriteria.length} \`(auto)\` acceptance criteria are achievable in these repositories.**` +
+            (typeof parsed.reason === "string" && parsed.reason ? ` ${parsed.reason}` : ""),
+        );
+        return;
+      }
+
+      const added = await appendKnownFindings(
+        wsPath,
+        infeasible.map((i) => ({
+          kind: "infeasible" as const,
+          summary: `Acceptance criterion cannot be satisfied in these repositories: ${i.criterion}`,
+          reason: i.reason,
+        })),
+      );
+
+      ctx.emitResult(
+        `**${infeasible.length} of ${autoCriteria.length} \`(auto)\` acceptance criteria cannot be satisfied in these repositories.**\n` +
+          infeasible.map((i) => `- ${i.criterion}\n  - ${i.reason}`).join("\n") +
+          `\n\nRecorded ${added.length} entr${added.length === 1 ? "y" : "ies"} in \`artifacts/known-findings.md\` so review and gate phases stop looping toward them. ` +
+          "The run continues on the remaining criteria; resolve these by updating the README (Non-Goal / Acceptance Criteria) or by taking them up with the owning repository.",
+      );
+    };
+
+    return { child, apply };
+  }
+
   function buildCriteriaFeasibilityPhase(): PipelinePhase {
     return {
       kind: "function",
@@ -609,84 +711,15 @@ export function buildAutonomousPipeline(input: {
           return true;
         }
 
-        const readmeContent = (await getReadme(ws)) ?? "";
-        const criteria = parseAcceptanceCriteria(readmeContent);
-        const autoCriteria = criteria.filter((c) => c.kind === "auto");
-        if (autoCriteria.length === 0) {
+        const judge = await prepareCriteriaFeasibility(ws);
+        if (!judge) {
           ctx.emitStatus("No (auto) acceptance criteria to check — skipping");
           return true;
         }
 
-        const wsPath = path.join(getWorkspaceDir(), ws);
-        const repos = listWorkspaceRepos(ws);
-        let resultText = "";
-        const ok = await ctx.runChild(
-          "Criteria Feasibility",
-          buildCriteriaFeasibilityPrompt({
-            workspaceName: ws,
-            readmeContent,
-            acceptanceCriteria: criteria
-              .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
-              .join("\n"),
-            repos: repos.map((r) => ({ repoName: r.repoName, worktreePath: r.worktreePath })),
-          }),
-          {
-            jsonSchema: CRITERIA_FEASIBILITY_SCHEMA,
-            stepType: STEP_TYPES.CRITERIA_FEASIBILITY,
-            addDirs: repos.map((r) => r.worktreePath),
-            appendSystemPromptFile: ensureSystemPrompt(wsPath, "criteria-feasibility"),
-            onResultText: (text) => { resultText = text; },
-            skipAskUserQuestion: true,
-          },
-        );
-
-        // Fail open in both directions: a judge hiccup must not stop the run, and
-        // must not silently mark anything unachievable either.
-        if (!ok || !resultText) {
-          ctx.emitStatus("Feasibility check returned no verdict — proceeding with all criteria");
-          return true;
-        }
-
-        let parsed: { infeasible?: unknown; reason?: unknown };
-        try {
-          parsed = JSON.parse(resultText);
-        } catch {
-          ctx.emitStatus("Could not parse feasibility verdict — proceeding with all criteria");
-          return true;
-        }
-
-        const infeasible = Array.isArray(parsed.infeasible)
-          ? parsed.infeasible.flatMap((entry) => {
-              if (typeof entry !== "object" || entry === null) return [];
-              const { criterion, reason } = entry as Record<string, unknown>;
-              if (typeof criterion !== "string" || criterion.trim() === "") return [];
-              return [{ criterion, reason: typeof reason === "string" ? reason : "" }];
-            })
-          : [];
-
-        if (infeasible.length === 0) {
-          ctx.emitResult(
-            `**All ${autoCriteria.length} \`(auto)\` acceptance criteria are achievable in these repositories.**` +
-              (typeof parsed.reason === "string" && parsed.reason ? ` ${parsed.reason}` : ""),
-          );
-          return true;
-        }
-
-        const added = await appendKnownFindings(
-          wsPath,
-          infeasible.map((i) => ({
-            kind: "infeasible" as const,
-            summary: `Acceptance criterion cannot be satisfied in these repositories: ${i.criterion}`,
-            reason: i.reason,
-          })),
-        );
-
-        ctx.emitResult(
-          `**${infeasible.length} of ${autoCriteria.length} \`(auto)\` acceptance criteria cannot be satisfied in these repositories.**\n` +
-            infeasible.map((i) => `- ${i.criterion}\n  - ${i.reason}`).join("\n") +
-            `\n\nRecorded ${added.length} entr${added.length === 1 ? "y" : "ies"} in \`artifacts/known-findings.md\` so review and gate phases stop looping toward them. ` +
-            "The run continues on the remaining criteria; resolve these by updating the README (Non-Goal / Acceptance Criteria) or by taking them up with the owning repository.",
-        );
+        const { label, prompt, ...opts } = judge.child;
+        const ok = await ctx.runChild(label, prompt, opts);
+        await judge.apply(ctx, ok);
         return true;
       },
     };
