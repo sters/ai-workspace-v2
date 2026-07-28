@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { migrateConfigContent, generateDefaultConfigContent } from "@/lib/config/migration";
+import { CONFIG_DEFAULTS, KNOWN_CONFIG_KEYS } from "@/lib/config/defaults";
+
+// The generated file documents each default as a commented-out line, and the
+// migrator carries its own copy in KNOWN_CONFIG_KEYS. Both are hand-maintained
+// strings, so a changed default silently leaves two copies stating the old one.
+describe("migration: documented defaults match the real defaults", () => {
+  const scalars = Object.entries(CONFIG_DEFAULTS.operations).filter(
+    ([, v]) => typeof v === "number" || typeof v === "boolean",
+  );
+
+  it.each(scalars)("operations.%s is documented as %s in the generated config", (key, value) => {
+    const line = generateDefaultConfigContent()
+      .split("\n")
+      .find((l) => new RegExp(`^#\\s+${key}:`).test(l));
+    expect(line, `no generated line for operations.${key}`).toBeDefined();
+    expect(line).toMatch(new RegExp(`^#\\s+${key}: ${value}\\b`));
+  });
+
+  it.each(scalars)("operations.%s's migrator hint states %s", (key, value) => {
+    const def = KNOWN_CONFIG_KEYS.find((k) => k.section === "operations" && k.key === key);
+    expect(def, `operations.${key} is missing from KNOWN_CONFIG_KEYS`).toBeDefined();
+    expect(def!.defaultLine).toMatch(new RegExp(`^#\\s+${key}: ${value}\\b`));
+  });
+});
 
 describe("migration: model support", () => {
   it("model is valid in operations section (not commented out)", () => {

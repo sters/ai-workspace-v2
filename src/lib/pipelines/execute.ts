@@ -21,6 +21,7 @@ import {
 import { writeReportTemplates, writeResearchTemplates } from "@/lib/workspace";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
+import { executePhaseBudgetMs } from "@/lib/pipeline/constants";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
@@ -76,7 +77,7 @@ export async function buildExecutePipeline(input: {
 
   // Estimate max batches for timeout calculation
   const maxBatchesPerRepo = await estimateMaxBatches(repos, wsPath, batchSize);
-  const timeoutMs = maxBatchesPerRepo * 20 * 60 * 1000 + 5 * 60 * 1000; // maxBatches * 20min + 5min buffer
+  const timeoutMs = executePhaseBudgetMs(maxBatchesPerRepo, batchSize);
 
   // Feature/bugfix: launch independent lanes per repository with batch splitting
   return [
@@ -327,7 +328,9 @@ async function executeRepoLane(
     return true;
   }
 
-  // If 3 or fewer actionable top-level items → no batching, single call
+  // Fits in one batch (batchSize or fewer actionable top-level items) → single
+  // call over the whole TODO file, with no per-batch focus instruction and no
+  // re-read between batches to resume from.
   if (batches.length === 1) {
     ctx.emitStatus(`[${repo.repoName}] Executing (no batching needed)`);
     const prompt = buildExecutorPrompt({

@@ -15,6 +15,7 @@ vi.mock("@/lib/config", () => ({
     claudeTimeoutMinutes: 20,
     functionTimeoutMinutes: 3,
     defaultInteractionLevel: "mid",
+    batchSize: 15,
   })),
 }));
 vi.mock("@/lib/workspace/reader", () => ({
@@ -80,6 +81,8 @@ vi.mock("@/lib/workspace/known-findings", async (importOriginal) => {
 });
 
 import { buildAutonomousPipeline } from "@/lib/pipelines/autonomous";
+import { executePhaseBudgetMs, ROUTINE_BATCH_COUNT } from "@/lib/pipeline/constants";
+import { getOperationConfig } from "@/lib/config";
 import { appendKnownFindings } from "@/lib/workspace/known-findings";
 import { parseAcceptanceCriteria } from "@/lib/parsers/readme";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
@@ -408,6 +411,23 @@ describe("buildAutonomousPipeline", () => {
       return phase;
     }
 
+    // `runSubPhases` ignores the sub-pipeline's own timeoutMs, so this wrapper is
+    // the only budget that applies. A wrapper tighter than what execute.ts sizes
+    // itself for fires first and makes that sizing dead code — which is what a
+    // hardcoded figure here did once PER_ITEM_BUDGET_MS moved.
+    it("execute phase budget covers what execute.ts sizes itself for", () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const execPhase = phaseByLabel(phases, "Cycle 1: Execute");
+
+      const { batchSize } = vi.mocked(getOperationConfig)("execute");
+      expect(execPhase.timeoutMs).toBeGreaterThanOrEqual(
+        executePhaseBudgetMs(ROUTINE_BATCH_COUNT, batchSize),
+      );
+    });
+
     it("execute phase runs buildExecutePipeline", async () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
@@ -460,7 +480,11 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      expect(phaseByLabel(phases, "Cycle 1: Execute").timeoutMs).toBe(70 * 60 * 1000);
+      // Derived from batchSize, not a fixed figure — see the budget test above.
+      const { batchSize } = vi.mocked(getOperationConfig)("execute");
+      expect(phaseByLabel(phases, "Cycle 1: Execute").timeoutMs).toBe(
+        executePhaseBudgetMs(ROUTINE_BATCH_COUNT, batchSize),
+      );
       expect(phaseByLabel(phases, "Cycle 1: Review").timeoutMs).toBe(45 * 60 * 1000);
       expect(phaseByLabel(phases, "Cycle 1: Gate").timeoutMs).toBe(10 * 60 * 1000);
     });

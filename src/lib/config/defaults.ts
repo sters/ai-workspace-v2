@@ -26,7 +26,12 @@ export const CONFIG_DEFAULTS: AppConfig = {
     functionTimeoutMinutes: 3,
     defaultInteractionLevel: "mid",
     bestOfN: 0,
-    batchSize: 10,
+    // A 10-item batch measured ~18.5min, and the tail batch of a 10+2 split cost
+    // 5min to re-establish context for two items. 15 absorbs a typical review
+    // follow-up round in one call; the batch boundary is still worth keeping
+    // beyond that, since it is where the executor gets fresh context and the
+    // remaining-work re-read (see execute.ts) resumes a batch that ran long.
+    batchSize: 15,
     typeOverrides: {},
   },
   chat: {
@@ -120,7 +125,7 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "functionTimeoutMinutes", section: "operations", defaultLine: "#   functionTimeoutMinutes: 3" },
   { key: "defaultInteractionLevel", section: "operations", defaultLine: "#   defaultInteractionLevel: mid   # low / mid / high" },
   { key: "bestOfN", section: "operations", defaultLine: "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates" },
-  { key: "batchSize", section: "operations", defaultLine: "#   batchSize: 10                  # TODO groups per batch in execute operations" },
+  { key: "batchSize", section: "operations", defaultLine: "#   batchSize: 15                  # TODO groups per batch in execute operations" },
   { key: "model", section: "operations", defaultLine: "#   model: null                    # null = CLI default (opus / sonnet / haiku)" },
   { key: "effort", section: "operations", defaultLine: "#   effort: null                   # null = per-step default (low / medium / high / xhigh / max)" },
   { key: "chat", section: null, defaultLine: "# chat:" },

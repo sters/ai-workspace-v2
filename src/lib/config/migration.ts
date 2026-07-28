@@ -37,7 +37,7 @@ export function generateDefaultConfigContent(): string {
     "#   functionTimeoutMinutes: 3",
     "#   defaultInteractionLevel: mid   # low / mid / high",
     "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates",
-    "#   batchSize: 10                  # TODO groups per batch in execute operations",
+    "#   batchSize: 15                  # TODO groups per batch in execute operations",
     "#   model: null                    # null = CLI default (opus / sonnet / haiku)",
     "#   effort: null                   # null = per-step default (low / medium / high / xhigh / max)",
     // Same block the migrator maintains, so a generated file needs no migration.
@@ -207,7 +207,7 @@ const TYPE_OVERRIDE_HINT_LINES = [
   "#   #   functionTimeoutMinutes: 3",
   "#   #   defaultInteractionLevel: mid",
   "#   #   bestOfN: 0",
-  "#   #   batchSize: 10",
+  "#   #   batchSize: 15",
   "#   #   model: sonnet",
   "#   #   effort: high",
   "#   #   steps:",
