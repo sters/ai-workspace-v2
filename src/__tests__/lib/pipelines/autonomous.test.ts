@@ -175,13 +175,12 @@ describe("buildAutonomousPipeline", () => {
         workspace: "test-ws",
         instruction: "fix things",
       });
-      // Ensure repositories + Ensure TODOs + update-todo + feasibility + Cycle 1
-      expect(phases).toHaveLength(7);
+      // Ensure repositories + Ensure TODOs + update-todo + Cycle 1
+      expect(phases).toHaveLength(6);
       expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
         "Ensure repositories",
         "Ensure TODOs",
         "Update TODOs",
-        "Check criteria feasibility",
         "Cycle 1: Execute",
         "Cycle 1: Review",
         "Cycle 1: Gate",
@@ -204,21 +203,31 @@ describe("buildAutonomousPipeline", () => {
       expect(mockBuildUpdateTodo).toHaveBeenCalled();
     });
 
-    it("has 6 phases (Ensure repos, Ensure TODOs, feasibility, Execute, Review, Gate) when startWith is execute", () => {
+    it("has 5 phases (Ensure repos, Ensure TODOs, Execute, Review, Gate) when startWith is execute", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
       });
-      expect(phases).toHaveLength(6);
+      expect(phases).toHaveLength(5);
       expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
         "Ensure repositories",
         "Ensure TODOs",
-        "Check criteria feasibility",
         "Cycle 1: Execute",
         "Cycle 1: Review",
         "Cycle 1: Gate",
       ]);
     });
+
+    // The judge runs where the criteria are written — the init path's clarity
+    // gate, or an update-readme operation — not on every run that reads them.
+    it.each(["execute", "update-todo"] as const)(
+      "does not re-judge criteria feasibility when startWith is %s",
+      (startWith) => {
+        const phases = buildAutonomousPipeline({ startWith, workspace: "test-ws" });
+        const labels = phases.map((p) => p.kind === "function" && p.label);
+        expect(labels).not.toContain("Check criteria feasibility");
+      },
+    );
 
     it("does not include salvage phases when startWith is init", () => {
       const phases = buildAutonomousPipeline({
@@ -885,101 +894,6 @@ describe("buildAutonomousPipeline", () => {
 
       expect(result).toBe(false);
       expect(mockBuildInitTodoAnalysis).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("criteria feasibility check", () => {
-    function getFeasibilityPhase() {
-      const phases = buildAutonomousPipeline({ startWith: "execute", workspace: "test-ws" });
-      const phase = phases.find(
-        (p) => p.kind === "function" && p.label === "Check criteria feasibility",
-      );
-      if (!phase || phase.kind !== "function") throw new Error("feasibility phase not found");
-      return phase;
-    }
-
-    function ctxReturning(verdict: unknown) {
-      return createMockCtx({
-        runChild: vi.fn(async (label, _prompt, opts) => {
-          if (opts?.onResultText && label === "Criteria Feasibility") {
-            opts.onResultText(JSON.stringify(verdict));
-          }
-          return true;
-        }),
-      });
-    }
-
-    beforeEach(() => {
-      mockParseAcceptanceCriteria.mockReturnValue([
-        { text: "Rows render on the detail screen", kind: "auto", checked: false },
-        { text: "Multiple IDs render most-recent-first", kind: "auto", checked: false },
-        { text: "Figma comparison", kind: "manual", checked: false },
-      ]);
-    });
-
-    it("records infeasible criteria in the known-findings ledger", async () => {
-      const phase = getFeasibilityPhase();
-      const ctx = ctxReturning({
-        infeasible: [
-          {
-            criterion: "Multiple IDs render most-recent-first",
-            reason: "The BFF collapses ShopOrders to obj[0]; the schema is owned elsewhere",
-          },
-        ],
-        reason: "one criterion blocked upstream",
-      });
-
-      expect(await phase.fn(ctx)).toBe(true);
-      expect(mockAppendKnownFindings).toHaveBeenCalledTimes(1);
-      const [, findings] = mockAppendKnownFindings.mock.calls[0];
-      expect(findings).toHaveLength(1);
-      expect(findings[0].kind).toBe("infeasible");
-      expect(findings[0].summary).toContain("Multiple IDs render most-recent-first");
-      expect(ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("known-findings.md"));
-    });
-
-    it("records nothing when every criterion is achievable", async () => {
-      const phase = getFeasibilityPhase();
-      const ctx = ctxReturning({ infeasible: [], reason: "all achievable" });
-
-      expect(await phase.fn(ctx)).toBe(true);
-      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
-      expect(ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("achievable"));
-    });
-
-    it("proceeds without recording when the judge returns no verdict", async () => {
-      const phase = getFeasibilityPhase();
-      // default runChild resolves true but never calls onResultText
-      const ctx = createMockCtx();
-
-      expect(await phase.fn(ctx)).toBe(true);
-      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
-    });
-
-    it("proceeds without recording when the verdict is unparsable", async () => {
-      const phase = getFeasibilityPhase();
-      const ctx = createMockCtx({
-        runChild: vi.fn(async (label, _prompt, opts) => {
-          if (opts?.onResultText && label === "Criteria Feasibility") {
-            opts.onResultText("not json");
-          }
-          return true;
-        }),
-      });
-
-      expect(await phase.fn(ctx)).toBe(true);
-      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
-    });
-
-    it("skips the judge entirely when the README has no (auto) criteria", async () => {
-      mockParseAcceptanceCriteria.mockReturnValue([
-        { text: "Figma comparison", kind: "manual", checked: false },
-      ]);
-      const phase = getFeasibilityPhase();
-      const ctx = createMockCtx();
-
-      expect(await phase.fn(ctx)).toBe(true);
-      expect(ctx.runChild).not.toHaveBeenCalled();
     });
   });
 

@@ -18,6 +18,26 @@ vi.mock("@/lib/pipelines/actions/ensure-repositories", () => ({
   syncReadmeRepositories: (...args: unknown[]) => mockSyncReadmeRepositories(...args),
 }));
 
+// Dependencies of the criteria-feasibility phase this pipeline now appends.
+vi.mock("@/lib/parsers/readme", () => ({
+  parseAcceptanceCriteria: vi.fn(() => []),
+}));
+vi.mock("@/lib/workspace/git", () => ({
+  listWorkspaceRepos: vi.fn(() => [
+    { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+  ]),
+}));
+vi.mock("@/lib/workspace/reader", () => ({
+  getReadme: vi.fn(async () => "# README"),
+}));
+vi.mock("@/lib/workspace/known-findings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/workspace/known-findings")>();
+  return {
+    ...actual,
+    appendKnownFindings: vi.fn(async (_p: string, f: unknown[]) => f),
+  };
+});
+
 function createMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunctionContext {
   return {
     operationId: "test-op",
@@ -47,12 +67,18 @@ afterAll(() => {
 });
 
 import { buildUpdateReadmePipeline } from "@/lib/pipelines/update-readme";
+import { parseAcceptanceCriteria } from "@/lib/parsers/readme";
+import { appendKnownFindings } from "@/lib/workspace/known-findings";
+
+const mockParseAcceptanceCriteria = vi.mocked(parseAcceptanceCriteria);
+const mockAppendKnownFindings = vi.mocked(appendKnownFindings);
 
 describe("buildUpdateReadmePipeline", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFileExists.mockResolvedValue(true);
     mockFileText.mockResolvedValue("# README");
+    mockParseAcceptanceCriteria.mockReturnValue([]);
     mockSyncReadmeRepositories.mockResolvedValue({
       metaRepoCount: 0,
       existingCount: 0,
@@ -61,15 +87,30 @@ describe("buildUpdateReadmePipeline", () => {
     });
   });
 
-  it("returns an 'Update README' phase followed by 'Ensure repositories'", async () => {
+  it("returns 'Update README', then 'Ensure repositories', then the feasibility judge", async () => {
     const phases = await buildUpdateReadmePipeline({ workspace: "test-ws", instruction: "add section" });
-    expect(phases).toHaveLength(2);
+    expect(phases).toHaveLength(3);
     expect(phases[0].kind).toBe("single");
     if (phases[0].kind !== "single") throw new Error("expected single");
     expect(phases[0].label).toBe("Update README");
     expect(phases[1].kind).toBe("function");
     if (phases[1].kind !== "function") throw new Error("expected function");
     expect(phases[1].label).toBe("Ensure repositories");
+    // Last, because the judge reads every worktree the README declares.
+    expect(phases[2].kind).toBe("function");
+    if (phases[2].kind !== "function") throw new Error("expected function");
+    expect(phases[2].label).toBe("Check criteria feasibility");
+  });
+
+  it("judges feasibility on the interject path too", async () => {
+    // An interject rewrites the criteria mid-run and then re-kicks autonomous,
+    // which no longer judges on that path — so this phase is the only check.
+    const phases = await buildUpdateReadmePipeline({
+      workspace: "test-ws",
+      instruction: "narrow the criteria",
+      interject: true,
+    });
+    expect(phases.map((p) => p.label)).toContain("Check criteria feasibility");
   });
 
   describe("Ensure repositories phase", () => {
@@ -174,5 +215,98 @@ describe("buildUpdateReadmePipeline", () => {
     const phase = phases[0];
     if (phase.kind !== "single") throw new Error("expected single");
     expect(phase.addDirs).toEqual([expect.stringContaining("test-ws")]);
+  });
+
+  describe("criteria feasibility check", () => {
+    async function getFeasibilityPhase() {
+      const phases = await buildUpdateReadmePipeline({ workspace: "test-ws", instruction: "rewrite criteria" });
+      const phase = phases.find((p) => p.label === "Check criteria feasibility");
+      if (!phase || phase.kind !== "function") throw new Error("feasibility phase not found");
+      return phase;
+    }
+
+    function ctxReturning(verdict: unknown) {
+      return createMockCtx({
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "Criteria Feasibility") {
+            opts.onResultText(JSON.stringify(verdict));
+          }
+          return true;
+        }),
+      });
+    }
+
+    beforeEach(() => {
+      mockParseAcceptanceCriteria.mockReturnValue([
+        { text: "Rows render on the detail screen", kind: "auto", checked: false },
+        { text: "Multiple IDs render most-recent-first", kind: "auto", checked: false },
+        { text: "Figma comparison", kind: "manual", checked: false },
+      ]);
+    });
+
+    it("records infeasible criteria in the known-findings ledger", async () => {
+      const phase = await getFeasibilityPhase();
+      const ctx = ctxReturning({
+        infeasible: [
+          {
+            criterion: "Multiple IDs render most-recent-first",
+            reason: "The BFF collapses ShopOrders to obj[0]; the schema is owned elsewhere",
+          },
+        ],
+        reason: "one criterion blocked upstream",
+      });
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockAppendKnownFindings).toHaveBeenCalledTimes(1);
+      const [, findings] = mockAppendKnownFindings.mock.calls[0];
+      expect(findings).toHaveLength(1);
+      expect(findings[0].kind).toBe("infeasible");
+      expect(findings[0].summary).toContain("Multiple IDs render most-recent-first");
+      expect(ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("known-findings.md"));
+    });
+
+    it("records nothing when every criterion is achievable", async () => {
+      const phase = await getFeasibilityPhase();
+      const ctx = ctxReturning({ infeasible: [], reason: "all achievable" });
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
+      expect(ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("achievable"));
+    });
+
+    it("proceeds without recording when the judge returns no verdict", async () => {
+      const phase = await getFeasibilityPhase();
+      // default runChild resolves true but never calls onResultText
+      const ctx = createMockCtx();
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
+    });
+
+    it("proceeds without recording when the verdict is unparsable", async () => {
+      const phase = await getFeasibilityPhase();
+      const ctx = createMockCtx({
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "Criteria Feasibility") {
+            opts.onResultText("not json");
+          }
+          return true;
+        }),
+      });
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
+    });
+
+    it("skips the judge entirely when the README has no (auto) criteria", async () => {
+      mockParseAcceptanceCriteria.mockReturnValue([
+        { text: "Figma comparison", kind: "manual", checked: false },
+      ]);
+      const phase = await getFeasibilityPhase();
+      const ctx = createMockCtx();
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(ctx.runChild).not.toHaveBeenCalled();
+    });
   });
 });

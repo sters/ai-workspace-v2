@@ -3,6 +3,7 @@ import { getWorkspaceDir } from "@/lib/config";
 import { buildReadmeUpdaterPrompt } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { syncReadmeRepositories } from "./actions/ensure-repositories";
+import { buildCriteriaFeasibilityPhase } from "./actions/criteria-feasibility";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
@@ -76,5 +77,11 @@ export async function buildUpdateReadmePipeline(input: {
         return true;
       },
     },
+    // This operation rewrites the `## Acceptance Criteria` the whole autonomous
+    // flow treats as authoritative, which invalidates any earlier feasibility
+    // verdict — and the autonomous run that follows only judges on its init
+    // path, so this is where a rewritten contract gets checked. Runs after
+    // repository setup because the judge reads every declared worktree.
+    buildCriteriaFeasibilityPhase(workspace),
   ];
 }
