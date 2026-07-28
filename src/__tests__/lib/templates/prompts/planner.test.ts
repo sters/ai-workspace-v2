@@ -4,24 +4,52 @@ import {
   getResearchPlannerSystemPrompt,
   buildPlannerPrompt,
 } from "@/lib/templates/prompts/planner";
+import {
+  REPO_SEARCH_EFFICIENCY,
+  WRITTEN_DELIVERABLE_LENGTH,
+} from "@/lib/templates/prompts/shared";
 
 describe("getPlannerSystemPrompt", () => {
   const prompt = getPlannerSystemPrompt();
 
-  it("requires Pattern, Verify, Why fields for code-change items (not optional)", () => {
-    // Pattern / Verify / Why must be marked required, not optional
-    expect(prompt).toMatch(/Pattern.*\(required/i);
-    expect(prompt).toMatch(/Verify.*\(required/i);
-    expect(prompt).toMatch(/Why.*\(required/i);
+  it("requires the three fields the executor cannot proceed without", () => {
+    expect(prompt).toMatch(/Target:.*\(required/i);
+    expect(prompt).toMatch(/Action:.*\(required/i);
+    expect(prompt).toMatch(/Verify:.*\(required/i);
+  });
+
+  it("makes Pattern and Why conditional so items are not padded to a fixed shape", () => {
+    // These were once mandatory on every code-change item, which cost the planner
+    // a search per item to find an analogue and the executor a re-read per batch.
+    expect(prompt).toMatch(/Pattern:.*\((only|omit|when)/i);
+    expect(prompt).toMatch(/Why:.*\((only|omit|when)/i);
+    expect(prompt).not.toMatch(/Pattern:.*\(required/i);
+    expect(prompt).not.toMatch(/Why:.*\(required/i);
+  });
+
+  it("does not mandate a separate Acceptance field on top of Verify", () => {
+    expect(prompt).not.toMatch(/Acceptance:.*\(required/i);
+  });
+
+  it("requires Verify to be a check that can pass or fail", () => {
+    expect(prompt).toMatch(/pass or fail|checkable/i);
+    expect(prompt).toMatch(/NOT "ensure it works"/);
+  });
+
+  it("tells the planner to write only what changes the executor's behavior", () => {
+    expect(prompt).toContain(WRITTEN_DELIVERABLE_LENGTH);
+    // The old wording pushed the opposite way ("never trade rigor of the format
+    // for brevity"), which is what produced 500-line TODO files.
+    expect(prompt).not.toMatch(/never trade rigor of the \*?format/i);
+  });
+
+  it("carries the repo search efficiency policy", () => {
+    expect(prompt).toContain(REPO_SEARCH_EFFICIENCY);
   });
 
   it("requires path:line or path + symbol/function for Target on code-change tasks", () => {
     expect(prompt).toMatch(/path:line/i);
     expect(prompt).toMatch(/(symbol|function name)/i);
-  });
-
-  it("requires an Acceptance field for implementation tasks", () => {
-    expect(prompt).toMatch(/Acceptance/);
   });
 
   it("forbids vague Target values like 'relevant module'", () => {

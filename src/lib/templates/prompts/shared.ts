@@ -44,6 +44,24 @@ export const NO_CD_RULES = `### Working Directory Rules
 **NEVER use \`cd\` in Bash commands. ALWAYS use path arguments or \`-C\` flags.**`;
 
 /**
+ * Search strategy for agents that explore a repository before writing anything.
+ *
+ * Measured on one planner phase: 47 tool calls, 46 of them Bash, zero Grep/Glob,
+ * all strictly serial — the agent had adopted `cd <subdir>; grep …` as its way to
+ * scope a lookup and paid a full model round-trip for each one, so most of the
+ * phase was round-trip latency rather than analysis. `worktreeCdRules` is what
+ * nudges it there (it establishes `cd` as how you point a command at a
+ * directory), so this counter-instruction has to travel alongside that one, and
+ * it narrows `cd` to shell commands rather than forbidding it — forbidding it is
+ * `NO_CD_RULES`, a different convention for a different class of agent.
+ */
+export const REPO_SEARCH_EFFICIENCY = `### Searching the Repository
+
+Locate code with \`Grep\` and \`Glob\` and read it with \`Read\`. They take path arguments, so they need no \`cd\`, and they are much faster than driving \`grep\` / \`find\` / \`ls\` / \`cat\` through Bash. Keep Bash for what only a shell can do: \`git\`, task runners, build / test / lint commands.
+
+Issue independent lookups **together in a single message** rather than one per turn — several \`Grep\`s for different symbols, or a \`Grep\` plus the \`Read\`s of files you already know you need, all in one batch. Every extra turn is another full round-trip, and a dozen one-call turns is the difference between a minute of exploration and five. Serialize only a call whose input genuinely depends on the previous result.`;
+
+/**
  * Length calibration for agents whose deliverable is a file on disk.
  * Reports are re-embedded verbatim into downstream prompts (the collector reads
  * every review, the autonomous gate reads every review AND every TODO file), so

@@ -4,7 +4,12 @@
  */
 
 import type { PlannerInput } from "@/types/prompts";
-import { SUBAGENT_DELEGATION_POLICY, worktreeCdRules } from "./shared";
+import {
+  REPO_SEARCH_EFFICIENCY,
+  SUBAGENT_DELEGATION_POLICY,
+  WRITTEN_DELIVERABLE_LENGTH,
+  worktreeCdRules,
+} from "./shared";
 
 const PLANNER_CD_RULES = worktreeCdRules({ examples: "`git status`, `git diff`, etc." });
 
@@ -35,8 +40,8 @@ export function getPlannerSystemPrompt(): string {
    Decide based on the task's nature:
    - **Documentation / config / simple tasks** (e.g., "write README", "update CI config", "add license"): Repository documentation alone is sufficient. Do NOT explore source code — create TODOs from the task description and docs.
    - **Implementation / refactoring / bugfix tasks** (e.g., "refactor auth module", "fix race condition", "add API endpoint"): Explore source code as needed — find reference implementations, understand existing patterns, check affected modules, and assess impact. Use your judgment on how broadly to explore.
-     - Analyze existing code style: naming conventions, error handling patterns, file organization, and import style
-     - Include \`Pattern:\` sub-items in TODO items with specific style observations (e.g., "Pattern: uses camelCase for variables, PascalCase for types")
+     - Note the conventions the executor would otherwise guess wrong: naming, error handling, file organization, import style
+     - Where such a convention is non-obvious, record it as a \`Pattern:\` sub-item pointing at the code that demonstrates it. Skip it where the surrounding code already makes it plain — the executor reads that code too.
 
 5. **Audit Existing Conventions Around the Edit Site** (REQUIRED for code-change tasks that add or modify typed contracts — proto/schema/IDL definitions, DB columns, public API signatures, struct fields):
    - For each new field, parameter, or column you plan to add, search the **same file** and **sibling files in the same package/module** for fields with the **same base name or near-synonym** (e.g. \`contact_type_id\` vs \`contact_type_ids\`, \`user_id\` vs \`UserID\`, \`created\` vs \`created_at\`).
@@ -58,7 +63,11 @@ Write the TODO file to the output directory specified in the user prompt: \`<tod
 
 ${SUBAGENT_DELEGATION_POLICY}
 
+${REPO_SEARCH_EFFICIENCY}
+
 ${PLANNER_CD_RULES}
+
+${WRITTEN_DELIVERABLE_LENGTH}
 
 ### TODO Item Format
 
@@ -70,11 +79,12 @@ Each TODO item MUST follow this structured format. There are TWO profiles — pi
 - [ ] **[Target]** Action description
   - Target: (required) path:line of the edit site, OR path + the exact symbol/function name (e.g. \`src/foo/bar.ts:42\` or \`src/foo/bar.ts → handleClick\`)
   - Action: (required) Concrete step-by-step recipe — name the import to add, the function to call, the literal to change. No generalities.
-  - Pattern: (required) Reference to existing code to mirror, with path:line (e.g. \`src/other/file.ts:120-135\`). If genuinely no analogue exists, write \`Pattern: none (greenfield)\` and justify in Why.
-  - Why: (required) The motivation — what breaks or stays broken without this item. One sentence.
-  - Verify: (required) Concrete check the executor can run: a shell command, a test to add, or an observable behavior. NOT "ensure it works".
-  - Acceptance: (required for implementation/feature tasks) A test-checkable fact, e.g. "Calling foo() with bar returns baz" or "Unit test at path/to/test.ts:NN passes".
+  - Verify: (required) One check that can pass or fail: a shell command, or the assertion a named test makes, or an observable behavior. NOT "ensure it works". This doubles as the item's acceptance condition, so make it decide the item — do not restate it as a separate field.
+  - Pattern: (only when the convention to follow is non-obvious) path:line of existing code to mirror, e.g. \`src/other/file.ts:120-135\`. Omit it when the edit site's own surroundings already show the pattern; never write \`Pattern: none\` just to fill the field, and do not go looking for an analogue you do not need.
+  - Why: (only when the Action does not already make it obvious) One sentence on what stays broken without this item. Worth writing when the item looks redundant or counterintuitive on its face; noise otherwise.
 \`\`\`
+
+Three required fields, two conditional. An item is finished when the executor can act on it without re-deriving context — not when every field is filled in.
 
 **B. Doc-only / config-only / non-code items** (README updates, comment-only edits, license files, CI YAML touch-ups that don't change build output):
 
@@ -125,7 +135,7 @@ Example:
 
 1. Focus on this repository only — do NOT read other repositories' source code
 2. Be actionable: each TODO should be something the executor can act on without re-deriving context
-3. Match the depth of analysis to the task — simple tasks need less investigation, complex implementation tasks need more. **However**: never trade rigor of the *format* for brevity. Code-change items always carry Target/Action/Pattern/Why/Verify/Acceptance.
+3. Match the depth of analysis — and the length of the TODO file — to the task. Every code-change item carries Target/Action/Verify; Pattern and Why appear only where they change what the executor writes. A TODO padded out to a uniform shape costs the executor a re-read of it on every batch and the reviewers and gate a re-read every cycle.
 4. Include commands: specify exact build/test/lint commands from repository docs (only for tasks that change code)
 5. Prefer task runner commands: use \`make lint\` / \`npm run test\` etc. over direct tool invocation. Only fall back to direct commands (e.g. \`golangci-lint\`, \`tsc\`) if no task runner target exists
 6. Order logically: dependencies first, then implementation, then tests

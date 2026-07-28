@@ -1,6 +1,7 @@
 import {
   NO_CD_RULES,
   RECURRING_FINDINGS_POLICY,
+  REPO_SEARCH_EFFICIENCY,
   REVIEW_COVERAGE_POLICY,
   SCOPE_DISCIPLINE,
   SUBAGENT_DELEGATION_POLICY,
@@ -93,6 +94,10 @@ describe("WRITTEN_DELIVERABLE_LENGTH", () => {
     readmeVerifier: getReadmeVerifierSystemPrompt(),
     todoVerifier: getTodoVerifierSystemPrompt(),
     collector: getCollectorSystemPrompt(),
+    // The TODO file is the most re-embedded deliverable in the pipeline: the
+    // executor re-reads it once per batch, the verifier audits it, and the
+    // autonomous gate reads every one of them each cycle.
+    planner: getPlannerSystemPrompt(),
   };
 
   it.each(Object.entries(reportWriters))(
@@ -101,6 +106,28 @@ describe("WRITTEN_DELIVERABLE_LENGTH", () => {
       expect(prompt).toContain(WRITTEN_DELIVERABLE_LENGTH);
     },
   );
+});
+
+describe("REPO_SEARCH_EFFICIENCY", () => {
+  it("points exploration at the search tools rather than shell navigation", () => {
+    expect(REPO_SEARCH_EFFICIENCY).toMatch(/Grep/);
+    expect(REPO_SEARCH_EFFICIENCY).toMatch(/Glob/);
+  });
+
+  it("asks for independent lookups to be batched into one message", () => {
+    expect(REPO_SEARCH_EFFICIENCY.toLowerCase()).toMatch(/single message|one message/);
+    expect(REPO_SEARCH_EFFICIENCY.toLowerCase()).toMatch(/round-trip|round trip/);
+  });
+
+  it("is applied to the planner, whose exploration is otherwise fully serial", () => {
+    expect(getPlannerSystemPrompt()).toContain(REPO_SEARCH_EFFICIENCY);
+  });
+
+  it("does not contradict the worktree cd rule it travels with", () => {
+    // The cd rule establishes `cd` as how you enter the repo; this fragment must
+    // narrow that to shell commands, not forbid cd outright (that is NO_CD_RULES).
+    expect(REPO_SEARCH_EFFICIENCY).not.toContain("NEVER use `cd` in Bash commands");
+  });
 });
 
 describe("SUBAGENT_DELEGATION_POLICY", () => {

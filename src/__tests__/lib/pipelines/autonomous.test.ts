@@ -240,6 +240,9 @@ describe("buildAutonomousPipeline", () => {
       // Cycle 1 is NOT queued upfront — the clarity gate appends it after the README is drafted.
       expect(labels).toContain("Analyze README clarity");
       expect(labels).not.toContain("Cycle 1: Execute");
+      // On the init path the feasibility judge runs inside the clarity phase's
+      // group rather than as a phase behind it — the two judges are independent.
+      expect(labels).not.toContain("Check criteria feasibility");
     });
   });
 
@@ -255,45 +258,111 @@ describe("buildAutonomousPipeline", () => {
       return phase;
     }
 
-    it("appends Cycle 1 when the README is judged sufficient", async () => {
-      const phase = getClarityGatePhase();
-      const appended: PipelinePhase[] = [];
+    /** Mock runChildGroup that feeds each child the verdict registered for its label. */
+    function groupCtxReturning(verdicts: Record<string, unknown>, appended: PipelinePhase[]) {
+      const seen: string[][] = [];
       const ctx = createMockCtx({
         appendPhases: vi.fn((p: PipelinePhase[]) => { appended.push(...p); }),
-        runChild: vi.fn(async (label, _prompt, opts) => {
-          if (opts?.onResultText && label === "README Clarity Gate") {
-            opts.onResultText(JSON.stringify({ sufficient: true, reason: "clear", missing: [] }));
+        runChildGroup: vi.fn(async (children) => {
+          seen.push(children.map((c) => c.label));
+          for (const child of children) {
+            if (child.onResultText && child.label in verdicts) {
+              child.onResultText(JSON.stringify(verdicts[child.label]));
+            }
           }
-          return true;
+          return children.map(() => true);
         }),
       });
-      const result = await phase.fn(ctx);
+      return { ctx, seen };
+    }
 
-      expect(result).toBe(true);
+    beforeEach(() => {
+      mockParseAcceptanceCriteria.mockReturnValue([
+        { text: "Rows render on the detail screen", kind: "auto", checked: false },
+      ]);
+    });
+
+    it("runs the clarity and feasibility judges as one parallel group", async () => {
+      const phase = getClarityGatePhase();
+      const appended: PipelinePhase[] = [];
+      const { ctx, seen } = groupCtxReturning(
+        { "README Clarity Gate": { sufficient: true, reason: "clear", missing: [] } },
+        appended,
+      );
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(ctx.runChildGroup).toHaveBeenCalledTimes(1);
+      expect(seen[0]).toEqual(["README Clarity Gate", "Criteria Feasibility"]);
+      expect(ctx.runChild).not.toHaveBeenCalled();
+    });
+
+    it("appends Cycle 1 without a separate feasibility phase when the README is sufficient", async () => {
+      const phase = getClarityGatePhase();
+      const appended: PipelinePhase[] = [];
+      const { ctx } = groupCtxReturning(
+        { "README Clarity Gate": { sufficient: true, reason: "clear", missing: [] } },
+        appended,
+      );
+
+      expect(await phase.fn(ctx)).toBe(true);
       expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
-        "Check criteria feasibility",
         "Cycle 1: Execute",
         "Cycle 1: Review",
         "Cycle 1: Gate",
       ]);
     });
 
+    it("records infeasible criteria from the group when the README is clear", async () => {
+      const phase = getClarityGatePhase();
+      const appended: PipelinePhase[] = [];
+      const { ctx } = groupCtxReturning(
+        {
+          "README Clarity Gate": { sufficient: true, reason: "clear", missing: [] },
+          "Criteria Feasibility": {
+            infeasible: [{ criterion: "Rows render on the detail screen", reason: "schema owned elsewhere" }],
+          },
+        },
+        appended,
+      );
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockAppendKnownFindings).toHaveBeenCalledTimes(1);
+      const [, findings] = mockAppendKnownFindings.mock.calls[0];
+      expect(findings[0].kind).toBe("infeasible");
+    });
+
+    it("omits the feasibility child when the README has no (auto) criteria", async () => {
+      mockParseAcceptanceCriteria.mockReturnValue([
+        { text: "Figma comparison", kind: "manual", checked: false },
+      ]);
+      const phase = getClarityGatePhase();
+      const appended: PipelinePhase[] = [];
+      const { ctx, seen } = groupCtxReturning(
+        { "README Clarity Gate": { sufficient: true, reason: "clear", missing: [] } },
+        appended,
+      );
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(seen[0]).toEqual(["README Clarity Gate"]);
+      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
+    });
+
     it("stops and recommends refining the README when judged insufficient", async () => {
       const phase = getClarityGatePhase();
       const appended: PipelinePhase[] = [];
-      const ctx = createMockCtx({
-        appendPhases: vi.fn((p: PipelinePhase[]) => { appended.push(...p); }),
-        runChild: vi.fn(async (label, _prompt, opts) => {
-          if (opts?.onResultText && label === "README Clarity Gate") {
-            opts.onResultText(JSON.stringify({
-              sufficient: false,
-              reason: "Goal is a placeholder",
-              missing: ["Concrete goal", "At least one auto acceptance criterion"],
-            }));
-          }
-          return true;
-        }),
-      });
+      const { ctx } = groupCtxReturning(
+        {
+          "README Clarity Gate": {
+            sufficient: false,
+            reason: "Goal is a placeholder",
+            missing: ["Concrete goal", "At least one auto acceptance criterion"],
+          },
+          "Criteria Feasibility": {
+            infeasible: [{ criterion: "Rows render on the detail screen", reason: "schema owned elsewhere" }],
+          },
+        },
+        appended,
+      );
       const result = await phase.fn(ctx);
 
       // Graceful stop: no cycle phases appended, run ends without touching code.
@@ -301,20 +370,19 @@ describe("buildAutonomousPipeline", () => {
       expect(appended).toHaveLength(0);
       expect(ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("too unclear"));
       expect(ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("update-readme"));
+      // The criteria are about to be rewritten, so a verdict against the old ones
+      // must not be frozen into the ledger.
+      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
     });
 
     it("fails open (proceeds) when the clarity judge returns no verdict", async () => {
       const phase = getClarityGatePhase();
       const appended: PipelinePhase[] = [];
-      const ctx = createMockCtx({
-        appendPhases: vi.fn((p: PipelinePhase[]) => { appended.push(...p); }),
-        // default runChild returns true but never calls onResultText → empty verdict
-      });
+      const { ctx } = groupCtxReturning({}, appended);
       const result = await phase.fn(ctx);
 
       expect(result).toBe(true);
       expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
-        "Check criteria feasibility",
         "Cycle 1: Execute",
         "Cycle 1: Review",
         "Cycle 1: Gate",
