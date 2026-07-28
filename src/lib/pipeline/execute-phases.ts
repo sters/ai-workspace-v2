@@ -115,7 +115,16 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
           emitStatus(managed, `Phase ${phaseNum} retry ${attempt}/${maxRetries} after ${retryDelayMs}ms delay`, phaseExtra);
 
           await delay(retryDelayMs, managed.abortController.signal);
-          if (managed.abortController.signal.aborted) break;
+          if (managed.abortController.signal.aborted) {
+            // A user kill landing inside the delay window is what normally
+            // cancels a retry, and the announcement above has already been
+            // written to the log. Say the retry did not happen — otherwise the
+            // log reads as though the phase re-ran on the same budget, which
+            // for a long Claude phase is a very different (and much more
+            // expensive) story than what actually occurred.
+            emitStatus(managed, `Phase ${phaseNum} retry ${attempt}/${maxRetries} cancelled — operation was interrupted`, phaseExtra);
+            break;
+          }
 
           // Reset start time for the new attempt
           if (phaseInfos[i]) {

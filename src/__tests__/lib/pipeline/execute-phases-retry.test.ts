@@ -310,6 +310,52 @@ describe("execute-phases retry logic", () => {
     expect(managed.operation.status).toBe("failed");
   });
 
+  it("says the retry was cancelled when an abort lands during the delay", async () => {
+    const phase = makeFunctionPhase(async () => false, {
+      maxRetries: 2,
+      retryDelayMs: 5000,
+    });
+
+    const { managed, phaseInfos, capturedEvents } = makeManagedOperation([phase]);
+    setTimeout(() => managed.abortController.abort(), 50);
+
+    await executePipelinePhases({
+      managed,
+      phases: [phase],
+      phaseInfos,
+      operationType: "execute",
+    });
+
+    const msgs = statusMessages(capturedEvents).filter((m) => !m.startsWith("__phaseUpdate:"));
+    // The "retry 1/2 after ..." announcement is already in the log; without a
+    // follow-up it reads as though the phase ran again on the same budget.
+    expect(msgs).toContain("Phase 1 retry 1/2 after 5000ms delay");
+    expect(msgs).toContain("Phase 1 retry 1/2 cancelled — operation was interrupted");
+  });
+
+  it("does not announce a cancellation when the retry actually runs", async () => {
+    let callCount = 0;
+    const phase = makeFunctionPhase(
+      async () => {
+        callCount++;
+        return callCount >= 2;
+      },
+      { maxRetries: 2, retryDelayMs: 10 },
+    );
+
+    const { managed, phaseInfos, capturedEvents } = makeManagedOperation([phase]);
+    await executePipelinePhases({
+      managed,
+      phases: [phase],
+      phaseInfos,
+      operationType: "execute",
+    });
+
+    expect(callCount).toBe(2);
+    const cancelled = statusMessages(capturedEvents).filter((m) => m.includes("cancelled"));
+    expect(cancelled).toHaveLength(0);
+  });
+
   it("tracks retryAttempt and maxRetries in phaseInfos", async () => {
     let callCount = 0;
     const phase = makeFunctionPhase(
