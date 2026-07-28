@@ -13,8 +13,15 @@ import { runSubPhases } from "./actions/run-sub-phases";
 import { resolveWorkspace } from "./actions/resolve-workspace";
 import { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "@/lib/templates/prompts/autonomous-gate";
 import { buildReadmeClarityGatePrompt, README_CLARITY_GATE_SCHEMA, README_CLARITY_PHASE_LABEL, README_CLARITY_STOP_PREFIX } from "@/lib/templates/prompts/readme-clarity-gate";
+import { buildCriteriaFeasibilityPrompt, CRITERIA_FEASIBILITY_SCHEMA, CRITERIA_FEASIBILITY_PHASE_LABEL } from "@/lib/templates/prompts/criteria-feasibility";
 import { getWorkspaceDir } from "@/lib/config";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
+import {
+  appendKnownFindings,
+  normalizeKnownFindingKind,
+  readKnownFindings,
+} from "@/lib/workspace/known-findings";
+import type { KnownFinding } from "@/lib/workspace/known-findings";
 import path from "node:path";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
@@ -56,6 +63,26 @@ interface AutonomousGateResult {
   giveUp: boolean;
   reason: string;
   fixableIssues: string[];
+  /** Findings the gate deliberately did not act on, for the known-findings ledger. */
+  dismissedFindings: KnownFinding[];
+}
+
+function settled(reason: string): AutonomousGateResult {
+  return { shouldLoop: false, giveUp: false, reason, fixableIssues: [], dismissedFindings: [] };
+}
+
+function parseDismissedFindings(raw: unknown): KnownFinding[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const { summary, reason, kind } = entry as Record<string, unknown>;
+    if (typeof summary !== "string" || summary.trim() === "") return [];
+    return [{
+      summary,
+      reason: typeof reason === "string" ? reason : "",
+      kind: normalizeKnownFindingKind(typeof kind === "string" ? kind : undefined),
+    }];
+  });
 }
 
 async function runAutonomousGate(
@@ -67,13 +94,13 @@ async function runAutonomousGate(
 ): Promise<AutonomousGateResult> {
   // Final iteration: skip AI call
   if (loopIteration >= maxLoops) {
-    return { shouldLoop: false, giveUp: false, reason: "Maximum loop iterations reached", fixableIssues: [] };
+    return settled("Maximum loop iterations reached");
   }
 
   // Check review results
   const sessions = await getReviewSessions(workspace);
   if (sessions.length === 0) {
-    return { shouldLoop: false, giveUp: false, reason: "No review sessions found", fixableIssues: [] };
+    return settled("No review sessions found");
   }
 
   const latest = sessions[0];
@@ -81,7 +108,7 @@ async function runAutonomousGate(
   // Always let AI evaluate — even warnings/suggestions may be worth fixing
   const reviewDetail = await getReviewDetail(workspace, latest.timestamp);
   if (!reviewDetail) {
-    return { shouldLoop: false, giveUp: false, reason: "Could not read review details", fixableIssues: [] };
+    return settled("Could not read review details");
   }
 
   // Get TODO files
@@ -103,6 +130,8 @@ async function runAutonomousGate(
     .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
     .join("\n");
 
+  const wsPath = path.join(getWorkspaceDir(), workspace);
+
   // Build gate prompt
   const prompt = buildAutonomousGatePrompt({
     workspaceName: workspace,
@@ -114,10 +143,10 @@ async function runAutonomousGate(
     loopIteration,
     maxLoops,
     previousGateResults,
+    knownFindings: await readKnownFindings(wsPath),
   });
 
   // Run AI gate
-  const wsPath = path.join(getWorkspaceDir(), workspace);
   let resultText = "";
   const ok = await ctx.runChild("Autonomous Gate", prompt, {
     jsonSchema: AUTONOMOUS_GATE_SCHEMA,
@@ -128,23 +157,26 @@ async function runAutonomousGate(
   });
 
   if (!ok || !resultText) {
-    return { shouldLoop: false, giveUp: false, reason: "Gate execution failed", fixableIssues: [] };
+    return settled("Gate execution failed");
   }
 
   // Parse result
   try {
-    const parsed = JSON.parse(resultText) as AutonomousGateResult;
+    const parsed = JSON.parse(resultText) as Record<string, unknown>;
     if (typeof parsed.shouldLoop !== "boolean") {
-      return { shouldLoop: false, giveUp: false, reason: "Invalid gate response", fixableIssues: [] };
+      return settled("Invalid gate response");
     }
     return {
       shouldLoop: parsed.shouldLoop,
       giveUp: parsed.giveUp === true,
-      reason: parsed.reason ?? "",
-      fixableIssues: Array.isArray(parsed.fixableIssues) ? parsed.fixableIssues : [],
+      reason: typeof parsed.reason === "string" ? parsed.reason : "",
+      fixableIssues: Array.isArray(parsed.fixableIssues)
+        ? parsed.fixableIssues.filter((i): i is string => typeof i === "string")
+        : [],
+      dismissedFindings: parseDismissedFindings(parsed.dismissedFindings),
     };
   } catch {
-    return { shouldLoop: false, giveUp: false, reason: "Failed to parse gate response", fixableIssues: [] };
+    return settled("Failed to parse gate response");
   }
 }
 
@@ -397,6 +429,21 @@ export function buildAutonomousPipeline(input: {
         const gateResult = await runAutonomousGate(ctx, ws, loopNumber, maxLoops, gateHistory);
         gateHistory.push({ cycle: loopNumber, reason: gateResult.reason, fixableIssues: gateResult.fixableIssues });
 
+        // Record what the gate declined to act on. Without this the next cycle's
+        // reviewers re-derive and re-report it at full length, and this gate
+        // spends another decision reaching the same conclusion.
+        if (gateResult.dismissedFindings.length > 0) {
+          const added = await appendKnownFindings(
+            path.join(getWorkspaceDir(), ws),
+            gateResult.dismissedFindings.map((f) => ({ ...f, cycle: loopNumber })),
+          );
+          if (added.length > 0) {
+            ctx.emitStatus(
+              `Recorded ${added.length} accepted finding${added.length === 1 ? "" : "s"} in artifacts/known-findings.md`,
+            );
+          }
+        }
+
         const decisionLabel = gateResult.giveUp
           ? "Give up"
           : gateResult.shouldLoop
@@ -481,6 +528,7 @@ export function buildAutonomousPipeline(input: {
 
         const appendCycleOne = () => {
           ctx.appendPhases([
+            buildCriteriaFeasibilityPhase(),
             buildCycleExecutePhase(1),
             buildCycleReviewPhase(1),
             buildCycleGatePhase(1),
@@ -542,6 +590,108 @@ export function buildAutonomousPipeline(input: {
     };
   }
 
+  // Acceptance-criteria feasibility check: runs once per run, before the first
+  // cycle. Records criteria no change in these repos can satisfy in the
+  // known-findings ledger so the reviewers stop re-deriving them and the gate
+  // stops looping toward them. Never stops the run — the rest of the contract is
+  // still worth implementing.
+  function buildCriteriaFeasibilityPhase(): PipelinePhase {
+    return {
+      kind: "function",
+      label: CRITERIA_FEASIBILITY_PHASE_LABEL,
+      timeoutMs: 15 * 60 * 1000,
+      maxRetries: 0,
+      fn: async (ctx) => {
+        if (ctx.signal.aborted) return false;
+        const ws = resolveWorkspace(ctx.operationId, workspace);
+        if (!ws) {
+          ctx.emitStatus("No workspace found — skipping criteria feasibility check");
+          return true;
+        }
+
+        const readmeContent = (await getReadme(ws)) ?? "";
+        const criteria = parseAcceptanceCriteria(readmeContent);
+        const autoCriteria = criteria.filter((c) => c.kind === "auto");
+        if (autoCriteria.length === 0) {
+          ctx.emitStatus("No (auto) acceptance criteria to check — skipping");
+          return true;
+        }
+
+        const wsPath = path.join(getWorkspaceDir(), ws);
+        const repos = listWorkspaceRepos(ws);
+        let resultText = "";
+        const ok = await ctx.runChild(
+          "Criteria Feasibility",
+          buildCriteriaFeasibilityPrompt({
+            workspaceName: ws,
+            readmeContent,
+            acceptanceCriteria: criteria
+              .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
+              .join("\n"),
+            repos: repos.map((r) => ({ repoName: r.repoName, worktreePath: r.worktreePath })),
+          }),
+          {
+            jsonSchema: CRITERIA_FEASIBILITY_SCHEMA,
+            stepType: STEP_TYPES.CRITERIA_FEASIBILITY,
+            addDirs: repos.map((r) => r.worktreePath),
+            appendSystemPromptFile: ensureSystemPrompt(wsPath, "criteria-feasibility"),
+            onResultText: (text) => { resultText = text; },
+            skipAskUserQuestion: true,
+          },
+        );
+
+        // Fail open in both directions: a judge hiccup must not stop the run, and
+        // must not silently mark anything unachievable either.
+        if (!ok || !resultText) {
+          ctx.emitStatus("Feasibility check returned no verdict — proceeding with all criteria");
+          return true;
+        }
+
+        let parsed: { infeasible?: unknown; reason?: unknown };
+        try {
+          parsed = JSON.parse(resultText);
+        } catch {
+          ctx.emitStatus("Could not parse feasibility verdict — proceeding with all criteria");
+          return true;
+        }
+
+        const infeasible = Array.isArray(parsed.infeasible)
+          ? parsed.infeasible.flatMap((entry) => {
+              if (typeof entry !== "object" || entry === null) return [];
+              const { criterion, reason } = entry as Record<string, unknown>;
+              if (typeof criterion !== "string" || criterion.trim() === "") return [];
+              return [{ criterion, reason: typeof reason === "string" ? reason : "" }];
+            })
+          : [];
+
+        if (infeasible.length === 0) {
+          ctx.emitResult(
+            `**All ${autoCriteria.length} \`(auto)\` acceptance criteria are achievable in these repositories.**` +
+              (typeof parsed.reason === "string" && parsed.reason ? ` ${parsed.reason}` : ""),
+          );
+          return true;
+        }
+
+        const added = await appendKnownFindings(
+          wsPath,
+          infeasible.map((i) => ({
+            kind: "infeasible" as const,
+            summary: `Acceptance criterion cannot be satisfied in these repositories: ${i.criterion}`,
+            reason: i.reason,
+          })),
+        );
+
+        ctx.emitResult(
+          `**${infeasible.length} of ${autoCriteria.length} \`(auto)\` acceptance criteria cannot be satisfied in these repositories.**\n` +
+            infeasible.map((i) => `- ${i.criterion}\n  - ${i.reason}`).join("\n") +
+            `\n\nRecorded ${added.length} entr${added.length === 1 ? "y" : "ies"} in \`artifacts/known-findings.md\` so review and gate phases stop looping toward them. ` +
+            "The run continues on the remaining criteria; resolve these by updating the README (Non-Goal / Acceptance Criteria) or by taking them up with the owning repository.",
+        );
+        return true;
+      },
+    };
+  }
+
   // Helper to build the Create PR phase
   function buildCreatePrPhase(): PipelinePhase {
     return {
@@ -573,6 +723,7 @@ export function buildAutonomousPipeline(input: {
       }
     }
   } else if (!initClarityGated) {
+    phases.push(buildCriteriaFeasibilityPhase());
     phases.push(buildCycleExecutePhase(1));
     phases.push(buildCycleReviewPhase(1));
     phases.push(buildCycleGatePhase(1));

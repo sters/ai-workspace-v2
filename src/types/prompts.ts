@@ -57,6 +57,8 @@ export interface CodeReviewerInput extends RepoPromptInput {
   readmeContent: string;
   repoChanges: string;
   reviewFilePath: string;
+  /** Raw `artifacts/known-findings.md` content, or "" / undefined when absent. */
+  knownFindings?: string;
 }
 
 /** Cross-repository code-review agent input (multi-repo workspaces only). */
@@ -65,6 +67,8 @@ export interface CrossRepositoryReviewerInput {
   reviewTimestamp: string;
   readmeContent: string;
   reviewFilePath: string;
+  /** Raw `artifacts/known-findings.md` content, or "" / undefined when absent. */
+  knownFindings?: string;
   repos: {
     repoName: string;
     repoPath: string;
@@ -220,6 +224,8 @@ export interface AutonomousGateInput {
   loopIteration: number;
   maxLoops: number;
   previousGateResults?: { cycle: number; reason: string; fixableIssues: string[] }[];
+  /** Raw `artifacts/known-findings.md` content, or "" / undefined when absent. */
+  knownFindings?: string;
 }
 
 export interface ReadmeClarityGateInput {
@@ -227,6 +233,15 @@ export interface ReadmeClarityGateInput {
   readmeContent: string;
   /** Pre-rendered Acceptance Criteria checklist parsed from the README, or "" when absent. */
   acceptanceCriteria?: string;
+}
+
+export interface CriteriaFeasibilityInput {
+  workspaceName: string;
+  readmeContent: string;
+  /** Pre-rendered Acceptance Criteria checklist parsed from the README, or "" when absent. */
+  acceptanceCriteria?: string;
+  /** Every repository worktree, since a criterion's blocker usually sits on the other side. */
+  repos: { repoName: string; worktreePath: string }[];
 }
 
 export interface WorkspaceSuggesterInput {

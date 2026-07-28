@@ -70,8 +70,18 @@ vi.mock("@/lib/pipelines/actions/setup-repository", () => ({
 vi.mock("@/lib/pipelines/actions/init-todo-analysis", () => ({
   buildInitTodoAnalysisPhases: vi.fn(() => []),
 }));
+vi.mock("@/lib/workspace/known-findings", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/workspace/known-findings")>();
+  return {
+    ...actual,
+    readKnownFindings: vi.fn(async () => ""),
+    appendKnownFindings: vi.fn(async (_p: string, f: unknown[]) => f),
+  };
+});
 
 import { buildAutonomousPipeline } from "@/lib/pipelines/autonomous";
+import { appendKnownFindings } from "@/lib/workspace/known-findings";
+import { parseAcceptanceCriteria } from "@/lib/parsers/readme";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
 import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import { setupRepository } from "@/lib/pipelines/actions/setup-repository";
@@ -100,6 +110,8 @@ const mockReadWorkspaceReadme = vi.mocked(readWorkspaceReadme);
 const mockSetupRepository = vi.mocked(setupRepository);
 const mockBuildInitTodoAnalysis = vi.mocked(buildInitTodoAnalysisPhases);
 const mockGetTodos = vi.mocked(getTodos);
+const mockAppendKnownFindings = vi.mocked(appendKnownFindings);
+const mockParseAcceptanceCriteria = vi.mocked(parseAcceptanceCriteria);
 
 function createMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunctionContext {
   return {
@@ -163,12 +175,13 @@ describe("buildAutonomousPipeline", () => {
         workspace: "test-ws",
         instruction: "fix things",
       });
-      // Ensure repositories + Ensure TODOs + update-todo + Cycle 1 (Execute, Review, Gate)
-      expect(phases).toHaveLength(6);
+      // Ensure repositories + Ensure TODOs + update-todo + feasibility + Cycle 1
+      expect(phases).toHaveLength(7);
       expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
         "Ensure repositories",
         "Ensure TODOs",
         "Update TODOs",
+        "Check criteria feasibility",
         "Cycle 1: Execute",
         "Cycle 1: Review",
         "Cycle 1: Gate",
@@ -191,15 +204,16 @@ describe("buildAutonomousPipeline", () => {
       expect(mockBuildUpdateTodo).toHaveBeenCalled();
     });
 
-    it("has 5 phases (Ensure repos, Ensure TODOs, Execute, Review, Gate) when startWith is execute", () => {
+    it("has 6 phases (Ensure repos, Ensure TODOs, feasibility, Execute, Review, Gate) when startWith is execute", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
       });
-      expect(phases).toHaveLength(5);
+      expect(phases).toHaveLength(6);
       expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
         "Ensure repositories",
         "Ensure TODOs",
+        "Check criteria feasibility",
         "Cycle 1: Execute",
         "Cycle 1: Review",
         "Cycle 1: Gate",
@@ -257,6 +271,7 @@ describe("buildAutonomousPipeline", () => {
 
       expect(result).toBe(true);
       expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
+        "Check criteria feasibility",
         "Cycle 1: Execute",
         "Cycle 1: Review",
         "Cycle 1: Gate",
@@ -299,6 +314,7 @@ describe("buildAutonomousPipeline", () => {
 
       expect(result).toBe(true);
       expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
+        "Check criteria feasibility",
         "Cycle 1: Execute",
         "Cycle 1: Review",
         "Cycle 1: Gate",
@@ -307,13 +323,20 @@ describe("buildAutonomousPipeline", () => {
   });
 
   describe("cycle phases", () => {
+    // Index-based lookups break whenever a leading phase is added, so address
+    // cycle phases by label.
+    function phaseByLabel(phases: PipelinePhase[], label: string) {
+      const phase = phases.find((p) => p.kind === "function" && p.label === label);
+      if (!phase || phase.kind !== "function") throw new Error(`phase not found: ${label}`);
+      return phase;
+    }
+
     it("execute phase runs buildExecutePipeline", async () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
         workspace: "test-ws",
       });
-      const execPhase = phases[2];
-      if (execPhase.kind !== "function") return;
+      const execPhase = phaseByLabel(phases, "Cycle 1: Execute");
 
       const ctx = createMockCtx();
       await execPhase.fn(ctx);
@@ -326,8 +349,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const reviewPhase = phases[3];
-      if (reviewPhase.kind !== "function") return;
+      const reviewPhase = phaseByLabel(phases, "Cycle 1: Review");
 
       const ctx = createMockCtx();
       await reviewPhase.fn(ctx);
@@ -340,8 +362,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const gatePhase = phases[4];
-      if (gatePhase.kind !== "function") return;
+      const gatePhase = phaseByLabel(phases, "Cycle 1: Gate");
 
       const appendedPhases: PipelinePhase[] = [];
       const ctx = createMockCtx({
@@ -362,9 +383,9 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      expect(phases[2].kind === "function" && phases[2].timeoutMs).toBe(70 * 60 * 1000);
-      expect(phases[3].kind === "function" && phases[3].timeoutMs).toBe(45 * 60 * 1000);
-      expect(phases[4].kind === "function" && phases[4].timeoutMs).toBe(10 * 60 * 1000);
+      expect(phaseByLabel(phases, "Cycle 1: Execute").timeoutMs).toBe(70 * 60 * 1000);
+      expect(phaseByLabel(phases, "Cycle 1: Review").timeoutMs).toBe(45 * 60 * 1000);
+      expect(phaseByLabel(phases, "Cycle 1: Gate").timeoutMs).toBe(10 * 60 * 1000);
     });
 
     // `runSubPhases` ignores each sub-phase's own `timeoutMs`, so the whole
@@ -397,8 +418,7 @@ describe("buildAutonomousPipeline", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
       });
-      const execPhase = phases[2];
-      if (execPhase.kind !== "function") return;
+      const execPhase = phaseByLabel(phases, "Cycle 1: Execute");
 
       const ctx = createMockCtx();
       const result = await execPhase.fn(ctx);
@@ -426,8 +446,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const gatePhase = phases[4];
-      if (gatePhase.kind !== "function") return;
+      const gatePhase = phaseByLabel(phases, "Cycle 1: Gate");
 
       const appendedPhases: PipelinePhase[] = [];
       const ctx = createMockCtx({
@@ -477,8 +496,7 @@ describe("buildAutonomousPipeline", () => {
         workspace: "test-ws",
         repo: "my-repo",
       });
-      const gatePhase = phases[4];
-      if (gatePhase.kind !== "function") return;
+      const gatePhase = phaseByLabel(phases, "Cycle 1: Gate");
 
       // Run gate to get the appended Update TODO phase
       const appendedPhases: PipelinePhase[] = [];
@@ -524,8 +542,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const gatePhase = phases[4];
-      if (gatePhase.kind !== "function") return;
+      const gatePhase = phaseByLabel(phases, "Cycle 1: Gate");
 
       const appendedPhases: PipelinePhase[] = [];
       const ctx = createMockCtx({
@@ -559,8 +576,7 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      const gatePhase = phases[4];
-      if (gatePhase.kind !== "function") return;
+      const gatePhase = phaseByLabel(phases, "Cycle 1: Gate");
 
       const appendedPhases: PipelinePhase[] = [];
       const ctx = createMockCtx({
@@ -801,6 +817,195 @@ describe("buildAutonomousPipeline", () => {
 
       expect(result).toBe(false);
       expect(mockBuildInitTodoAnalysis).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("criteria feasibility check", () => {
+    function getFeasibilityPhase() {
+      const phases = buildAutonomousPipeline({ startWith: "execute", workspace: "test-ws" });
+      const phase = phases.find(
+        (p) => p.kind === "function" && p.label === "Check criteria feasibility",
+      );
+      if (!phase || phase.kind !== "function") throw new Error("feasibility phase not found");
+      return phase;
+    }
+
+    function ctxReturning(verdict: unknown) {
+      return createMockCtx({
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "Criteria Feasibility") {
+            opts.onResultText(JSON.stringify(verdict));
+          }
+          return true;
+        }),
+      });
+    }
+
+    beforeEach(() => {
+      mockParseAcceptanceCriteria.mockReturnValue([
+        { text: "Rows render on the detail screen", kind: "auto", checked: false },
+        { text: "Multiple IDs render most-recent-first", kind: "auto", checked: false },
+        { text: "Figma comparison", kind: "manual", checked: false },
+      ]);
+    });
+
+    it("records infeasible criteria in the known-findings ledger", async () => {
+      const phase = getFeasibilityPhase();
+      const ctx = ctxReturning({
+        infeasible: [
+          {
+            criterion: "Multiple IDs render most-recent-first",
+            reason: "The BFF collapses ShopOrders to obj[0]; the schema is owned elsewhere",
+          },
+        ],
+        reason: "one criterion blocked upstream",
+      });
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockAppendKnownFindings).toHaveBeenCalledTimes(1);
+      const [, findings] = mockAppendKnownFindings.mock.calls[0];
+      expect(findings).toHaveLength(1);
+      expect(findings[0].kind).toBe("infeasible");
+      expect(findings[0].summary).toContain("Multiple IDs render most-recent-first");
+      expect(ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("known-findings.md"));
+    });
+
+    it("records nothing when every criterion is achievable", async () => {
+      const phase = getFeasibilityPhase();
+      const ctx = ctxReturning({ infeasible: [], reason: "all achievable" });
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
+      expect(ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("achievable"));
+    });
+
+    it("proceeds without recording when the judge returns no verdict", async () => {
+      const phase = getFeasibilityPhase();
+      // default runChild resolves true but never calls onResultText
+      const ctx = createMockCtx();
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
+    });
+
+    it("proceeds without recording when the verdict is unparsable", async () => {
+      const phase = getFeasibilityPhase();
+      const ctx = createMockCtx({
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "Criteria Feasibility") {
+            opts.onResultText("not json");
+          }
+          return true;
+        }),
+      });
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
+    });
+
+    it("skips the judge entirely when the README has no (auto) criteria", async () => {
+      mockParseAcceptanceCriteria.mockReturnValue([
+        { text: "Figma comparison", kind: "manual", checked: false },
+      ]);
+      const phase = getFeasibilityPhase();
+      const ctx = createMockCtx();
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(ctx.runChild).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("gate dismissals", () => {
+    function gateCtxReturning(verdict: unknown) {
+      return createMockCtx({
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "Autonomous Gate") {
+            opts.onResultText(JSON.stringify(verdict));
+          }
+          return true;
+        }),
+      });
+    }
+
+    function getGatePhase() {
+      const phases = buildAutonomousPipeline({ startWith: "execute", workspace: "test-ws" });
+      const phase = phases.find((p) => p.kind === "function" && p.label === "Cycle 1: Gate");
+      if (!phase || phase.kind !== "function") throw new Error("gate phase not found");
+      return phase;
+    }
+
+    beforeEach(() => {
+      mockGetReviewSessions.mockResolvedValue([
+        { timestamp: "20260728-102052", repoCount: 1, hasSummary: true },
+      ] as never);
+      mockGetReviewDetail.mockResolvedValue({
+        timestamp: "20260728-102052",
+        summary: "# Summary",
+        files: [],
+      } as never);
+    });
+
+    it("appends the gate's dismissed findings to the ledger, tagged with the cycle", async () => {
+      const phase = getGatePhase();
+      const ctx = gateCtxReturning({
+        shouldLoop: false,
+        giveUp: false,
+        reason: "nothing actionable left",
+        fixableIssues: [],
+        dismissedFindings: [
+          { summary: "golangci-lint v1/v2 mismatch", reason: "environment", kind: "pre-existing" },
+          { summary: "Rename helper for clarity", reason: "deferred to PR", kind: "deferred" },
+        ],
+      });
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockAppendKnownFindings).toHaveBeenCalledTimes(1);
+      const [, findings] = mockAppendKnownFindings.mock.calls[0];
+      expect(findings).toHaveLength(2);
+      expect(findings.every((f: { cycle?: number }) => f.cycle === 1)).toBe(true);
+    });
+
+    it("coerces an unknown dismissal kind to the weakest claim", async () => {
+      const phase = getGatePhase();
+      const ctx = gateCtxReturning({
+        shouldLoop: false,
+        giveUp: false,
+        reason: "done",
+        fixableIssues: [],
+        dismissedFindings: [{ summary: "Something", reason: "why", kind: "not-a-kind" }],
+      });
+
+      await phase.fn(ctx);
+      const [, findings] = mockAppendKnownFindings.mock.calls[0];
+      expect(findings[0].kind).toBe("deferred");
+    });
+
+    it("drops dismissals with no summary rather than writing an empty entry", async () => {
+      const phase = getGatePhase();
+      const ctx = gateCtxReturning({
+        shouldLoop: false,
+        giveUp: false,
+        reason: "done",
+        fixableIssues: [],
+        dismissedFindings: [{ summary: "  ", reason: "why", kind: "deferred" }],
+      });
+
+      await phase.fn(ctx);
+      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
+    });
+
+    it("does not touch the ledger when the gate dismissed nothing", async () => {
+      const phase = getGatePhase();
+      const ctx = gateCtxReturning({
+        shouldLoop: true,
+        giveUp: false,
+        reason: "fix the bug",
+        fixableIssues: ["Fix the bug"],
+        dismissedFindings: [],
+      });
+
+      await phase.fn(ctx);
+      expect(mockAppendKnownFindings).not.toHaveBeenCalled();
     });
   });
 

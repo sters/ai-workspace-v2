@@ -5,9 +5,11 @@
 
 import type { CodeReviewerInput } from "@/types/prompts";
 import {
+  RECURRING_FINDINGS_POLICY,
   REVIEW_COVERAGE_POLICY,
   SUBAGENT_DELEGATION_POLICY,
   WRITTEN_DELIVERABLE_LENGTH,
+  knownFindingsSection,
   worktreeCdRules,
 } from "./shared";
 
@@ -40,6 +42,8 @@ export function getCodeReviewerSystemPrompt(): string {
 5. **Write Review Report** to the specified file path
 
 ${REVIEW_COVERAGE_POLICY}
+
+${RECURRING_FINDINGS_POLICY}
 
 ${WRITTEN_DELIVERABLE_LENGTH}
 
@@ -86,7 +90,7 @@ export function buildCodeReviewerPrompt(input: CodeReviewerInput): string {
 ## Workspace README
 
 ${input.readmeContent}
-
+${knownFindingsSection(input.knownFindings)}
 ## Repository Changes
 
 ${input.repoChanges}

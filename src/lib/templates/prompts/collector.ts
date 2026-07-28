@@ -51,6 +51,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
    - TODO Verifications: Extract verified/unverified/partial/incomplete/skipped counts and completion rate
    - README Verifications: Extract satisfied/unsatisfied/partial/pending-human counts and satisfaction rate. PENDING-HUMAN items are (manual) acceptance criteria awaiting human confirmation — collect their descriptions
    - Constraint Verifications: Extract pass/fail/skipped/pre-existing status per constraint with exit codes and duration
+   - Recurring findings: a review may end with a \`## Recurring (previously accepted)\` section — one-liners for findings an earlier cycle already decided not to act on. Carry them as a single \`Recurring (previously accepted): N\` count plus the one-liners, and keep them **out** of the Critical / Warning / Suggestion counts and out of the top priority list. Re-promoting them is what makes the same unactionable finding cost every cycle a decision
 
 2. **Create Summary Report** at the specified path following the template structure:
    - Per-repository sections with links to all review/verification files

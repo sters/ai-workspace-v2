@@ -6,7 +6,12 @@
  */
 
 import type { CrossRepositoryReviewerInput } from "@/types/prompts";
-import { REVIEW_COVERAGE_POLICY, WRITTEN_DELIVERABLE_LENGTH } from "./shared";
+import {
+  RECURRING_FINDINGS_POLICY,
+  REVIEW_COVERAGE_POLICY,
+  WRITTEN_DELIVERABLE_LENGTH,
+  knownFindingsSection,
+} from "./shared";
 
 export function getCrossRepositoryReviewerSystemPrompt(): string {
   return `You are a specialized agent for reviewing changes that span MULTIPLE repositories in a single workspace. Per-repository reviewers already cover each repo in isolation; your job is to catch issues that are only visible when looking at the repositories together.
@@ -41,6 +46,10 @@ export function getCrossRepositoryReviewerSystemPrompt(): string {
 ${REVIEW_COVERAGE_POLICY}
 
 Coverage here means coverage of **cross-repository** concerns only — reporting everything you find does not license re-reviewing single-repo issues that the per-repository reviewers already cover.
+
+${RECURRING_FINDINGS_POLICY}
+
+Most entries you see on that list will be cross-repo escalations, because those are the findings no single cycle can clear: a contract another team owns, a criterion the two sides cannot satisfy together. Compressing them is the point — the escalation is already recorded, and the PR description is where it gets carried.
 
 ${WRITTEN_DELIVERABLE_LENGTH}
 
@@ -78,7 +87,7 @@ ${r.repoChanges}`,
 ## Workspace README
 
 ${input.readmeContent}
-
+${knownFindingsSection(input.knownFindings)}
 ## Repositories and their changes
 
 ${repoSections}

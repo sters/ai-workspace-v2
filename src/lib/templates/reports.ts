@@ -49,6 +49,10 @@ export const REVIEW_REPORT_TEMPLATE = `# Code Review: {repository_name}
 ## Conclusion
 
 {Final assessment}
+
+## Recurring (previously accepted)
+
+{One line per finding already on the workspace's Known / Accepted Findings list, marked (Recurring). Omit this section entirely when there are none. These do not count toward the Critical / Warning / Suggestion totals above.}
 `;
 
 export const VERIFICATION_REPORT_TEMPLATE = `# TODO Verification: {repository_name}
@@ -185,8 +189,11 @@ export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
 | Warnings | {count} |
 | Suggestions | {count} |
 | Low-Confidence Findings | {count} |
+| Recurring (previously accepted) | {count} |
 
 {Warning descriptions as numbered list with their (Confidence: ...) annotations preserved, no heading needed}
+
+{Recurring findings as one-liners, if any — already decided in an earlier cycle, excluded from the counts above and from Top Priority Issues}
 
 #### TODO Verification
 

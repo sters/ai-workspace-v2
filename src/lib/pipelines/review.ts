@@ -17,6 +17,7 @@ import {
   buildCrossRepositoryReviewerPrompt,
 } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
+import { readKnownFindings } from "@/lib/workspace/known-findings";
 import { execConstraintCommand, buildConstraintReport } from "@/lib/workspace/constraint-runner";
 import type { ConstraintExecResult } from "@/lib/workspace/constraint-runner";
 import { getCleanEnv } from "@/lib/env";
@@ -48,6 +49,10 @@ export async function buildReviewPipeline(input: {
 
   // Parse constraints from README for programmatic verification
   const allConstraints = parseConstraints(readmeContent);
+
+  // Findings earlier cycles decided not to act on. Reviewers are spawned fresh
+  // each cycle, so this is their only memory of that decision.
+  const knownFindings = await readKnownFindings(wsPath);
 
   // Pre-render the Acceptance Criteria checklist so the README verifier gets an
   // unambiguous auto/manual split instead of re-parsing prose.
@@ -102,6 +107,7 @@ export async function buildReviewPipeline(input: {
         worktreePath: repo.worktreePath,
         repoChanges: repoChangesText,
         reviewFilePath: path.join(reviewDir, reviewFileName),
+        knownFindings,
       }),
       addDirs: [reviewDir],
       appendSystemPromptFile: ensureSystemPrompt(wsPath, "code-reviewer"),
@@ -177,6 +183,7 @@ export async function buildReviewPipeline(input: {
         readmeContent,
         reviewFilePath: path.join(reviewDir, "REVIEW-cross-repository.md"),
         repos: crossRepoInputs,
+        knownFindings,
       }),
       addDirs: [reviewDir, ...repos.map((r) => r.worktreePath)],
       appendSystemPromptFile: ensureSystemPrompt(wsPath, "cross-repository-reviewer"),

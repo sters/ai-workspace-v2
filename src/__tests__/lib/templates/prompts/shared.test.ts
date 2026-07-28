@@ -1,5 +1,6 @@
 import {
   NO_CD_RULES,
+  RECURRING_FINDINGS_POLICY,
   REVIEW_COVERAGE_POLICY,
   SCOPE_DISCIPLINE,
   SUBAGENT_DELEGATION_POLICY,
@@ -145,6 +146,29 @@ describe("REVIEW_COVERAGE_POLICY", () => {
     ["codeReviewer", getCodeReviewerSystemPrompt()],
     ["crossRepositoryReviewer", getCrossRepositoryReviewerSystemPrompt()],
   ])("%s prioritizes coverage over self-filtering", (_name, prompt) => {
+    expect(prompt).toContain(REVIEW_COVERAGE_POLICY);
+  });
+});
+
+describe("RECURRING_FINDINGS_POLICY", () => {
+  it("compresses recurrences instead of suppressing them", () => {
+    expect(RECURRING_FINDINGS_POLICY).toContain("Known / Accepted Findings");
+    expect(RECURRING_FINDINGS_POLICY).toContain("(Recurring)");
+    // Coverage must survive: the finding is still reported, just not re-argued.
+    expect(RECURRING_FINDINGS_POLICY).toMatch(/report it/i);
+    expect(RECURRING_FINDINGS_POLICY).toMatch(/one line/i);
+  });
+
+  it("keeps a merely similar or materially changed finding out of the compressed bucket", () => {
+    expect(RECURRING_FINDINGS_POLICY).toMatch(/resembles/i);
+    expect(RECURRING_FINDINGS_POLICY).toMatch(/materially changed/i);
+  });
+
+  it.each([
+    ["codeReviewer", getCodeReviewerSystemPrompt()],
+    ["crossRepositoryReviewer", getCrossRepositoryReviewerSystemPrompt()],
+  ])("%s carries the recurring-findings policy alongside coverage", (_name, prompt) => {
+    expect(prompt).toContain(RECURRING_FINDINGS_POLICY);
     expect(prompt).toContain(REVIEW_COVERAGE_POLICY);
   });
 });

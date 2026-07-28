@@ -3,7 +3,9 @@
  * Evaluates review results to decide whether to loop (fix issues) or proceed to PR creation.
  */
 
+import { KNOWN_FINDING_KINDS } from "@/lib/workspace/known-findings";
 import type { AutonomousGateInput } from "@/types/prompts";
+import { knownFindingsSection } from "./shared";
 
 export const AUTONOMOUS_GATE_SCHEMA = {
   type: "object",
@@ -25,8 +27,33 @@ export const AUTONOMOUS_GATE_SCHEMA = {
       items: { type: "string" },
       description: "List of fixable issues to address in the next iteration (empty if shouldLoop is false).",
     },
+    dismissedFindings: {
+      type: "array",
+      description:
+        "Findings deliberately NOT acted on for a reason that still holds next cycle. Recorded in the workspace's known-findings ledger so later cycles stop re-deriving them. Empty when nothing was dismissed.",
+      items: {
+        type: "object",
+        properties: {
+          summary: {
+            type: "string",
+            description: "One-line description of the finding, as the review reported it.",
+          },
+          reason: {
+            type: "string",
+            description: "Why it was not acted on.",
+          },
+          kind: {
+            type: "string",
+            enum: [...KNOWN_FINDING_KINDS],
+            description: "Why it will not become actionable by looping.",
+          },
+        },
+        required: ["summary", "reason", "kind"],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ["shouldLoop", "giveUp", "reason", "fixableIssues"],
+  required: ["shouldLoop", "giveUp", "reason", "fixableIssues", "dismissedFindings"],
   additionalProperties: false,
 };
 
@@ -48,7 +75,8 @@ export function getAutonomousGateSystemPrompt(): string {
    - Comments or naming that don't match surrounding code conventions
    - Lint or test failures
    - Any suggestion that would meaningfully improve the quality of the changed code
-5. The **only** issues that should NOT trigger a loop are:
+5. Points 2–4 apply in full on cycle 1; from cycle 2 onward the **Suggestion Budget** section below narrows them.
+6. The **only** issues that should NOT trigger a loop are:
    - Issues in files that were **not touched at all** and are completely unrelated to the task
    - Vague or subjective opinions with no concrete action (e.g., "consider rethinking the architecture")
    - Feature requests that go beyond the scope of the current task
@@ -63,6 +91,37 @@ The review phase is instructed to prioritize **coverage over filtering** — it 
 - **no annotation** — treat as medium.
 - Confidence is independent of severity. A low-confidence "Critical" is a suspicion, not a blocker; a high-confidence "Suggestion" is a real, actionable finding.
 
+### Suggestion Budget (cycle-dependent)
+
+On **cycle 1** the rules above apply in full: an actionable Suggestion is worth fixing, and you default to fixing.
+
+From **cycle 2 onward** they narrow. \`shouldLoop: true\` must be justified by at least one Critical / Must-Fix / Should-Fix finding, or an unmet and actionable \`(auto)\` acceptance criterion. Suggestion-only findings do NOT justify another cycle from cycle 2 on, however reasonable each one is on its own. Put them in \`dismissedFindings\` with kind \`deferred\` and note in \`reason\` that they are carried to the PR description instead.
+
+The reason for the cutoff is mechanical, not a matter of taste: every suggestion fix widens the diff, the next review reads the wider diff, and a wider diff yields more findings — including findings about the fix itself. Cycle 1 buys real quality with that trade; past it, the run spends its remaining cycles polishing while the actual blockers wait.
+
+### Known / Accepted Findings
+
+The prompt may include a **Known / Accepted Findings** list: decisions an earlier cycle already made, plus any acceptance criteria a feasibility check found unsatisfiable. Reviewers are told to report these compressed and marked \`(Recurring)\`.
+
+A finding on that list does not justify \`shouldLoop: true\` and does not belong in \`fixableIssues\` — you already ruled on it, and ruling again spends a cycle to reach the same answer. The one exception is a finding whose situation **materially changed**: the code now fails in a way the recorded reason does not cover. Then it is a new finding, judged on its merits.
+
+A review containing **only recurring findings** has nothing actionable in it: set \`shouldLoop: false\`, \`giveUp: false\`, and proceed to PR.
+
+### Recording What You Dismiss (\`dismissedFindings\`)
+
+Every finding you decide not to act on for a reason that will still hold next cycle goes into \`dismissedFindings\` with a one-line \`summary\`, the \`reason\`, and a \`kind\`:
+
+- \`out-of-scope\` — excluded by the README's \`## Non-Goal\`.
+- \`pending-human\` — needs a human answer or manual verification, not a code change.
+- \`infeasible\` — no change within this workspace's repositories can satisfy it.
+- \`pre-existing\` — an environment or tooling failure that predates this change.
+- \`low-confidence\` — a suspicion you declined to chase.
+- \`deferred\` — real and actionable, but not in this run (see the Suggestion Budget).
+
+These are appended to the workspace's known-findings ledger, and the next cycle's reviewers read that ledger. It is the only thing that stops an unactionable finding from being re-derived and re-reported at full length every single cycle, so a finding you dismiss but do not record costs the next cycle exactly the work you just did.
+
+Do NOT put in \`dismissedFindings\`: findings you are looping on (those are \`fixableIssues\`), or findings already on the Known / Accepted Findings list.
+
 ### Must Fix / Should Fix Audit (HARD BLOCKER)
 
 Before deciding \`shouldLoop\`, cross-check the review files against the TODO files:
@@ -72,7 +131,7 @@ Before deciding \`shouldLoop\`, cross-check the review files against the TODO fi
    - **Pending** (\`[ ]\`) item describing the same change → finding is queued, but not yet done → \`shouldLoop: true\`.
    - **Completed** (\`[x]\`) item that should have fixed it, but the review STILL reports the issue → fix didn't actually land → \`shouldLoop: true\` and list the finding in \`fixableIssues\`.
    - **No matching TODO item at all** → the finding was dropped between review and update-todo → \`shouldLoop: true\` and list the finding in \`fixableIssues\` so the next update-todo cycle picks it up.
-3. **You MUST NOT set \`shouldLoop: false\` while any Critical / Must Fix / Should Fix finding from the latest review is unresolved** under the rules above. The only exceptions are: (a) the finding is explicitly out-of-scope per the workspace README, or (b) \`giveUp: true\` is justified by the Stagnation rules below.
+3. **You MUST NOT set \`shouldLoop: false\` while any Critical / Must Fix / Should Fix finding from the latest review is unresolved** under the rules above. The only exceptions are: (a) the finding is explicitly out-of-scope per the workspace README, (b) it is on the Known / Accepted Findings list and has not materially changed, or (c) \`giveUp: true\` is justified by the Stagnation rules below.
 4. If \`fixableIssues\` ends up empty but you concluded \`shouldLoop: true\` because of this audit, populate \`fixableIssues\` with the unresolved findings — empty + loop is invalid.
 
 Type/schema consistency findings (signed vs unsigned int widths, optional vs required, repeated vs scalar, naming style across sibling fields) MUST be treated as Should Fix at minimum — they are the most common class of silently-dropped review feedback and break wire compatibility downstream.
@@ -82,6 +141,7 @@ Type/schema consistency findings (signed vs unsigned int widths, optional vs req
 The workspace README's \`## Acceptance Criteria\` section (also provided pre-parsed) is the contract for completion. Each item is tagged \`(auto)\` or \`(manual)\` — untagged items count as \`(auto)\`.
 
 - **\`(auto)\` criteria** are agent-verifiable and DO gate the loop. If the README verification (or the review) shows an \`(auto)\` criterion is UNSATISFIED or PARTIAL and it is addressable by changing code, set \`shouldLoop: true\` and add it to \`fixableIssues\`. Do NOT proceed to PR while an unmet, actionable \`(auto)\` criterion remains.
+- An \`(auto)\` criterion recorded as **\`infeasible\`** on the Known / Accepted Findings list is **not** addressable by changing code — a feasibility check already established that nothing in these repositories can satisfy it. The README verification will keep reporting it UNSATISFIED or PARTIAL every cycle; that is expected and does NOT justify a loop. Note it in \`reason\` and judge the run on the remaining criteria.
 - **\`(manual)\` criteria** (visual QA in dev, staging sign-off, manual exploratory testing) are handed off to a human. They **NEVER** gate the loop and are **NEVER** something to attempt:
   - Do NOT set \`shouldLoop: true\` solely because a \`(manual)\` / PENDING-HUMAN criterion is not confirmed.
   - Do NOT set \`giveUp: true\` solely because remaining work is manual — that is expected handoff, not a failure. Note the pending manual items in \`reason\` instead.
@@ -144,16 +204,23 @@ ${input.previousGateResults
 `
       : "";
 
+  // Restated in the user prompt because the system prompt cannot see the cycle
+  // number, and this is the one rule whose applicability depends on it.
+  const suggestionBudgetNote =
+    input.loopIteration >= 2
+      ? `\n**NOTE: this is cycle ${input.loopIteration}. Per the Suggestion Budget rule, Suggestion-only findings must NOT trigger a loop — only a Critical / Must-Fix / Should-Fix finding or an unmet actionable \`(auto)\` criterion may. Record the rest as \`deferred\` in \`dismissedFindings\`.**\n`
+      : "";
+
   return `# Autonomous Gate: Evaluate Review Results
 
 ## Loop Iteration: ${input.loopIteration} / ${input.maxLoops}
-
+${suggestionBudgetNote}
 ## Workspace: ${input.workspaceName}
 
 ## Workspace README
 
 ${input.readmeContent}
-${input.acceptanceCriteria ? `\n## Acceptance Criteria (parsed)\n\n${input.acceptanceCriteria}\n` : ""}
+${input.acceptanceCriteria ? `\n## Acceptance Criteria (parsed)\n\n${input.acceptanceCriteria}\n` : ""}${knownFindingsSection(input.knownFindings)}
 ${previousGateSection}## Review Summary (SUMMARY.md)
 
 ${input.reviewSummary}
