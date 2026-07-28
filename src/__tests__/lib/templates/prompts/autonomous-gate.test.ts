@@ -74,19 +74,24 @@ describe("buildAutonomousGatePrompt", () => {
     expect(prompt).toContain("Fix bugs in repo-a");
   });
 
-  it("adds final iteration note when at max loops", () => {
+  // The final cycle used to be told to report `shouldLoop: false` "regardless of
+  // issues found", which handed a PR to the human with the run's own leftovers in
+  // it. Now it reports the truth and the pipeline stops instead.
+  it("tells the final cycle that remaining work stops the run instead of looping", () => {
     const prompt = buildAutonomousGatePrompt({
       ...baseInput,
       loopIteration: 3,
       maxLoops: 3,
     });
-    expect(prompt).toContain("final iteration");
-    expect(prompt).toContain("MUST set `shouldLoop: false`");
+    expect(prompt).toContain("FINAL cycle");
+    expect(prompt).toMatch(/without creating a PR/i);
+    expect(prompt).toMatch(/`shouldLoop: true`/);
+    expect(prompt).not.toMatch(/MUST set `shouldLoop: false`/);
   });
 
-  it("does not add final iteration note when below max loops", () => {
+  it("does not add the final-cycle note when below max loops", () => {
     const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).not.toContain("final iteration");
+    expect(prompt).not.toContain("FINAL cycle");
   });
 
   it("handles empty review files", () => {
@@ -112,18 +117,38 @@ describe("buildAutonomousGatePrompt", () => {
     expect(systemPrompt).toContain("every severity level");
   });
 
-  it("defaults to fixing actionable issues", () => {
+  // The bar is the run's own deliverable: is the contract implemented, correct
+  // and complete. "Default to fixing" plus a reviewer that reports every nit
+  // meant cycle 1 always looped, so a one-line task cost three cycles.
+  it("loops on the work not being done, not on anything actionable", () => {
     const systemPrompt = getAutonomousGateSystemPrompt();
-    expect(systemPrompt).toContain("Default to fixing");
-    expect(systemPrompt).toContain("Err on the side of addressing issues");
+    expect(systemPrompt).not.toContain("Default to fixing");
+    expect(systemPrompt).not.toContain("Err on the side of addressing issues");
+    expect(systemPrompt).toMatch(/review[- ]ready/i);
+    expect(systemPrompt).toMatch(/Critical \/ Must-Fix \/ Should-Fix/);
   });
 
-  it("lists concrete examples of fixable issues including struct layouts", () => {
+  // The cycles exist to finish the run's own work, not to pre-empt opinions a
+  // future reviewer might hold — that framing turns polish into a loop reason.
+  it("does not define the bar as a future reviewer's reaction", () => {
     const systemPrompt = getAutonomousGateSystemPrompt();
-    expect(systemPrompt).toContain("Typos");
-    expect(systemPrompt).toContain("stale references");
-    expect(systemPrompt).toContain("struct/type layouts");
-    expect(systemPrompt).toContain("suboptimal data structures");
+    expect(systemPrompt).not.toMatch(/human reviewer would/i);
+    expect(systemPrompt).not.toMatch(/block a merge/i);
+  });
+
+  it("splits the examples into loop-worthy and deferred, with nits on the deferred side", () => {
+    const systemPrompt = getAutonomousGateSystemPrompt();
+    const loopExamples = systemPrompt.slice(
+      systemPrompt.indexOf("do** justify a loop"),
+      systemPrompt.indexOf("**defer** rather than loop"),
+    );
+    const deferExamples = systemPrompt.slice(
+      systemPrompt.indexOf("**defer** rather than loop"),
+    );
+    expect(loopExamples).toMatch(/test coverage/i);
+    expect(loopExamples).toMatch(/lint|test|build/i);
+    expect(deferExamples).toContain("Typos");
+    expect(deferExamples).toContain("struct/type layout");
   });
 
   it("marks the loop-trigger examples as non-exhaustive", () => {
@@ -234,26 +259,71 @@ describe("buildAutonomousGatePrompt", () => {
   });
 
   describe("suggestion budget", () => {
-    it("narrows the loop trigger from cycle 2 onward", () => {
+    // Cycle-independent now. When it started at cycle 2, cycle 1 looped on nits
+    // by design, so no run ever finished in one cycle.
+    it("keeps Suggestion-level findings out of the loop on every cycle", () => {
       const systemPrompt = getAutonomousGateSystemPrompt();
       expect(systemPrompt).toContain("### Suggestion Budget");
-      expect(systemPrompt).toMatch(/cycle 1/i);
-      expect(systemPrompt).toMatch(/cycle 2 onward/i);
-      expect(systemPrompt).toMatch(/Suggestion-only findings do NOT justify/);
+      expect(systemPrompt).toMatch(/on \*\*any\*\* cycle|any cycle/i);
+      expect(systemPrompt).not.toMatch(/cycle 2 onward/i);
       // The reason has to be in the prompt: fixes widen the diff, which grows
       // the next review's surface.
       expect(systemPrompt).toMatch(/widen/i);
     });
 
-    it("reinforces the budget in the user prompt from cycle 2 onward", () => {
-      const prompt = buildAutonomousGatePrompt({ ...baseInput, loopIteration: 2 });
-      expect(prompt).toContain("Suggestion Budget");
-      expect(prompt).toMatch(/must NOT trigger a loop/);
+    // The budget must not become a licence to file a real defect as a Suggestion:
+    // the loop bar is only safe if the severity labels mean what they say.
+    it("forbids down-labelling a merge-blocking finding to dodge the loop", () => {
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toMatch(/down-label/i);
+      expect(systemPrompt).toMatch(/test coverage for changed code is Should-Fix/i);
     });
 
-    it("does not reinforce it on cycle 1", () => {
-      const prompt = buildAutonomousGatePrompt(baseInput);
-      expect(prompt).not.toContain("Suggestion Budget");
+    // The gate cannot see the cycle number from its system prompt, and the rule
+    // no longer depends on it, so there is nothing to restate per cycle.
+    it("needs no per-cycle restatement in the user prompt", () => {
+      expect(buildAutonomousGatePrompt(baseInput)).not.toContain("Suggestion Budget");
+      expect(buildAutonomousGatePrompt({ ...baseInput, loopIteration: 2 })).not.toContain(
+        "Suggestion Budget",
+      );
+    });
+
+    it("records deferred suggestions rather than promising them to the PR body", () => {
+      // Nothing carries them into the PR description — create-pr never reads the
+      // review or the gate's output — so the prompt must not claim it does.
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).not.toMatch(/carried to the PR description/i);
+      expect(systemPrompt).toMatch(/`deferred`/);
+    });
+  });
+
+  describe("completion bar", () => {
+    it("makes a PR conditional on the work actually being finished", () => {
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toContain("### Completion Bar");
+      expect(systemPrompt).toMatch(/pending|\[ \]/);
+      expect(systemPrompt).toMatch(/`\[~\]`/);
+      expect(systemPrompt).toMatch(/PR/);
+    });
+
+    it("keeps a human-blocked TODO item from blocking the PR forever", () => {
+      // `[!]` items are excluded from execute batching, so treating them as
+      // blocking work would make every such run end without a PR.
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toMatch(/`\[!\]`/);
+      expect(systemPrompt).toMatch(/pending-human/);
+    });
+  });
+
+  describe("final cycle", () => {
+    it("explains that shouldLoop stops the run when no cycle is left", () => {
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toContain("### The Final Cycle");
+      expect(systemPrompt).toMatch(/stops the run \*\*without creating a PR\*\*/);
+      // Both failure directions matter: a soft "done" ships leftovers, and
+      // invented remaining work throws away a finished branch.
+      expect(systemPrompt).toMatch(/do not soften/i);
+      expect(systemPrompt).toMatch(/do not invent/i);
     });
   });
 });

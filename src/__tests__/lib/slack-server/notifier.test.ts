@@ -3,11 +3,13 @@ import {
   extractCreatedPrs,
   buildCompletionMessage,
   extractClarityGateStop,
+  extractIncompleteStop,
 } from "@/lib/slack-server/notifier";
 import {
   README_CLARITY_PHASE_LABEL,
   README_CLARITY_STOP_PREFIX,
 } from "@/lib/templates/prompts/readme-clarity-gate";
+import { FINAL_CYCLE_STOP_PREFIX } from "@/lib/templates/prompts/autonomous-gate";
 import type { OperationEvent } from "@/types/operation";
 
 function ev(data: string, phaseLabel?: string): OperationEvent {
@@ -217,6 +219,31 @@ describe("extractClarityGateStop", () => {
       resultEvent(`${README_CLARITY_STOP_PREFIX} real`, README_CLARITY_PHASE_LABEL),
     ]);
     expect(out).toBe(`${README_CLARITY_STOP_PREFIX} real`);
+  });
+});
+
+describe("extractIncompleteStop", () => {
+  // Same reason the clarity-gate relay exists: "Done! No PRs were created" reads
+  // as a successful no-op run, when in fact the branch has known remaining work.
+  it("returns the stop message when the final cycle halted with work remaining", () => {
+    const msg = `${FINAL_CYCLE_STOP_PREFIX} (cycle 3/3) — no PR was created. 2 criteria unmet`;
+    expect(extractIncompleteStop([resultEvent(msg, "Cycle 3: Gate")])).toBe(msg);
+  });
+
+  it("returns null for a gate result that proceeded to PR", () => {
+    const out = extractIncompleteStop([
+      resultEvent("**Gate decision (cycle 2/3)**: Proceed to PR — all criteria met", "Cycle 2: Gate"),
+    ]);
+    expect(out).toBeNull();
+  });
+
+  it("returns null when there are no events", () => {
+    expect(extractIncompleteStop([])).toBeNull();
+  });
+
+  it("tolerates non-JSON event data", () => {
+    const msg = `${FINAL_CYCLE_STOP_PREFIX} real`;
+    expect(extractIncompleteStop([ev("not-json"), resultEvent(msg, "Cycle 1: Gate")])).toBe(msg);
   });
 });
 

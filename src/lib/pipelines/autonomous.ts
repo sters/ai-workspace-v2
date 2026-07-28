@@ -11,7 +11,7 @@ import { buildCreatePrPipeline } from "./create-pr";
 import { buildUpdateTodoPipeline } from "./update-todo";
 import { runSubPhases } from "./actions/run-sub-phases";
 import { resolveWorkspace } from "./actions/resolve-workspace";
-import { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "@/lib/templates/prompts/autonomous-gate";
+import { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA, FINAL_CYCLE_STOP_PREFIX } from "@/lib/templates/prompts/autonomous-gate";
 import { buildReadmeClarityGatePrompt, README_CLARITY_GATE_SCHEMA, README_CLARITY_PHASE_LABEL, README_CLARITY_STOP_PREFIX } from "@/lib/templates/prompts/readme-clarity-gate";
 import { prepareCriteriaFeasibility } from "./actions/criteria-feasibility";
 import { getWorkspaceDir, getOperationConfig } from "@/lib/config";
@@ -101,11 +101,11 @@ async function runAutonomousGate(
   maxLoops: number,
   previousGateResults?: { cycle: number; reason: string; fixableIssues: string[] }[],
 ): Promise<AutonomousGateResult> {
-  // Final iteration: skip AI call
-  if (loopIteration >= maxLoops) {
-    return settled("Maximum loop iterations reached");
-  }
-
+  // The final cycle is evaluated like any other. It used to short-circuit here
+  // without calling the model, which threw away the cycle's whole review — the
+  // most expensive phase of a cycle — and handed the human a PR containing the
+  // run's own leftovers, since nothing downstream reads the review either.
+  //
   // Check review results
   const sessions = await getReviewSessions(workspace);
   if (sessions.length === 0) {
@@ -461,10 +461,13 @@ export function buildAutonomousPipeline(input: {
           }
         }
 
+        const isFinalCycle = loopNumber >= maxLoops;
         const decisionLabel = gateResult.giveUp
           ? "Give up"
           : gateResult.shouldLoop
-            ? "Continue"
+            ? isFinalCycle
+              ? "Stop — work remains"
+              : "Continue"
             : "Proceed to PR";
         ctx.emitResult(
           `**Gate decision (cycle ${loopNumber}/${maxLoops})**: ${decisionLabel} — ${gateResult.reason}` +
@@ -474,6 +477,25 @@ export function buildAutonomousPipeline(input: {
         );
 
         if (gateResult.giveUp) {
+          return true;
+        }
+
+        // Out of cycles with work still outstanding: stop here rather than open a
+        // PR. The run's deliverable is a review-ready branch, so a PR carrying its
+        // own remaining TODO items misreports what was achieved — and nothing
+        // downstream even says what was left, since create-pr reads only the README
+        // and the diff, never the review or this gate's output.
+        if (gateResult.shouldLoop && isFinalCycle) {
+          const remaining =
+            gateResult.fixableIssues.length > 0
+              ? `\n\nRemaining work:\n- ${gateResult.fixableIssues.join("\n- ")}`
+              : "";
+          ctx.emitResult(
+            `${FINAL_CYCLE_STOP_PREFIX} (cycle ${loopNumber}/${maxLoops})\n\n` +
+              `No PR was created.${gateResult.reason ? ` ${gateResult.reason}` : ""}${remaining}\n\n` +
+              "The branch and its TODO files are left as they are. Continue with an **update-todo** " +
+              "operation followed by another autonomous run, or finish the remaining items by hand.",
+          );
           return true;
         }
 
