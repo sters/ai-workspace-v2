@@ -4,6 +4,7 @@ import {
   getAutonomousGateSystemPrompt,
   AUTONOMOUS_GATE_SCHEMA,
 } from "@/lib/templates/prompts/autonomous-gate";
+import { KNOWN_FINDING_KINDS } from "@/lib/workspace/known-findings";
 
 describe("AUTONOMOUS_GATE_SCHEMA", () => {
   it("has required fields", () => {
@@ -11,6 +12,18 @@ describe("AUTONOMOUS_GATE_SCHEMA", () => {
     expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("giveUp");
     expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("reason");
     expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("fixableIssues");
+  });
+
+  it("requires dismissedFindings so a dismissal is never silent", () => {
+    expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("dismissedFindings");
+    const dismissed = AUTONOMOUS_GATE_SCHEMA.properties.dismissedFindings as {
+      items: { required: string[]; properties: { kind: { enum: string[] } } };
+    };
+    expect(dismissed.items.required).toEqual(
+      expect.arrayContaining(["summary", "reason", "kind"]),
+    );
+    // The enum must match the ledger's kinds, or entries land on the fallback.
+    expect(dismissed.items.properties.kind.enum).toEqual([...KNOWN_FINDING_KINDS]);
   });
 });
 
@@ -126,7 +139,7 @@ describe("buildAutonomousGatePrompt", () => {
       systemPrompt.indexOf("### Confidence Filtering"),
     );
     const numbers = [...section.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1]));
-    expect(numbers).toEqual([1, 2, 3, 4, 5]);
+    expect(numbers).toEqual([1, 2, 3, 4, 5, 6]);
   });
 
   it("treats low-confidence findings as insufficient grounds for a loop", () => {
@@ -168,5 +181,79 @@ describe("buildAutonomousGatePrompt", () => {
   it("does not include previous gate results section when undefined", () => {
     const prompt = buildAutonomousGatePrompt(baseInput);
     expect(prompt).not.toContain("Previous Gate Decisions");
+  });
+
+  describe("known / accepted findings", () => {
+    it("includes the ledger when the workspace has one", () => {
+      const prompt = buildAutonomousGatePrompt({
+        ...baseInput,
+        knownFindings: "- **[infeasible]** (cycle 1) Criterion 4 cannot be satisfied",
+      });
+      expect(prompt).toContain("## Known / Accepted Findings");
+      expect(prompt).toContain("Criterion 4 cannot be satisfied");
+    });
+
+    it("omits the section when the ledger is empty", () => {
+      expect(buildAutonomousGatePrompt(baseInput)).not.toContain("Known / Accepted Findings");
+    });
+
+    it("stops treating an infeasible (auto) criterion as an actionable gate", () => {
+      // Otherwise the README verifier's permanent UNSATISFIED keeps the loop
+      // running toward a target the feasibility check already ruled out.
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toMatch(/`infeasible`/);
+      expect(systemPrompt).toMatch(/not\*{0,2} addressable by changing code/);
+      expect(systemPrompt).toMatch(/does NOT justify a loop/);
+    });
+
+    it("forbids looping on an already-accepted finding, with a materially-changed escape", () => {
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toContain("### Known / Accepted Findings");
+      expect(systemPrompt).toMatch(/does not justify `shouldLoop: true`/);
+      expect(systemPrompt).toMatch(/materially changed/i);
+      // The actual convergence rule: recurring-only review means proceed.
+      expect(systemPrompt).toMatch(/only recurring findings/i);
+    });
+  });
+
+  describe("dismissed findings", () => {
+    it("explains what to record and why the next cycle depends on it", () => {
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toContain("`dismissedFindings`");
+      for (const kind of KNOWN_FINDING_KINDS) {
+        expect(systemPrompt).toContain(`\`${kind}\``);
+      }
+      expect(systemPrompt).toMatch(/re-deriv|re-report/i);
+    });
+
+    it("keeps looped-on findings out of dismissedFindings", () => {
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toMatch(/Do NOT put in `dismissedFindings`/);
+      expect(systemPrompt).toContain("`fixableIssues`");
+    });
+  });
+
+  describe("suggestion budget", () => {
+    it("narrows the loop trigger from cycle 2 onward", () => {
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toContain("### Suggestion Budget");
+      expect(systemPrompt).toMatch(/cycle 1/i);
+      expect(systemPrompt).toMatch(/cycle 2 onward/i);
+      expect(systemPrompt).toMatch(/Suggestion-only findings do NOT justify/);
+      // The reason has to be in the prompt: fixes widen the diff, which grows
+      // the next review's surface.
+      expect(systemPrompt).toMatch(/widen/i);
+    });
+
+    it("reinforces the budget in the user prompt from cycle 2 onward", () => {
+      const prompt = buildAutonomousGatePrompt({ ...baseInput, loopIteration: 2 });
+      expect(prompt).toContain("Suggestion Budget");
+      expect(prompt).toMatch(/must NOT trigger a loop/);
+    });
+
+    it("does not reinforce it on cycle 1", () => {
+      const prompt = buildAutonomousGatePrompt(baseInput);
+      expect(prompt).not.toContain("Suggestion Budget");
+    });
   });
 });

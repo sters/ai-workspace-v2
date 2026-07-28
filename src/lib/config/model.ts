@@ -28,6 +28,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.EXECUTE]: "opus",
   [STEP_TYPES.DISCOVER_CONSTRAINTS]: "opus",
   [STEP_TYPES.VERIFY_README]: "opus",
+  [STEP_TYPES.CRITERIA_FEASIBILITY]: "opus",
   [STEP_TYPES.CODE_REVIEW]: "opus",
   [STEP_TYPES.REVIEW_TODOS]: "opus",
   [STEP_TYPES.COORDINATE_TODOS]: "opus",
@@ -122,6 +123,11 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // Verifies against the enumerated `## Acceptance Criteria` checkboxes, which
   // the prompt treats as the authoritative requirement set.
   [STEP_TYPES.VERIFY_README]: "medium",
+  // Same shape as verify-readme and sized to match: the criteria list is
+  // enumerated, so the question is bounded — but answering it means reading the
+  // other repositories' source to see whether the contract can carry the data at
+  // all, which is more than the `readme-clarity-gate` rung below does.
+  [STEP_TYPES.CRITERIA_FEASIBILITY]: "medium",
   // Applies a requested edit to one document, and is forbidden from touching
   // code — the same shape as update-todo.
   [STEP_TYPES.UPDATE_README]: "medium",

@@ -56,24 +56,46 @@ const COORDINATOR_INSTRUCTIONS = `You are a specialized agent for coordinating T
    - Remove the \`[CROSS-REPO]\` tag once resolved — the item should now be self-contained and actionable
    - If a dependency cannot be resolved (the feature doesn't exist yet in the other repo), note this clearly and keep the TODO as a stub/mock-first approach
 
-3. **Optimize for Parallel Execution**:
+3. **Contract Audit** (REQUIRED whenever data, types, or calls cross a repository boundary):
+
+   You are the only agent in this pipeline allowed to read every repository. The per-repo planners are forbidden from it, so a cross-repo contract mismatch that you do not resolve here gets frozen into the plan as a guess, and surfaces later as a review finding — every cycle, since no single-repo cycle can fix it.
+
+   For each field, message, endpoint, or event that crosses the boundary, read **both sides** and record the concrete shape of each. Audit at least:
+
+   - **Cardinality** — repeated/list vs scalar on each side, and whether one side collapses a list (e.g. taking only the first element). A consumer requirement about "all of them" or "the most recent one" is unsatisfiable against a producer that already collapsed the list.
+   - **Nullability and sentinels** — optional vs required, and whether "absent" is expressed as null, an empty string, a zero value, or not at all.
+   - **Ordering guarantees** — whether the producer documents any order. Consumers routinely assume "most recent first" from a field that guarantees nothing.
+   - **Timestamp encoding** — unix seconds vs milliseconds vs ISO-8601 vs a typed Timestamp, on each side, including what test fixtures and mocks produce (a mock in a different encoding makes the consumer's handling untestable).
+   - **ID types and naming** — string vs typed ID, signed vs unsigned width, and whether the same concept is named differently on each side.
+   - **Format normalization** — prefixes, casing, or encodings stripped or added on one side only, and which form each consumer of the value expects.
+
+   Record what you found in the \`## Coordination\` section, and fix the affected TODO items to match reality — including the encoding a fixture or mock must use, since that is what makes the behavior testable at all.
+
+4. **Flag acceptance criteria the contract cannot satisfy**:
+
+   If the workspace README's \`## Acceptance Criteria\` contains an item that the contract as it exists cannot satisfy — the audit above shows the data never reaches the consumer, or reaches it in a shape that loses what the criterion requires — say so explicitly under \`## Coordination\`, naming the criterion and the blocker, and recommend either amending the criterion or moving it to \`## Non-Goal\`.
+
+   Do not silently plan around it, and do not write a TODO item that pretends to satisfy it. Downstream phases treat the criteria as the definition of done, so an impossible one keeps the run looping toward a target it cannot reach.
+
+5. **Optimize for Parallel Execution**:
    - Separate items into parallel phases and dependent phases
    - Use stub-first approach when Repo B depends on Repo A
    - Use interface-first when multiple repos share a contract
 
-4. **Restructure TODO Files**:
+6. **Restructure TODO Files**:
    - Update resolved \`[CROSS-REPO]\` items with concrete details
    - Add parallel execution phase hints
    - Add coordination notes
    - Ensure consistency across repos
 
-5. **Create Coordination Summary**:
+7. **Create Coordination Summary**:
    - Add a \`## Coordination\` section to the workspace README.md with:
      - Execution order
      - Dependency graph
      - Resolved cross-repo dependencies summary
+     - The contract audit's findings, and any acceptance criterion the contract cannot satisfy
 
-6. **Commit changes** to the workspace git repository
+8. **Commit changes** to the workspace git repository
 
 ${SUBAGENT_DELEGATION_POLICY}
 

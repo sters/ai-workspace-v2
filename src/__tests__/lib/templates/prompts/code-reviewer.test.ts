@@ -44,4 +44,20 @@ describe("buildCodeReviewerPrompt", () => {
     expect(prompt).toContain("main");
     expect(prompt).toContain("/tmp/worktree");
   });
+
+  it("includes the known-findings ledger when the workspace has one", () => {
+    const prompt = buildCodeReviewerPrompt({
+      ...baseInput,
+      knownFindings: "- **[out-of-scope]** (cycle 1) BFF collapses UserOrders",
+    });
+    expect(prompt).toContain("## Known / Accepted Findings");
+    expect(prompt).toContain("BFF collapses UserOrders");
+  });
+
+  it("omits the known-findings section when the ledger is absent or empty", () => {
+    expect(buildCodeReviewerPrompt(baseInput)).not.toContain("Known / Accepted Findings");
+    expect(
+      buildCodeReviewerPrompt({ ...baseInput, knownFindings: "  \n" }),
+    ).not.toContain("Known / Accepted Findings");
+  });
 });

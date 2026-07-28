@@ -41,6 +41,12 @@ export {
 } from "./best-of-n-reviewer";
 export { getAutonomousGateSystemPrompt, buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "./autonomous-gate";
 export { getReadmeClarityGateSystemPrompt, buildReadmeClarityGatePrompt, README_CLARITY_GATE_SCHEMA } from "./readme-clarity-gate";
+export {
+  getCriteriaFeasibilitySystemPrompt,
+  buildCriteriaFeasibilityPrompt,
+  CRITERIA_FEASIBILITY_SCHEMA,
+  CRITERIA_FEASIBILITY_PHASE_LABEL,
+} from "./criteria-feasibility";
 export { getWorkspaceSuggesterSystemPrompt, buildWorkspaceSuggesterPrompt, WORKSPACE_SUGGESTION_SCHEMA } from "./workspace-suggester";
 export { getDiscoverySystemPrompt, buildDiscoveryPrompt, DISCOVERY_SCHEMA } from "./discovery";
 export { buildSuggestionAggregatorPrompt, SUGGESTION_AGGREGATION_SCHEMA } from "./suggestion-aggregator";

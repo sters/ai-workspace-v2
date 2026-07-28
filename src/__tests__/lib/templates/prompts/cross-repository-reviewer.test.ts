@@ -66,4 +66,19 @@ describe("buildCrossRepositoryReviewerPrompt", () => {
     expect(prompt).toContain("api diff body");
     expect(prompt).toContain("web diff body");
   });
+
+  it("includes the known-findings ledger when the workspace has one", () => {
+    const prompt = buildCrossRepositoryReviewerPrompt({
+      ...baseInput,
+      knownFindings: "- **[infeasible]** (cycle 2) Criterion 4 cannot be satisfied",
+    });
+    expect(prompt).toContain("## Known / Accepted Findings");
+    expect(prompt).toContain("Criterion 4 cannot be satisfied");
+  });
+
+  it("omits the known-findings section when the ledger is absent", () => {
+    expect(buildCrossRepositoryReviewerPrompt(baseInput)).not.toContain(
+      "Known / Accepted Findings",
+    );
+  });
 });

@@ -85,3 +85,29 @@ Annotate every finding with a **Confidence** so the downstream filter can rank i
 - **low** — a suspicion worth checking; may turn out to be a false positive.
 
 Write it inline with the finding (e.g. \`(Confidence: medium)\`). Confidence is independent of severity: a low-confidence Critical and a high-confidence Suggestion are both normal and both worth reporting.`;
+
+/**
+ * Cross-cycle memory for review agents. Reviewers are spawned fresh each
+ * autonomous cycle, so without this they re-derive and re-report at full length
+ * every finding an earlier gate already declined to act on — an unsatisfiable
+ * acceptance criterion, another team's escalation, a pre-existing tooling
+ * failure. This compresses recurrences without weakening
+ * `REVIEW_COVERAGE_POLICY`: the finding is still reported, just not re-argued.
+ */
+export const RECURRING_FINDINGS_POLICY = `### Recurring Findings
+
+The prompt may include a **Known / Accepted Findings** list: findings an earlier cycle evaluated and deliberately did not act on, each with the reason (out of scope, handed to a human, infeasible in this workspace, a pre-existing environment issue, or deferred).
+
+If one of those is still true of the code, report it — but compress it. Give it one line under a \`## Recurring (previously accepted)\` heading at the end of the report, marked \`(Recurring)\`, naming the finding and nothing else: no re-investigation, no restated evidence, no fix proposal, and do not count it in the report's Critical / Warning / Suggestion totals. That decision was already made; re-arguing it costs a later phase a judgment it has already spent.
+
+Two things this does NOT license. A finding that only *resembles* a listed one — different symbol, different file, different failure — is new, and gets the full treatment. And a listed finding whose situation has materially changed (the code now fails in a way the recorded reason does not cover) is also new: report it in full and say what changed.`;
+
+/**
+ * Render the workspace's known-findings ledger as a user-prompt section, or ""
+ * when the ledger is empty. Shared so the reviewers and the autonomous gate all
+ * refer to the list by the same heading their instructions name.
+ */
+export function knownFindingsSection(content: string | undefined): string {
+  if (!content || content.trim() === "") return "";
+  return `\n## Known / Accepted Findings\n\n${content.trim()}\n`;
+}
