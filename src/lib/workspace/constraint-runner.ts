@@ -71,6 +71,21 @@ export async function execConstraintCommand(
   }
 }
 
+/**
+ * Report for a repo the README declares no constraint commands for. Written so
+ * the review's constraint section distinguishes "nothing was run" from "every
+ * command passed" — without it the collector sees no CONSTRAINTS-* file and
+ * SUMMARY.md is simply silent, which reads as a pass.
+ */
+export function buildNoConstraintsReport(repoName: string): string {
+  return `# Constraint Verification: ${repoName}
+
+**Overall**: NOT DECLARED (0/0)
+
+No lint/test/build commands are declared for this repository under \`## Repository Constraints\` in the workspace README, so none were run. Nothing mechanically verified this branch — treat this as missing coverage, not as a pass. Declaring the commands (or re-running constraint discovery) restores it for later cycles.
+`;
+}
+
 export function buildConstraintReport(
   repoName: string,
   results: ConstraintExecResult[],

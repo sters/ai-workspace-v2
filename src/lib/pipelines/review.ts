@@ -18,7 +18,11 @@ import {
 } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { readKnownFindings } from "@/lib/workspace/known-findings";
-import { execConstraintCommand, buildConstraintReport } from "@/lib/workspace/constraint-runner";
+import {
+  execConstraintCommand,
+  buildConstraintReport,
+  buildNoConstraintsReport,
+} from "@/lib/workspace/constraint-runner";
 import type { ConstraintExecResult } from "@/lib/workspace/constraint-runner";
 import { getCleanEnv } from "@/lib/env";
 import { STEP_TYPES } from "@/types/pipeline";
@@ -196,29 +200,41 @@ export async function buildReviewPipeline(input: {
       kind: "group",
       children: reviewChildren,
     },
-    // Phase 2: Run constraint commands programmatically
+    // Phase 2: Run constraint commands programmatically. This is the only place
+    // lint/test/build actually run during a review — the code reviewer is told
+    // to leave them alone, because only here does a failure get compared against
+    // the merge-base before it can reach the gate as a blocker.
     {
       kind: "function",
       label: "Verify constraints",
       timeoutMs: 10 * 60 * 1000,
       fn: async (ctx) => {
-        if (allConstraints.length === 0) {
-          ctx.emitStatus("No constraints found in README — skipping verification");
-          return true;
-        }
-
         let anyFailure = false;
+        let anyUndeclared = false;
         const env = getCleanEnv();
 
         for (const repo of repos) {
           const repoConstraints = allConstraints.find(
             (c) => c.repoName === repo.repoName,
           );
-          if (!repoConstraints || repoConstraints.constraints.length === 0) continue;
-
           const baseBranch = repoBaseBranches.get(repo.repoName) ?? "main";
           const orgName = repo.repoPath.split("/").slice(0, -1).join("_") || "local";
           const constraintFileName = `CONSTRAINTS-${orgName}_${repo.repoName}.md`;
+
+          // Still write a report: an absent file is indistinguishable from a
+          // clean run downstream, and no other phase runs these commands now.
+          if (!repoConstraints || repoConstraints.constraints.length === 0) {
+            anyUndeclared = true;
+            ctx.emitStatus(
+              `[${repo.repoName}] No constraints declared in README — nothing to run`,
+            );
+            await Bun.write(
+              path.join(reviewDir, constraintFileName),
+              buildNoConstraintsReport(repo.repoName),
+            );
+            continue;
+          }
+
           const results: ConstraintExecResult[] = [];
 
           for (const constraint of repoConstraints.constraints) {
@@ -280,6 +296,14 @@ export async function buildReviewPipeline(input: {
 
         if (anyFailure) {
           ctx.emitResult("Constraint verification completed with failures");
+        } else if (anyUndeclared && allConstraints.length === 0) {
+          ctx.emitResult(
+            "No constraints declared in the README — nothing was verified mechanically",
+          );
+        } else if (anyUndeclared) {
+          ctx.emitResult(
+            "All declared constraints passed (or skipped/pre-existing); some repos declare none",
+          );
         } else {
           ctx.emitResult("All constraints passed (or skipped/pre-existing)");
         }
