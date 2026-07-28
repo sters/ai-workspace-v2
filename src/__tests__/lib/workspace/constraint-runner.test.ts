@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { execConstraintCommand, buildConstraintReport } from "@/lib/workspace/constraint-runner";
+import {
+  execConstraintCommand,
+  buildConstraintReport,
+  buildNoConstraintsReport,
+} from "@/lib/workspace/constraint-runner";
 import type { ConstraintExecResult } from "@/lib/workspace/constraint-runner";
 
 describe("execConstraintCommand", () => {
@@ -191,5 +195,21 @@ describe("buildConstraintReport", () => {
     const report = buildConstraintReport("my-repo", results);
     expect(report).toContain("1/3");
     expect(report).toContain("FAILURES DETECTED");
+  });
+});
+
+describe("buildNoConstraintsReport", () => {
+  const report = buildNoConstraintsReport("my-repo");
+
+  it("uses the same heading shape as a real constraint report so the collector parses it", () => {
+    expect(report).toContain("# Constraint Verification: my-repo");
+    expect(report).toContain("**Overall**:");
+  });
+
+  it("states NOT DECLARED rather than a pass, and says nothing ran", () => {
+    expect(report).toContain("NOT DECLARED");
+    expect(report).not.toContain("ALL PASSED");
+    expect(report).not.toContain("FAILURES DETECTED");
+    expect(report).toMatch(/Repository Constraints/);
   });
 });

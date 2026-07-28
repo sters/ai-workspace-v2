@@ -46,6 +46,7 @@ vi.mock("@/lib/pipeline-manager", () => ({
 vi.mock("@/lib/workspace/constraint-runner", () => ({
   execConstraintCommand: vi.fn(),
   buildConstraintReport: vi.fn(() => ""),
+  buildNoConstraintsReport: vi.fn(() => "NOT-DECLARED-REPORT"),
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -76,12 +77,16 @@ afterAll(() => {
 import { buildReviewPipeline } from "@/lib/pipelines/review";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { parseConstraints } from "@/lib/parsers/readme";
-import { execConstraintCommand } from "@/lib/workspace/constraint-runner";
+import {
+  execConstraintCommand,
+  buildNoConstraintsReport,
+} from "@/lib/workspace/constraint-runner";
 import type { PhaseFunctionContext, PipelinePhaseFunction, PipelinePhaseGroup } from "@/types/pipeline";
 
 const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
 const mockParseConstraints = vi.mocked(parseConstraints);
 const mockExecConstraintCommand = vi.mocked(execConstraintCommand);
+const mockBuildNoConstraintsReport = vi.mocked(buildNoConstraintsReport);
 
 describe("buildReviewPipeline — skip verify-todo when TODO file is missing", () => {
   beforeEach(() => {
@@ -347,5 +352,111 @@ describe("buildReviewPipeline — constraint timeout aborts remaining commands i
         (m) => m.includes("repo-a") && /skip/i.test(m) && /timeout|timed out/i.test(m),
       ),
     ).toBe(true);
+  });
+});
+
+// A repo with no declared constraints used to leave no CONSTRAINTS-* file at
+// all, so the collector's constraint section read "(none)" and SUMMARY.md was
+// silent — indistinguishable from "everything passed". Since the code reviewer
+// no longer runs lint/test on its own initiative, nothing else covers the gap.
+describe("buildReviewPipeline — repos without declared constraints", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+    mockBunWrite.mockClear();
+    mockExecConstraintCommand.mockReset();
+    mockBuildNoConstraintsReport.mockReturnValue("NOT-DECLARED-REPORT");
+  });
+
+  const reviewDir = "/ws/test-ws/artifacts/reviews/2026-04-08T00-00-00";
+
+  it("writes a not-declared report per repo when the README declares no constraints at all", async () => {
+    mockListWorkspaceRepos.mockReturnValue([
+      {
+        repoName: "repo-a",
+        repoPath: "owner/repo-a",
+        worktreePath: "/repos/repo-a/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+      {
+        repoName: "repo-b",
+        repoPath: "owner/repo-b",
+        worktreePath: "/repos/repo-b/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+    ]);
+    mockParseConstraints.mockReturnValue([]);
+
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    const verifyPhase = phases[1] as PipelinePhaseFunction;
+    const ctx = createMockCtx();
+    expect(await verifyPhase.fn(ctx)).toBe(true);
+
+    expect(mockExecConstraintCommand).not.toHaveBeenCalled();
+    expect(mockBuildNoConstraintsReport.mock.calls.map((c) => c[0])).toEqual([
+      "repo-a",
+      "repo-b",
+    ]);
+    expect(mockBunWrite).toHaveBeenCalledTimes(2);
+    expect(mockBunWrite).toHaveBeenCalledWith(
+      `${reviewDir}/CONSTRAINTS-owner_repo-a.md`,
+      "NOT-DECLARED-REPORT",
+    );
+    expect(mockBunWrite).toHaveBeenCalledWith(
+      `${reviewDir}/CONSTRAINTS-owner_repo-b.md`,
+      "NOT-DECLARED-REPORT",
+    );
+  });
+
+  it("does not report a not-declared repo as a constraint failure", async () => {
+    mockListWorkspaceRepos.mockReturnValue([
+      {
+        repoName: "repo-a",
+        repoPath: "owner/repo-a",
+        worktreePath: "/repos/repo-a/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+    ]);
+    mockParseConstraints.mockReturnValue([]);
+
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    const ctx = createMockCtx();
+    await (phases[1] as PipelinePhaseFunction).fn(ctx);
+
+    const results = vi.mocked(ctx.emitResult).mock.calls.map((c) => c[0]);
+    expect(results.some((m) => /failure/i.test(m))).toBe(false);
+    expect(results.some((m) => /no constraints declared/i.test(m))).toBe(true);
+  });
+
+  it("covers only the undeclared repo in a workspace where another repo declares constraints", async () => {
+    mockListWorkspaceRepos.mockReturnValue([
+      {
+        repoName: "declared",
+        repoPath: "owner/declared",
+        worktreePath: "/repos/declared/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+      {
+        repoName: "undeclared",
+        repoPath: "owner/undeclared",
+        worktreePath: "/repos/undeclared/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+    ]);
+    mockParseConstraints.mockReturnValue([
+      { repoName: "declared", constraints: [{ label: "Lint", command: "make lint" }] },
+    ]);
+    mockExecConstraintCommand.mockResolvedValue({
+      exitCode: 0,
+      stdout: "",
+      stderr: "",
+      timedOut: false,
+      durationMs: 10,
+    });
+
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    const ctx = createMockCtx();
+    await (phases[1] as PipelinePhaseFunction).fn(ctx);
+
+    expect(mockExecConstraintCommand).toHaveBeenCalledTimes(1);
+    expect(mockBuildNoConstraintsReport.mock.calls.map((c) => c[0])).toEqual([
+      "undeclared",
+    ]);
+    expect(mockBunWrite).toHaveBeenCalledTimes(2);
   });
 });

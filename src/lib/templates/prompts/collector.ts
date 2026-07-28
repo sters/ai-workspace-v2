@@ -50,7 +50,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
    - Code Reviews: Extract repository name, overall assessment, critical/warning/suggestion counts, and individual warning descriptions. Reviewers annotate findings with \`(Confidence: high|medium|low)\` — **preserve those annotations verbatim** on every finding you carry into the summary, and count how many findings are low-confidence. The autonomous gate uses confidence to decide what is worth another cycle, so stripping it silently promotes speculation to fact
    - TODO Verifications: Extract verified/unverified/partial/incomplete/skipped counts and completion rate
    - README Verifications: Extract satisfied/unsatisfied/partial/pending-human counts and satisfaction rate. PENDING-HUMAN items are (manual) acceptance criteria awaiting human confirmation — collect their descriptions
-   - Constraint Verifications: Extract pass/fail/skipped/pre-existing status per constraint with exit codes and duration
+   - Constraint Verifications: Extract pass/fail/skipped/pre-existing status per constraint with exit codes and duration. A report marked \`NOT DECLARED\` means the README lists no lint/test/build commands for that repository, so none ran
    - Recurring findings: a review may end with a \`## Recurring (previously accepted)\` section — one-liners for findings an earlier cycle already decided not to act on. Carry them as a single \`Recurring (previously accepted): N\` count plus the one-liners, and keep them **out** of the Critical / Warning / Suggestion counts and out of the top priority list. Re-promoting them is what makes the same unactionable finding cost every cycle a decision
 
 2. **Create Summary Report** at the specified path following the template structure:
@@ -60,7 +60,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
    - Warning descriptions as a numbered list directly after the Code Review table (no separate heading), each keeping its \`(Confidence: ...)\` annotation
    - TODO Verification status as a table with completion rate
    - README Verification status as a table with satisfaction rate (satisfaction rate is over auto/agent-verifiable criteria only). If any PENDING-HUMAN items exist, list them as a "Manual verification needed" checklist so a human knows what to confirm — these are handoffs, not failures
-   - Constraint Verification results as a table per repository (Constraint, Status, Exit Code, Duration). If ANY constraint has status FAIL, add it as a **Critical Issue**. SKIPPED and PRE-EXISTING constraints are informational — note them but do NOT flag as critical
+   - Constraint Verification results as a table per repository (Constraint, Status, Exit Code, Duration). If ANY constraint has status FAIL, add it as a **Critical Issue**. SKIPPED and PRE-EXISTING constraints are informational — note them but do NOT flag as critical. A NOT DECLARED repository gets one informational line saying no constraint commands are declared for it (so a reader does not read the empty table as a pass); keep it out of the Critical Issue and Warning counts, since declaring them is workspace setup rather than a defect in these changes
    - Do NOT include an Aggregate Statistics section
 
 ${WRITTEN_DELIVERABLE_LENGTH}

@@ -22,6 +22,26 @@ describe("getCodeReviewerSystemPrompt", () => {
       /Suggestions only|never (?:be )?(?:classified as )?(?:Critical|Warning)/i,
     );
   });
+
+  // The reviewer used to be told to discover and run the repo's lint/test
+  // commands and report failures as Critical Issues. The `Verify constraints`
+  // phase already runs the README's declared commands deterministically and
+  // classifies each failure against the merge-base, so the reviewer's copy only
+  // added a second, unclassified verdict on the same commands — a failure that
+  // predates the branch reached the autonomous gate as a blocker.
+  it("does not instruct the reviewer to run lint/test/build commands itself", () => {
+    expect(prompt).not.toMatch(/\*\*Run Lint & Tests\*\*/);
+    expect(prompt).not.toMatch(/run them\. Report any failures as \*\*Critical Issues\*\*/);
+  });
+
+  it("points lint/test execution at the Verify constraints phase and its merge-base classification", () => {
+    expect(prompt).toContain("Verify constraints");
+    expect(prompt).toMatch(/merge-base/);
+  });
+
+  it("still asks the reviewer to judge test coverage from the diff", () => {
+    expect(prompt).toMatch(/test coverage/i);
+  });
 });
 
 describe("buildCodeReviewerPrompt", () => {
