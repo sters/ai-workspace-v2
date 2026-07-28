@@ -105,6 +105,28 @@ Annotate every finding with a **Confidence** so the downstream filter can rank i
 Write it inline with the finding (e.g. \`(Confidence: medium)\`). Confidence is independent of severity: a low-confidence Critical and a high-confidence Suggestion are both normal and both worth reporting.`;
 
 /**
+ * Severity calibration for review agents, and the other half of the autonomous
+ * gate's loop rule: the gate loops only on Critical / Warning-level findings, so
+ * the severity label is what decides whether a finding is ever acted on. A real
+ * defect filed under Suggestions is a defect the run will not come back to, and a
+ * nit filed as a Warning costs a full execute + review cycle.
+ *
+ * Anchored to the deliverable — is this done and sound — rather than to what a
+ * later human reviewer might say. This is a *self*-review: the run's job is to
+ * finish its own work, and predicting an outside reader's preferences is how
+ * polish becomes a loop reason.
+ */
+export const SEVERITY_CALIBRATION = `### Calibrating Severity
+
+Severity answers one question about the change in front of you: **is it done, and is it sound?**
+
+- **Critical Issues** — it is broken: wrong behavior, a security hole, data loss, a build that does not build.
+- **Warnings** — it works in the happy path but is not finished or not sound as delivered: an unhandled failure path, something the task's contract requires that the code does not implement, a type/schema inconsistency across a boundary, missing test coverage for new or changed behavior, a reference the change left stale.
+- **Suggestions** — it is complete and correct as it stands, and this is taste: naming and wording preferences, layout and readability polish, refactoring or consolidation opportunities, anything correct-but-not-how-you'd-write-it.
+
+Place each finding by what it says about the deliverable, not by how easy the fix is. Do not lift a preference to Warning because it would be a one-line change, and do not file real incompleteness under Suggestions because you are unsure it is worth the reader's time — uncertainty belongs in the Confidence annotation, not in the severity.`;
+
+/**
  * Cross-cycle memory for review agents. Reviewers are spawned fresh each
  * autonomous cycle, so without this they re-derive and re-report at full length
  * every finding an earlier gate already declined to act on — an unsatisfiable

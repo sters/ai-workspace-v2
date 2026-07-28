@@ -7,6 +7,7 @@ import type { CodeReviewerInput } from "@/types/prompts";
 import {
   RECURRING_FINDINGS_POLICY,
   REVIEW_COVERAGE_POLICY,
+  SEVERITY_CALIBRATION,
   SUBAGENT_DELEGATION_POLICY,
   WRITTEN_DELIVERABLE_LENGTH,
   knownFindingsSection,
@@ -51,6 +52,8 @@ The task may split the changes into a **Change Context** section and a **Review 
 - When no Review Target section is present, the whole branch is the target — this is the first review of the branch.
 
 ${REVIEW_COVERAGE_POLICY}
+
+${SEVERITY_CALIBRATION}
 
 ${RECURRING_FINDINGS_POLICY}
 

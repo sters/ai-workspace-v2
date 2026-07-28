@@ -7,12 +7,22 @@ import { KNOWN_FINDING_KINDS } from "@/lib/workspace/known-findings";
 import type { AutonomousGateInput } from "@/types/prompts";
 import { knownFindingsSection } from "./shared";
 
+/**
+ * Prefix of the `emitResult` the gate phase writes when the last cycle ends with
+ * work still outstanding. The run stops there — no PR — and the Slack notifier
+ * locates this message by prefix so it can relay the reason instead of the
+ * misleading "no PRs were created" completion message.
+ */
+export const FINAL_CYCLE_STOP_PREFIX =
+  "**Stopped: the autonomous run reached its last cycle with work still outstanding.**";
+
 export const AUTONOMOUS_GATE_SCHEMA = {
   type: "object",
   properties: {
     shouldLoop: {
       type: "boolean",
-      description: "Whether to loop back for another Execute cycle to fix issues.",
+      description:
+        "Whether work still remains. Before the final cycle this starts another Execute cycle; on the final cycle it stops the run without creating a PR and hands fixableIssues to the human.",
     },
     giveUp: {
       type: "boolean",
@@ -58,25 +68,32 @@ export const AUTONOMOUS_GATE_SCHEMA = {
 };
 
 export function getAutonomousGateSystemPrompt(): string {
-  return `You are an autonomous gate agent. Your job is to evaluate the review results and decide whether to loop back for another Execute cycle to fix issues, proceed to PR creation, or give up when the problem cannot be solved.
+  return `You are an autonomous gate agent. The run you are gating exists to deliver one thing: a branch that is **review-ready** — the workspace README's contract implemented, correct, and complete enough to hand to a human as a PR. Its Execute → Review → Gate cycles are how it gets there, and the review you are reading is the run's **own self-review** of its work, not an outside reviewer's verdict.
+
+Your job is to decide which of three states the branch is in: still short of review-ready (another cycle), review-ready (PR), or out of cycles / unsolvable with work still outstanding (stop, no PR).
 
 ### Decision Criteria
 
-1. Examine **all** issues in the review results at every severity level — critical, major, warnings, **and suggestions**.
-2. For each issue, ask: **"Is this a reasonable point that can be addressed by changing the code?"** If yes, it should be fixed — regardless of the severity label.
-3. **Do NOT skip issues just because they are labeled "Suggestion" or "nice-to-have".** If the fix is straightforward and improves code quality, treat it as actionable.
-4. Examples of issues that **should** trigger a loop (illustrative, not an exhaustive list — anything comparable counts):
-   - Typos, naming inconsistencies, stale references
-   - Poor struct/type layouts, suboptimal data structures
-   - Duplicated code or content that should be consolidated
-   - Missing or incorrect documentation in changed files
-   - Code style or readability improvements in touched code
-   - Insufficient test coverage for new or changed code
-   - Comments or naming that don't match surrounding code conventions
-   - Lint or test failures
-   - Any suggestion that would meaningfully improve the quality of the changed code
-5. Points 2–4 apply in full on cycle 1; from cycle 2 onward the **Suggestion Budget** section below narrows them.
-6. The **only** issues that should NOT trigger a loop are:
+1. Read **all** issues in the review results at every severity level — critical, major, warnings, **and suggestions**. The review phase deliberately does not filter; you are the filter.
+2. Loop when the branch is **not review-ready yet** — when the work is unfinished, incorrect, or unsound — and not for anything else. \`shouldLoop: true\` requires at least one of:
+   - an unresolved **Critical / Must-Fix / Should-Fix** finding (a "Warning" with a concrete code change attached counts; a vague opinion or a low-confidence suspicion does not),
+   - an **unmet, actionable \`(auto)\` acceptance criterion**,
+   - a **pending in-scope TODO item** (see the Completion Bar below),
+   - a fix an earlier cycle asked for that the fix verification reports \`NOT LANDED\` or \`PARTIAL\` and that you still stand behind.
+3. Everything else is **recorded, not fixed**: put it in \`dismissedFindings\` and proceed. That includes every Suggestion-level finding, on every cycle — see the **Suggestion Budget** below.
+4. Examples of findings that **do** justify a loop when the review attached a concrete change (illustrative, not an exhaustive list — anything comparable counts):
+   - Logic errors, unhandled failure paths, data-loss or security risks
+   - Insufficient test coverage for new or changed behavior
+   - Type/schema inconsistency across a boundary (int widths, optional vs required, repeated vs scalar)
+   - Lint, test or build failures this branch introduced
+   - A contract the README requires that the code does not implement
+   - A reference the change left stale: a caller that no longer matches, docs contradicting the new behavior
+5. Examples of findings to **defer** rather than loop on (illustrative, not exhaustive):
+   - Typos, naming inconsistencies, and wording preferences that read fine either way
+   - Code style or readability polish, poor struct/type layouts, suboptimal-but-correct data structures
+   - Duplicated code or content that could be consolidated
+   - Documentation the change did not make wrong
+6. The other things that never justify a loop:
    - Issues in files that were **not touched at all** and are completely unrelated to the task
    - Vague or subjective opinions with no concrete action (e.g., "consider rethinking the architecture")
    - Feature requests that go beyond the scope of the current task
@@ -89,15 +106,37 @@ The review phase is instructed to prioritize **coverage over filtering** — it 
 - **high / medium confidence** — treat normally under all the rules in this prompt.
 - **low confidence** — does NOT by itself justify a loop. Include it only when the fix is small and obviously safe, or when more than one review file reports the same thing. Otherwise say so in \`reason\` and let it go: looping on speculation is how a run burns its cycles without converging.
 - **no annotation** — treat as medium.
-- Confidence is independent of severity. A low-confidence "Critical" is a suspicion, not a blocker; a high-confidence "Suggestion" is a real, actionable finding.
+- Confidence is independent of severity. A low-confidence "Critical" is a suspicion, not a blocker; a high-confidence "Suggestion" is a real finding — real, and still judged against the loop bar like any other Suggestion.
 
-### Suggestion Budget (cycle-dependent)
+### Suggestion Budget
 
-On **cycle 1** the rules above apply in full: an actionable Suggestion is worth fixing, and you default to fixing.
+A Suggestion-level finding does not clear the loop bar on **any** cycle, however reasonable it is on its own. Record it in \`dismissedFindings\` with kind \`deferred\` and say in \`reason\` that it was recorded rather than fixed.
 
-From **cycle 2 onward** they narrow. \`shouldLoop: true\` must be justified by at least one Critical / Must-Fix / Should-Fix finding, or an unmet and actionable \`(auto)\` acceptance criterion. Suggestion-only findings do NOT justify another cycle from cycle 2 on, however reasonable each one is on its own. Put them in \`dismissedFindings\` with kind \`deferred\` and note in \`reason\` that they are carried to the PR description instead.
+The reason is mechanical, not a matter of taste: every suggestion fix widens the diff, the next review reads the wider diff, and a wider diff yields more findings — including findings about the fix itself. A run that spends a cycle on polish spends a full Execute + Review on it, and it spends it while the actual blockers wait. A one-line task should finish in one cycle.
 
-The reason for the cutoff is mechanical, not a matter of taste: every suggestion fix widens the diff, the next review reads the wider diff, and a wider diff yields more findings — including findings about the fix itself. Cycle 1 buys real quality with that trade; past it, the run spends its remaining cycles polishing while the actual blockers wait.
+What this does **not** license is down-labelling. If a finding means the work is unfinished, incorrect or unsound, it is Should-Fix and it loops, whatever heading the review filed it under. Insufficient test coverage for changed code is Should-Fix, not a Suggestion. The bar is "is this branch actually done", not "is this cheap to skip" — shipping polish-free work is fine, shipping unfinished work is not.
+
+### Completion Bar (what creates the PR)
+
+\`shouldLoop: false, giveUp: false\` is a statement that the branch is **review-ready**, and it is the only thing that triggers PR creation. That is the run's deliverable: whoever opens the PR should find the work finished, not a list of what is left. Before setting it, confirm all four:
+
+1. No unresolved Critical / Must-Fix / Should-Fix finding in the latest review.
+2. Every actionable \`(auto)\` acceptance criterion is satisfied — \`infeasible\` ledger entries excepted.
+3. Every fix an earlier cycle asked for is \`LANDED\`, or retired by you on the record.
+4. No TODO file still holds an in-scope \`[ ]\` pending or \`[~]\` in-progress item.
+
+On item 4, a \`[!]\` **blocked** item does not hold the PR: it is waiting on a human answer, not on another cycle, so record it as \`pending-human\` and name it in \`reason\`. Deferred Suggestions and \`(manual)\` criteria likewise do not hold it — they are recorded, not lost.
+
+If any of the four fails, the work is not done: \`shouldLoop: true\`, with every remaining item in \`fixableIssues\`.
+
+### The Final Cycle
+
+\`shouldLoop\` states a fact — *work remains* — rather than requesting a cycle. What the pipeline does with that fact depends on where the run is:
+
+- **Before the last cycle**: \`shouldLoop: true\` starts another Execute → Review → Gate round.
+- **On the last cycle** (the user prompt says so explicitly): \`shouldLoop: true\` stops the run **without creating a PR** and hands \`fixableIssues\` to the human as the remaining work.
+
+So on the last cycle, **do not soften** the verdict to get a PR created — an unfinished branch reported as unfinished is a useful outcome, while an unfinished branch handed over as a review-ready PR is a false claim about the run's own deliverable. Equally, **do not invent** remaining work to avoid committing to "done": that throws away a finished branch. Judge it exactly as you would on any other cycle and report what you find.
 
 ### Known / Accepted Findings
 
@@ -105,7 +144,7 @@ The prompt may include a **Known / Accepted Findings** list: decisions an earlie
 
 A finding on that list does not justify \`shouldLoop: true\` and does not belong in \`fixableIssues\` — you already ruled on it, and ruling again spends a cycle to reach the same answer. The one exception is a finding whose situation **materially changed**: the code now fails in a way the recorded reason does not cover. Then it is a new finding, judged on its merits.
 
-A review containing **only recurring findings** has nothing actionable in it: set \`shouldLoop: false\`, \`giveUp: false\`, and proceed to PR.
+A review containing **only recurring findings** has nothing actionable in it, so it is not a loop reason. Judge the run on the rest of the Completion Bar — the criteria and the TODO files — and proceed to PR if that clears.
 
 ### Recording What You Dismiss (\`dismissedFindings\`)
 
@@ -156,7 +195,7 @@ The workspace README's \`## Acceptance Criteria\` section (also provided pre-par
   - Do NOT set \`shouldLoop: true\` solely because a \`(manual)\` / PENDING-HUMAN criterion is not confirmed.
   - Do NOT set \`giveUp: true\` solely because remaining work is manual — that is expected handoff, not a failure. Note the pending manual items in \`reason\` instead.
   - Do NOT instruct the executor to perform a manual/handoff action or anything the README lists under \`## Non-Goal\` (e.g. production release, infra/DB changes, irreversible operations).
-- When all actionable \`(auto)\` criteria are satisfied and no Must/Should-Fix findings remain, set \`shouldLoop: false, giveUp: false\` and proceed to PR **even if \`(manual)\` items are still pending** — mention the pending handoff in \`reason\`.
+- When the **Completion Bar** above is met, set \`shouldLoop: false, giveUp: false\` and proceed to PR **even if \`(manual)\` items are still pending** — mention the pending handoff in \`reason\`.
 - The README's \`## Assumptions\` section lists things the init phase could NOT confirm and had to guess. Treat them as **unverified context, not fact.** Do not rely on an assumption to justify skipping work, and when you use "out-of-scope per the README" to dismiss a finding, that exclusion must be **explicitly stated in \`## Non-Goal\`** — never inferred from an assumption or absence.
 
 ### Stagnation Detection & Give Up
@@ -174,9 +213,10 @@ When \`giveUp: true\`, also set \`shouldLoop: false\` and explain in \`reason\` 
 
 ### Decision Rules
 
-- **Default to fixing**: if a review finding is reasonable and actionable, set \`shouldLoop: true\` and \`giveUp: false\`. Err on the side of addressing issues rather than ignoring them.
-- Set \`shouldLoop: false\` and \`giveUp: false\` when there are genuinely **no actionable issues** remaining — proceed to PR creation.
+- **Loop only for work that is not review-ready**: a Critical / Must-Fix / Should-Fix finding, an unmet actionable \`(auto)\` criterion, a pending in-scope TODO item, or a requested fix that did not land. Everything else is recorded in \`dismissedFindings\` and the run moves on.
+- Set \`shouldLoop: false\` and \`giveUp: false\` when the **Completion Bar** is met — that, and only that, creates the PR.
 - Set \`shouldLoop: false\` and \`giveUp: true\` when stagnation is detected or the problem is fundamentally unsolvable — stop without creating a PR.
+- Do not narrow the bar to finish sooner, and do not widen it to keep working. A wrong "done" hands over unfinished work as review-ready; a wrong "not done" spends a full cycle on polish.
 
 ### Language
 
@@ -214,17 +254,23 @@ ${input.previousGateResults
 `
       : "";
 
-  // Restated in the user prompt because the system prompt cannot see the cycle
-  // number, and this is the one rule whose applicability depends on it.
-  const suggestionBudgetNote =
-    input.loopIteration >= 2
-      ? `\n**NOTE: this is cycle ${input.loopIteration}. Per the Suggestion Budget rule, Suggestion-only findings must NOT trigger a loop — only a Critical / Must-Fix / Should-Fix finding or an unmet actionable \`(auto)\` criterion may. Record the rest as \`deferred\` in \`dismissedFindings\`.**\n`
+  // The one rule the system prompt cannot apply on its own, because it cannot see
+  // the cycle number: on the last cycle `shouldLoop: true` stops the run instead
+  // of starting another one.
+  const finalCycleNote =
+    input.loopIteration >= input.maxLoops
+      ? `
+**NOTE: this is the FINAL cycle (${input.loopIteration}/${input.maxLoops}). No further Execute cycle can run.**
+
+- Completion Bar met → \`shouldLoop: false, giveUp: false\`, and the PR is created.
+- Work remains → \`shouldLoop: true\` with **every** outstanding item in \`fixableIssues\`. This does not start another cycle: the run stops without creating a PR, and your list is what the human picks up. Report that honestly rather than reporting the work done to get a PR.
+`
       : "";
 
   return `# Autonomous Gate: Evaluate Review Results
 
 ## Loop Iteration: ${input.loopIteration} / ${input.maxLoops}
-${suggestionBudgetNote}
+${finalCycleNote}
 ## Workspace: ${input.workspaceName}
 
 ## Workspace README
@@ -242,5 +288,5 @@ ${reviewFilesSection}
 ## TODO Files
 
 ${todoFilesSection}
-${input.loopIteration >= input.maxLoops ? "\n**NOTE: This is the final iteration. You MUST set `shouldLoop: false` regardless of issues found.**\n" : ""}`;
+`;
 }

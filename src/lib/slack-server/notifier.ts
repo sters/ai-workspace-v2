@@ -5,6 +5,7 @@ import { getOperation } from "@/lib/db/operations";
 import { listReadyNotifications, deleteNotification } from "@/lib/db/slack-notifications";
 import { extractPrUrls, type PrUrlInfo } from "@/lib/workspace/pr-url";
 import { README_CLARITY_PHASE_LABEL, README_CLARITY_STOP_PREFIX } from "@/lib/templates/prompts/readme-clarity-gate";
+import { FINAL_CYCLE_STOP_PREFIX } from "@/lib/templates/prompts/autonomous-gate";
 
 /** Phase label set by the autonomous pipeline for the Create PR step
  * (`src/lib/pipelines/autonomous.ts`, `buildCreatePrPhase`). Filtering by
@@ -59,11 +60,14 @@ export function startNotifier(opts: NotifierOptions): Notifier {
           // A README-clarity-gate stop means the run halted before doing any
           // work — relay that reason instead of the misleading "no PRs" message.
           const clarityStop = extractClarityGateStop(events);
+          // Same reasoning one step later in the run: the gate stopped with work
+          // outstanding, so "no PRs were created" would read as a clean no-op.
+          const incompleteStop = extractIncompleteStop(events);
           const prs = extractCreatedPrs(events, { inputDescription });
           await opts.client.chat.postMessage({
             channel: row.channel,
             thread_ts: row.threadTs,
-            text: clarityStop ?? buildCompletionMessage(prs),
+            text: clarityStop ?? incompleteStop ?? buildCompletionMessage(prs),
           });
         }
         // status === "failed": silently drop per product decision
@@ -170,6 +174,34 @@ export function extractClarityGateStop(events: OperationEvent[]): string | null 
     if (!parsed || typeof parsed !== "object") continue;
     const p = parsed as { type?: unknown; result?: unknown };
     if (p.type === "result" && typeof p.result === "string" && p.result.startsWith(README_CLARITY_STOP_PREFIX)) {
+      return p.result;
+    }
+  }
+  return null;
+}
+
+/**
+ * Detect an autonomous run that stopped on its last cycle with work outstanding.
+ * The gate phase emits an `emitResult` starting with
+ * {@link FINAL_CYCLE_STOP_PREFIX}; unlike the clarity gate this is not matched by
+ * phase label, because the label carries the cycle number (`Cycle 3: Gate`).
+ * Returns the full message (reason + remaining work + handoff), or `null`.
+ */
+export function extractIncompleteStop(events: OperationEvent[]): string | null {
+  for (const e of events) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(e.data);
+    } catch {
+      continue;
+    }
+    if (!parsed || typeof parsed !== "object") continue;
+    const p = parsed as { type?: unknown; result?: unknown };
+    if (
+      p.type === "result" &&
+      typeof p.result === "string" &&
+      p.result.startsWith(FINAL_CYCLE_STOP_PREFIX)
+    ) {
       return p.result;
     }
   }

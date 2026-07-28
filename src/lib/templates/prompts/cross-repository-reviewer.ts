@@ -9,6 +9,7 @@ import type { CrossRepositoryReviewerInput } from "@/types/prompts";
 import {
   RECURRING_FINDINGS_POLICY,
   REVIEW_COVERAGE_POLICY,
+  SEVERITY_CALIBRATION,
   WRITTEN_DELIVERABLE_LENGTH,
   knownFindingsSection,
 } from "./shared";
@@ -47,9 +48,11 @@ ${REVIEW_COVERAGE_POLICY}
 
 Coverage here means coverage of **cross-repository** concerns only — reporting everything you find does not license re-reviewing single-repo issues that the per-repository reviewers already cover.
 
+${SEVERITY_CALIBRATION}
+
 ${RECURRING_FINDINGS_POLICY}
 
-Most entries you see on that list will be cross-repo escalations, because those are the findings no single cycle can clear: a contract another team owns, a criterion the two sides cannot satisfy together. Compressing them is the point — the escalation is already recorded, and the PR description is where it gets carried.
+Most entries you see on that list will be cross-repo escalations, because those are the findings no single cycle can clear: a contract another team owns, a criterion the two sides cannot satisfy together. Compressing them is the point — the escalation is already recorded in that ledger, and it is carried from there rather than re-argued here.
 
 ${WRITTEN_DELIVERABLE_LENGTH}
 

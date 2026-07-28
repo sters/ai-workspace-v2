@@ -4,6 +4,7 @@ import {
   REPO_SEARCH_EFFICIENCY,
   REVIEW_COVERAGE_POLICY,
   SCOPE_DISCIPLINE,
+  SEVERITY_CALIBRATION,
   SUBAGENT_DELEGATION_POLICY,
   WRITTEN_DELIVERABLE_LENGTH,
   worktreeCdRules,
@@ -173,6 +174,31 @@ describe("REVIEW_COVERAGE_POLICY", () => {
     ["codeReviewer", getCodeReviewerSystemPrompt()],
     ["crossRepositoryReviewer", getCrossRepositoryReviewerSystemPrompt()],
   ])("%s prioritizes coverage over self-filtering", (_name, prompt) => {
+    expect(prompt).toContain(REVIEW_COVERAGE_POLICY);
+  });
+});
+
+describe("SEVERITY_CALIBRATION", () => {
+  // The autonomous gate now loops only on Critical/Warning-level findings, so the
+  // severity label is load-bearing: a real defect filed as a Suggestion is a
+  // defect the run will never come back to.
+  it("anchors severity to whether the change is done and sound", () => {
+    expect(SEVERITY_CALIBRATION).toMatch(/complete|incomplete/i);
+    expect(SEVERITY_CALIBRATION).toMatch(/Suggestion/);
+    expect(SEVERITY_CALIBRATION).toMatch(/test coverage/i);
+  });
+
+  // Severity must describe the deliverable, not predict a future reader.
+  it("does not anchor severity to a hypothetical reviewer's reaction", () => {
+    expect(SEVERITY_CALIBRATION).not.toMatch(/human reviewer/i);
+    expect(SEVERITY_CALIBRATION).not.toMatch(/before merg/i);
+  });
+
+  it.each([
+    ["codeReviewer", getCodeReviewerSystemPrompt()],
+    ["crossRepositoryReviewer", getCrossRepositoryReviewerSystemPrompt()],
+  ])("%s carries the severity calibration alongside coverage", (_name, prompt) => {
+    expect(prompt).toContain(SEVERITY_CALIBRATION);
     expect(prompt).toContain(REVIEW_COVERAGE_POLICY);
   });
 });

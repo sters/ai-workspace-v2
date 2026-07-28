@@ -81,6 +81,7 @@ vi.mock("@/lib/workspace/known-findings", async (importOriginal) => {
 });
 
 import { buildAutonomousPipeline } from "@/lib/pipelines/autonomous";
+import { FINAL_CYCLE_STOP_PREFIX } from "@/lib/templates/prompts/autonomous-gate";
 import { executePhaseBudgetMs, ROUTINE_BATCH_COUNT } from "@/lib/pipeline/constants";
 import { getOperationConfig } from "@/lib/config";
 import { appendKnownFindings } from "@/lib/workspace/known-findings";
@@ -727,6 +728,121 @@ describe("buildAutonomousPipeline", () => {
       expect(ctx.emitResult).toHaveBeenCalledWith(
         expect.stringContaining("Give up"),
       );
+    });
+
+    describe("final cycle", () => {
+      function gateCtxReturning(payload: Record<string, unknown>) {
+        const appendedPhases: PipelinePhase[] = [];
+        const ctx = createMockCtx({
+          runChild: vi.fn(async (label, _prompt, opts) => {
+            if (opts?.onResultText && label === "Autonomous Gate") {
+              opts.onResultText(JSON.stringify(payload));
+            }
+            return true;
+          }),
+          appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
+        });
+        return { ctx, appendedPhases };
+      }
+
+      beforeEach(() => {
+        mockGetReviewSessions.mockResolvedValue([{
+          timestamp: "2024-01-01", critical: 1, major: 0, minor: 0, total: 1,
+        }]);
+        mockGetReviewDetail.mockResolvedValue({
+          summary: "1 critical issue",
+          files: [{ name: "REVIEW-repo.md", content: "Critical: unhandled error" }],
+        });
+      });
+
+      // The gate used to short-circuit at maxLoops without calling the model, so
+      // the last cycle's whole review — the most expensive phase of a cycle — was
+      // produced and then read by nobody.
+      it("still evaluates the review on the last cycle instead of short-circuiting", async () => {
+        const phases = buildAutonomousPipeline({
+          startWith: "execute", workspace: "test-ws", maxLoops: 1,
+        });
+        const { ctx } = gateCtxReturning({
+          shouldLoop: false, giveUp: false, reason: "done", fixableIssues: [],
+        });
+
+        await phaseByLabel(phases, "Cycle 1: Gate").fn(ctx);
+
+        expect(ctx.runChild).toHaveBeenCalledWith(
+          "Autonomous Gate", expect.any(String), expect.anything(),
+        );
+      });
+
+      // create-pr is the end of the work, not a handoff: a PR that ships with the
+      // run's own leftovers in it is what the human then has to finish by hand.
+      it("stops without creating a PR when the last cycle still has work left", async () => {
+        const phases = buildAutonomousPipeline({
+          startWith: "execute", workspace: "test-ws", maxLoops: 2,
+        });
+        const { ctx, appendedPhases } = gateCtxReturning({
+          shouldLoop: true,
+          giveUp: false,
+          reason: "Unhandled error path is still open",
+          fixableIssues: ["handle the nil branch in parse()"],
+        });
+
+        // Cycle 2 is the last one when maxLoops is 2.
+        const result = await phaseByLabel(phases, "Cycle 1: Gate").fn(ctx);
+        const cycle2Gate = appendedPhases.find(
+          (p) => p.kind === "function" && p.label === "Cycle 2: Gate",
+        );
+        if (!cycle2Gate || cycle2Gate.kind !== "function") throw new Error("no cycle 2 gate");
+        expect(result).toBe(true);
+
+        const final = gateCtxReturning({
+          shouldLoop: true,
+          giveUp: false,
+          reason: "Unhandled error path is still open",
+          fixableIssues: ["handle the nil branch in parse()"],
+        });
+        await cycle2Gate.fn(final.ctx);
+
+        expect(final.appendedPhases).toHaveLength(0);
+        expect(final.ctx.emitResult).toHaveBeenCalledWith(
+          expect.stringContaining(FINAL_CYCLE_STOP_PREFIX),
+        );
+        expect(final.ctx.emitResult).toHaveBeenCalledWith(
+          expect.stringContaining("handle the nil branch in parse()"),
+        );
+      });
+
+      it("creates the PR when the last cycle reports the work complete", async () => {
+        const phases = buildAutonomousPipeline({
+          startWith: "execute", workspace: "test-ws", maxLoops: 1,
+        });
+        const { ctx, appendedPhases } = gateCtxReturning({
+          shouldLoop: false,
+          giveUp: false,
+          reason: "All criteria satisfied",
+          fixableIssues: [],
+        });
+
+        await phaseByLabel(phases, "Cycle 1: Gate").fn(ctx);
+
+        expect(appendedPhases.map((p) => p.kind === "function" && p.label)).toEqual(["Create PR"]);
+      });
+
+      it("does not queue another cycle's work when it stops", async () => {
+        const phases = buildAutonomousPipeline({
+          startWith: "execute", workspace: "test-ws", maxLoops: 1,
+        });
+        const { ctx, appendedPhases } = gateCtxReturning({
+          shouldLoop: true,
+          giveUp: false,
+          reason: "Two acceptance criteria unmet",
+          fixableIssues: ["implement criterion 2", "implement criterion 3"],
+        });
+
+        await phaseByLabel(phases, "Cycle 1: Gate").fn(ctx);
+
+        expect(appendedPhases).toHaveLength(0);
+        expect(mockStripCompletedTodos).not.toHaveBeenCalled();
+      });
     });
 
     it("does not strip TODOs when gate says stop", async () => {
