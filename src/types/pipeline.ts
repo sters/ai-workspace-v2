@@ -6,6 +6,7 @@ export const STEP_TYPES = {
   CODE_REVIEW: "code-review",
   VERIFY_TODO: "verify-todo",
   VERIFY_README: "verify-readme",
+  VERIFY_FIXES: "verify-fixes",
   COLLECT_REVIEWS: "collect-reviews",
   EXECUTE: "execute",
   RESEARCH: "research",

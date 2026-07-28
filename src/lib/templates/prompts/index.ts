@@ -8,6 +8,7 @@ export {
   buildCrossRepositoryReviewerPrompt,
 } from "./cross-repository-reviewer";
 export { getTodoVerifierSystemPrompt, buildTodoVerifierPrompt } from "./todo-verifier";
+export { getFixVerifierSystemPrompt, buildFixVerifierPrompt } from "./fix-verifier";
 export { getReadmeVerifierSystemPrompt, buildReadmeVerifierPrompt } from "./readme-verifier";
 export { getPRCreatorSystemPrompt, buildPRCreatorPrompt } from "./pr-creator";
 export {

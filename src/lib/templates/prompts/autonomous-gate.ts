@@ -136,6 +136,16 @@ Before deciding \`shouldLoop\`, cross-check the review files against the TODO fi
 
 Type/schema consistency findings (signed vs unsigned int widths, optional vs required, repeated vs scalar, naming style across sibling fields) MUST be treated as Should Fix at minimum — they are the most common class of silently-dropped review feedback and break wire compatibility downstream.
 
+### Did Your Last Asks Land? (\`VERIFY-FIXES-*\`)
+
+When a previous cycle set \`fixableIssues\`, this cycle's review includes a **fix verification** report per repository, giving each numbered ask a status read out of the code: \`LANDED\`, \`PARTIAL\`, or \`NOT LANDED\`.
+
+- **That report outranks the TODO cross-reference above.** A \`[x]\` records what the executor believed; the verifier read the code. Where they disagree, the verifier is right, and a \`[x]\` sitting on a \`NOT LANDED\` ask is exactly the case the report exists to catch.
+- \`NOT LANDED\` or \`PARTIAL\` on an ask you still stand behind → \`shouldLoop: true\`, and carry that ask forward in \`fixableIssues\` — restated more concretely if the verifier's note explains why it was missed. It does not matter how minor the ask was or which cycle you are on: the Suggestion Budget governs *new* findings, not work already requested and lost.
+- \`LANDED\` on every ask means this part of the audit is satisfied. Judge the run on the review's own findings.
+- **You may retire an ask instead of looping on it.** You wrote it, so you are the only one who can withdraw it: if the verifier quotes a recorded reason it was declined and that reason holds, or you now judge the ask itself was wrong, record it in \`dismissedFindings\` (\`out-of-scope\` when the README excludes it, \`low-confidence\` when the ask rested on a misreading, \`deferred\` otherwise) and do not re-issue it. What you must not do is drop it silently — an ask that vanishes without either landing or being retired is how requested work disappears.
+- An ask the verifier could not find *and* that has no recorded reason was dropped between the gate and the executor. Loop on it.
+
 ### Acceptance Criteria (defines "done")
 
 The workspace README's \`## Acceptance Criteria\` section (also provided pre-parsed) is the contract for completion. Each item is tagged \`(auto)\` or \`(manual)\` — untagged items count as \`(auto)\`.

@@ -54,6 +54,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.SUGGEST_WORKSPACE]: "opus",
   [STEP_TYPES.CREATE_PR]: "opus",
   [STEP_TYPES.README_CLARITY_GATE]: "opus",
+  [STEP_TYPES.VERIFY_FIXES]: "opus",
   // The markdown best-of-N pair (`best-of-n-files.ts`): pick a winner, then
   // splice documents together. No code is involved in either.
   [STEP_TYPES.BEST_OF_N_FILE_REVIEWER]: "opus",
@@ -149,6 +150,12 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // A single yes/no against documented criteria, and deliberately biased toward
   // proceeding — it is a safety valve, not a quality bar.
   [STEP_TYPES.README_CLARITY_GATE]: "low",
+  // Checks an enumerated list of requested fixes against the code — bounded, like
+  // `verify-todo` on the rung below. It sits here rather than there because the
+  // asks are free-form prose rather than structured TODO items, and because a
+  // `NOT LANDED` verdict is a hard loop reason for the gate: a false negative
+  // costs a cycle, a false positive lets requested work disappear.
+  [STEP_TYPES.VERIFY_FIXES]: "low",
   // Pick the best of N markdown candidates, then splice the chosen documents.
   // Comparative judgment, but over prose, with no code and nothing to merge.
   [STEP_TYPES.BEST_OF_N_FILE_REVIEWER]: "low",

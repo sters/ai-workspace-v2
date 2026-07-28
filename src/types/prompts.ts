@@ -59,6 +59,31 @@ export interface CodeReviewerInput extends RepoPromptInput {
   reviewFilePath: string;
   /** Raw `artifacts/known-findings.md` content, or "" / undefined when absent. */
   knownFindings?: string;
+  /**
+   * Narrows the review to the branch's own work since a prior review. Absent
+   * means no usable baseline, and the whole branch is the review target.
+   */
+  reviewScope?: {
+    /** Review session the baseline came from, named so the reviewer can cite it. */
+    sinceTimestamp: string;
+    sinceSha: string;
+    changedFiles: string;
+    diffStat: string;
+    commitLog: string;
+    hasChanges: boolean;
+  };
+}
+
+/** Requested-fix verifier input — checks a previous cycle's asks against the code. */
+export interface FixVerifierInput extends RepoPromptInput {
+  baseBranch: string;
+  reviewTimestamp: string;
+  /** The previous cycle's gate `fixableIssues`, verbatim. */
+  requestedFixes: string[];
+  verifyFilePath: string;
+  /** Baseline the fixes were requested at, when one was recorded. */
+  sinceSha?: string;
+  sinceTimestamp?: string;
 }
 
 /** Cross-repository code-review agent input (multi-repo workspaces only). */
@@ -186,6 +211,11 @@ export interface CollectorInput {
   verifyFiles: string[];
   readmeVerifyFiles: string[];
   constraintFiles: string[];
+  /**
+   * `VERIFY-FIXES-*` reports. Present only on a cycle whose predecessor asked
+   * for fixes, so absent on a first review.
+   */
+  fixVerifyFiles?: string[];
 }
 
 export interface InitAnalyzeAndReadmeInput {

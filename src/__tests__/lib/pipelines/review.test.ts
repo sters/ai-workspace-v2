@@ -33,6 +33,13 @@ vi.mock("@/lib/templates", () => ({
   buildReadmeVerifierPrompt: vi.fn(() => "readme-verifier-prompt"),
   buildCollectorPrompt: vi.fn(() => "collector-prompt"),
   buildCrossRepositoryReviewerPrompt: vi.fn(() => "cross-repo-reviewer-prompt"),
+  buildFixVerifierPrompt: vi.fn(() => "fix-verifier-prompt"),
+}));
+
+vi.mock("@/lib/workspace/review-baseline", () => ({
+  captureRepoHead: vi.fn(() => "head0001"),
+  readPreviousReviewBaseline: vi.fn(async () => null),
+  writeReviewBaseline: vi.fn(async () => {}),
 }));
 
 vi.mock("@/lib/workspace/prompts", () => ({
@@ -83,10 +90,24 @@ import {
 } from "@/lib/workspace/constraint-runner";
 import type { PhaseFunctionContext, PipelinePhaseFunction, PipelinePhaseGroup } from "@/types/pipeline";
 
+import { getRepoChanges } from "@/lib/workspace";
+import { buildCodeReviewerPrompt, buildFixVerifierPrompt } from "@/lib/templates";
+import {
+  captureRepoHead,
+  readPreviousReviewBaseline,
+  writeReviewBaseline,
+} from "@/lib/workspace/review-baseline";
+
 const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
 const mockParseConstraints = vi.mocked(parseConstraints);
 const mockExecConstraintCommand = vi.mocked(execConstraintCommand);
 const mockBuildNoConstraintsReport = vi.mocked(buildNoConstraintsReport);
+const mockGetRepoChanges = vi.mocked(getRepoChanges);
+const mockBuildCodeReviewerPrompt = vi.mocked(buildCodeReviewerPrompt);
+const mockBuildFixVerifierPrompt = vi.mocked(buildFixVerifierPrompt);
+const mockCaptureRepoHead = vi.mocked(captureRepoHead);
+const mockReadPreviousBaseline = vi.mocked(readPreviousReviewBaseline);
+const mockWriteReviewBaseline = vi.mocked(writeReviewBaseline);
 
 describe("buildReviewPipeline — skip verify-todo when TODO file is missing", () => {
   beforeEach(() => {
@@ -458,5 +479,183 @@ describe("buildReviewPipeline — repos without declared constraints", () => {
       "undeclared",
     ]);
     expect(mockBunWrite).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("buildReviewPipeline — incremental review scope", () => {
+  const repo = {
+    repoName: "repo-a",
+    repoPath: "owner/repo-a",
+    worktreePath: "/repos/repo-a/worktrees/test-ws",
+  } as ReturnType<typeof listWorkspaceRepos>[number];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+    mockListWorkspaceRepos.mockReturnValue([repo]);
+    mockReadPreviousBaseline.mockResolvedValue(null);
+    mockCaptureRepoHead.mockReturnValue("head0001");
+    mockGetRepoChanges.mockReturnValue({
+      currentBranch: "feature/test",
+      changedFiles: "",
+      diffStat: "",
+      commitLog: "",
+    });
+  });
+
+  it("records this review's heads so the next review has a baseline", async () => {
+    await buildReviewPipeline({ workspace: "test-ws" });
+    expect(mockWriteReviewBaseline).toHaveBeenCalledWith(
+      "/ws/test-ws",
+      "2026-04-08T00-00-00",
+      { "repo-a": "head0001" },
+    );
+  });
+
+  it("omits a repo whose HEAD could not be read rather than recording a bogus one", async () => {
+    mockCaptureRepoHead.mockReturnValue(null);
+    await buildReviewPipeline({ workspace: "test-ws" });
+    expect(mockWriteReviewBaseline).toHaveBeenCalledWith(
+      "/ws/test-ws",
+      "2026-04-08T00-00-00",
+      {},
+    );
+  });
+
+  it("asks for the diff since the previous baseline for that repo", async () => {
+    mockReadPreviousBaseline.mockResolvedValue({
+      timestamp: "20260101-000000",
+      heads: { "repo-a": "old00001" },
+    });
+
+    await buildReviewPipeline({ workspace: "test-ws" });
+
+    expect(mockGetRepoChanges).toHaveBeenCalledWith(
+      "test-ws",
+      "owner/repo-a",
+      "main",
+      "old00001",
+    );
+  });
+
+  it("passes no baseline for a repo the previous review did not cover", async () => {
+    mockReadPreviousBaseline.mockResolvedValue({
+      timestamp: "20260101-000000",
+      heads: { "other-repo": "old00001" },
+    });
+
+    await buildReviewPipeline({ workspace: "test-ws" });
+
+    expect(mockGetRepoChanges).toHaveBeenCalledWith(
+      "test-ws",
+      "owner/repo-a",
+      "main",
+      undefined,
+    );
+  });
+
+  it("hands the code reviewer a review scope tagged with the baseline session", async () => {
+    mockReadPreviousBaseline.mockResolvedValue({
+      timestamp: "20260101-000000",
+      heads: { "repo-a": "old00001" },
+    });
+    mockGetRepoChanges.mockReturnValue({
+      currentBranch: "feature/test",
+      changedFiles: "M\tfull.ts",
+      diffStat: "full",
+      commitLog: "full log",
+      incremental: {
+        sinceSha: "old00001",
+        changedFiles: "M\tinc.ts",
+        diffStat: "inc",
+        commitLog: "inc log",
+        hasChanges: true,
+      },
+    });
+
+    await buildReviewPipeline({ workspace: "test-ws" });
+
+    expect(mockBuildCodeReviewerPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reviewScope: expect.objectContaining({
+          sinceSha: "old00001",
+          sinceTimestamp: "20260101-000000",
+          changedFiles: "M\tinc.ts",
+        }),
+      }),
+    );
+  });
+
+  // A baseline that git rejected (rebase, force-push) yields no incremental block,
+  // and the reviewer must then get the whole branch rather than an empty target.
+  it("leaves the review scope unset when the range was unusable", async () => {
+    mockReadPreviousBaseline.mockResolvedValue({
+      timestamp: "20260101-000000",
+      heads: { "repo-a": "gone0001" },
+    });
+
+    await buildReviewPipeline({ workspace: "test-ws" });
+
+    expect(mockBuildCodeReviewerPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ reviewScope: undefined }),
+    );
+  });
+});
+
+describe("buildReviewPipeline — requested-fix verifier", () => {
+  const repo = {
+    repoName: "repo-a",
+    repoPath: "owner/repo-a",
+    worktreePath: "/repos/repo-a/worktrees/test-ws",
+  } as ReturnType<typeof listWorkspaceRepos>[number];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+    mockListWorkspaceRepos.mockReturnValue([repo]);
+    mockReadPreviousBaseline.mockResolvedValue(null);
+    mockCaptureRepoHead.mockReturnValue("head0001");
+    mockGetRepoChanges.mockReturnValue({
+      currentBranch: "feature/test",
+      changedFiles: "",
+      diffStat: "",
+      commitLog: "",
+    });
+  });
+
+  it("is absent on a run where no previous cycle asked for anything", async () => {
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    const labels = (phases[0] as PipelinePhaseGroup).children.map((c) => c.label);
+    expect(labels).not.toContain("verify-fixes-repo-a");
+  });
+
+  it("is absent when the list is present but empty", async () => {
+    const phases = await buildReviewPipeline({ workspace: "test-ws", requestedFixes: [] });
+    const labels = (phases[0] as PipelinePhaseGroup).children.map((c) => c.label);
+    expect(labels).not.toContain("verify-fixes-repo-a");
+  });
+
+  it("is added, alongside the code reviewer, when fixes were requested", async () => {
+    const phases = await buildReviewPipeline({
+      workspace: "test-ws",
+      requestedFixes: ["gate the anchor on a defined href"],
+    });
+    const labels = (phases[0] as PipelinePhaseGroup).children.map((c) => c.label);
+    expect(labels).toContain("verify-fixes-repo-a");
+    expect(labels).toContain("review-repo-a");
+  });
+
+  it("gives the verifier the asks verbatim and its own report file", async () => {
+    await buildReviewPipeline({
+      workspace: "test-ws",
+      requestedFixes: ["fix one", "fix two"],
+    });
+
+    expect(mockBuildFixVerifierPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestedFixes: ["fix one", "fix two"],
+        verifyFilePath: expect.stringContaining("VERIFY-FIXES-owner_repo-a.md"),
+      }),
+    );
   });
 });
