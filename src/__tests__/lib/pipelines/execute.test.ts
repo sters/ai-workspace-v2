@@ -198,3 +198,79 @@ describe("buildExecutePipeline — skip repo when no actionable TODO items", () 
     );
   });
 });
+
+describe("buildExecutePipeline — phase budget scales with item count, not batch count", () => {
+  const MINUTE = 60 * 1000;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+  });
+
+  function todoWithPendingItems(count: number): string {
+    const items = Array.from({ length: count }, (_, i) => `- [ ] item ${i + 1}`);
+    return `# TODO\n\n${items.join("\n")}\n`;
+  }
+
+  async function budgetFor(itemCount: number, batchSize: number): Promise<number> {
+    mockListWorkspaceRepos.mockReturnValue([
+      {
+        repoName: "active-repo",
+        repoPath: "/repos/active-repo",
+        worktreePath: "/repos/active-repo/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+    ]);
+    mockFileMap.set("/ws/test-ws/TODO-active-repo.md", todoWithPendingItems(itemCount));
+
+    const phases = await buildExecutePipeline({ workspace: "test-ws", batchSize });
+    const phase = phases[0];
+    if (phase.kind !== "function") throw new Error("expected function phase");
+    if (phase.timeoutMs === undefined) throw new Error("expected a phase budget");
+    return phase.timeoutMs;
+  }
+
+  // The bug this guards: budgeting per *batch* meant raising batchSize shrank the
+  // budget for identical work — 12 items got 45min at batchSize 10 but 25min at 20.
+  it("does not shrink the budget when a larger batchSize packs the same items into fewer batches", async () => {
+    const atTen = await budgetFor(12, 10);
+    const atTwenty = await budgetFor(12, 20);
+    expect(atTwenty).toBeGreaterThanOrEqual(atTen);
+  });
+
+  it("budgets 3min per item of batch capacity plus a 5min buffer", async () => {
+    // 12 items / batchSize 10 → 2 batches → 20 items of capacity
+    expect(await budgetFor(12, 10)).toBe(20 * 3 * MINUTE + 5 * MINUTE);
+    // 12 items / batchSize 20 → 1 batch → 20 items of capacity
+    expect(await budgetFor(12, 20)).toBe(20 * 3 * MINUTE + 5 * MINUTE);
+    // 12 items / batchSize 15 → 1 batch → 15 items of capacity
+    expect(await budgetFor(12, 15)).toBe(15 * 3 * MINUTE + 5 * MINUTE);
+  });
+
+  // Measured ~1.85min/item, so the margin at 3min is ~60%. It is deliberately
+  // not tight: a timeout kill re-runs the whole batch on the same budget.
+  it("leaves real headroom over the measured per-item cost", async () => {
+    const measuredPerItemMs = 1.85 * MINUTE;
+    expect(await budgetFor(15, 15)).toBeGreaterThan(15 * measuredPerItemMs * 1.5);
+  });
+
+  it("grows the budget as items are added past a batch boundary", async () => {
+    const oneBatch = await budgetFor(15, 15);
+    const twoBatches = await budgetFor(16, 15);
+    expect(twoBatches).toBeGreaterThan(oneBatch);
+  });
+
+  it("keeps a floor of one batch of capacity when no TODO file exists", async () => {
+    mockListWorkspaceRepos.mockReturnValue([
+      {
+        repoName: "no-todo-repo",
+        repoPath: "/repos/no-todo-repo",
+        worktreePath: "/repos/no-todo-repo/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+    ]);
+
+    const phases = await buildExecutePipeline({ workspace: "test-ws", batchSize: 15 });
+    const phase = phases[0];
+    if (phase.kind !== "function") throw new Error("expected function phase");
+    expect(phase.timeoutMs).toBe(15 * 3 * MINUTE + 5 * MINUTE);
+  });
+});

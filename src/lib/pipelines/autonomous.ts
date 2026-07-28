@@ -14,7 +14,8 @@ import { resolveWorkspace } from "./actions/resolve-workspace";
 import { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "@/lib/templates/prompts/autonomous-gate";
 import { buildReadmeClarityGatePrompt, README_CLARITY_GATE_SCHEMA, README_CLARITY_PHASE_LABEL, README_CLARITY_STOP_PREFIX } from "@/lib/templates/prompts/readme-clarity-gate";
 import { prepareCriteriaFeasibility } from "./actions/criteria-feasibility";
-import { getWorkspaceDir } from "@/lib/config";
+import { getWorkspaceDir, getOperationConfig } from "@/lib/config";
+import { executePhaseBudgetMs, ROUTINE_BATCH_COUNT } from "@/lib/pipeline/constants";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import {
   appendKnownFindings,
@@ -48,8 +49,6 @@ const DEFAULT_UPDATE_TODO_INSTRUCTION =
  * Claude child from scratch each time.
  */
 const CYCLE_BUDGETS_MS = {
-  /** `execute.ts` budgets `maxBatches * 20min + 5min`; batch count is unknown until run time, 3 is routine. */
-  execute: 70 * 60 * 1000,
   /** `review.ts`: reviewer group (scales with repo count) + constraints (10min) + collect (20min). */
   review: 45 * 60 * 1000,
   /** One `autonomous-gate` child over the review summary; measured well under a minute. */
@@ -57,6 +56,16 @@ const CYCLE_BUDGETS_MS = {
   /** `update-todo.ts`: one updater child, plus up to 60min on the best-of-N path. */
   updateTodo: 30 * 60 * 1000,
 } as const;
+
+/**
+ * Execute's budget is derived rather than listed above, because it depends on
+ * the configured `batchSize` — a hardcoded figure here silently became tighter
+ * than what `execute.ts` sizes itself for when the per-item allowance moved.
+ * Read at build time so a configured `batchSize` is reflected.
+ */
+function executeCycleBudgetMs(): number {
+  return executePhaseBudgetMs(ROUTINE_BATCH_COUNT, getOperationConfig("execute").batchSize);
+}
 
 interface AutonomousGateResult {
   shouldLoop: boolean;
@@ -379,7 +388,7 @@ export function buildAutonomousPipeline(input: {
     return {
       kind: "function",
       label: `Cycle ${loopNumber}: Execute`,
-      timeoutMs: CYCLE_BUDGETS_MS.execute,
+      timeoutMs: executeCycleBudgetMs(),
       fn: async (ctx) => {
         if (ctx.signal.aborted) return false;
         const ws = resolveWorkspace(ctx.operationId, workspace);
