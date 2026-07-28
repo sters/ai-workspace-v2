@@ -6,6 +6,7 @@ import { wireChild } from "./wire-child";
 import { runClaude } from "@/lib/claude";
 import { resolveEffort, resolveModel } from "@/lib/config";
 import { Semaphore } from "@/lib/semaphore";
+import { getMaxGroupConcurrency } from "./constants";
 import { updateOperationWorkspace } from "@/lib/db";
 
 export function buildPhaseFunctionContext(
@@ -137,7 +138,7 @@ export function buildPhaseFunctionContext(
       if (appendPhasesFn) appendPhasesFn(phases);
     },
     runChildGroup: (children) => {
-      const sem = new Semaphore(5);
+      const sem = new Semaphore(getMaxGroupConcurrency());
       const promises = children.map(async (child) => {
         return sem.run(async () => {
           const cid = `${operationId}-phase-${phaseIndex}-fn-${childCounter++}`;

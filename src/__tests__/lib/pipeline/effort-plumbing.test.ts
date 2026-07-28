@@ -28,6 +28,9 @@ vi.mock("@/lib/claude", () => ({
 vi.mock("@/lib/config", () => ({
   resolveModel: vi.fn(),
   resolveEffort: vi.fn(),
+  // Both group runners size their semaphore from config at call time.
+  getConfig: () => ({ operations: { maxGroupConcurrency: 8 } }),
+  getOperationConfig: () => ({ claudeTimeoutMinutes: 20, functionTimeoutMinutes: 3 }),
 }));
 
 /** Minimal ClaudeProcess stub that completes successfully on the next tick. */

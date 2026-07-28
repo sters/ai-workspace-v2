@@ -17,6 +17,11 @@ export const CONFIG_DEFAULTS: AppConfig = {
   },
   operations: {
     maxConcurrent: 3,
+    // Sized to the review fan-out: `2..3 children per repo + 1 cross-repo`, so
+    // 8 covers a two-repo workspace outright and leaves a three-repo one only
+    // slightly queued. Raising it costs concurrency, not tokens — the same
+    // children run either way, just compressed in time.
+    maxGroupConcurrency: 8,
     claudeTimeoutMinutes: 20,
     functionTimeoutMinutes: 3,
     defaultInteractionLevel: "mid",
@@ -110,6 +115,7 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "path", section: "claude", defaultLine: "#   path: null           # null = auto-detect" },
   { key: "operations", section: null, defaultLine: "# operations:" },
   { key: "maxConcurrent", section: "operations", defaultLine: "#   maxConcurrent: 3" },
+  { key: "maxGroupConcurrency", section: "operations", defaultLine: "#   maxGroupConcurrency: 8         # Claude children started at once within one parallel group (per group, so it multiplies with maxConcurrent)" },
   { key: "claudeTimeoutMinutes", section: "operations", defaultLine: "#   claudeTimeoutMinutes: 20" },
   { key: "functionTimeoutMinutes", section: "operations", defaultLine: "#   functionTimeoutMinutes: 3" },
   { key: "defaultInteractionLevel", section: "operations", defaultLine: "#   defaultInteractionLevel: mid   # low / mid / high" },

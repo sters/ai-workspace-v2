@@ -7,6 +7,7 @@ import { buildPhaseFunctionContext } from "./context-builder";
 import { runClaude } from "@/lib/claude";
 import { resolveEffort, resolveModel } from "@/lib/config";
 import { Semaphore } from "@/lib/semaphore";
+import { getMaxGroupConcurrency } from "./constants";
 
 export async function runFunctionPhase(
   managed: ManagedOperation,
@@ -93,7 +94,7 @@ export async function runGroupPhase(
   const groupLabel = phase.children.map((c) => c.label).join(", ");
   emitStatus(managed, `Phase ${phaseNum}/${totalPhases}: parallel [${groupLabel}]`, phaseExtra);
 
-  const groupSem = new Semaphore(5);
+  const groupSem = new Semaphore(getMaxGroupConcurrency());
   const groupPromises = phase.children.map(async (child, j) => {
     return groupSem.run(async () => {
       const childId = `${operationId}-phase-${phaseIndex}-child-${j}`;

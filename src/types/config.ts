@@ -41,6 +41,11 @@ export interface AppConfig {
 
   operations: OperationTypeSettings & {
     maxConcurrent: number;
+    /**
+     * Max Claude children started concurrently within one parallel group.
+     * Applies per group, not globally, so it multiplies with `maxConcurrent`.
+     */
+    maxGroupConcurrency: number;
     /** Per-operation-type setting overrides. Keys are OperationType values. */
     typeOverrides: Partial<Record<OperationType, Partial<OperationTypeSettings>>>;
   };
