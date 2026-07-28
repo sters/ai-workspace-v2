@@ -21,6 +21,8 @@ export {
   getCrossRepositoryReviewerSystemPrompt,
   buildCrossRepositoryReviewerPrompt,
   getTodoVerifierSystemPrompt,
+  getFixVerifierSystemPrompt,
+  buildFixVerifierPrompt,
   buildTodoVerifierPrompt,
   getReadmeVerifierSystemPrompt,
   buildReadmeVerifierPrompt,

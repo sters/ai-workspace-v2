@@ -41,6 +41,15 @@ export function getCodeReviewerSystemPrompt(): string {
 
 5. **Write Review Report** to the specified file path
 
+### Review Scope
+
+The task may split the changes into a **Change Context** section and a **Review Target** section. When it does, the Review Target is the branch's own work since the review named there, and it is what you report on. The Change Context is the branch as a whole, already reviewed in earlier sessions — it is there so you can tell *why* the target's code looks the way it does, not to be reviewed again.
+
+- Report findings **in the Review Target**. A defect in already-reviewed code was either reported then or accepted then; raising it again spends a cycle re-deciding a settled question, and the run has a bounded number of cycles.
+- **Read outside the target freely.** Judging a change usually means reading the callers, the types, and the tests around it, and those often sit outside the target. The restriction is on what you *report*, not on what you may read.
+- The one exception: if code outside the target is **broken by** code inside it, that is a finding about the target. Say which line in the target causes it.
+- When no Review Target section is present, the whole branch is the target — this is the first review of the branch.
+
 ${REVIEW_COVERAGE_POLICY}
 
 ${RECURRING_FINDINGS_POLICY}
@@ -78,6 +87,36 @@ ${worktreeCdRules({
 `;
 }
 
+function changesSection(input: CodeReviewerInput): string {
+  const scope = input.reviewScope;
+  if (!scope) {
+    return `## Repository Changes
+
+${input.repoChanges}`;
+  }
+
+  const target = scope.hasChanges
+    ? `Changed files:
+${scope.changedFiles}
+
+Diff stat:
+${scope.diffStat}
+
+New commits:
+${scope.commitLog}`
+    : `No changes — this repository has not been touched since review ${scope.sinceTimestamp}. Report that and nothing else for it; there is no new code to find defects in.`;
+
+  return `## Change Context — the branch as a whole (do NOT review this)
+
+Already reviewed in an earlier session. Here so you can judge the review target in context.
+
+${input.repoChanges}
+
+## Review Target — this repository's own work since review ${scope.sinceTimestamp} (\`${scope.sinceSha}\`)
+
+${target}`;
+}
+
 export function buildCodeReviewerPrompt(input: CodeReviewerInput): string {
   return `# Task: Review code changes for ${input.repoName}
 
@@ -91,9 +130,7 @@ export function buildCodeReviewerPrompt(input: CodeReviewerInput): string {
 
 ${input.readmeContent}
 ${knownFindingsSection(input.knownFindings)}
-## Repository Changes
-
-${input.repoChanges}
+${changesSection(input)}
 
 ## Review Report Template
 

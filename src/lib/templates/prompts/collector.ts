@@ -31,6 +31,9 @@ ${input.readmeVerifyFiles.map((f) => `- ${f}`).join("\n") || "(none)"}
 ### Constraint Verifications
 ${input.constraintFiles.map((f) => `- ${f}`).join("\n") || "(none)"}
 
+### Fix Verifications
+${(input.fixVerifyFiles ?? []).map((f) => `- ${f}`).join("\n") || "(none)"}
+
 ## Summary Report Template
 
 Write the summary to: ${input.reviewDir}/SUMMARY.md
@@ -51,6 +54,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
    - TODO Verifications: Extract verified/unverified/partial/incomplete/skipped counts and completion rate
    - README Verifications: Extract satisfied/unsatisfied/partial/pending-human counts and satisfaction rate. PENDING-HUMAN items are (manual) acceptance criteria awaiting human confirmation — collect their descriptions
    - Constraint Verifications: Extract pass/fail/skipped/pre-existing status per constraint with exit codes and duration. A report marked \`NOT DECLARED\` means the README lists no lint/test/build commands for that repository, so none ran
+   - Fix Verifications: a \`VERIFY-FIXES-*\` file checks whether the fixes a previous cycle asked for are present in the code, one status per numbered ask: \`LANDED\` / \`PARTIAL\` / \`NOT LANDED\`. Carry every \`NOT LANDED\` and \`PARTIAL\` into the summary with the ask it belongs to and any recorded reason the verifier quoted. These are **not** review findings: keep them out of the Critical / Warning / Suggestion counts, because a status describes whether requested work happened, not whether the code has a defect
    - Recurring findings: a review may end with a \`## Recurring (previously accepted)\` section — one-liners for findings an earlier cycle already decided not to act on. Carry them as a single \`Recurring (previously accepted): N\` count plus the one-liners, and keep them **out** of the Critical / Warning / Suggestion counts and out of the top priority list. Re-promoting them is what makes the same unactionable finding cost every cycle a decision
 
 2. **Create Summary Report** at the specified path following the template structure:
@@ -61,6 +65,7 @@ const COLLECTOR_INSTRUCTIONS = `You are a specialized agent for collecting revie
    - TODO Verification status as a table with completion rate
    - README Verification status as a table with satisfaction rate (satisfaction rate is over auto/agent-verifiable criteria only). If any PENDING-HUMAN items exist, list them as a "Manual verification needed" checklist so a human knows what to confirm — these are handoffs, not failures
    - Constraint Verification results as a table per repository (Constraint, Status, Exit Code, Duration). If ANY constraint has status FAIL, add it as a **Critical Issue**. SKIPPED and PRE-EXISTING constraints are informational — note them but do NOT flag as critical. A NOT DECLARED repository gets one informational line saying no constraint commands are declared for it (so a reader does not read the empty table as a pass); keep it out of the Critical Issue and Warning counts, since declaring them is workspace setup rather than a defect in these changes
+   - A "Requested Fix Verification" table per repository (#, Ask, Status) when a \`VERIFY-FIXES-*\` file exists. Put every \`NOT LANDED\` and \`PARTIAL\` ask in the **top priority list** — a fix the pipeline asked for and then lost is the failure this file exists to catch, and it is invisible in the review counts by design
    - Do NOT include an Aggregate Statistics section
 
 ${WRITTEN_DELIVERABLE_LENGTH}

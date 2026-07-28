@@ -579,6 +579,65 @@ describe("buildAutonomousPipeline", () => {
       ]);
     });
 
+    // The gate's own Must/Should-Fix audit infers this from TODO checkboxes,
+    // which record what the executor believed. The next review gets the asks so a
+    // verifier can check them against the code instead.
+    it("hands the next cycle's review the fixes this gate asked for", async () => {
+      mockGetReviewSessions.mockResolvedValue([{
+        timestamp: "2024-01-01", critical: 0, major: 0, minor: 2, total: 2,
+      }]);
+      mockGetReviewDetail.mockResolvedValue({
+        summary: "2 warnings found",
+        files: [{ name: "REVIEW-repo.md", content: "Warning: typo found" }],
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+
+      const appendedPhases: PipelinePhase[] = [];
+      const ctx = createMockCtx({
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "Autonomous Gate") {
+            opts.onResultText(JSON.stringify({
+              shouldLoop: true,
+              reason: "Two warnings worth fixing",
+              fixableIssues: ["gate the anchor on a defined href", "promote selectedAtMs"],
+            }));
+          }
+          return true;
+        }),
+        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
+      });
+
+      await phaseByLabel(phases, "Cycle 1: Gate").fn(ctx);
+
+      const cycle2Review = appendedPhases.find(
+        (p) => p.kind === "function" && p.label === "Cycle 2: Review",
+      );
+      if (!cycle2Review || cycle2Review.kind !== "function") throw new Error("no cycle 2 review");
+      await cycle2Review.fn(createMockCtx());
+
+      expect(mockBuildReview).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestedFixes: ["gate the anchor on a defined href", "promote selectedAtMs"],
+        }),
+      );
+    });
+
+    it("asks for no fix verification on the first cycle, which has no prior asks", async () => {
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      await phaseByLabel(phases, "Cycle 1: Review").fn(createMockCtx());
+
+      expect(mockBuildReview).toHaveBeenCalledWith(
+        expect.objectContaining({ requestedFixes: undefined }),
+      );
+    });
+
     it("update-todo phase strips completed TODOs and runs update pipeline", async () => {
       mockGetReviewSessions.mockResolvedValue([{
         timestamp: "2024-01-01",

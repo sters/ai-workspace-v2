@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
-import { exec } from "./helpers";
+import { exec, execArgs } from "./helpers";
 import type { ExistingPR, RepoChanges } from "@/types/workspace";
 
 // ---------------------------------------------------------------------------
@@ -57,10 +57,89 @@ export function checkExistingPR(worktreePath: string): ExistingPR {
 // getRepoChanges
 // ---------------------------------------------------------------------------
 
+/**
+ * Paths beyond which the pathspec is dropped rather than risking an argv that
+ * exceeds the OS limit. Well above a reviewable change; a branch this wide gets
+ * the unrestricted range, which is a wider review, not a wrong one.
+ */
+const MAX_PATHSPEC_ENTRIES = 400;
+
+/**
+ * The branch's own new work since `sinceSha`, for a re-review that should look at
+ * what changed rather than at the whole branch again.
+ *
+ * Returns null when `sinceSha` is unusable — absent, or no longer an ancestor of
+ * HEAD after a rebase or force-push. Null means "no usable baseline", and the
+ * caller's correct response is a full-branch review, not an error.
+ *
+ * Restricted to paths the branch itself touches (`origin/<base>...HEAD`), because
+ * `<sinceSha>..HEAD` also contains everything a mid-run `origin/<base>` merge
+ * brought in — on the branch this was written for, 10 of 12 commits in that range
+ * belonged to other teams. The restriction is an approximation in one direction:
+ * a file both the branch and the base branch changed stays in scope, which is
+ * wanted, since that is where a merge resolution lands.
+ */
+export function getIncrementalChanges(
+  worktreePath: string,
+  baseBranch: string,
+  sinceSha: string,
+): { sinceSha: string; changedFiles: string; diffStat: string; commitLog: string; hasChanges: boolean } | null {
+  if (!sinceSha.trim()) return null;
+
+  // Ancestry, not mere existence: a rebased or force-pushed baseline still
+  // resolves but no longer describes a point on this history, so a diff against
+  // it would report unrelated churn as new work.
+  try {
+    execArgs(["git", "-C", worktreePath, "merge-base", "--is-ancestor", sinceSha, "HEAD"]);
+  } catch {
+    return null;
+  }
+
+  const branchPaths = (() => {
+    try {
+      return execArgs([
+        "git", "-C", worktreePath, "diff", "--name-only", `origin/${baseBranch}...HEAD`,
+      ])
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l !== "");
+    } catch {
+      return [];
+    }
+  })();
+
+  const pathspec =
+    branchPaths.length > 0 && branchPaths.length <= MAX_PATHSPEC_ENTRIES
+      ? ["--", ...branchPaths]
+      : [];
+
+  const run = (args: string[]): string => {
+    try { return execArgs(["git", "-C", worktreePath, ...args]); }
+    catch { return ""; }
+  };
+
+  const changedFiles = run(["diff", "--name-status", sinceSha, "HEAD", ...pathspec]);
+  const diffStat = run(["diff", "--stat", sinceSha, "HEAD", ...pathspec]);
+  // --no-merges --first-parent so the log names the branch's own commits and not
+  // the ones a base-branch merge dragged along.
+  const commitLog = run([
+    "log", "--oneline", "--no-merges", "--first-parent", `${sinceSha}..HEAD`, ...pathspec,
+  ]);
+
+  return {
+    sinceSha,
+    changedFiles,
+    diffStat,
+    commitLog,
+    hasChanges: changedFiles.trim() !== "",
+  };
+}
+
 export function getRepoChanges(
   workspaceName: string,
   repoPath: string,
   baseBranch: string,
+  sinceSha?: string,
 ): RepoChanges {
   const worktreePath = path.join(getWorkspaceDir(), workspaceName, repoPath);
 
@@ -92,5 +171,9 @@ export function getRepoChanges(
     catch { return "(no commits)"; }
   })();
 
-  return { currentBranch, changedFiles, diffStat, commitLog };
+  const incremental = sinceSha
+    ? getIncrementalChanges(worktreePath, baseBranch, sinceSha) ?? undefined
+    : undefined;
+
+  return { currentBranch, changedFiles, diffStat, commitLog, incremental };
 }

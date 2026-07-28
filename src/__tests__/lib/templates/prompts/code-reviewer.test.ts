@@ -80,4 +80,67 @@ describe("buildCodeReviewerPrompt", () => {
       buildCodeReviewerPrompt({ ...baseInput, knownFindings: "  \n" }),
     ).not.toContain("Known / Accepted Findings");
   });
+
+  describe("incremental review scope", () => {
+    const scope = {
+      sinceTimestamp: "20260727-181719",
+      sinceSha: "abc1234",
+      changedFiles: "M\tsrc/hook.ts",
+      diffStat: " src/hook.ts | 12 ++--",
+      commitLog: "b4224e2 Review follow-ups",
+      hasChanges: true,
+    };
+
+    it("reviews the whole branch when no baseline is available", () => {
+      const prompt = buildCodeReviewerPrompt(baseInput);
+      expect(prompt).toContain("## Repository Changes");
+      expect(prompt).toContain("diff body");
+      expect(prompt).not.toContain("Review Target");
+    });
+
+    it("splits the branch into context and the incremental range into the review target", () => {
+      const prompt = buildCodeReviewerPrompt({ ...baseInput, reviewScope: scope });
+      expect(prompt).toContain("## Change Context");
+      expect(prompt).toContain("## Review Target");
+      // The full-branch material stays, as context.
+      expect(prompt).toContain("diff body");
+      // The incremental material is what gets reviewed.
+      expect(prompt).toContain("src/hook.ts");
+      expect(prompt).toContain("b4224e2 Review follow-ups");
+      expect(prompt).toContain("20260727-181719");
+    });
+
+    // Context that reads like a review target is the failure mode here: the whole
+    // point is that the reviewer not re-report findings in already-reviewed code.
+    it("marks the change context as not-to-be-reviewed", () => {
+      const prompt = buildCodeReviewerPrompt({ ...baseInput, reviewScope: scope });
+      const contextHeading = prompt.split("## Change Context")[1]?.split("##")[0] ?? "";
+      expect(contextHeading.toLowerCase()).toContain("do not review");
+    });
+
+    it("says so explicitly when nothing changed since the baseline", () => {
+      const prompt = buildCodeReviewerPrompt({
+        ...baseInput,
+        reviewScope: { ...scope, changedFiles: "", diffStat: "", commitLog: "", hasChanges: false },
+      });
+      expect(prompt).toContain("## Review Target");
+      expect(prompt.toLowerCase()).toContain("no changes");
+    });
+  });
+});
+
+describe("getCodeReviewerSystemPrompt — incremental scope contract", () => {
+  const prompt = getCodeReviewerSystemPrompt();
+
+  it("tells the reviewer to confine findings to the review target when one is given", () => {
+    expect(prompt).toContain("Review Target");
+    expect(prompt).toContain("Change Context");
+  });
+
+  // Without this the incremental scope would silently drop the regression net:
+  // a reviewer told "only look here" must still be allowed to read outward.
+  it("still permits reading outside the target for context", () => {
+    expect(prompt.toLowerCase()).toContain("read");
+    expect(prompt).toMatch(/outside the .*target|beyond the .*target/i);
+  });
 });

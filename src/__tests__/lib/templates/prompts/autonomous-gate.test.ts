@@ -257,3 +257,40 @@ describe("buildAutonomousGatePrompt", () => {
     });
   });
 });
+
+describe("getAutonomousGateSystemPrompt — requested-fix verification", () => {
+  const prompt = getAutonomousGateSystemPrompt();
+
+  it("names the fix-verification report as the authority on whether an ask landed", () => {
+    expect(prompt).toContain("NOT LANDED");
+    expect(prompt).toContain("PARTIAL");
+  });
+
+  // The whole reason the verifier exists: the audit's TODO cross-reference reads
+  // what the executor claimed, and a `[x]` on unlanded work ends the run early.
+  it("prefers the verifier's verdict over the TODO checkbox when they disagree", () => {
+    expect(prompt).toMatch(/VERIFY-FIXES|fix verification/i);
+    expect(prompt.toLowerCase()).toMatch(/disagree|conflict|over the todo|rather than the todo/);
+  });
+
+  it("makes an unlanded ask a loop reason", () => {
+    const bullet = prompt
+      .split("\n")
+      .find((l) => l.includes("NOT LANDED") && l.includes("shouldLoop"));
+    expect(bullet, "no line ties NOT LANDED to shouldLoop").toBeDefined();
+    expect(bullet).toContain("shouldLoop: true");
+  });
+
+  // The Suggestion Budget narrows what *new* findings may loop from cycle 2 on.
+  // Applying it to already-requested work would let an ask be dropped by the
+  // cycle counter alone.
+  it("exempts already-requested work from the Suggestion Budget", () => {
+    expect(prompt).toMatch(/Suggestion Budget governs \*new\* findings/);
+  });
+
+  // Otherwise a bogus ask loops forever: the gate wrote it, so only the gate can
+  // retire it, and it needs the recorded reason to do that.
+  it("lets the gate retire an ask it now judges wrong instead of looping on it", () => {
+    expect(prompt.toLowerCase()).toMatch(/dismissedfindings|retire|withdraw/);
+  });
+});

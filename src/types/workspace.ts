@@ -127,4 +127,16 @@ export interface RepoChanges {
   changedFiles: string;
   diffStat: string;
   commitLog: string;
+  /**
+   * The branch's own work since a prior review's recorded HEAD. Absent when no
+   * baseline was recorded or it is no longer usable, which is the caller's cue to
+   * review the whole branch.
+   */
+  incremental?: {
+    sinceSha: string;
+    changedFiles: string;
+    diffStat: string;
+    commitLog: string;
+    hasChanges: boolean;
+  };
 }

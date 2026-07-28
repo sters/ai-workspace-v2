@@ -15,7 +15,13 @@ import {
   buildReadmeVerifierPrompt,
   buildCollectorPrompt,
   buildCrossRepositoryReviewerPrompt,
+  buildFixVerifierPrompt,
 } from "@/lib/templates";
+import {
+  captureRepoHead,
+  readPreviousReviewBaseline,
+  writeReviewBaseline,
+} from "@/lib/workspace/review-baseline";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { readKnownFindings } from "@/lib/workspace/known-findings";
 import {
@@ -35,8 +41,14 @@ export async function buildReviewPipeline(input: {
   repository?: string;
   /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
   repos?: WorkspaceRepo[];
+  /**
+   * Fixes the previous autonomous cycle's gate asked for. When present, a
+   * verifier child checks each one against the code — the gate otherwise infers
+   * this from TODO checkboxes, which record intent rather than outcome.
+   */
+  requestedFixes?: string[];
 }): Promise<PipelinePhase[]> {
-  const { workspace, repository } = input;
+  const { workspace, repository, requestedFixes } = input;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
   const allRepos = input.repos ?? listWorkspaceRepos(workspace);
@@ -76,14 +88,29 @@ export async function buildReviewPipeline(input: {
     repoChanges: string;
   }[] = [];
 
+  // What each repo's HEAD was at the previous review, so this one can scope
+  // itself to the branch's own work since then instead of re-reviewing every
+  // commit with a reviewer that has no memory of the earlier sessions.
+  const previousBaseline = await readPreviousReviewBaseline(wsPath, reviewTimestamp);
+  const currentHeads: Record<string, string> = {};
+
   for (const repo of repos) {
     const metaRepo = meta.repositories.find(
       (r) => r.path === repo.repoPath || r.alias === repo.repoName,
     );
     const baseBranch = metaRepo?.baseBranch ?? detectBaseBranch(repo.worktreePath);
     repoBaseBranches.set(repo.repoName, baseBranch);
-    const changes = getRepoChanges(workspace, repo.repoPath, baseBranch);
+
+    const head = captureRepoHead(repo.worktreePath);
+    if (head) currentHeads[repo.repoName] = head;
+
+    const sinceSha = previousBaseline?.heads[repo.repoName];
+    const changes = getRepoChanges(workspace, repo.repoPath, baseBranch, sinceSha);
     const repoChangesText = `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`;
+    const reviewScope =
+      changes.incremental && previousBaseline
+        ? { ...changes.incremental, sinceTimestamp: previousBaseline.timestamp }
+        : undefined;
 
     crossRepoInputs.push({
       repoName: repo.repoName,
@@ -112,10 +139,37 @@ export async function buildReviewPipeline(input: {
         repoChanges: repoChangesText,
         reviewFilePath: path.join(reviewDir, reviewFileName),
         knownFindings,
+        reviewScope,
       }),
       addDirs: [reviewDir],
       appendSystemPromptFile: ensureSystemPrompt(wsPath, "code-reviewer"),
     });
+
+    // Requested-fix verifier — only when a previous cycle actually asked for
+    // something. Separate from the code reviewer so the "did the ask land"
+    // verdict and the "is this code good" verdict stay in different files with
+    // different scopes.
+    if (requestedFixes && requestedFixes.length > 0) {
+      const fixVerifyFileName = `VERIFY-FIXES-${orgName}_${repo.repoName}.md`;
+      reviewChildren.push({
+        label: `verify-fixes-${repo.repoName}`,
+        stepType: STEP_TYPES.VERIFY_FIXES,
+        prompt: buildFixVerifierPrompt({
+          workspaceName: workspace,
+          repoPath: repo.repoPath,
+          repoName: repo.repoName,
+          baseBranch,
+          reviewTimestamp,
+          requestedFixes,
+          worktreePath: repo.worktreePath,
+          verifyFilePath: path.join(reviewDir, fixVerifyFileName),
+          sinceSha: reviewScope?.sinceSha,
+          sinceTimestamp: reviewScope?.sinceTimestamp,
+        }),
+        addDirs: [reviewDir],
+        appendSystemPromptFile: ensureSystemPrompt(wsPath, "fix-verifier"),
+      });
+    }
 
     // TODO verifier — skipped when the repo has no TODO file (or it's empty),
     // since there is nothing for the verifier to check against.
@@ -165,6 +219,11 @@ export async function buildReviewPipeline(input: {
       appendSystemPromptFile: ensureSystemPrompt(wsPath, "readme-verifier"),
     });
   }
+
+  // Record where this review started so the next one can scope itself. Written
+  // before any child runs: the heads captured above are the point this review
+  // judged, and a child that commits during the review must not move it.
+  await writeReviewBaseline(wsPath, reviewTimestamp, currentHeads);
 
   // Cross-repository review: only when the whole workspace (no single-repo
   // filter) has more than one repo. Catches issues that span repos — API/contract
@@ -321,10 +380,12 @@ export async function buildReviewPipeline(input: {
         const verifyGlob = new Bun.Glob("VERIFY-TODO-*");
         const readmeVerifyGlob = new Bun.Glob("VERIFY-README-*");
         const constraintGlob = new Bun.Glob("CONSTRAINTS-*");
+        const fixVerifyGlob = new Bun.Glob("VERIFY-FIXES-*");
         const actualReviewFiles = [...reviewGlob.scanSync({ cwd: reviewDir })];
         const actualReadmeVerifyFiles = new Set([...readmeVerifyGlob.scanSync({ cwd: reviewDir })]);
         const actualVerifyFiles = [...verifyGlob.scanSync({ cwd: reviewDir })];
         const actualConstraintFiles = [...constraintGlob.scanSync({ cwd: reviewDir })];
+        const actualFixVerifyFiles = [...fixVerifyGlob.scanSync({ cwd: reviewDir })];
 
         const prompt = buildCollectorPrompt({
           workspaceName: workspace,
@@ -334,6 +395,7 @@ export async function buildReviewPipeline(input: {
           verifyFiles: actualVerifyFiles.map((f) => path.join(reviewDir, f)),
           readmeVerifyFiles: [...actualReadmeVerifyFiles].map((f) => path.join(reviewDir, f)),
           constraintFiles: actualConstraintFiles.map((f) => path.join(reviewDir, f)),
+          fixVerifyFiles: actualFixVerifyFiles.map((f) => path.join(reviewDir, f)),
         });
 
         const ok = await ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir], stepType: STEP_TYPES.COLLECT_REVIEWS, appendSystemPromptFile: ensureSystemPrompt(wsPath, "collector") });

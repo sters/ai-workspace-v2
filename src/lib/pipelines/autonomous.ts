@@ -416,7 +416,15 @@ export function buildAutonomousPipeline(input: {
           return false;
         }
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Reviewing workspace: ${ws}`);
-        const reviewPhases = await buildReviewPipeline({ workspace: ws, repository: repo });
+        // Read at run time, not build time: later cycles are appended before the
+        // gate that fills their entry has run, so a captured value would be stale.
+        // Empty on cycle 1, which is correct — nothing has been asked for yet.
+        const previousAsks = gateHistory[gateHistory.length - 1]?.fixableIssues;
+        const reviewPhases = await buildReviewPipeline({
+          workspace: ws,
+          repository: repo,
+          requestedFixes: previousAsks && previousAsks.length > 0 ? previousAsks : undefined,
+        });
         return runSubPhases(ctx, reviewPhases, skip);
       },
     };
