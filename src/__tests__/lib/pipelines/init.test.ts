@@ -34,6 +34,10 @@ const EXPECTED_LABELS = [
   "Analyze & draft README",
   "Setup workspace",
   "Discover repo constraints",
+  // Fire-and-forget: it starts the install/submodule commands the constraints
+  // just declared and returns, so planning overlaps them instead of Execute
+  // paying for them.
+  "Prepare toolchain",
   "Plan TODO items",
   "Coordinate TODOs",
   "Review TODOs",

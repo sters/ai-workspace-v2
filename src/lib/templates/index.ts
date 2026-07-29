@@ -25,6 +25,8 @@ export {
   getTodoVerifierSystemPrompt,
   getFixVerifierSystemPrompt,
   buildFixVerifierPrompt,
+  getFixApplierSystemPrompt,
+  buildFixApplierPrompt,
   buildTodoVerifierPrompt,
   getReadmeVerifierSystemPrompt,
   buildReadmeVerifierPrompt,

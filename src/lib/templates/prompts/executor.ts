@@ -4,7 +4,13 @@
  */
 
 import type { ExecutorInput, BatchedExecutorInput } from "@/types/prompts";
-import { SCOPE_DISCIPLINE, SUBAGENT_DELEGATION_POLICY, worktreeCdRules } from "./shared";
+import {
+  NO_TICKET_IDS_IN_CODE,
+  SCOPE_DISCIPLINE,
+  SUBAGENT_DELEGATION_POLICY,
+  TOOLCHAIN_RESOLUTION,
+  worktreeCdRules,
+} from "./shared";
 
 export function getExecutorSystemPrompt(): string {
   return `You are a specialized agent for executing TODO items for a specific repository within a workspace directory. Your role is to autonomously consume and complete TODO tasks defined in the TODO file provided in the user prompt.
@@ -77,19 +83,7 @@ export function getExecutorSystemPrompt(): string {
      - Use \`make fmt\` instead of \`goimports -w .\` or \`gofmt\`
    - **Exception**: When operating on a specific file (e.g. running a single test file, linting one file), it is acceptable to use direct commands if the task runner does not support file-level targeting
 
-### Toolchain & Environment Resolution
-
-**Before running any build/test/lint/install command, make sure the correct tool versions and dependency manager are actually available.** A command failing because the toolchain isn't set up is NOT a reason to give up — resolve it first. This is language-agnostic; apply the same reasoning to node, python, ruby, go, rust, java, php, etc.
-
-1. **Resolve pinned versions** from version files, then activate them:
-   - Universal first: if \`.tool-versions\` or \`mise.toml\`/\`.mise.toml\` exists, prefer \`mise install\` (or \`asdf install\`) — it handles multiple languages at once.
-   - Otherwise language-specific: \`.node-version\`/\`.nvmrc\` (node → \`fnm use\` / \`nvm use\` / \`mise\`), \`.python-version\`/\`pyproject.toml\` (python → \`pyenv\` / \`uv\`), \`.ruby-version\` (ruby → \`rbenv\`), the \`go\` directive in \`go.mod\`, \`rust-toolchain.toml\` (rust → rustup), \`.java-version\`/\`.sdkmanrc\` (jvm → sdkman).
-2. **Resolve the dependency manager from the lockfile / declaration — do NOT substitute a different one.** A \`pnpm-lock.yaml\` means use pnpm, not bun or npm; \`uv.lock\` means uv, not pip; \`poetry.lock\` means poetry; \`yarn.lock\` means yarn; \`Gemfile.lock\` means bundler; \`Cargo.lock\` means cargo. Honor \`packageManager\` in package.json when present. Switching managers corrupts the lockfile and breaks reproducibility.
-3. **If the resolved manager is missing, set it up — don't bail:**
-   - JS package managers: try \`corepack enable\` (then \`corepack prepare --activate\`), or install via \`mise\`/\`asdf\`, or \`npm i -g <pm>\` as a last resort.
-   - Other languages: install the manager via the version manager (\`mise\`/\`asdf\`) or the documented bootstrap in CONTRIBUTING/README.
-4. **Only after the toolchain is ready**, run the install command (e.g. \`pnpm install --frozen-lockfile\`, \`uv sync\`, \`bundle install\`, \`go mod download\`).
-5. If, after genuinely attempting steps 1–4 (corepack, mise/asdf, documented bootstrap), the toolchain still cannot be provisioned (e.g. it needs network access you don't have, or a credentialed private registry), mark the affected item \`[!]\` (blocked) with a Note stating exactly which tool/version/manager is missing and what you tried. Do NOT silently switch to a different manager, and do NOT treat it as "unsolvable" without recording the attempts.
+${TOOLCHAIN_RESOLUTION}
 
 ${SCOPE_DISCIPLINE}
 
@@ -129,24 +123,7 @@ To commit changes to the workspace (TODO file updates), \`cd\` to the workspace 
 - **Do NOT inspect remote pull request or CI state.** Do NOT run \`gh pr view\`, \`gh pr checks\`, \`gh pr diff\`, \`gh run view\`, \`gh api\`, or any equivalent. A TODO item derived from PR feedback already quotes what you need (the failing job name and its key error line, the review comment). Work from that quoted text plus the local repository. If an item's quoted context is too thin to act on, mark it \`[!]\` (blocked) with a Note stating what is missing — do not go fetch it from the remote. Verify your fix with the repository's own lint/test/build commands, never with remote CI.
 - Merge branches, perform git merge, PR merge, or any branch merging operations (unless explicitly instructed)
 
-### No Ticket IDs in Code
-
-**CRITICAL: Ticket IDs and issue references must NEVER appear inside the codebase.** This includes Jira keys (e.g. \`PROJ-123\`, \`JIRA-456\`), GitHub issue/PR refs (\`#789\`, \`org/repo#789\`), Linear IDs, and any similar task-tracker identifier.
-
-Forbidden locations (non-exhaustive):
-- Source code, including identifiers, string literals, constants, enum values
-- Comments and docstrings (\`// PROJ-123: ...\`, \`/** for JIRA-456 */\`)
-- Test names and \`describe\`/\`it\` titles
-- File names and directory names
-- TODO file content you author for downstream consumers
-- Configuration files, fixtures, snapshots
-
-Allowed locations (the only ones):
-- Git commit messages
-- Branch names
-- PR titles and descriptions (handled by a later phase, not by you)
-
-If the workspace TODO or README references a ticket ID, treat it as background context only — do NOT propagate it into any file you edit or create. If you find existing ticket IDs in code you are touching, leave them alone unless removing them is part of the TODO; do not add new ones.
+${NO_TICKET_IDS_IN_CODE}
 
 ### Repository Constraints Enforcement
 

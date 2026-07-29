@@ -100,6 +100,13 @@ export interface FixVerifierInput extends RepoPromptInput {
   sinceTimestamp?: string;
 }
 
+/** Targeted fix round input: the gate's asks, applied to one repository. */
+export interface FixApplierInput extends RepoPromptInput {
+  readmeContent: string;
+  /** The gate's `fixableIssues`, verbatim — the whole scope of the round. */
+  requestedFixes: string[];
+}
+
 /** Cross-repository code-review agent input (multi-repo workspaces only). */
 export interface CrossRepositoryReviewerInput {
   workspaceName: string;
@@ -132,6 +139,12 @@ export interface ReadmeVerifierInput extends RepoPromptInput {
   verifyFilePath: string;
   /** Pre-rendered Acceptance Criteria checklist parsed from the README, or "" when absent. */
   acceptanceCriteria?: string;
+  /**
+   * Report the Verify constraints phase wrote before this child started. Present
+   * so a criterion phrased as "the declared commands exit 0" is answered by
+   * reading it rather than by re-running lint/test/build.
+   */
+  constraintReportPath?: string;
 }
 
 export interface PRCreatorInput extends RepoPromptInput {

@@ -20,6 +20,7 @@ import {
 } from "@/lib/templates";
 import { writeReportTemplates, writeResearchTemplates } from "@/lib/workspace";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
+import { awaitToolchainPrewarm } from "@/lib/workspace/toolchain-prewarm";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { executePhaseBudgetMs } from "@/lib/pipeline/constants";
 import { STEP_TYPES } from "@/types/pipeline";
@@ -280,6 +281,8 @@ async function executeRepoLanes(
 ): Promise<boolean> {
   const { workspace, readmeContent, repos, wsPath, batchSize } = input;
 
+  await reportToolchainPrewarm(ctx, workspace, repos);
+
   const results = await Promise.all(
     repos.map((repo) =>
       executeRepoLane(ctx, {
@@ -293,6 +296,38 @@ async function executeRepoLanes(
   );
 
   return results.every(Boolean);
+}
+
+/**
+ * Wait for the toolchain prep the init pipeline started during planning, and say
+ * what it did. Reported rather than enforced: the executor resolves its own
+ * environment anyway, so a failed prep costs it the time this was meant to save
+ * but never blocks the cycle. Empty for a standalone `execute` run, which had no
+ * discovery phase ahead of it to start one.
+ */
+async function reportToolchainPrewarm(
+  ctx: PhaseFunctionContext,
+  workspace: string,
+  repos: WorkspaceRepo[],
+): Promise<void> {
+  const results = await awaitToolchainPrewarm(
+    workspace,
+    repos.map((r) => r.repoName),
+  );
+  for (const result of results) {
+    const totalMs = result.steps.reduce((sum, s) => sum + s.durationMs, 0);
+    if (result.ok) {
+      ctx.emitStatus(
+        `[${result.repoName}] Toolchain prepared during planning (${result.steps.length} command(s), ${Math.round(totalMs / 1000)}s)`,
+      );
+      continue;
+    }
+    const failed = result.steps[result.steps.length - 1];
+    ctx.emitStatus(
+      `[${result.repoName}] Toolchain prep failed at \`${failed?.command ?? "?"}\`` +
+        ` (exit ${failed?.exitCode ?? "n/a"}) — the executor will resolve the toolchain itself`,
+    );
+  }
 }
 
 interface SingleLaneInput {

@@ -1265,3 +1265,168 @@ describe("buildAutonomousPipeline", () => {
     });
   });
 });
+
+describe("buildAutonomousPipeline — targeted fix round", () => {
+  function findPhase(phases: PipelinePhase[], label: string) {
+    const p = phases.find((x) => x.kind === "function" && x.label === label);
+    if (!p || p.kind !== "function") throw new Error(`no phase ${label}`);
+    return p;
+  }
+
+  async function runGate(verdict: Record<string, unknown>) {
+    mockGetReviewSessions.mockResolvedValue([{
+      timestamp: "2024-01-01", critical: 0, major: 0, minor: 1, total: 1,
+    }]);
+    mockGetReviewDetail.mockResolvedValue({
+      summary: "one warning",
+      files: [{ name: "REVIEW-repo.md", content: "Warning: duplicate key" }],
+    });
+
+    const phases = buildAutonomousPipeline({ startWith: "execute", workspace: "test-ws" });
+    const appended: PipelinePhase[] = [];
+    const ctx = createMockCtx({
+      runChild: vi.fn(async (label, _prompt, opts) => {
+        if (opts?.onResultText && label === "Autonomous Gate") {
+          opts.onResultText(JSON.stringify(verdict));
+        }
+        return true;
+      }),
+      appendPhases: vi.fn((p: PipelinePhase[]) => { appended.push(...p); }),
+    });
+    await findPhase(phases, "Cycle 1: Gate").fn(ctx);
+    return { appended, ctx };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetOperation.mockReturnValue({
+      id: "test-op",
+      workspace: "test-ws",
+    } as ReturnType<typeof mockGetOperation>);
+  });
+
+  it("replaces Update TODO + Execute with a single Fix phase", async () => {
+    const { appended } = await runGate({
+      shouldLoop: true,
+      giveUp: false,
+      reason: "one localized fix left",
+      fixableIssues: ["include the index in the list key at row.tsx:118"],
+      fixScope: "targeted",
+    });
+
+    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
+      "Cycle 2: Fix",
+      "Cycle 2: Review",
+      "Cycle 2: Gate",
+    ]);
+  });
+
+  it("scopes the review behind it to fix verification", async () => {
+    const { appended } = await runGate({
+      shouldLoop: true,
+      giveUp: false,
+      reason: "one localized fix left",
+      fixableIssues: ["include the index in the list key"],
+      fixScope: "targeted",
+    });
+
+    await findPhase(appended, "Cycle 2: Review").fn(createMockCtx());
+    expect(mockBuildReview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: "fixes",
+        requestedFixes: ["include the index in the list key"],
+      }),
+    );
+  });
+
+  it("hands the asks to the fix applier verbatim, per repo", async () => {
+    const { appended } = await runGate({
+      shouldLoop: true,
+      giveUp: false,
+      reason: "two localized fixes left",
+      fixableIssues: ["ask one", "ask two"],
+      fixScope: "targeted",
+    });
+
+    const children: { label: string; prompt: string }[] = [];
+    const fixCtx = createMockCtx({
+      runChildGroup: vi.fn(async (cs) => {
+        children.push(...cs.map((c) => ({ label: c.label, prompt: c.prompt })));
+        return cs.map(() => true);
+      }),
+    });
+    await findPhase(appended, "Cycle 2: Fix").fn(fixCtx);
+
+    expect(children.map((c) => c.label)).toEqual(["repo"]);
+    expect(children[0].prompt).toContain("1. ask one");
+    expect(children[0].prompt).toContain("2. ask two");
+  });
+
+  it("leaves the TODO file alone — no strip, no update-todo pipeline", async () => {
+    const { appended } = await runGate({
+      shouldLoop: true,
+      giveUp: false,
+      reason: "one localized fix left",
+      fixableIssues: ["ask one"],
+      fixScope: "targeted",
+    });
+    await findPhase(appended, "Cycle 2: Fix").fn(createMockCtx());
+
+    expect(mockStripCompletedTodos).not.toHaveBeenCalled();
+    expect(mockBuildUpdateTodo).not.toHaveBeenCalled();
+  });
+
+  it("still runs the full round for fixScope: replan", async () => {
+    const { appended } = await runGate({
+      shouldLoop: true,
+      giveUp: false,
+      reason: "needs a new module",
+      fixableIssues: ["extract a shared helper"],
+      fixScope: "replan",
+    });
+
+    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
+      "Cycle 1: Update TODO",
+      "Cycle 2: Execute",
+      "Cycle 2: Review",
+      "Cycle 2: Gate",
+    ]);
+  });
+
+  it.each([undefined, "TARGETED", "something-else"])(
+    "falls back to the full round for an unusable fixScope %p",
+    async (fixScope) => {
+      const { appended } = await runGate({
+        shouldLoop: true,
+        giveUp: false,
+        reason: "work remains",
+        fixableIssues: ["ask one"],
+        fixScope,
+      });
+      expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
+        "Cycle 1: Update TODO",
+        "Cycle 2: Execute",
+        "Cycle 2: Review",
+        "Cycle 2: Gate",
+      ]);
+    },
+  );
+
+  it("falls back to the full round when targeted arrives with no asks", async () => {
+    // A targeted round with nothing to apply would land no change and then be
+    // judged again on an identical branch.
+    const { appended } = await runGate({
+      shouldLoop: true,
+      giveUp: false,
+      reason: "work remains but unspecified",
+      fixableIssues: [],
+      fixScope: "targeted",
+    });
+    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
+      "Cycle 1: Update TODO",
+      "Cycle 2: Execute",
+      "Cycle 2: Review",
+      "Cycle 2: Gate",
+    ]);
+  });
+});

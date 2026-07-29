@@ -31,7 +31,14 @@ export function getReadmeVerifierSystemPrompt(): string {
 
 3. **Review Changes**: The changed files, diff stat, and commit log are already provided in the "Repository Changes" section of the user prompt. Use \`git diff\` (without \`--stat\` / \`--name-only\` / \`log\`) only when you need the actual content of a specific change.
 
-4. **Verify Each Requirement** (including any found from linked resources):
+4. **Take Constraint Results From the Report, Don't Re-Run Them**:
+   A criterion phrased as "lint / test / build / typecheck exits 0" (however the README words it) is already answered: a phase ahead of you ran every command the README declares under \`## Repository Constraints\` and wrote the exit code, duration and output of each to the constraint report named in the user prompt. Read that file and cite it as your evidence.
+   - Do NOT re-run those commands. That phase is the only place they run during a review, because it is the only place a failure gets compared against the merge-base before it counts against this branch — a re-run of your own has no such comparison, and a full suite and build cost minutes of the review's wall clock for an answer already on disk.
+   - A command the report marks \`PRE-EXISTING\` fails on the merge-base too, so it is not this branch's failure. Report the criterion as PARTIAL, name the pre-existing failure as the reason, and do not treat it as UNSATISFIED work for the branch.
+   - \`NOT DECLARED\` in the report means nothing mechanically verified this repo. Say so rather than filling the gap yourself.
+   - Running a **single narrow test** to confirm a specific behavior the criteria describe is still fine (e.g. one spec file for one new function). What this rule forbids is re-running the declared constraint set.
+
+5. **Verify Each Requirement** (including any found from linked resources):
    - Check if the required files were created or modified
    - Verify expected functionality exists (search for patterns, function names, etc.)
    - Classify each requirement as:
@@ -40,7 +47,7 @@ export function getReadmeVerifierSystemPrompt(): string {
      - **UNSATISFIED**: No evidence the requirement was addressed
      - **PENDING-HUMAN**: A \`(manual)\` acceptance criterion that can only be confirmed by a human. This is NOT a failure — it is a handoff. Never classify a \`(manual)\` item as UNSATISFIED just because you could not verify it yourself.
 
-5. **Write Verification Report** to the specified file path
+6. **Write Verification Report** to the specified file path
    - Each extracted requirement becomes its own h2 section (## {Requirement})
    - Under each h2, include Status, Evidence, and Notes
    - List all PENDING-HUMAN items together under the report's handoff section so the human reviewer knows exactly what still needs manual confirmation
@@ -83,7 +90,11 @@ ${input.acceptanceCriteria ? `\n## Acceptance Criteria (parsed — verify these)
 ## Repository Changes
 
 ${input.repoChanges}
-
+${
+  input.constraintReportPath
+    ? `\n## Constraint Verification Report (already run — read, do not re-run)\n\n${input.constraintReportPath}\n\nEvery command the README declares under \`## Repository Constraints\` was run before you started, with each failure compared against the merge-base. Cite this report for any criterion about lint / test / build / typecheck passing.\n`
+    : ""
+}
 ## Verification Report Template
 
 Write the verification report to: ${input.verifyFilePath}

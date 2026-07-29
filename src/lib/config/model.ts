@@ -107,7 +107,6 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   [STEP_TYPES.ANALYZE_README]: "high",
   [STEP_TYPES.PLAN_TODO]: "high",
   [STEP_TYPES.RESEARCH]: "high",
-  [STEP_TYPES.CODE_REVIEW]: "high",
   [STEP_TYPES.COORDINATE_TODOS]: "high",
   [STEP_TYPES.BEST_OF_N_REVIEWER]: "high",
   // The one step tiered by payoff rather than shape: it reads an already
@@ -121,6 +120,21 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // step in the pipeline and runs once per batch per repo, so it dominates both
   // wall clock and spend.
   [STEP_TYPES.EXECUTE]: "medium",
+  // The one placement this ladder makes by budget rather than by shape, and it is
+  // an exception on purpose: by the "absence of a checklist" rule above, hunting
+  // defects nobody enumerated belongs at `high`, and that is where it sat.
+  //
+  // It moved because it is the measured critical path of *every* review phase —
+  // 7.4 min / 40 turns on the first cycle of one autonomous run and 4.9 on the
+  // second, with under 10s of that spent waiting on a tool, i.e. essentially all
+  // model time — and a review phase runs once per cycle. What makes the trade
+  // survivable is how much of the reviewer's job the harness around it now owns:
+  // `REVIEW_COVERAGE_POLICY` asks for breadth rather than adjudication,
+  // `SEVERITY_CALIBRATION` supplies the labels, the `Verify constraints` phase
+  // owns lint/test/build, and **Incremental review scope** narrows it to the diff
+  // since the last review. Depth is still what gets traded away: raise it back
+  // via `operations.review.steps.code-review.effort` where a run needs it.
+  [STEP_TYPES.CODE_REVIEW]: "medium",
   // Verifies against the enumerated `## Acceptance Criteria` checkboxes, which
   // the prompt treats as the authoritative requirement set.
   [STEP_TYPES.VERIFY_README]: "medium",
