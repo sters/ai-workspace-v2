@@ -96,11 +96,15 @@ export const REVIEW_COVERAGE_POLICY = `### Coverage, Not Filtering
 
 Report every issue you find, including ones you are uncertain about and ones you consider low-severity. Your job at this stage is **coverage**, not filtering — the review summary and the autonomous gate rank and filter afterwards. It is better to surface a finding that later gets filtered out than to silently drop a real bug. Do not withhold nits either; file them as Suggestions. The only finding you should leave out is one you actively confirmed is NOT a problem.
 
+That applies to your report's summary sections too, where the temptation is a verdict rather than a filter. Describe what you found and what state the change is in, but **do not state** whether it can merge or ship, whether it is "review-ready", or whether your findings are "blocking" / "no blocking issues". You are not positioned to make that call: the acceptance criteria, the TODO files, whether the fixes an earlier cycle asked for actually landed, and the record of findings already accepted are all outside your view, and the stage that holds them decides. A verdict written here reads as authoritative, gets overridden, and leaves two contradictory answers in one file.
+
 Annotate every finding with a **Confidence** so the downstream filter can rank it:
 
 - **high** — verified in the code; you can point at the concrete failure.
 - **medium** — likely a real problem, but you could not fully confirm it.
 - **low** — a suspicion worth checking; may turn out to be a false positive.
+
+Confidence measures **whether the mechanism you describe is real**, checked against the code — not how likely the triggering input is, nor how much the failure would matter. When you verified the mechanism but cannot confirm the input ever occurs, that is **high** confidence: state the unconfirmed part in the finding itself, where the reader can weigh it. Exposure you could not establish does not lower confidence, because the downstream filter drops low-confidence findings outright — routing an "is it reachable?" doubt into this field is how a verified defect disappears.
 
 Write it inline with the finding (e.g. \`(Confidence: medium)\`). Confidence is independent of severity: a low-confidence Critical and a high-confidence Suggestion are both normal and both worth reporting.`;
 
@@ -121,10 +125,12 @@ export const SEVERITY_CALIBRATION = `### Calibrating Severity
 Severity answers one question about the change in front of you: **is it done, and is it sound?**
 
 - **Critical Issues** — it is broken: wrong behavior, a security hole, data loss, a build that does not build.
-- **Warnings** — it works in the happy path but is not finished or not sound as delivered: an unhandled failure path, something the task's contract requires that the code does not implement, a type/schema inconsistency across a boundary, missing test coverage for new or changed behavior, a reference the change left stale.
-- **Suggestions** — it is complete and correct as it stands, and this is taste: naming and wording preferences, layout and readability polish, refactoring or consolidation opportunities, anything correct-but-not-how-you'd-write-it.
+- **Warnings** — it works in the happy path but is not finished or not sound as delivered: an unhandled failure path, something the task's contract requires that the code does not implement, a type/schema inconsistency across a boundary, missing test coverage for behavior the contract requires or that some input reachable in practice exercises, an input class the code this change **replaced** handled and the new code does not, a reference the change left stale.
+- **Suggestions** — it is complete and correct as it stands, and this is taste: naming and wording preferences, layout and readability polish, refactoring or consolidation opportunities, an untested defensive guard no reachable input hits, anything correct-but-not-how-you'd-write-it.
 
-Place each finding by what it says about the deliverable, not by how easy the fix is. Do not lift a preference to Warning because it would be a one-line change, and do not file real incompleteness under Suggestions because you are unsure it is worth the reader's time — uncertainty belongs in the Confidence annotation, not in the severity.`;
+Place each finding by what it says about the deliverable, not by how easy the fix is. Do not lift a preference to Warning because it would be a one-line change, and do not file real incompleteness under Suggestions because you are unsure it is worth the reader's time — uncertainty belongs in the Confidence annotation, not in the severity.
+
+On that Warning about a **replaced** capability: compare the new code against the code it replaced in this diff, not against the rest of the repository — a defect the change did not introduce is not this change's Warning. "The old code handled input X and the new code does not" is a fact you can establish from the diff alone, so not knowing how often X actually arrives does not soften it; say what you could not confirm and keep the severity. Attach the change you would fall back to if the answer never comes, rather than leaving the finding as a question for a human — a finding whose only exit is someone else's answer is one nothing will act on.`;
 
 /**
  * Cross-cycle memory for review agents. Reviewers are spawned fresh each

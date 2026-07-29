@@ -83,7 +83,7 @@ Your job is to decide which of three states the branch is in: still short of rev
 3. Everything else is **recorded, not fixed**: put it in \`dismissedFindings\` and proceed. That includes every Suggestion-level finding, on every cycle — see the **Suggestion Budget** below.
 4. Examples of findings that **do** justify a loop when the review attached a concrete change (illustrative, not an exhaustive list — anything comparable counts):
    - Logic errors, unhandled failure paths, data-loss or security risks
-   - Insufficient test coverage for new or changed behavior
+   - Insufficient test coverage for changed behavior the README's contract requires, or for a path some reachable input exercises
    - Type/schema inconsistency across a boundary (int widths, optional vs required, repeated vs scalar)
    - Lint, test or build failures this branch introduced
    - A contract the README requires that the code does not implement
@@ -107,6 +107,7 @@ The review phase is instructed to prioritize **coverage over filtering** — it 
 - **low confidence** — does NOT by itself justify a loop. Include it only when the fix is small and obviously safe, or when more than one review file reports the same thing. Otherwise say so in \`reason\` and let it go: looping on speculation is how a run burns its cycles without converging.
 - **no annotation** — treat as medium.
 - Confidence is independent of severity. A low-confidence "Critical" is a suspicion, not a blocker; a high-confidence "Suggestion" is a real finding — real, and still judged against the loop bar like any other Suggestion.
+- The annotation is about whether the described **mechanism** is real, not about how likely the triggering input is. So a finding that verified its mechanism in the code and flags only that the input is **unconfirmed** — "this comparator returns 0 for a 13-digit timestamp; whether the backend ever sends one is unverified" — is **not low confidence** whatever label it arrived with. Read it as high and judge it on the loop bar; the unconfirmed exposure belongs in \`reason\` if you defer it. The genuine low-confidence case is one where the *mechanism itself* is a guess.
 
 ### Suggestion Budget
 
@@ -114,7 +115,9 @@ A Suggestion-level finding does not clear the loop bar on **any** cycle, however
 
 The reason is mechanical, not a matter of taste: every suggestion fix widens the diff, the next review reads the wider diff, and a wider diff yields more findings — including findings about the fix itself. A run that spends a cycle on polish spends a full Execute + Review on it, and it spends it while the actual blockers wait. A one-line task should finish in one cycle.
 
-What this does **not** license is down-labelling. If a finding means the work is unfinished, incorrect or unsound, it is Should-Fix and it loops, whatever heading the review filed it under. Insufficient test coverage for changed code is Should-Fix, not a Suggestion. The bar is "is this branch actually done", not "is this cheap to skip" — shipping polish-free work is fine, shipping unfinished work is not.
+What this does **not** license is down-labelling. If a finding means the work is unfinished, incorrect or unsound, it is Should-Fix and it loops, whatever heading the review filed it under. The bar is "is this branch actually done", not "is this cheap to skip" — shipping polish-free work is fine, shipping unfinished work is not.
+
+Test coverage is scoped rather than absolute: missing test coverage is Should-Fix when the untested behavior is one the README's contract requires, or one that some reachable input exercises. An untested **defensive guard** that no input the system produces can reach — a fallback for a value the wire format does not carry, a branch the reviewer itself calls unreachable — is a Suggestion. Every fix a cycle lands is itself changed code carrying new guards, so reading this rule absolutely guarantees another cycle no matter how complete the work is: the run's own fix becomes the next cycle's blocker, and there is no state the branch could reach that clears the bar.
 
 ### Completion Bar (what creates the PR)
 
