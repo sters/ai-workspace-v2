@@ -13,6 +13,19 @@ import {
 
 const PLANNER_CD_RULES = worktreeCdRules({ examples: "`git status`, `git diff`, etc." });
 
+/**
+ * The exploring planner gets the cd rule with a pointer out of it. Its opening
+ * line is an emphatic MUST about a Bash call, which on its own reads as "Bash is
+ * how you touch this repository" — measured: 54 Bash calls and zero Grep/Glob in
+ * one phase. The pointer, and rendering "Searching the Repository" *after* this
+ * section rather than before it, are what keep that from being the last word.
+ */
+const EXPLORING_PLANNER_CD_RULES = worktreeCdRules({
+  examples: "`git status`, `git diff`, etc.",
+  extra:
+    "This rule is about **shell commands**. It is not how you search or read code: `Grep`, `Glob` and `Read` take path arguments and need no `cd` — see \"Searching the Repository\" below.",
+});
+
 export function getPlannerSystemPrompt(): string {
   return `You are a specialized agent for creating TODO items. Your role is to understand the workspace objectives, assess how much repository analysis is needed, and create actionable TODO items that guide the executor.
 
@@ -30,7 +43,7 @@ export function getPlannerSystemPrompt(): string {
    - Replace \`{{REPOSITORY_NAME}}\` with the actual repository name
 
 3. **Read Repository Documentation and Discover Task Runner Commands**:
-   - Read CLAUDE.md, README.md, CONTRIBUTING.md from the repository
+   - Read CLAUDE.md, README.md, CONTRIBUTING.md from the repository — one \`Read\` each, all in the same turn
    - Extract build/test/lint commands and coding conventions
    - Check for task runners: Makefile, package.json scripts, Taskfile.yml, Justfile, etc.
    - Identify available targets (e.g. \`make lint\`, \`npm run test\`, \`bun run build\`)
@@ -45,7 +58,7 @@ export function getPlannerSystemPrompt(): string {
      - Where such a convention is non-obvious, record it as a \`Pattern:\` sub-item pointing at the code that demonstrates it. Skip it where the surrounding code already makes it plain — the executor reads that code too.
 
 5. **Audit Existing Conventions Around the Edit Site** (REQUIRED for code-change tasks that add or modify typed contracts — proto/schema/IDL definitions, DB columns, public API signatures, struct fields):
-   - For each new field, parameter, or column you plan to add, search the **same file** and **sibling files in the same package/module** for fields with the **same base name or near-synonym** (e.g. \`contact_type_id\` vs \`contact_type_ids\`, \`user_id\` vs \`UserID\`, \`created\` vs \`created_at\`).
+   - For each new field, parameter, or column you plan to add, \`Grep\` the **same file** and **sibling files in the same package/module** for fields with the **same base name or near-synonym** (e.g. \`contact_type_id\` vs \`contact_type_ids\`, \`user_id\` vs \`UserID\`, \`created\` vs \`created_at\`).
    - Record the existing type / cardinality / nullability / naming style of those matches, and make sure the new addition matches — or, if it diverges intentionally, document the reason explicitly in the TODO item's \`Why:\` line.
    - Common audit dimensions: signed vs unsigned int width (int64 vs uint64), optional vs required, repeated vs scalar, string vs typed ID, snake_case vs camelCase, timestamp encoding (\`google.protobuf.Timestamp\` vs unix int).
    - This audit catches silent inconsistencies that compile but break at wire/serialization time (e.g. proto3 JSON encodes uint64 as string but int64 as number; sign-extension when crossing layers). The planner is the **last cheap chance** to catch these — fixing them after PR is far more expensive.
@@ -64,9 +77,9 @@ Write the TODO file to the output directory specified in the user prompt: \`<tod
 
 ${SUBAGENT_DELEGATION_POLICY}
 
-${REPO_SEARCH_EFFICIENCY}
+${EXPLORING_PLANNER_CD_RULES}
 
-${PLANNER_CD_RULES}
+${REPO_SEARCH_EFFICIENCY}
 
 ${WRITTEN_DELIVERABLE_LENGTH}
 

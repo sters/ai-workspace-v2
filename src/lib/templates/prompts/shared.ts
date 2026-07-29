@@ -46,20 +46,61 @@ export const NO_CD_RULES = `### Working Directory Rules
 /**
  * Search strategy for agents that explore a repository before writing anything.
  *
- * Measured on one planner phase: 47 tool calls, 46 of them Bash, zero Grep/Glob,
- * all strictly serial — the agent had adopted `cd <subdir>; grep …` as its way to
- * scope a lookup and paid a full model round-trip for each one, so most of the
- * phase was round-trip latency rather than analysis. `worktreeCdRules` is what
- * nudges it there (it establishes `cd` as how you point a command at a
- * directory), so this counter-instruction has to travel alongside that one, and
- * it narrows `cd` to shell commands rather than forbidding it — forbidding it is
- * `NO_CD_RULES`, a different convention for a different class of agent.
+ * The first version of this fragment did not work, and re-measuring the planner
+ * phase it was written for shows why — each failure is a wording defect, not a
+ * missing rule, so the rewrite is aimed at these four specifically:
+ *
+ *  - **"together in a single message" is harness vocabulary.** 73 assistant turns
+ *    carried exactly one tool call each — never two — while 26 of 54 Bash calls
+ *    packed several lookups into one command string with `;` and `echo ===`
+ *    separators. The agent *did* batch; it read "one message" as "one command",
+ *    which is the one reading that saves nothing. So the rule now names the unit
+ *    (several tool calls in one turn), shows it, and says outright that
+ *    `;`-packing is not it.
+ *  - **A closed list of shell tools is read as the closed list it is.** The old
+ *    text named `grep` / `find` / `ls` / `cat`; the transcript used `sed` 9×,
+ *    `awk` 2×, `wc` 2× and `head` 26×, none of them listed. The replacement
+ *    states the test for when a shell is needed at all, and marks its table
+ *    non-exhaustive (see the note on literal enumerations in CLAUDE.md's Prompt
+ *    conventions).
+ *  - **`Read` looked inapplicable to the file that mattered.** Most `sed -n
+ *    'X,Yp'` calls targeted a 17k-line generated file. Nothing said `Read` takes
+ *    an offset and a limit, so the shell stayed the only way to read a slice.
+ *  - **It lost on emphasis and position.** It rendered immediately before
+ *    `worktreeCdRules`, whose opening line is an all-caps MUST about Bash, and
+ *    the planner's user prompt ends with a ```bash fence. Rationale ("they are
+ *    much faster") does not outrank a MUST, so the fragment now leads with the
+ *    directive and the composition order puts it *after* the cd rule.
+ *
+ * It still narrows `cd` to shell commands rather than forbidding it — forbidding
+ * it is `NO_CD_RULES`, a different convention for a different class of agent.
  */
 export const REPO_SEARCH_EFFICIENCY = `### Searching the Repository
 
-Locate code with \`Grep\` and \`Glob\` and read it with \`Read\`. They take path arguments, so they need no \`cd\`, and they are much faster than driving \`grep\` / \`find\` / \`ls\` / \`cat\` through Bash. Keep Bash for what only a shell can do: \`git\`, task runners, build / test / lint commands.
+**Use \`Grep\`, \`Glob\` and \`Read\` to look at this repository, and issue the independent lookups of one step as several tool calls in a single turn.** They take path arguments, so none of them needs a \`cd\`.
 
-Issue independent lookups **together in a single message** rather than one per turn — several \`Grep\`s for different symbols, or a \`Grep\` plus the \`Read\`s of files you already know you need, all in one batch. Every extra turn is another full round-trip, and a dozen one-call turns is the difference between a minute of exploration and five. Serialize only a call whose input genuinely depends on the previous result.`;
+A turn that explores looks like this — four calls, one round-trip:
+
+\`\`\`
+Grep  pattern="getUrlForSzCst" path="src" output_mode="files_with_matches"
+Grep  pattern="export type Chat = " path="src/features/graphql/gen" -A 40
+Glob  pattern="src/contents/inquiry-search/**/*.tsx"
+Read  file_path="src/utils/url/external-page.ts"
+\`\`\`
+
+Packing those into one Bash command — \`grep …; echo ===; grep …\` — is **not** the same thing and saves nothing: the shell round-trip is negligible, the model round-trip is what costs seconds, and you still paid one. What matters is how many *turns* you take, not how many commands you fit in one.
+
+Reach for Bash when the task needs a shell rather than an answer about the code: \`git\`, task runners, build / test / lint / install commands. For everything else there is a tool that does it in-process, so the shell form is a slower path to the same result (non-exhaustive):
+
+| instead of | use |
+|---|---|
+| \`grep -rn PATTERN\`, with \`-A\` / \`-B\` / \`-l\` | \`Grep\` (same flags, plus \`output_mode\`) |
+| \`find . -name …\`, \`ls\` to discover paths | \`Glob\` |
+| \`cat file\` | \`Read\` |
+| \`sed -n '400,520p' file\`, \`head\`, \`tail\` | \`Read\` with \`offset\` and \`limit\` — this is the answer for a large generated file, not a reason to go back to the shell |
+| \`wc -l\`, \`awk\` over source to slice a definition out | \`Grep\` with \`-A\` / \`-C\`, or \`Read\` on the range |
+
+Serialize only a call whose input genuinely depends on the previous result. A dozen one-call turns is the difference between a minute of exploration and five.`;
 
 /**
  * Length calibration for agents whose deliverable is a file on disk.

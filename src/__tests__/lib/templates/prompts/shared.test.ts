@@ -129,6 +129,50 @@ describe("REPO_SEARCH_EFFICIENCY", () => {
     // narrow that to shell commands, not forbid cd outright (that is NO_CD_RULES).
     expect(REPO_SEARCH_EFFICIENCY).not.toContain("NEVER use `cd` in Bash commands");
   });
+
+  // The measured failure was not a missing rule. The agent batched its lookups
+  // into one Bash string (26 of 54 calls used `;`) while taking exactly one tool
+  // call per turn, 73 turns running — it read "one message" as "one command".
+  it("names the unit as tool calls in a turn, not a message", () => {
+    expect(REPO_SEARCH_EFFICIENCY).toContain("several tool calls in a single turn");
+    expect(REPO_SEARCH_EFFICIENCY).not.toContain("in a single message");
+  });
+
+  it("rules out packing lookups into one shell command", () => {
+    expect(REPO_SEARCH_EFFICIENCY).toMatch(/is \*\*not\*\* the same thing/);
+  });
+
+  it("shows the wanted turn shape rather than only describing it", () => {
+    // A positive example of the wanted behavior, per CLAUDE.md's prompt
+    // conventions — the old version was rationale competing with a MUST.
+    expect(REPO_SEARCH_EFFICIENCY).toMatch(/```\n(Grep|Glob|Read)/);
+  });
+
+  it.each(["sed", "head", "awk", "wc", "find", "cat"])(
+    "covers the %s idiom the transcript actually used",
+    (cmd) => {
+      expect(REPO_SEARCH_EFFICIENCY).toContain(cmd);
+    },
+  );
+
+  it("marks its shell-to-tool table non-exhaustive", () => {
+    // Claude reads enumerations literally: the closed list `grep`/`find`/`ls`/`cat`
+    // left `sed -n 'X,Yp'` feeling permitted, and it became the most used call.
+    expect(REPO_SEARCH_EFFICIENCY).toContain("non-exhaustive");
+  });
+
+  it("gives a large file an answer other than the shell", () => {
+    expect(REPO_SEARCH_EFFICIENCY).toMatch(/`offset` and `limit`/);
+  });
+
+  it("renders after the cd rule in the planner, not before it", () => {
+    // Emphasis and position: the cd rule opens with an all-caps MUST about a Bash
+    // call, so whichever comes second gets the last word on how to touch the repo.
+    const prompt = getPlannerSystemPrompt();
+    expect(prompt.indexOf("### Working Directory")).toBeLessThan(
+      prompt.indexOf("### Searching the Repository"),
+    );
+  });
 });
 
 describe("SUBAGENT_DELEGATION_POLICY", () => {
