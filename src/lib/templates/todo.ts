@@ -6,6 +6,8 @@ export const TODO_FEATURE_TEMPLATE = `# TODO: {{REPOSITORY_NAME}}
 
 ## Initialize
 
+<!-- Context for the executor, NOT a checklist. Do not turn these into TODO items. -->
+
 Before starting implementation, read the following documentation:
 
 - **README.md** — Understand project overview, setup, and development workflow
@@ -15,39 +17,39 @@ Before starting implementation, read the following documentation:
 ## Implementation Tasks
 
 <!--
-Each code-change item below MUST include every field (Target/Action/Pattern/Why/Verify/Acceptance).
+Every code-change item carries Target / Action / Verify. Pattern and Why are conditional — include
+them only where they change what the executor writes; never write "Pattern: none" to fill the field.
 Target must be path:line OR path + the exact symbol/function name — never a vague string like "relevant module".
+Verify is the item's acceptance condition: one check that can pass or fail, scoped as narrowly as the
+item allows (the one test path, not the whole suite).
 -->
 
 - [ ] **[TBD]** (Replace with specific implementation task — one atomic change per item)
   - Target: (path:line, OR path + symbol/function name)
   - Action: (Concrete step-by-step recipe — name the import, the function, the literal to change)
-  - Pattern: (Existing code to mirror at path:line, OR "none (greenfield)")
-  - Why: (Motivation — what breaks without this change, one sentence)
-  - Verify: (Concrete check: shell command, test to add, or observable behavior)
-  - Acceptance: (Test-checkable fact, e.g. "Unit test at path/to/test.ts passes")
+  - Verify: (Concrete check that can pass or fail: narrowest shell command, test assertion, or observable behavior)
+  - Pattern: (only where the convention to follow is non-obvious — existing code to mirror at path:line)
+  - Why: (only where the Action doesn't already make it obvious — what stays broken without this)
 
 - [ ] **[TBD]** (Replace with specific test task)
   - Target: (Test file path + the test name to add)
   - Action: (Describe the test case to add — arrange/act/assert)
-  - Pattern: (Existing test to mirror at path:line)
-  - Why: (What regression this test prevents)
-  - Verify: (Exact test command to run)
-  - Acceptance: (Test passes; without the fix it would have failed)
+  - Verify: (Exact test command, narrowed to this test's path)
+  - Pattern: (only where the test style is non-obvious — existing test to mirror at path:line)
 
 ## Verification
 
-<!-- Remove this section if the task does not involve code changes -->
+<!--
+Remove this section if the task does not involve code changes.
+ONE item only. Do NOT expand the README's \`## Repository Constraints\` into one item per command:
+the executor already runs the full declared set before marking anything complete, and the review
+pipeline runs it again afterwards with a merge-base comparison. Per-item checks belong in \`Verify:\`.
+-->
 
-- [ ] **[Repository]** Run test suite
+- [ ] **[Repository]** Run the declared constraint set once the implementation items are done
   - Target: Repository root
-  - Action: Execute test command from CLAUDE.md/README.md or \`make test\`
-  - Verify: All tests pass
-
-- [ ] **[Repository]** Run linter
-  - Target: Repository root
-  - Action: Execute lint command from CLAUDE.md/README.md or \`make lint\`
-  - Verify: No lint errors
+  - Action: Run every command listed for this repository under the workspace README's \`## Repository Constraints\`
+  - Verify: Each command exits 0, or its failure also reproduces on the base branch
 
 ## Finalize
 
@@ -64,6 +66,8 @@ export const TODO_BUGFIX_TEMPLATE = `# TODO: {{REPOSITORY_NAME}}
 
 ## Initialize
 
+<!-- Context for the executor, NOT a checklist. Do not turn these into TODO items. -->
+
 Before starting investigation, read the following documentation:
 
 - **README.md** — Understand project overview, setup, and development workflow
@@ -73,7 +77,8 @@ Before starting investigation, read the following documentation:
 
 <!--
 Investigation items are looser (they're exploratory).
-Bug-fix items below are code changes — they MUST carry the full Target/Action/Pattern/Why/Verify/Acceptance fields.
+Bug-fix items below are code changes — they carry Target / Action / Verify, plus Pattern and Why only
+where those change what the executor writes.
 Target on fix items must be path:line OR path + symbol/function name — no vague strings.
 -->
 
@@ -91,32 +96,28 @@ Target on fix items must be path:line OR path + symbol/function name — no vagu
 - [ ] **[TBD]** (Replace with specific fix implementation)
   - Target: (path:line, OR path + symbol/function name)
   - Action: (Concrete change — name the literal, the condition, the call site)
-  - Pattern: (Existing correct code to mirror at path:line, OR "none — root cause is a missing branch")
-  - Why: (What incorrect behavior this fix prevents)
-  - Verify: (Reproduce steps now pass; lint/test commands)
-  - Acceptance: (Regression test below passes; original repro no longer triggers the bug)
+  - Verify: (Reproduce steps now pass, plus the narrowest test command covering this path)
+  - Pattern: (only where the correct shape is non-obvious — existing code to mirror at path:line)
+  - Why: (only where the Action doesn't already make it obvious — what incorrect behavior remains)
 
 - [ ] **[TBD]** Add regression test
   - Target: (Test file path + the new test name)
   - Action: (Test case that would have caught this bug — arrange/act/assert)
-  - Pattern: (Existing test to mirror at path:line)
-  - Why: (Prevents reintroducing this specific bug)
   - Verify: Test fails on the buggy code, passes after the fix
-  - Acceptance: New test is part of the default test command output
 
 ## Verification
 
-<!-- Remove this section if the task does not involve code changes -->
+<!--
+Remove this section if the task does not involve code changes.
+ONE item only. Do NOT expand the README's \`## Repository Constraints\` into one item per command:
+the executor already runs the full declared set before marking anything complete, and the review
+pipeline runs it again afterwards with a merge-base comparison. Per-item checks belong in \`Verify:\`.
+-->
 
-- [ ] **[Repository]** Run test suite
+- [ ] **[Repository]** Run the declared constraint set once the implementation items are done
   - Target: Repository root
-  - Action: Execute test command from CLAUDE.md/README.md or \`make test\`
-  - Verify: All tests pass (including new regression test)
-
-- [ ] **[Repository]** Run linter
-  - Target: Repository root
-  - Action: Execute lint command from CLAUDE.md/README.md or \`make lint\`
-  - Verify: No lint errors
+  - Action: Run every command listed for this repository under the workspace README's \`## Repository Constraints\`
+  - Verify: Each command exits 0, or its failure also reproduces on the base branch
 
 ## Finalize
 
@@ -132,6 +133,8 @@ Target on fix items must be path:line OR path + symbol/function name — no vagu
 export const TODO_RESEARCH_TEMPLATE = `# TODO: {{REPOSITORY_NAME}}
 
 ## Initialize
+
+<!-- Context for the executor, NOT a checklist. Do not turn these into TODO items. -->
 
 Before starting research, read the following documentation:
 
@@ -159,6 +162,8 @@ export const TODO_DEFAULT_TEMPLATE = `# TODO: {{REPOSITORY_NAME}}
 
 ## Initialize
 
+<!-- Context for the executor, NOT a checklist. Do not turn these into TODO items. -->
+
 Before starting, read the following documentation:
 
 - **README.md** — Understand project overview, setup, and development workflow
@@ -172,12 +177,17 @@ Before starting, read the following documentation:
 
 ## Verification
 
-<!-- Remove this section if the task does not involve code changes -->
+<!--
+Remove this section if the task does not involve code changes.
+ONE item only. Do NOT expand the README's \`## Repository Constraints\` into one item per command:
+the executor already runs the full declared set before marking anything complete, and the review
+pipeline runs it again afterwards with a merge-base comparison. Per-item checks belong in \`Verify:\`.
+-->
 
-- [ ] **[Repository]** Run test suite (if applicable)
+- [ ] **[Repository]** Run the declared constraint set once the implementation items are done
   - Target: Repository root
-  - Action: Execute test command from CLAUDE.md/README.md
-  - Verify: All tests pass
+  - Action: Run every command listed for this repository under the workspace README's \`## Repository Constraints\`
+  - Verify: Each command exits 0, or its failure also reproduces on the base branch
 
 ## Notes
 

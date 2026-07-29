@@ -91,7 +91,11 @@ import {
 import type { PhaseFunctionContext, PipelinePhaseFunction, PipelinePhaseGroup } from "@/types/pipeline";
 
 import { getRepoChanges } from "@/lib/workspace";
-import { buildCodeReviewerPrompt, buildFixVerifierPrompt } from "@/lib/templates";
+import {
+  buildCodeReviewerPrompt,
+  buildFixVerifierPrompt,
+  buildReadmeVerifierPrompt,
+} from "@/lib/templates";
 import {
   captureRepoHead,
   readPreviousReviewBaseline,
@@ -126,7 +130,7 @@ describe("buildReviewPipeline — skip verify-todo when TODO file is missing", (
     // No entry in mockFileMap → file doesn't exist
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const groupPhase = phases[1] as PipelinePhaseGroup;
     expect(groupPhase.kind).toBe("group");
 
     const labels = groupPhase.children.map((c) => c.label);
@@ -146,7 +150,7 @@ describe("buildReviewPipeline — skip verify-todo when TODO file is missing", (
     mockFileMap.set("/ws/test-ws/TODO-empty-todo-repo.md", "   \n\n  ");
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const groupPhase = phases[1] as PipelinePhaseGroup;
     const labels = groupPhase.children.map((c) => c.label);
     expect(labels).not.toContain("verify-todo-empty-todo-repo");
   });
@@ -165,7 +169,7 @@ describe("buildReviewPipeline — skip verify-todo when TODO file is missing", (
     );
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const groupPhase = phases[1] as PipelinePhaseGroup;
     const labels = groupPhase.children.map((c) => c.label);
     expect(labels).toContain("verify-todo-active-repo");
   });
@@ -189,7 +193,7 @@ describe("buildReviewPipeline — skip verify-todo when TODO file is missing", (
     );
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const groupPhase = phases[1] as PipelinePhaseGroup;
     const labels = groupPhase.children.map((c) => c.label);
 
     expect(labels).not.toContain("verify-todo-no-todo-repo");
@@ -227,7 +231,7 @@ describe("buildReviewPipeline — cross-repository review", () => {
     mockListWorkspaceRepos.mockReturnValue(twoRepos());
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const groupPhase = phases[1] as PipelinePhaseGroup;
     const labels = groupPhase.children.map((c) => c.label);
 
     expect(labels).toContain("review-cross-repository");
@@ -237,7 +241,7 @@ describe("buildReviewPipeline — cross-repository review", () => {
     mockListWorkspaceRepos.mockReturnValue(twoRepos());
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const groupPhase = phases[1] as PipelinePhaseGroup;
     const labels = groupPhase.children.map((c) => c.label);
 
     // The group runs behind a FIFO semaphore that starts children in array
@@ -253,7 +257,7 @@ describe("buildReviewPipeline — cross-repository review", () => {
     mockListWorkspaceRepos.mockReturnValue([twoRepos()[0]]);
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const groupPhase = phases[1] as PipelinePhaseGroup;
     const labels = groupPhase.children.map((c) => c.label);
 
     expect(labels).not.toContain("review-cross-repository");
@@ -266,7 +270,7 @@ describe("buildReviewPipeline — cross-repository review", () => {
       workspace: "test-ws",
       repository: "owner/api",
     });
-    const groupPhase = phases[0] as PipelinePhaseGroup;
+    const groupPhase = phases[1] as PipelinePhaseGroup;
     const labels = groupPhase.children.map((c) => c.label);
 
     expect(labels).not.toContain("review-cross-repository");
@@ -338,7 +342,7 @@ describe("buildReviewPipeline — constraint timeout aborts remaining commands i
     });
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const verifyPhase = phases[1] as PipelinePhaseFunction;
+    const verifyPhase = phases[0] as PipelinePhaseFunction;
     expect(verifyPhase.kind).toBe("function");
     expect(verifyPhase.label).toBe("Verify constraints");
 
@@ -407,7 +411,7 @@ describe("buildReviewPipeline — repos without declared constraints", () => {
     mockParseConstraints.mockReturnValue([]);
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const verifyPhase = phases[1] as PipelinePhaseFunction;
+    const verifyPhase = phases[0] as PipelinePhaseFunction;
     const ctx = createMockCtx();
     expect(await verifyPhase.fn(ctx)).toBe(true);
 
@@ -439,7 +443,7 @@ describe("buildReviewPipeline — repos without declared constraints", () => {
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
     const ctx = createMockCtx();
-    await (phases[1] as PipelinePhaseFunction).fn(ctx);
+    await (phases[0] as PipelinePhaseFunction).fn(ctx);
 
     const results = vi.mocked(ctx.emitResult).mock.calls.map((c) => c[0]);
     expect(results.some((m) => /failure/i.test(m))).toBe(false);
@@ -472,7 +476,7 @@ describe("buildReviewPipeline — repos without declared constraints", () => {
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
     const ctx = createMockCtx();
-    await (phases[1] as PipelinePhaseFunction).fn(ctx);
+    await (phases[0] as PipelinePhaseFunction).fn(ctx);
 
     expect(mockExecConstraintCommand).toHaveBeenCalledTimes(1);
     expect(mockBuildNoConstraintsReport.mock.calls.map((c) => c[0])).toEqual([
@@ -625,13 +629,13 @@ describe("buildReviewPipeline — requested-fix verifier", () => {
 
   it("is absent on a run where no previous cycle asked for anything", async () => {
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const labels = (phases[0] as PipelinePhaseGroup).children.map((c) => c.label);
+    const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
     expect(labels).not.toContain("verify-fixes-repo-a");
   });
 
   it("is absent when the list is present but empty", async () => {
     const phases = await buildReviewPipeline({ workspace: "test-ws", requestedFixes: [] });
-    const labels = (phases[0] as PipelinePhaseGroup).children.map((c) => c.label);
+    const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
     expect(labels).not.toContain("verify-fixes-repo-a");
   });
 
@@ -640,7 +644,7 @@ describe("buildReviewPipeline — requested-fix verifier", () => {
       workspace: "test-ws",
       requestedFixes: ["gate the anchor on a defined href"],
     });
-    const labels = (phases[0] as PipelinePhaseGroup).children.map((c) => c.label);
+    const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
     expect(labels).toContain("verify-fixes-repo-a");
     expect(labels).toContain("review-repo-a");
   });
@@ -657,5 +661,95 @@ describe("buildReviewPipeline — requested-fix verifier", () => {
         verifyFilePath: expect.stringContaining("VERIFY-FIXES-owner_repo-a.md"),
       }),
     );
+  });
+});
+
+describe("buildReviewPipeline — phase order", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+    mockListWorkspaceRepos.mockReturnValue([
+      {
+        repoName: "repo-a",
+        repoPath: "owner/repo-a",
+        worktreePath: "/repos/repo-a/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+    ]);
+  });
+
+  it("runs constraints before the reviewer group so the report is on disk for it", async () => {
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    expect((phases[0] as PipelinePhaseFunction).label).toBe("Verify constraints");
+    expect(phases[1].kind).toBe("group");
+    expect((phases[2] as PipelinePhaseFunction).label).toBe("Collect review results");
+  });
+
+  it("points the README verifier at the constraint report instead of the commands", async () => {
+    await buildReviewPipeline({ workspace: "test-ws" });
+    expect(vi.mocked(buildReadmeVerifierPrompt)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        constraintReportPath: expect.stringContaining("CONSTRAINTS-owner_repo-a.md"),
+      }),
+    );
+  });
+});
+
+describe("buildReviewPipeline — fixes scope", () => {
+  const repo = {
+    repoName: "repo-a",
+    repoPath: "owner/repo-a",
+    worktreePath: "/repos/repo-a/worktrees/test-ws",
+  } as ReturnType<typeof listWorkspaceRepos>[number];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+    mockListWorkspaceRepos.mockReturnValue([repo]);
+    mockFileMap.set("/ws/test-ws/TODO-repo-a.md", "- [ ] something");
+  });
+
+  it("keeps only the fix and contract verifiers — no fresh defect hunt", async () => {
+    const phases = await buildReviewPipeline({
+      workspace: "test-ws",
+      scope: "fixes",
+      requestedFixes: ["fix one"],
+    });
+    const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
+    expect(labels).toEqual(["verify-fixes-repo-a", "verify-readme-repo-a"]);
+  });
+
+  it("still verifies constraints and collects a summary the gate can read", async () => {
+    const phases = await buildReviewPipeline({
+      workspace: "test-ws",
+      scope: "fixes",
+      requestedFixes: ["fix one"],
+    });
+    expect((phases[0] as PipelinePhaseFunction).label).toBe("Verify constraints");
+    expect((phases[2] as PipelinePhaseFunction).label).toBe("Collect review results");
+  });
+
+  it("falls back to a full review when there is nothing to verify", async () => {
+    const phases = await buildReviewPipeline({ workspace: "test-ws", scope: "fixes" });
+    const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
+    expect(labels).toContain("review-repo-a");
+    expect(labels).toContain("verify-todo-repo-a");
+  });
+
+  it("drops the cross-repository reviewer too", async () => {
+    mockListWorkspaceRepos.mockReturnValue([
+      repo,
+      {
+        repoName: "repo-b",
+        repoPath: "owner/repo-b",
+        worktreePath: "/repos/repo-b/worktrees/test-ws",
+      } as ReturnType<typeof listWorkspaceRepos>[number],
+    ]);
+    const phases = await buildReviewPipeline({
+      workspace: "test-ws",
+      scope: "fixes",
+      requestedFixes: ["fix one"],
+    });
+    const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
+    expect(labels).not.toContain("review-cross-repository");
   });
 });

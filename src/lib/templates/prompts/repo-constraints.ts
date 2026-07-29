@@ -41,7 +41,15 @@ export function getRepoConstraintsSystemPrompt(): string {
    - Build / type-check commands (e.g., \`make build\`, \`tsc --noEmit\`)
    - Any other quality gates documented as required before committing or pushing
 
-4. **Update Workspace README**:
+4. **Probe the Invocation You Are About to Record** (REQUIRED — record only invocations you have seen resolve):
+   Later phases run these commands through a plain non-interactive \`sh -c\` in the worktree: no login shell, no shell profile, no version-manager hook. A bare tool name that works in an interactive terminal can resolve there to a **different runtime than the repo pins** — a shim, a system-wide install — or to nothing at all. A command recorded from documentation alone is a guess, and a wrong one is expensive: the constraint verification phase reports every command as failing, and each later agent re-derives the working invocation from scratch.
+   - For each distinct tool you plan to record (\`pnpm\`, \`go\`, \`make\`, \`uv\`, …), run **one cheap probe** of the exact invocation form: \`<invocation> --version\` (or \`go version\`, \`make --version\`, whatever that tool answers to). Batch the probes together — they take about a second each.
+   - Compare what the probe reports against the version pins you found in step 2. A probe that succeeds but reports a version the pins contradict is a **failed** probe.
+   - When a bare invocation fails or reports the wrong version, use the version manager's exec form for that tool and probe again — e.g. \`mise exec node@<pinned> -- pnpm\`, \`asdf exec\`, \`poetry run\`, \`bundle exec\`, \`nix develop -c\`. Record the form that passed, applied to **every** command that needs it, so \`Lint\` becomes \`mise exec node@22.22.0 -- pnpm --filter app lint\`.
+   - **Probe the tool, never the work.** \`pnpm --version\` and \`go version\` cost a second; \`pnpm install\`, \`make build\` and the test suite cost minutes and belong to later phases, which compare their failures against the merge-base before they count as anything. Do not run the lint / test / build / install commands themselves.
+   - If no invocation resolves, still record the repo's documented command and add nothing else — a wrong command that is honestly the repo's own is more useful than a fabricated prefix.
+
+5. **Update Workspace README**:
    - Read the workspace README at the path specified in the user prompt
    - Append the discovered constraints to the \`## Repository Constraints\` section
    - Use the format specified in the user prompt for each repository
@@ -66,6 +74,8 @@ Add to the \`## Repository Constraints\` section using **exactly** this format �
 
 **IMPORTANT**: Each constraint line MUST follow the pattern \`- <Label>: \`<command>\`\`. Do NOT add any other lines (e.g. "All changes MUST pass..."). Only include commands that actually exist in or are clearly implied by the repository (a lockfile implies its manager's install command). Do not guess or fabricate commands.
 
+Each recorded command must be **runnable as written** from the worktree root in a non-interactive shell, including whatever exec prefix step 4's probe established. These lines are consumed verbatim: a phase runs them with no chance to adapt, the executor treats them as the set to satisfy before marking work done, and the README's acceptance criteria refer to them by name.
+
 ### Working Directory
 
 **IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**
@@ -81,7 +91,7 @@ After that, run commands as separate Bash calls. Do NOT use \`git -C\`.
 
 1. Only report constraints that are clearly documented or discoverable from the repository
 2. Prefer task runner commands (e.g., \`make lint\`) over direct tool invocation
-3. Do NOT run the commands — only identify them
+3. Probe tool invocations (\`--version\`-style checks, per step 4) but never run the lint / test / build / install commands themselves
 4. Do NOT modify any files other than the workspace README
 `;
 }

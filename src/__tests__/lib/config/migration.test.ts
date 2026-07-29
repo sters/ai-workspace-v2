@@ -175,14 +175,16 @@ describe("migration: model support", () => {
 
   it("lists each step under exactly one rung", () => {
     const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
-    // code-review earns the top rung; the mechanical steps must not appear there.
     const rungLines = result.split("\n");
     const topRung = rungLines.findIndex((l) => l.includes("opus / high"));
     const nextRung = rungLines.findIndex((l) => l.includes("opus / medium"));
     const topBlock = rungLines.slice(topRung, nextRung).join("\n");
-    expect(topBlock).toContain("code-review");
+    // plan-todo earns the top rung; the mechanical steps must not appear there.
+    expect(topBlock).toContain("plan-todo");
     expect(topBlock).not.toContain("collect-reviews");
     expect(topBlock).not.toContain("verify-todo");
+    // code-review sits a rung down by budget, not by shape — see model.ts.
+    expect(topBlock).not.toContain("code-review");
   });
 });
 

@@ -37,6 +37,12 @@ export const AUTONOMOUS_GATE_SCHEMA = {
       items: { type: "string" },
       description: "List of fixable issues to address in the next iteration (empty if shouldLoop is false).",
     },
+    fixScope: {
+      type: "string",
+      enum: ["targeted", "replan"],
+      description:
+        "How the next round should be shaped. `targeted`: every item in fixableIssues is a localized edit to code or tests that already exist, so the round applies the list directly. `replan`: the remaining work needs planning first. Ignored when shouldLoop is false.",
+    },
     dismissedFindings: {
       type: "array",
       description:
@@ -63,7 +69,7 @@ export const AUTONOMOUS_GATE_SCHEMA = {
       },
     },
   },
-  required: ["shouldLoop", "giveUp", "reason", "fixableIssues", "dismissedFindings"],
+  required: ["shouldLoop", "giveUp", "reason", "fixableIssues", "fixScope", "dismissedFindings"],
   additionalProperties: false,
 };
 
@@ -118,6 +124,17 @@ The reason is mechanical, not a matter of taste: every suggestion fix widens the
 What this does **not** license is down-labelling. If a finding means the work is unfinished, incorrect or unsound, it is Should-Fix and it loops, whatever heading the review filed it under. The bar is "is this branch actually done", not "is this cheap to skip" — shipping polish-free work is fine, shipping unfinished work is not.
 
 Test coverage is scoped rather than absolute: missing test coverage is Should-Fix when the untested behavior is one the README's contract requires, or one that some reachable input exercises. An untested **defensive guard** that no input the system produces can reach — a fallback for a value the wire format does not carry, a branch the reviewer itself calls unreachable — is a Suggestion. Every fix a cycle lands is itself changed code carrying new guards, so reading this rule absolutely guarantees another cycle no matter how complete the work is: the run's own fix becomes the next cycle's blocker, and there is no state the branch could reach that clears the bar.
+
+### Shaping the Next Round (\`fixScope\`)
+
+When you loop, you also choose how much machinery the next round needs. A full round re-plans the TODO file, re-executes it, and re-reviews the branch from scratch — measured at about 15 minutes for what turned out to be a one-line fix and one new test file. So say which of the two the remaining work actually is:
+
+- **\`targeted\`** — every item in \`fixableIssues\` is a localized change to code or tests that already exist, and your list already says what to change and where. The pipeline hands the list straight to a fix agent, then verifies each ask landed and re-runs the repository's constraint commands.
+- **\`replan\`** — anything else: work that needs new files or a new approach, several interacting changes, an ask you could only state as a direction rather than a change, or a criterion still unmet with no concrete fix identified. The pipeline re-plans the TODO file and runs a full Execute → Review round.
+
+Two things to know when choosing. First, \`targeted\` **skips the code review of the fix diff** — the next round verifies that your asks landed and that lint/test/build still pass, but nothing hunts for new defects in the fix itself. That is a fair trade for a change whose whole shape you can see from here, and a bad one for a change you cannot. Second, the round after a \`targeted\` one is judged by this gate again, so a \`targeted\` guess that turns out wrong costs a cycle rather than the run.
+
+When in doubt, choose \`replan\`. Set it to \`replan\` whenever \`shouldLoop\` is false — it is ignored there.
 
 ### Completion Bar (what creates the PR)
 

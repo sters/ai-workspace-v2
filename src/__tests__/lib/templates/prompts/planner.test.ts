@@ -96,3 +96,27 @@ describe("buildPlannerPrompt", () => {
     }
   );
 });
+
+describe("getPlannerSystemPrompt — plan size", () => {
+  const prompt = getPlannerSystemPrompt();
+
+  it("forbids turning constraint commands into TODO items", () => {
+    expect(prompt).toContain("### Repository Constraints");
+    expect(prompt).toMatch(/do \*\*not\*\* turn them into TODO items/i);
+    // The rule only holds up if the prompt says where they go instead.
+    expect(prompt).toContain("`Verify:` field");
+  });
+
+  it("caps whole-repo verification at one trailing item", () => {
+    expect(prompt).toMatch(/at most one/i);
+  });
+
+  it("forbids itemizing documentation reading", () => {
+    expect(prompt).toContain("### What Is Not a TODO Item");
+    expect(prompt).toMatch(/Reading documentation/);
+  });
+
+  it("no longer requires a verification item per declared constraint", () => {
+    expect(prompt).not.toMatch(/MUST include corresponding verification TODO items/);
+  });
+});

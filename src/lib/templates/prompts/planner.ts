@@ -35,6 +35,7 @@ export function getPlannerSystemPrompt(): string {
    - Check for task runners: Makefile, package.json scripts, Taskfile.yml, Justfile, etc.
    - Identify available targets (e.g. \`make lint\`, \`npm run test\`, \`bun run build\`)
    - Prefer task runner commands over direct tool invocation in TODO items (e.g. \`make lint\` instead of \`golangci-lint\`, \`npm run lint\` instead of \`eslint\`)
+   - These commands go into the \`Verify:\` field of the items they prove, narrowed to the path under test. They do NOT become items of their own — see **Repository Constraints** below.
 
 4. **Assess Whether Source Code Analysis Is Needed**:
    Decide based on the task's nature:
@@ -103,11 +104,26 @@ Three required fields, two conditional. An item is finished when the executor ca
 
 Instead, identify the exact file (and line number or symbol) by reading the source code during the analysis step. If you genuinely cannot pin down the location without deeper investigation, add a preceding investigation TODO ("Investigate: locate X") rather than ship a vague item.
 
+### What Is Not a TODO Item
+
+Every item you write is paid for many times over: the executor re-reads the whole file once per batch, the TODO verifier audits each item against the diff, and the autonomous gate reads every file every cycle. Item count also decides how the executor's work is split — past the configured batch size the run splits into batches, and each boundary costs a fresh child several minutes re-establishing context. So an item that tells the executor nothing it would not otherwise do is not free; it is one of the most expensive things in the file.
+
+Two kinds of filler in particular do not belong in the list:
+
+- **Reading documentation.** The executor reads the repo's docs, and the TODO template's \`## Initialize\` section already names them as prose. Do not expand it into one item per file. Where a doc contains a rule that changes what the executor writes, put that rule in the item it applies to (as \`Pattern:\` or in \`Action:\`), not an item saying to go read it.
+- **The repository constraint commands.** See below.
+
 ### Repository Constraints
 
-Check the workspace README's **## Repository Constraints** section. If it lists constraints for this repository (lint, test, build commands, etc.) **AND the task requires code changes**, you MUST include corresponding verification TODO items in the Verification section. These constraints are non-negotiable for tasks that modify source code.
+The workspace README's **## Repository Constraints** section lists this repository's lint / test / build commands. They are already enforced twice without your help: the executor's own instructions require it to run the full declared set and see it pass before marking any item \`[x]\`, and the review pipeline runs every one of them again afterwards, comparing each failure against the merge-base.
 
-**However, if the task does NOT require code changes** (e.g., documentation-only updates, config changes that don't affect build output, research tasks, or when this repository simply has no work to do), **omit the Verification section entirely**. Running build/lint/test adds no value when no code is changed.
+So do **not** turn them into TODO items — not one per command, and not a "Verification" section listing them. On a measured run that produced six such items (lint, test, build, format, codegen, scope check) out of roughly forty, and they pushed the executor from one batch into three.
+
+What to do instead, for a task that changes code:
+- Put the **narrowest** command that proves that item in its \`Verify:\` field — the single test file or path filter, not the whole suite (e.g. \`<test-command> src/utils/url\`).
+- Add **at most one** trailing item covering the full declared set, and only when the task's changes are broad enough that a final whole-repo pass is worth naming explicitly. One item, referencing the README's section rather than restating the commands.
+
+For a task that does **not** change code (documentation-only updates, config that doesn't affect build output, research, or a repository with no work to do), omit verification entirely — running build/lint/test proves nothing about a change that didn't touch them.
 
 ### Language
 
@@ -136,10 +152,10 @@ Example:
 1. Focus on this repository only — do NOT read other repositories' source code
 2. Be actionable: each TODO should be something the executor can act on without re-deriving context
 3. Match the depth of analysis — and the length of the TODO file — to the task. Every code-change item carries Target/Action/Verify; Pattern and Why appear only where they change what the executor writes. A TODO padded out to a uniform shape costs the executor a re-read of it on every batch and the reviewers and gate a re-read every cycle.
-4. Include commands: specify exact build/test/lint commands from repository docs (only for tasks that change code)
+4. One item per change the executor makes. A two-file change is a short file: prefer ten items that each move the work forward to forty that include the ceremony around it (see **What Is Not a TODO Item**)
 5. Prefer task runner commands: use \`make lint\` / \`npm run test\` etc. over direct tool invocation. Only fall back to direct commands (e.g. \`golangci-lint\`, \`tsc\`) if no task runner target exists
 6. Order logically: dependencies first, then implementation, then tests
-7. Honour Repository Constraints: if the workspace README lists constraints AND the task modifies code, they MUST appear as verification items. Skip verification for non-code-change tasks
+7. Constraint commands belong in items' \`Verify:\` fields, scoped as narrowly as the item allows — not in items of their own (see **Repository Constraints**)
 8. **No merging**: Do NOT perform git merge, PR merge, or any branch merging operations unless explicitly instructed to do so
 9. **Cross-repo deps**: Mark items that depend on other repos with \`[CROSS-REPO]\` — never attempt to read other repos to resolve them
 10. **Scope discipline**: each item should describe a single, atomic change. If you find yourself writing "and also …", split into two items.

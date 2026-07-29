@@ -12,6 +12,7 @@ import { buildUpdateTodoPipeline } from "./update-todo";
 import { runSubPhases } from "./actions/run-sub-phases";
 import { resolveWorkspace } from "./actions/resolve-workspace";
 import { buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA, FINAL_CYCLE_STOP_PREFIX } from "@/lib/templates/prompts/autonomous-gate";
+import { buildFixApplierPrompt } from "@/lib/templates/prompts/fix-applier";
 import { buildReadmeClarityGatePrompt, README_CLARITY_GATE_SCHEMA, README_CLARITY_PHASE_LABEL, README_CLARITY_STOP_PREFIX } from "@/lib/templates/prompts/readme-clarity-gate";
 import { prepareCriteriaFeasibility } from "./actions/criteria-feasibility";
 import { getWorkspaceDir, getOperationConfig } from "@/lib/config";
@@ -53,6 +54,12 @@ const CYCLE_BUDGETS_MS = {
   review: 45 * 60 * 1000,
   /** One `autonomous-gate` child over the review summary; measured well under a minute. */
   gate: 10 * 60 * 1000,
+  /**
+   * One fix-applier child per repo over a short ask list. Bounded well below the
+   * execute budget on purpose: a targeted round that needs longer than this is a
+   * round the gate should have shaped as `replan`.
+   */
+  fix: 30 * 60 * 1000,
   /** `update-todo.ts`: one updater child, plus up to 60min on the best-of-N path. */
   updateTodo: 30 * 60 * 1000,
 } as const;
@@ -72,12 +79,25 @@ interface AutonomousGateResult {
   giveUp: boolean;
   reason: string;
   fixableIssues: string[];
+  /**
+   * How the next round should be shaped. `"targeted"` skips re-planning and the
+   * fresh defect hunt; anything unrecognized reads as `"replan"`, which is the
+   * full round the pipeline ran before this existed.
+   */
+  fixScope: "targeted" | "replan";
   /** Findings the gate deliberately did not act on, for the known-findings ledger. */
   dismissedFindings: KnownFinding[];
 }
 
 function settled(reason: string): AutonomousGateResult {
-  return { shouldLoop: false, giveUp: false, reason, fixableIssues: [], dismissedFindings: [] };
+  return {
+    shouldLoop: false,
+    giveUp: false,
+    reason,
+    fixableIssues: [],
+    fixScope: "replan",
+    dismissedFindings: [],
+  };
 }
 
 function parseDismissedFindings(raw: unknown): KnownFinding[] {
@@ -182,6 +202,9 @@ async function runAutonomousGate(
       fixableIssues: Array.isArray(parsed.fixableIssues)
         ? parsed.fixableIssues.filter((i): i is string => typeof i === "string")
         : [],
+      // Anything but an explicit "targeted" means the full round: the shortcut
+      // trades away the fix diff's code review, so it is opt-in only.
+      fixScope: parsed.fixScope === "targeted" ? "targeted" : "replan",
       dismissedFindings: parseDismissedFindings(parsed.dismissedFindings),
     };
   } catch {
@@ -403,7 +426,74 @@ export function buildAutonomousPipeline(input: {
     };
   }
 
-  function buildCycleReviewPhase(loopNumber: number): PipelinePhase {
+  /**
+   * The Execute half of a **targeted** round: hand the gate's asks straight to a
+   * fix agent, with no Update TODO phase ahead of it.
+   *
+   * The full round exists to turn review findings into a plan and then execute
+   * the plan. When every ask is already a concrete change at a named site, that
+   * machinery adds a re-planned TODO file and a fresh executor reading it — 2.6
+   * of the 15 minutes one measured round spent to land a one-line fix and one
+   * test file. The gate decides which shape applies (`fixScope`), because it is
+   * the only thing that has read both the review and the branch.
+   *
+   * The TODO file is deliberately left untouched, which is also why the review
+   * behind this skips the TODO verifier: the plan still records what the last
+   * full review found, and nothing here changes that.
+   */
+  function buildCycleFixPhase(loopNumber: number, fixableIssues: string[]): PipelinePhase {
+    return {
+      kind: "function",
+      label: `Cycle ${loopNumber}: Fix`,
+      timeoutMs: CYCLE_BUDGETS_MS.fix,
+      fn: async (ctx) => {
+        if (ctx.signal.aborted) return false;
+        const ws = resolveWorkspace(ctx.operationId, workspace);
+        if (!ws) {
+          ctx.emitStatus("No workspace found — cannot apply fixes");
+          return false;
+        }
+        const wsPath = path.join(getWorkspaceDir(), ws);
+        const readmeContent = (await getReadme(ws)) ?? "";
+        const allRepos = listWorkspaceRepos(ws);
+        const repos = repo
+          ? allRepos.filter((r) => r.repoPath === repo || r.repoName === repo)
+          : allRepos;
+
+        if (repos.length === 0) {
+          ctx.emitStatus("No repositories in workspace — cannot apply fixes");
+          return false;
+        }
+
+        ctx.emitStatus(
+          `Cycle ${loopNumber}/${maxLoops}: Applying ${fixableIssues.length} requested fix(es)`,
+        );
+
+        const results = await ctx.runChildGroup(
+          repos.map((r) => ({
+            label: r.repoName,
+            stepType: STEP_TYPES.EXECUTE,
+            prompt: buildFixApplierPrompt({
+              workspaceName: ws,
+              repoPath: r.repoPath,
+              repoName: r.repoName,
+              worktreePath: r.worktreePath,
+              readmeContent,
+              requestedFixes: fixableIssues,
+            }),
+            addDirs: [wsPath],
+            appendSystemPromptFile: ensureSystemPrompt(wsPath, "fix-applier"),
+          })),
+        );
+        return results.every(Boolean);
+      },
+    };
+  }
+
+  function buildCycleReviewPhase(
+    loopNumber: number,
+    scope: "full" | "fixes" = "full",
+  ): PipelinePhase {
     return {
       kind: "function",
       label: `Cycle ${loopNumber}: Review`,
@@ -415,7 +505,10 @@ export function buildAutonomousPipeline(input: {
           ctx.emitStatus("No workspace found — cannot review");
           return false;
         }
-        ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Reviewing workspace: ${ws}`);
+        ctx.emitStatus(
+          `Cycle ${loopNumber}/${maxLoops}: Reviewing workspace: ${ws}` +
+            (scope === "fixes" ? " (fix verification only)" : ""),
+        );
         // Read at run time, not build time: later cycles are appended before the
         // gate that fills their entry has run, so a captured value would be stale.
         // Empty on cycle 1, which is correct — nothing has been asked for yet.
@@ -424,6 +517,7 @@ export function buildAutonomousPipeline(input: {
           workspace: ws,
           repository: repo,
           requestedFixes: previousAsks && previousAsks.length > 0 ? previousAsks : undefined,
+          scope,
         });
         return runSubPhases(ctx, reviewPhases, skip);
       },
@@ -501,6 +595,22 @@ export function buildAutonomousPipeline(input: {
 
         if (!gateResult.shouldLoop) {
           ctx.appendPhases([buildCreatePrPhase()]);
+          return true;
+        }
+
+        // A targeted round: the asks go straight to a fix agent and the review
+        // behind it only checks that they landed. No Update TODO phase, and no
+        // fresh defect hunt over the fix diff — see `buildCycleFixPhase`.
+        if (gateResult.fixScope === "targeted" && gateResult.fixableIssues.length > 0) {
+          ctx.emitStatus(
+            `Next round is targeted: applying ${gateResult.fixableIssues.length} ask(s) directly, ` +
+              "verifying they landed, and re-running the repository constraints",
+          );
+          ctx.appendPhases([
+            buildCycleFixPhase(loopNumber + 1, gateResult.fixableIssues),
+            buildCycleReviewPhase(loopNumber + 1, "fixes"),
+            buildCycleGatePhase(loopNumber + 1),
+          ]);
           return true;
         }
 

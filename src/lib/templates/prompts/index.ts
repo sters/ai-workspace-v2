@@ -14,6 +14,7 @@ export {
 } from "./cross-repository-reviewer";
 export { getTodoVerifierSystemPrompt, buildTodoVerifierPrompt } from "./todo-verifier";
 export { getFixVerifierSystemPrompt, buildFixVerifierPrompt } from "./fix-verifier";
+export { getFixApplierSystemPrompt, buildFixApplierPrompt } from "./fix-applier";
 export { getReadmeVerifierSystemPrompt, buildReadmeVerifierPrompt } from "./readme-verifier";
 export { getPRCreatorSystemPrompt, buildPRCreatorPrompt } from "./pr-creator";
 export {

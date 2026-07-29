@@ -157,3 +157,46 @@ export function knownFindingsSection(content: string | undefined): string {
   if (!content || content.trim() === "") return "";
   return `\n## Known / Accepted Findings\n\n${content.trim()}\n`;
 }
+
+/**
+ * Toolchain provisioning, for agents that run a repository's own build / test /
+ * lint commands (the executor and the targeted fix applier). Shared because a
+ * missing toolchain is the failure both of them hit first, and "resolve it, do
+ * not give up" has to be worded identically in both — an agent told to bail
+ * marks real work blocked over an environment problem.
+ */
+export const TOOLCHAIN_RESOLUTION = `### Toolchain & Environment Resolution
+
+**Before running any build/test/lint/install command, make sure the correct tool versions and dependency manager are actually available.** A command failing because the toolchain isn't set up is NOT a reason to give up — resolve it first. This is language-agnostic; apply the same reasoning to node, python, ruby, go, rust, java, php, etc.
+
+1. **Resolve pinned versions** from version files, then activate them:
+   - Universal first: if \`.tool-versions\` or \`mise.toml\`/\`.mise.toml\` exists, prefer \`mise install\` (or \`asdf install\`) — it handles multiple languages at once.
+   - Otherwise language-specific: \`.node-version\`/\`.nvmrc\` (node → \`fnm use\` / \`nvm use\` / \`mise\`), \`.python-version\`/\`pyproject.toml\` (python → \`pyenv\` / \`uv\`), \`.ruby-version\` (ruby → \`rbenv\`), the \`go\` directive in \`go.mod\`, \`rust-toolchain.toml\` (rust → rustup), \`.java-version\`/\`.sdkmanrc\` (jvm → sdkman).
+2. **Resolve the dependency manager from the lockfile / declaration — do NOT substitute a different one.** A \`pnpm-lock.yaml\` means use pnpm, not bun or npm; \`uv.lock\` means uv, not pip; \`poetry.lock\` means poetry; \`yarn.lock\` means yarn; \`Gemfile.lock\` means bundler; \`Cargo.lock\` means cargo. Honor \`packageManager\` in package.json when present. Switching managers corrupts the lockfile and breaks reproducibility.
+3. **If the resolved manager is missing, set it up — don't bail:**
+   - JS package managers: try \`corepack enable\` (then \`corepack prepare --activate\`), or install via \`mise\`/\`asdf\`, or \`npm i -g <pm>\` as a last resort.
+   - Other languages: install the manager via the version manager (\`mise\`/\`asdf\`) or the documented bootstrap in CONTRIBUTING/README.
+4. **Only after the toolchain is ready**, run the install command (e.g. \`pnpm install --frozen-lockfile\`, \`uv sync\`, \`bundle install\`, \`go mod download\`).
+5. If, after genuinely attempting steps 1–4 (corepack, mise/asdf, documented bootstrap), the toolchain still cannot be provisioned (e.g. it needs network access you don't have, or a credentialed private registry), mark the affected item \`[!]\` (blocked) with a Note stating exactly which tool/version/manager is missing and what you tried. Do NOT silently switch to a different manager, and do NOT treat it as "unsolvable" without recording the attempts.`;
+
+/**
+ * Ticket-tracker hygiene, for every agent that edits files in a repository.
+ */
+export const NO_TICKET_IDS_IN_CODE = `### No Ticket IDs in Code
+
+**CRITICAL: Ticket IDs and issue references must NEVER appear inside the codebase.** This includes Jira keys (e.g. \`PROJ-123\`, \`JIRA-456\`), GitHub issue/PR refs (\`#789\`, \`org/repo#789\`), Linear IDs, and any similar task-tracker identifier.
+
+Forbidden locations (non-exhaustive):
+- Source code, including identifiers, string literals, constants, enum values
+- Comments and docstrings (\`// PROJ-123: ...\`, \`/** for JIRA-456 */\`)
+- Test names and \`describe\`/\`it\` titles
+- File names and directory names
+- TODO file content you author for downstream consumers
+- Configuration files, fixtures, snapshots
+
+Allowed locations (the only ones):
+- Git commit messages
+- Branch names
+- PR titles and descriptions (handled by a later phase, not by you)
+
+If the workspace TODO or README references a ticket ID, treat it as background context only — do NOT propagate it into any file you edit or create. If you find existing ticket IDs in code you are touching, leave them alone unless removing them is part of the TODO; do not add new ones.`;

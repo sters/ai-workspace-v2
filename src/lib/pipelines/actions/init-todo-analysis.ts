@@ -8,7 +8,8 @@
 
 import { existsSync, unlinkSync } from "node:fs";
 import path from "node:path";
-import { readWorkspaceReadme } from "@/lib/parsers/readme";
+import { readWorkspaceReadme, parseConstraints } from "@/lib/parsers/readme";
+import { startToolchainPrewarm } from "@/lib/workspace/toolchain-prewarm";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { buildPlannerPrompt } from "@/lib/templates";
 import { runBestOfNFiles } from "./best-of-n-files";
@@ -65,6 +66,49 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
           wsPath: wsPath(),
           repos: repos().map((r) => ({ repoName: r.repoName, worktreePath: r.worktreePath })),
         }).fn(ctx),
+    },
+    // Phase C2: Start the toolchain prep in the background.
+    //
+    // Deliberately fire-and-forget: the phases behind it (planning, plan review,
+    // the README gates) read source and write markdown, so they gain nothing by
+    // waiting, and the dependency install / submodule checkout they would be
+    // waiting on measured 4.3 min inside the first executor child. Execute awaits
+    // whatever is still running; see `toolchain-prewarm.ts`.
+    {
+      kind: "function",
+      label: "Prepare toolchain",
+      // Bounded by the parse + spawn only — the commands outlive this phase.
+      timeoutMs: 60 * 1000,
+      maxRetries: 0,
+      fn: async (ctx) => {
+        const rs = repos();
+        if (rs.length === 0) return true;
+
+        let readmeContent: string;
+        try {
+          readmeContent = (await readWorkspaceReadme(wsPath())).content;
+        } catch (err) {
+          ctx.emitStatus(`Could not read README for toolchain prep: ${err}`);
+          return true;
+        }
+
+        const started = startToolchainPrewarm({
+          workspace: wsName(),
+          repos: rs.map((r) => ({ repoName: r.repoName, worktreePath: r.worktreePath })),
+          constraints: parseConstraints(readmeContent),
+        });
+
+        if (started.length === 0) {
+          ctx.emitStatus("No toolchain/install commands declared — nothing to prepare");
+          return true;
+        }
+        for (const { repoName, commands } of started) {
+          ctx.emitStatus(
+            `[${repoName}] Preparing in background: ${commands.map((c) => `\`${c}\``).join(", ")}`,
+          );
+        }
+        return true;
+      },
     },
     // Phase D: Plan TODOs for each repo (parallel, with optional Best-of-N)
     {

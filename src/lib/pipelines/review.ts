@@ -47,8 +47,17 @@ export async function buildReviewPipeline(input: {
    * this from TODO checkboxes, which record intent rather than outcome.
    */
   requestedFixes?: string[];
+  /**
+   * `"fixes"` reviews a targeted fix round: only "did the asks land" and "is the
+   * contract still met", no fresh defect hunt. See `buildCycleFixPhase` in
+   * `autonomous.ts` for when that is a fair trade. Falls back to `"full"` when
+   * there are no requested fixes to verify.
+   */
+  scope?: "full" | "fixes";
 }): Promise<PipelinePhase[]> {
   const { workspace, repository, requestedFixes } = input;
+  const hasRequestedFixes = requestedFixes !== undefined && requestedFixes.length > 0;
+  const scope = input.scope === "fixes" && hasRequestedFixes ? "fixes" : "full";
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
   const allRepos = input.repos ?? listWorkspaceRepos(workspace);
@@ -123,33 +132,38 @@ export async function buildReviewPipeline(input: {
     const orgName = repo.repoPath.split("/").slice(0, -1).join("_") || "local";
     const reviewFileName = `REVIEW-${orgName}_${repo.repoName}.md`;
     const verifyFileName = `VERIFY-TODO-${orgName}_${repo.repoName}.md`;
+    const constraintFileName = `CONSTRAINTS-${orgName}_${repo.repoName}.md`;
 
-    // Code reviewer
-    reviewChildren.push({
-      label: `review-${repo.repoName}`,
-      stepType: STEP_TYPES.CODE_REVIEW,
-      prompt: buildCodeReviewerPrompt({
-        workspaceName: workspace,
-        repoPath: repo.repoPath,
-        repoName: repo.repoName,
-        baseBranch,
-        reviewTimestamp,
-        readmeContent,
-        worktreePath: repo.worktreePath,
-        repoChanges: repoChangesText,
-        reviewFilePath: path.join(reviewDir, reviewFileName),
-        knownFindings,
-        reviewScope,
-      }),
-      addDirs: [reviewDir],
-      appendSystemPromptFile: ensureSystemPrompt(wsPath, "code-reviewer"),
-    });
+    // Code reviewer. Absent in `"fixes"` scope: that round exists to land a
+    // short list of asks the previous review already produced, so a fresh
+    // defect hunt over the fix diff is the thing being traded away.
+    if (scope === "full") {
+      reviewChildren.push({
+        label: `review-${repo.repoName}`,
+        stepType: STEP_TYPES.CODE_REVIEW,
+        prompt: buildCodeReviewerPrompt({
+          workspaceName: workspace,
+          repoPath: repo.repoPath,
+          repoName: repo.repoName,
+          baseBranch,
+          reviewTimestamp,
+          readmeContent,
+          worktreePath: repo.worktreePath,
+          repoChanges: repoChangesText,
+          reviewFilePath: path.join(reviewDir, reviewFileName),
+          knownFindings,
+          reviewScope,
+        }),
+        addDirs: [reviewDir],
+        appendSystemPromptFile: ensureSystemPrompt(wsPath, "code-reviewer"),
+      });
+    }
 
     // Requested-fix verifier — only when a previous cycle actually asked for
     // something. Separate from the code reviewer so the "did the ask land"
     // verdict and the "is this code good" verdict stay in different files with
     // different scopes.
-    if (requestedFixes && requestedFixes.length > 0) {
+    if (hasRequestedFixes) {
       const fixVerifyFileName = `VERIFY-FIXES-${orgName}_${repo.repoName}.md`;
       reviewChildren.push({
         label: `verify-fixes-${repo.repoName}`,
@@ -172,14 +186,16 @@ export async function buildReviewPipeline(input: {
     }
 
     // TODO verifier — skipped when the repo has no TODO file (or it's empty),
-    // since there is nothing for the verifier to check against.
+    // since there is nothing for the verifier to check against. Also skipped in
+    // `"fixes"` scope: that round works from the gate's ask list, not from the
+    // TODO file, so it leaves the file exactly as the last full review found it.
     const todoFileName = `TODO-${repo.repoName}.md`;
     const todoFile = Bun.file(path.join(wsPath, todoFileName));
     const todoContent = (await todoFile.exists())
       ? await todoFile.text()
       : "";
 
-    if (todoContent.trim() !== "") {
+    if (scope === "full" && todoContent.trim() !== "") {
       reviewChildren.push({
         label: `verify-todo-${repo.repoName}`,
         stepType: STEP_TYPES.VERIFY_TODO,
@@ -214,6 +230,10 @@ export async function buildReviewPipeline(input: {
         worktreePath: repo.worktreePath,
         repoChanges: repoChangesText,
         verifyFilePath: path.join(reviewDir, readmeVerifyFileName),
+        // Already written by the Verify constraints phase ahead of this group,
+        // so a criterion phrased as "the declared commands exit 0" is answered
+        // by reading it instead of re-running the build and test suite.
+        constraintReportPath: path.join(reviewDir, constraintFileName),
       }),
       addDirs: [reviewDir],
       appendSystemPromptFile: ensureSystemPrompt(wsPath, "readme-verifier"),
@@ -236,7 +256,7 @@ export async function buildReviewPipeline(input: {
   // behind a FIFO semaphore, and this is the longest-running child of the set
   // (it reads across all worktrees). Appending it would put the critical path
   // last in the queue whenever the fan-out exceeds the concurrency limit.
-  if (!repository && repos.length > 1) {
+  if (scope === "full" && !repository && repos.length > 1) {
     reviewChildren.unshift({
       label: "review-cross-repository",
       stepType: STEP_TYPES.CODE_REVIEW,
@@ -254,15 +274,17 @@ export async function buildReviewPipeline(input: {
   }
 
   return [
-    // Phase 1: Run code reviews and TODO verifiers in parallel
-    {
-      kind: "group",
-      children: reviewChildren,
-    },
-    // Phase 2: Run constraint commands programmatically. This is the only place
+    // Phase 1: Run constraint commands programmatically. This is the only place
     // lint/test/build actually run during a review — the code reviewer is told
     // to leave them alone, because only here does a failure get compared against
     // the merge-base before it can reach the gate as a blocker.
+    //
+    // It runs *before* the reviewer group, not after, so the report is on disk
+    // while the README verifier works: an acceptance criterion phrased as "the
+    // declared commands exit 0" was otherwise verified by re-running the whole
+    // build and test suite, once per cycle, duplicating this phase's work with
+    // no merge-base comparison behind it. Costs nothing in wall clock — the
+    // phase is deterministic and the same length wherever it sits.
     {
       kind: "function",
       label: "Verify constraints",
@@ -368,6 +390,11 @@ export async function buildReviewPipeline(input: {
         }
         return true;
       },
+    },
+    // Phase 2: Run the review + verify children in parallel
+    {
+      kind: "group",
+      children: reviewChildren,
     },
     // Phase 3: Collect results into summary
     {
