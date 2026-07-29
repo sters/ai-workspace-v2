@@ -1,7 +1,12 @@
 export { getExecutorSystemPrompt, buildExecutorPrompt, buildBatchedExecutorPrompt } from "./executor";
 export { getPlannerSystemPrompt, getResearchPlannerSystemPrompt, buildPlannerPrompt } from "./planner";
 export { getCoordinatorSystemPrompt, buildCoordinatorPrompt } from "./coordinator";
-export { getReviewerSystemPrompt, buildReviewerPrompt } from "./reviewer";
+export {
+  getReviewerSystemPrompt,
+  buildReviewerPrompt,
+  buildTodoReviewResolutionInstruction,
+  TODO_REVIEW_SCHEMA,
+} from "./reviewer";
 export { getCodeReviewerSystemPrompt, buildCodeReviewerPrompt } from "./code-reviewer";
 export {
   getCrossRepositoryReviewerSystemPrompt,
