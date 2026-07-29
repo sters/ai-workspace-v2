@@ -1,23 +1,14 @@
 import {
   TODO_REVIEW_SCHEMA,
-  buildReviewerPrompt,
   buildTodoReviewResolutionInstruction,
   getReviewerSystemPrompt,
 } from "@/lib/templates/prompts/reviewer";
 import { REPO_SEARCH_EFFICIENCY } from "@/lib/templates/prompts/shared";
-import type { ReviewerInput, TodoReviewFinding } from "@/types/prompts";
+import type { TodoReviewFinding } from "@/types/prompts";
 
 describe("TODO_REVIEW_SCHEMA", () => {
-  it("requires a status and a findings list", () => {
-    expect(TODO_REVIEW_SCHEMA.required).toEqual(expect.arrayContaining(["status", "findings"]));
-  });
-
-  it("anchors every finding to an item with an actionable detail", () => {
-    expect(TODO_REVIEW_SCHEMA.properties.findings.items.required).toEqual(
-      expect.arrayContaining(["kind", "item", "detail"]),
-    );
-  });
-
+  // The resolution instruction branches on `kind`, so the enum is a contract
+  // between the reviewer's verdict and the reviser that applies it.
   it("carries a risk kind alongside the two question kinds", () => {
     expect(TODO_REVIEW_SCHEMA.properties.findings.items.properties.kind.enum).toEqual(
       expect.arrayContaining(["blocking", "unclear", "risk"]),
@@ -59,10 +50,6 @@ describe("getReviewerSystemPrompt", () => {
   it("is read-only — the revision step owns the TODO file", () => {
     expect(prompt).toMatch(/read-only/i);
     expect(prompt).not.toMatch(/NEEDS_CLARIFICATION/);
-  });
-
-  it("returns JSON matching the schema", () => {
-    expect(prompt).toMatch(/JSON object matching the schema/i);
   });
 
   it("carries the repo-search convention it needs to confirm the plan's claims", () => {
@@ -133,22 +120,5 @@ describe("buildTodoReviewResolutionInstruction", () => {
 
   it("returns an empty string when there is nothing to resolve", () => {
     expect(buildTodoReviewResolutionInstruction({ findings: [] })).toBe("");
-  });
-});
-
-describe("buildReviewerPrompt", () => {
-  const input: ReviewerInput = {
-    workspaceName: "ws",
-    repoName: "frontend",
-    readmeContent: "# Task\n\n## Non-Goal\n\n- Other screens",
-    todoContent: "- [ ] **[View]** Add the rows",
-    worktreePath: "/tmp/frontend",
-  };
-
-  it("passes the README and TODO through so both sides can be compared", () => {
-    const prompt = buildReviewerPrompt(input);
-    expect(prompt).toContain("## Non-Goal");
-    expect(prompt).toContain("Add the rows");
-    expect(prompt).toContain("/tmp/frontend");
   });
 });

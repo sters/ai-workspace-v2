@@ -18,14 +18,8 @@ function baseInput(): UpdaterInput {
 }
 
 describe("buildUpdaterPrompt", () => {
-  it("omits the interjection notice by default", () => {
-    const prompt = buildUpdaterPrompt(baseInput());
-    expect(prompt).not.toContain("Interjection Notice");
-    expect(prompt).not.toContain(INTERJECT_MARKER);
-  });
-
-  it("omits the interjection notice when interject is false", () => {
-    const prompt = buildUpdaterPrompt({ ...baseInput(), interject: false });
+  it.each([undefined, false])("omits the interjection notice for interject=%p", (interject) => {
+    const prompt = buildUpdaterPrompt({ ...baseInput(), interject });
     expect(prompt).not.toContain("Interjection Notice");
     expect(prompt).not.toContain(INTERJECT_MARKER);
   });

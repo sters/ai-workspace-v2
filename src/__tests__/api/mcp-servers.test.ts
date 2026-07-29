@@ -21,7 +21,6 @@ vi.mock("node:os", async () => {
 
 vi.mock("@/lib/config", () => ({
   getResolvedWorkspaceRoot: () => "/workspace-root",
-  getResolvedWorkspaceRoot: () => "/workspace-root",
 }));
 
 async function callGET() {

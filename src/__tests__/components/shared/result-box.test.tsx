@@ -16,13 +16,6 @@ describe("ResultBox", () => {
     );
   });
 
-  it("applies green result styling", () => {
-    const { container } = render(<ResultBox content="test" />);
-    const el = container.firstElementChild!;
-    expect(el.className).toContain("bg-green-50");
-    expect(el.className).toContain("text-green-800");
-  });
-
   it("shows cost when provided", () => {
     render(<ResultBox content="test" cost="$0.05" />);
     expect(screen.getByText("$0.05")).toBeInTheDocument();

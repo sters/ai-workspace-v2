@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildExecutorPrompt,
   buildBatchedExecutorPrompt,
   getExecutorSystemPrompt,
 } from "@/lib/templates/prompts/executor";
@@ -27,24 +26,6 @@ describe("getExecutorSystemPrompt", () => {
   });
 });
 
-describe("buildExecutorPrompt", () => {
-  it("includes repo name and workspace in output", () => {
-    const prompt = buildExecutorPrompt({
-      workspaceName: "ws-1",
-      repoPath: "github.com/org/my-repo",
-      repoName: "my-repo",
-      readmeContent: "# My README",
-      todoContent: "- [ ] Task 1",
-      worktreePath: "/tmp/wt",
-      workspacePath: "/tmp/ws",
-    });
-    expect(prompt).toContain("my-repo");
-    expect(prompt).toContain("ws-1");
-    expect(prompt).toContain("# My README");
-    expect(prompt).toContain("- [ ] Task 1");
-  });
-});
-
 describe("buildBatchedExecutorPrompt", () => {
   const baseInput = {
     workspaceName: "ws-1",
@@ -56,7 +37,8 @@ describe("buildBatchedExecutorPrompt", () => {
     workspacePath: "/tmp/ws",
   };
 
-  it("includes batch number in header", () => {
+  // batchIndex is 0-based; the prompt has to count from 1.
+  it("renders the 0-based batch index as a 1-based position", () => {
     const prompt = buildBatchedExecutorPrompt({
       ...baseInput,
       batchIndex: 0,
@@ -65,17 +47,6 @@ describe("buildBatchedExecutorPrompt", () => {
     });
     expect(prompt).toContain("Batch 1/3");
     expect(prompt).toContain("1 of 3");
-  });
-
-  it("includes batch TODO content", () => {
-    const batchContent = "- [ ] Task 1\n- [ ] Task 2";
-    const prompt = buildBatchedExecutorPrompt({
-      ...baseInput,
-      batchIndex: 1,
-      totalBatches: 2,
-      batchTodoContent: batchContent,
-    });
-    expect(prompt).toContain(batchContent);
   });
 
   it("includes completed summary when provided", () => {

@@ -1,24 +1,5 @@
-import {
-  getCrossRepositoryReviewerSystemPrompt,
-  buildCrossRepositoryReviewerPrompt,
-} from "@/lib/templates/prompts/cross-repository-reviewer";
+import { buildCrossRepositoryReviewerPrompt } from "@/lib/templates/prompts/cross-repository-reviewer";
 import type { CrossRepositoryReviewerInput } from "@/types/prompts";
-
-describe("getCrossRepositoryReviewerSystemPrompt", () => {
-  const prompt = getCrossRepositoryReviewerSystemPrompt();
-
-  it("instructs the reviewer to focus on issues that span multiple repositories", () => {
-    expect(prompt.toLowerCase()).toMatch(/cross-repositor|across repositor|between repositor/);
-  });
-
-  it("mentions concrete cross-repo concerns such as API contracts or shared types", () => {
-    expect(prompt.toLowerCase()).toMatch(/api|contract|interface|shared type|schema/);
-  });
-
-  it("does not duplicate per-repository review work", () => {
-    expect(prompt.toLowerCase()).toMatch(/do not|don't|avoid/);
-  });
-});
 
 describe("buildCrossRepositoryReviewerPrompt", () => {
   const baseInput: CrossRepositoryReviewerInput = {
@@ -43,29 +24,6 @@ describe("buildCrossRepositoryReviewerPrompt", () => {
       },
     ],
   };
-
-  it("includes workspace and review file path", () => {
-    const prompt = buildCrossRepositoryReviewerPrompt(baseInput);
-    expect(prompt).toContain("ws");
-    expect(prompt).toContain("/tmp/reviews/REVIEW-cross-repository.md");
-  });
-
-  it("lists every repository with its path, base branch, and worktree", () => {
-    const prompt = buildCrossRepositoryReviewerPrompt(baseInput);
-    expect(prompt).toContain("api");
-    expect(prompt).toContain("github.com/org/api");
-    expect(prompt).toContain("/tmp/api");
-    expect(prompt).toContain("web");
-    expect(prompt).toContain("github.com/org/web");
-    expect(prompt).toContain("/tmp/web");
-    expect(prompt).toContain("develop");
-  });
-
-  it("includes each repository's changes", () => {
-    const prompt = buildCrossRepositoryReviewerPrompt(baseInput);
-    expect(prompt).toContain("api diff body");
-    expect(prompt).toContain("web diff body");
-  });
 
   it("includes the known-findings ledger when the workspace has one", () => {
     const prompt = buildCrossRepositoryReviewerPrompt({

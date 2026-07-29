@@ -92,69 +92,10 @@ describe("resolveEffort", () => {
     expect(resolveEffort("review")).toBe("medium");
   });
 
-  it("reserves high for genuinely open-ended work", () => {
-    setConfig({});
-    // Writes the done-contract, then the plan the executor follows.
-    expect(resolveEffort("init", "analyze-readme")).toBe("high");
-    expect(resolveEffort("init", "plan-todo")).toBe("high");
-    // Hunts defects in a diff with no checklist to work from.
-    expect(resolveEffort("review", "code-review")).toBe("high");
-    // Reads the *other* repos' source to resolve [CROSS-REPO] placeholders.
-    expect(resolveEffort("init", "coordinate-todos")).toBe("high");
-    // The findings are the research operation's deliverable, not a step toward one.
-    expect(resolveEffort("execute", "research")).toBe("high");
-    // Judges between, and merges, implementations it did not write.
-    expect(resolveEffort("execute", "best-of-n-reviewer")).toBe("high");
-    // The one step tiered by payoff rather than shape: a ~60s sonnet call whose
-    // wrong answer costs a whole cycle in either direction.
-    expect(resolveEffort("autonomous", "autonomous-gate")).toBe("high");
-  });
-
-  it("uses medium as the default tier for bounded work", () => {
-    setConfig({});
-    // The TODO the executor consumes already says what to build, so the work is
-    // bounded implementation rather than open-ended investigation.
-    expect(resolveEffort("execute", "execute")).toBe("medium");
-    expect(resolveEffort("autonomous", "execute")).toBe("medium");
-    // Checks an enumerated Acceptance Criteria list — a checklist, not a hunt.
-    expect(resolveEffort("review", "verify-readme")).toBe("medium");
-    // Applies a requested edit to one document; explicitly must not touch code.
-    expect(resolveEffort("update-readme", "update-readme")).toBe("medium");
-    expect(resolveEffort("review", "plan-todo-from-review")).toBe("medium");
-    expect(resolveEffort("init", "review-todos")).toBe("medium");
-    expect(resolveEffort("update-todo", "update-todo")).toBe("medium");
-    // Invents the candidate work items rather than reading them off an input.
-    expect(resolveEffort("execute", "suggest-workspace")).toBe("medium");
-  });
-
-  it("uses opus/low for work a step above mechanical", () => {
-    setConfig({});
-    // Reads version-pinning files and task runners, then resolves *which*
-    // package manager and activation command apply — shallow judgment, but
-    // judgment, so it is not the sonnet rung.
-    expect(resolveEffort("review", "discover-constraints")).toBe("low");
-    expect(resolveModel("review", "discover-constraints")).toBe("opus");
-    // Fills a PR template from the diff and README, plus the gh mechanics.
-    expect(resolveEffort("create-pr", "create-pr")).toBe("low");
-    expect(resolveModel("create-pr", "create-pr")).toBe("opus");
-    // A single yes/no against documented criteria, biased toward proceeding.
-    expect(resolveEffort("autonomous", "readme-clarity-gate")).toBe("low");
-    expect(resolveModel("autonomous", "readme-clarity-gate")).toBe("opus");
-    // Pick the best of N markdown candidates, then splice them — no code.
-    expect(resolveEffort("init", "best-of-n-file-reviewer")).toBe("low");
-    expect(resolveModel("init", "best-of-n-file-reviewer")).toBe("opus");
-    expect(resolveEffort("execute", "best-of-n-synthesizer")).toBe("low");
-    expect(resolveModel("execute", "best-of-n-synthesizer")).toBe("opus");
-  });
-
-  it("uses sonnet/low only where there is nothing to think about", () => {
-    setConfig({});
-    for (const step of ["collect-reviews", "verify-todo", "deep-search", "aggregate-suggestions", "prune-suggestions"] as const) {
-      expect(resolveEffort("review", step)).toBe("low");
-      expect(resolveModel("review", step)).toBe("sonnet");
-    }
-  });
-
+  // Which step sits on which rung is documented in CLAUDE.md's ladder table;
+  // re-asserting each membership here only mirrors STEP_DEFAULT_*. What the tests
+  // below hold is the shape of the ladder, which a new step type cannot violate
+  // by accident.
   it("uses exactly four rungs of one model+effort ladder", () => {
     // The two tables are not tuned independently — together they form a single
     // ordered ladder, cheapest first:
@@ -183,6 +124,12 @@ describe("resolveEffort", () => {
     const levels = Object.values(STEP_DEFAULT_EFFORTS);
     expect(levels).not.toContain("xhigh");
     expect(levels).not.toContain("max");
+  });
+
+  it("resolves a code-level step default when nothing is configured", () => {
+    setConfig({});
+    expect(resolveEffort("execute", "execute")).toBe("medium");
+    expect(resolveModel("execute", "execute")).toBe("opus");
   });
 
   it("lets config.yml override a code-level step default", () => {

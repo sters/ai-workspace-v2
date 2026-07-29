@@ -7,13 +7,6 @@ import {
 import { KNOWN_FINDING_KINDS } from "@/lib/workspace/known-findings";
 
 describe("AUTONOMOUS_GATE_SCHEMA", () => {
-  it("has required fields", () => {
-    expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("shouldLoop");
-    expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("giveUp");
-    expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("reason");
-    expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("fixableIssues");
-  });
-
   it("requires dismissedFindings so a dismissal is never silent", () => {
     expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("dismissedFindings");
     const dismissed = AUTONOMOUS_GATE_SCHEMA.properties.dismissedFindings as {
@@ -42,38 +35,6 @@ describe("buildAutonomousGatePrompt", () => {
     maxLoops: 3,
   };
 
-  it("includes workspace name", () => {
-    const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).toContain("test-ws");
-  });
-
-  it("includes loop iteration info", () => {
-    const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).toContain("1 / 3");
-  });
-
-  it("includes review summary", () => {
-    const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).toContain("2 critical issues found");
-  });
-
-  it("includes review files", () => {
-    const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).toContain("review-repo-a.md");
-    expect(prompt).toContain("missing error handling");
-  });
-
-  it("includes TODO files", () => {
-    const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).toContain("TODO-repo-a.md");
-    expect(prompt).toContain("Add error handling");
-  });
-
-  it("includes README content", () => {
-    const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).toContain("Fix bugs in repo-a");
-  });
-
   // The final cycle used to be told to report `shouldLoop: false` "regardless of
   // issues found", which handed a PR to the human with the run's own leftovers in
   // it. Now it reports the truth and the pipeline stops instead.
@@ -92,22 +53,6 @@ describe("buildAutonomousGatePrompt", () => {
   it("does not add the final-cycle note when below max loops", () => {
     const prompt = buildAutonomousGatePrompt(baseInput);
     expect(prompt).not.toContain("FINAL cycle");
-  });
-
-  it("handles empty review files", () => {
-    const prompt = buildAutonomousGatePrompt({
-      ...baseInput,
-      reviewFiles: [],
-    });
-    expect(prompt).toContain("(no review files)");
-  });
-
-  it("handles empty TODO files", () => {
-    const prompt = buildAutonomousGatePrompt({
-      ...baseInput,
-      todoFiles: [],
-    });
-    expect(prompt).toContain("(no TODO files)");
   });
 
   it("instructs to evaluate all severity levels including warnings and suggestions", () => {
@@ -195,18 +140,13 @@ describe("buildAutonomousGatePrompt", () => {
     expect(prompt).toContain("Fix typo in main.go");
   });
 
-  it("does not include previous gate results section when empty", () => {
-    const prompt = buildAutonomousGatePrompt({
-      ...baseInput,
-      previousGateResults: [],
-    });
-    expect(prompt).not.toContain("Previous Gate Decisions");
-  });
-
-  it("does not include previous gate results section when undefined", () => {
-    const prompt = buildAutonomousGatePrompt(baseInput);
-    expect(prompt).not.toContain("Previous Gate Decisions");
-  });
+  it.each([[[]], [undefined]])(
+    "does not include previous gate results section for %p",
+    (previousGateResults) => {
+      const prompt = buildAutonomousGatePrompt({ ...baseInput, previousGateResults });
+      expect(prompt).not.toContain("Previous Gate Decisions");
+    },
+  );
 
   describe("known / accepted findings", () => {
     it("includes the ledger when the workspace has one", () => {

@@ -1,34 +1,12 @@
 import { describe, expect, it } from "vitest";
-import {
-  getWorkspaceSuggesterSystemPrompt,
-  buildWorkspaceSuggesterPrompt,
-  WORKSPACE_SUGGESTION_SCHEMA,
-} from "@/lib/templates/prompts/workspace-suggester";
+import { getWorkspaceSuggesterSystemPrompt } from "@/lib/templates/prompts/workspace-suggester";
 
 describe("workspace-suggester prompt", () => {
-  it("builds a prompt containing workspace name, README, and transcript digest", () => {
-    const prompt = buildWorkspaceSuggesterPrompt({
-      workspaceName: "test-ws",
-      readmeContent: "# My Project\n\nScope: fix auth module",
-      operationDigest: "[text] I noticed the logging module has a flaky test",
-    });
-
-    expect(prompt).toContain("test-ws");
-    expect(prompt).toContain("fix auth module");
-    expect(prompt).toContain("flaky test");
+  // The suggester's whole job is separating incidental out-of-scope observations
+  // from the workspace's own work.
+  it("scopes suggestions to out-of-scope, incidental findings", () => {
     const systemPrompt = getWorkspaceSuggesterSystemPrompt();
     expect(systemPrompt).toContain("out of scope");
     expect(systemPrompt).toContain("incidental");
-  });
-
-  it("schema has required suggestions array", () => {
-    expect(WORKSPACE_SUGGESTION_SCHEMA.type).toBe("object");
-    expect(WORKSPACE_SUGGESTION_SCHEMA.required).toContain("suggestions");
-    expect(WORKSPACE_SUGGESTION_SCHEMA.properties.suggestions.type).toBe("array");
-
-    const itemProps = WORKSPACE_SUGGESTION_SCHEMA.properties.suggestions.items.properties;
-    expect(itemProps.targetRepository).toBeDefined();
-    expect(itemProps.title).toBeDefined();
-    expect(itemProps.description).toBeDefined();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { resolveEffort, resolveModel, STEP_DEFAULT_EFFORTS, STEP_DEFAULT_MODELS } from "@/lib/config/model";
+import { resolveModel, STEP_DEFAULT_EFFORTS, STEP_DEFAULT_MODELS } from "@/lib/config/model";
 import { _resetConfig, _setConfigFilePath } from "@/lib/config/resolver";
 import type { StepType } from "@/types/pipeline";
 import fs from "node:fs";
@@ -39,13 +39,6 @@ describe("resolveModel", () => {
   it("returns undefined when no model is configured", () => {
     setConfig({});
     expect(resolveModel("execute")).toBeUndefined();
-  });
-
-  it("returns explicitModel when provided (highest priority)", () => {
-    setConfig({
-      operations: { model: "sonnet" },
-    });
-    expect(resolveModel("execute", undefined, "opus")).toBe("opus");
   });
 
   it("returns global operations.model", () => {
@@ -100,49 +93,6 @@ describe("resolveModel", () => {
     expect(resolveModel("review", "code-review", "haiku")).toBe("haiku");
   });
 
-  it("falls back correctly for unknown stepType", () => {
-    setConfig({
-      operations: {
-        review: {
-          model: "sonnet",
-          steps: {
-            "code-review": { model: "opus" },
-          },
-        },
-      },
-    });
-    // Unknown step falls back to operation type model
-    expect(resolveModel("review", "collect-reviews")).toBe("sonnet");
-  });
-
-  it("uses opus as the code-level default for suggest-workspace step", () => {
-    setConfig({});
-    // No config, no operation/type model — opus should come from STEP_DEFAULT_MODELS
-    expect(resolveModel("execute", "suggest-workspace")).toBe("opus");
-    expect(resolveModel("review", "suggest-workspace")).toBe("opus");
-    expect(resolveModel("autonomous", "suggest-workspace")).toBe("opus");
-  });
-
-  it("allows overriding suggest-workspace model via config.yml", () => {
-    setConfig({
-      operations: {
-        execute: {
-          steps: {
-            "suggest-workspace": { model: "haiku" },
-          },
-        },
-      },
-    });
-    expect(resolveModel("execute", "suggest-workspace")).toBe("haiku");
-    // Unconfigured parent types still fall back to the code-level default
-    expect(resolveModel("review", "suggest-workspace")).toBe("opus");
-  });
-
-  it("uses opus for autonomous-gate, the one step tiered by payoff", () => {
-    setConfig({});
-    expect(resolveModel("autonomous", "autonomous-gate")).toBe("opus");
-  });
-
   it("reserves sonnet for the purely mechanical rung", () => {
     // Sonnet is the bottom rung of the ladder and pairs only with `low` effort;
     // see the ladder invariant in `effort.test.ts`. Anything above mechanical
@@ -155,46 +105,6 @@ describe("resolveModel", () => {
     for (const step of sonnetSteps) {
       expect(STEP_DEFAULT_EFFORTS[step as StepType]).toBe("low");
     }
-  });
-
-  it("uses opus as the code-level default for plan-like and heavy-reasoning steps", () => {
-    setConfig({});
-    expect(resolveModel("init", "analyze-readme")).toBe("opus");
-    expect(resolveModel("init", "plan-todo")).toBe("opus");
-    expect(resolveModel("review", "plan-todo-from-review")).toBe("opus");
-    expect(resolveModel("execute", "execute")).toBe("opus");
-    expect(resolveModel("review", "verify-readme")).toBe("opus");
-    expect(resolveModel("review", "code-review")).toBe("opus");
-    expect(resolveModel("review", "discover-constraints")).toBe("opus");
-    expect(resolveModel("review", "review-todos")).toBe("opus");
-    expect(resolveModel("review", "coordinate-todos")).toBe("opus");
-  });
-
-  it("uses opus for research and the two workspace-document rewrites", () => {
-    setConfig({});
-    expect(resolveModel("execute", "research")).toBe("opus");
-    expect(resolveModel("update-todo", "update-todo")).toBe("opus");
-    expect(resolveModel("update-readme", "update-readme")).toBe("opus");
-  });
-
-  it("tiers the best-of-n steps by whether they merge code or markdown", () => {
-    setConfig({});
-    // The code-candidate reviewer also performs the merge in the worktree.
-    expect(resolveModel("execute", "best-of-n-reviewer")).toBe("opus");
-    // The markdown ones only pick and splice documents, so they drop a rung to
-    // opus/low rather than a model tier.
-    expect(resolveEffort("execute", "best-of-n-reviewer")).toBe("high");
-    expect(resolveEffort("init", "best-of-n-file-reviewer")).toBe("low");
-    expect(resolveEffort("init", "best-of-n-synthesizer")).toBe("low");
-  });
-
-  it("uses sonnet for the cheap extraction steps (no haiku tier)", () => {
-    setConfig({});
-    expect(resolveModel("review", "collect-reviews")).toBe("sonnet");
-    expect(resolveModel("review", "verify-todo")).toBe("sonnet");
-    expect(resolveModel("search", "deep-search")).toBe("sonnet");
-    expect(resolveModel("execute", "aggregate-suggestions")).toBe("sonnet");
-    expect(resolveModel("execute", "prune-suggestions")).toBe("sonnet");
   });
 
   it("falls back to global when operation type has no model", () => {

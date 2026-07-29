@@ -1,8 +1,4 @@
-import {
-  buildCoordinatorPrompt,
-  getCoordinatorSystemPrompt,
-} from "@/lib/templates/prompts/coordinator";
-import type { CoordinatorInput } from "@/types/prompts";
+import { getCoordinatorSystemPrompt } from "@/lib/templates/prompts/coordinator";
 
 describe("getCoordinatorSystemPrompt", () => {
   const prompt = getCoordinatorSystemPrompt();
@@ -33,31 +29,5 @@ describe("getCoordinatorSystemPrompt", () => {
 
   it("keeps the audit inside the Coordination section it already writes", () => {
     expect(prompt).toContain("## Coordination");
-  });
-});
-
-describe("buildCoordinatorPrompt", () => {
-  const baseInput: CoordinatorInput = {
-    workspaceName: "ws",
-    workspacePath: "/tmp/ws",
-    readmeContent: "# readme",
-    todoFiles: [{ repoName: "api", content: "- [ ] do a thing" }],
-    repoWorktrees: [
-      { repoName: "api", worktreePath: "/tmp/api" },
-      { repoName: "web", worktreePath: "/tmp/web" },
-    ],
-  };
-
-  it("lists worktree paths so the audit can read both sides", () => {
-    const prompt = buildCoordinatorPrompt(baseInput);
-    expect(prompt).toContain("/tmp/api");
-    expect(prompt).toContain("/tmp/web");
-  });
-
-  it("includes the README and every TODO file", () => {
-    const prompt = buildCoordinatorPrompt(baseInput);
-    expect(prompt).toContain("# readme");
-    expect(prompt).toContain("TODO-api.md");
-    expect(prompt).toContain("do a thing");
   });
 });

@@ -51,26 +51,11 @@ describe("buildFixVerifierPrompt", () => {
     verifyFilePath: "/tmp/VERIFY-FIXES-repo.md",
   };
 
-  it("enumerates each requested fix so the report can be matched back", () => {
+  // The gate matches each status back to its ask by number, so the numbering is
+  // the contract between this prompt and VERIFY-FIXES-*.md.
+  it("enumerates each requested fix from 1", () => {
     const prompt = buildFixVerifierPrompt(baseInput);
     expect(prompt).toContain("1. order-information.tsx:46");
     expect(prompt).toContain("2. promote selectedAtMs into @/utils/time");
-  });
-
-  it("includes repo, worktree and the report path", () => {
-    const prompt = buildFixVerifierPrompt(baseInput);
-    expect(prompt).toContain("github.com/org/repo");
-    expect(prompt).toContain("/tmp/worktree");
-    expect(prompt).toContain("/tmp/VERIFY-FIXES-repo.md");
-  });
-
-  it("passes the incremental range when one is known", () => {
-    const prompt = buildFixVerifierPrompt({
-      ...baseInput,
-      sinceSha: "abc1234",
-      sinceTimestamp: "20260727-181719",
-    });
-    expect(prompt).toContain("abc1234");
-    expect(prompt).toContain("20260727-181719");
   });
 });

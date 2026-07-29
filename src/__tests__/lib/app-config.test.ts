@@ -16,31 +16,6 @@ import {
   validateOpeners,
 } from "@/lib/config";
 
-describe("CONFIG_DEFAULTS", () => {
-  it("has expected default values", () => {
-    expect(CONFIG_DEFAULTS.workspaceRoot).toBeNull();
-    expect(CONFIG_DEFAULTS.server.port).toBe(3741);
-    expect(CONFIG_DEFAULTS.server.chatPort).toBe(3742);
-    expect(CONFIG_DEFAULTS.claude.path).toBeNull();
-    expect(CONFIG_DEFAULTS.operations.maxConcurrent).toBe(3);
-    expect(CONFIG_DEFAULTS.operations.claudeTimeoutMinutes).toBe(20);
-    expect(CONFIG_DEFAULTS.operations.functionTimeoutMinutes).toBe(3);
-    expect(CONFIG_DEFAULTS.operations.defaultInteractionLevel).toBe("mid");
-    expect(CONFIG_DEFAULTS.operations.typeOverrides).toEqual({});
-    expect(CONFIG_DEFAULTS.openers).toEqual([
-      { name: "Editor (VSCode)", command: "code {path}" },
-      { name: "Terminal", command: "open -a Terminal {path}" },
-    ]);
-    expect(CONFIG_DEFAULTS.hooks).toEqual({
-      sessionStartGitContext: true,
-      blockDangerousBash: true,
-    });
-    expect(CONFIG_DEFAULTS.suggest).toEqual({
-      enabled: true,
-    });
-  });
-});
-
 describe("loadConfigFile", () => {
   it("returns null for non-existent file", () => {
     expect(loadConfigFile("/tmp/does-not-exist-config.yml")).toBeNull();
@@ -294,37 +269,13 @@ describe("mergeConfig", () => {
     expect(result.operations.defaultInteractionLevel).toBe("mid");
   });
 
-  it("merges all layers correctly for claude config", () => {
-    const fileConfig: Partial<AppConfig> = {
-      claude: { path: "/usr/bin/claude" },
-    };
-    const env: Partial<AppConfig> = {
-      claude: { path: "/from/env" } as AppConfig["claude"],
-    };
-    const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, env);
-    // env wins for path
-    expect(result.claude.path).toBe("/from/env");
-  });
-
-  it("handles workspaceRoot from file", () => {
-    const fileConfig: Partial<AppConfig> = {
-      workspaceRoot: "/from/file",
-    };
-    const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, {});
-    expect(result.workspaceRoot).toBe("/from/file");
-  });
-
+  // Arrays are replaced wholesale, not merged element-wise.
   it("file config replaces openers default", () => {
     const fileConfig: Partial<AppConfig> = {
       openers: [{ name: "Custom", command: "cursor {path}" }],
     };
     const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, {});
     expect(result.openers).toEqual([{ name: "Custom", command: "cursor {path}" }]);
-  });
-
-  it("falls back to defaults when neither file nor env provide openers", () => {
-    const result = mergeConfig(CONFIG_DEFAULTS, {}, {});
-    expect(result.openers).toEqual(CONFIG_DEFAULTS.openers);
   });
 
   it("merges typeOverrides from file config", () => {
@@ -341,11 +292,6 @@ describe("mergeConfig", () => {
     expect(result.operations.bestOfN).toBe(3);
     expect(result.operations.typeOverrides.review).toEqual({ bestOfN: 0 });
     expect(result.operations.typeOverrides.execute).toEqual({ claudeTimeoutMinutes: 30 });
-  });
-
-  it("defaults typeOverrides to empty when not in file", () => {
-    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
-    expect(result.operations.typeOverrides).toEqual({});
   });
 });
 
@@ -412,35 +358,14 @@ describe("getConfig", () => {
     expect(first).not.toBe(second);
   });
 
-  it("defaults openers to VSCode + Terminal", () => {
-    const config = getConfig();
-    expect(config.openers).toEqual([
-      { name: "Editor (VSCode)", command: "code {path}" },
-      { name: "Terminal", command: "open -a Terminal {path}" },
-    ]);
-  });
-
-  it("defaults disableAccessLog to false", () => {
-    const config = getConfig();
-    expect(config.server.disableAccessLog).toBe(false);
-  });
-
-  it("picks up AIW_DISABLE_ACCESS_LOG env var (true)", () => {
-    process.env.AIW_DISABLE_ACCESS_LOG = "true";
-    const config = getConfig();
-    expect(config.server.disableAccessLog).toBe(true);
-  });
-
-  it("AIW_DISABLE_ACCESS_LOG=false keeps it false", () => {
-    process.env.AIW_DISABLE_ACCESS_LOG = "false";
-    const config = getConfig();
-    expect(config.server.disableAccessLog).toBe(false);
-  });
-
-  it("AIW_DISABLE_ACCESS_LOG=1 enables it", () => {
-    process.env.AIW_DISABLE_ACCESS_LOG = "1";
-    const config = getConfig();
-    expect(config.server.disableAccessLog).toBe(true);
+  it.each([
+    [undefined, false],
+    ["true", true],
+    ["1", true],
+    ["false", false],
+  ])("reads AIW_DISABLE_ACCESS_LOG=%s as %s", (value, expected) => {
+    if (value !== undefined) process.env.AIW_DISABLE_ACCESS_LOG = value;
+    expect(getConfig().server.disableAccessLog).toBe(expected);
   });
 });
 

@@ -3,7 +3,6 @@ import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
 // Mock config (needed by spawnClaude/spawnClaudeSync)
 vi.mock("@/lib/config", () => ({
   getResolvedWorkspaceRoot: () => "/mock/workspace-root",
-  getResolvedWorkspaceRoot: () => "/mock/workspace-root",
   getConfig: () => ({ claude: { path: null } }),
 }));
 

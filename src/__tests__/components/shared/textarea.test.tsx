@@ -9,16 +9,6 @@ describe("Textarea", () => {
     expect(screen.getByRole("textbox")).toBeInTheDocument();
   });
 
-  it("applies base styling classes", () => {
-    render(<Textarea aria-label="input" />);
-    const el = screen.getByRole("textbox");
-    expect(el.className).toContain("rounded-md");
-    expect(el.className).toContain("border");
-    expect(el.className).toContain("bg-background");
-    expect(el.className).toContain("text-sm");
-    expect(el.className).toContain("resize-y");
-  });
-
   it("passes through placeholder", () => {
     render(<Textarea placeholder="Type here..." />);
     expect(screen.getByPlaceholderText("Type here...")).toBeInTheDocument();

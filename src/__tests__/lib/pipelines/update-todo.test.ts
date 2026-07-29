@@ -2,7 +2,6 @@ import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
 
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/ws",
-  getWorkspaceDir: () => "/ws",
 }));
 
 vi.mock("@/lib/workspace", () => ({

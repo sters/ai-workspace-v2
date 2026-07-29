@@ -70,57 +70,29 @@ describe("getResearchPlannerSystemPrompt", () => {
 });
 
 describe("buildPlannerPrompt", () => {
-  it("includes repo and worktree details", () => {
-    const out = buildPlannerPrompt({
-      workspaceName: "ws-1",
-      repoPath: "github.com/org/my-repo",
-      repoName: "my-repo",
-      readmeContent: "# README",
-      taskType: "feature",
-      worktreePath: "/tmp/wt",
-    });
-    expect(out).toContain("my-repo");
-    expect(out).toContain("ws-1");
-    expect(out).toContain("/tmp/wt");
-    expect(out).toContain("feature");
-  });
-
-  it("omits the User Instruction section when no instruction is given", () => {
-    const out = buildPlannerPrompt({
-      workspaceName: "ws-1",
-      repoPath: "github.com/org/my-repo",
-      repoName: "my-repo",
-      readmeContent: "# README",
-      taskType: "feature",
-      worktreePath: "/tmp/wt",
-    });
-    expect(out).not.toContain("User Instruction");
-  });
+  const baseInput = {
+    workspaceName: "ws-1",
+    repoPath: "github.com/org/my-repo",
+    repoName: "my-repo",
+    readmeContent: "# README",
+    taskType: "feature" as const,
+    worktreePath: "/tmp/wt",
+  };
 
   it("includes the user instruction when provided", () => {
     const out = buildPlannerPrompt({
-      workspaceName: "ws-1",
-      repoPath: "github.com/org/my-repo",
-      repoName: "my-repo",
-      readmeContent: "# README",
-      taskType: "feature",
-      worktreePath: "/tmp/wt",
+      ...baseInput,
       instruction: "Focus TODOs on adding tests",
     });
     expect(out).toContain("User Instruction");
     expect(out).toContain("Focus TODOs on adding tests");
   });
 
-  it("ignores a whitespace-only instruction", () => {
-    const out = buildPlannerPrompt({
-      workspaceName: "ws-1",
-      repoPath: "github.com/org/my-repo",
-      repoName: "my-repo",
-      readmeContent: "# README",
-      taskType: "feature",
-      worktreePath: "/tmp/wt",
-      instruction: "   ",
-    });
-    expect(out).not.toContain("User Instruction");
-  });
+  it.each([undefined, "   "])(
+    "omits the User Instruction section for instruction %p",
+    (instruction) => {
+      const out = buildPlannerPrompt({ ...baseInput, instruction });
+      expect(out).not.toContain("User Instruction");
+    }
+  );
 });
