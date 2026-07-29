@@ -16,6 +16,8 @@ export {
   buildCoordinatorPrompt,
   getReviewerSystemPrompt,
   buildReviewerPrompt,
+  buildTodoReviewResolutionInstruction,
+  TODO_REVIEW_SCHEMA,
   getCodeReviewerSystemPrompt,
   buildCodeReviewerPrompt,
   getCrossRepositoryReviewerSystemPrompt,

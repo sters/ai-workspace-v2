@@ -51,6 +51,20 @@ export interface ReviewerInput {
   worktreePath: string;
 }
 
+/** One finding from the pre-execution plan review (`TODO_REVIEW_SCHEMA`). */
+export interface TodoReviewFinding {
+  /**
+   * `risk`: the item as written introduces a defect. `blocking`: it cannot be
+   * executed as written. `unclear`: executable on an assumption worth recording.
+   */
+  kind: "risk" | "blocking" | "unclear";
+  /** The TODO item the finding is about, quoted closely enough to locate it. */
+  item: string;
+  /** The defect (for `risk`) or the specific question (for the others). */
+  detail: string;
+  suggestedResolution?: string;
+}
+
 export interface CodeReviewerInput extends RepoPromptInput {
   baseBranch: string;
   reviewTimestamp: string;

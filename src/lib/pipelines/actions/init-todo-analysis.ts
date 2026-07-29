@@ -169,7 +169,8 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
         }).fn(ctx);
       },
     },
-    // Phase F: Review TODOs (parallel, per repo)
+    // Phase F: Review TODOs (parallel, per repo) and revise them from the verdict.
+    // Both children run under this one budget; the review half measured ~3 min.
     {
       kind: "function",
       label: "Review TODOs",
@@ -184,6 +185,7 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
           workspace: wsName(),
           wsPath: wsPath(),
           repos: repos().map((r) => ({ repoName: r.repoName, worktreePath: r.worktreePath })),
+          interactionLevel,
         }).fn(ctx);
       },
     },
