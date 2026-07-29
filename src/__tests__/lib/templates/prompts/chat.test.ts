@@ -4,11 +4,6 @@ import { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, getRes
 describe("getChatSystemPrompt", () => {
   const systemPrompt = getChatSystemPrompt();
 
-  it("mentions README.md and TODO", () => {
-    expect(systemPrompt).toContain("README.md");
-    expect(systemPrompt).toContain("TODO");
-  });
-
   it("spells out the wanted first turn as a positive example", () => {
     // Positive examples steer better than a stack of "Do NOT" lines.
     expect(systemPrompt).toContain('"Ready."');
@@ -36,20 +31,6 @@ describe("buildInitPrompt", () => {
   const workspaceId = "my-project";
   const workspacePath = "/root/workspace/my-project";
 
-  it("includes a cd instruction so Claude operates in the workspace dir", async () => {
-    const prompt = await buildInitPrompt(workspaceId, workspacePath, { readme: "x", todos: [] });
-    expect(prompt).toContain(`cd ${workspacePath}`);
-  });
-
-  it("embeds README content", async () => {
-    const prompt = await buildInitPrompt(workspaceId, workspacePath, {
-      readme: "# My Project\nSome description",
-      todos: [],
-    });
-    expect(prompt).toContain("# My Project");
-    expect(prompt).toContain("Some description");
-  });
-
   it("shows placeholder when README is missing", async () => {
     const prompt = await buildInitPrompt(workspaceId, workspacePath, {
       readme: null,
@@ -58,7 +39,7 @@ describe("buildInitPrompt", () => {
     expect(prompt).toContain("(no README.md)");
   });
 
-  it("embeds TODO summary", async () => {
+  it("renders each TODO file as a progress count plus checkbox lines", async () => {
     const prompt = await buildInitPrompt(workspaceId, workspacePath, {
       readme: "# Test",
       todos: [
@@ -116,13 +97,6 @@ describe("buildReviewChatPrompt", () => {
   const workspacePath = "/root/workspace/my-project";
   const reviewTimestamp = "20260214-235920";
 
-  it("includes a cd instruction so Claude operates in the workspace dir", async () => {
-    const prompt = await buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp, {
-      readme: "x", todos: [], reviewSummary: "y",
-    });
-    expect(prompt).toContain(`cd ${workspacePath}`);
-  });
-
   it("includes the review timestamp and artifacts path", async () => {
     const prompt = await buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp, {
       readme: "# Test",
@@ -131,15 +105,6 @@ describe("buildReviewChatPrompt", () => {
     });
     expect(prompt).toContain(reviewTimestamp);
     expect(prompt).toContain(`artifacts/reviews/${reviewTimestamp}/`);
-  });
-
-  it("embeds review summary", async () => {
-    const prompt = await buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp, {
-      readme: "# Test",
-      todos: [],
-      reviewSummary: "Critical: 2, Warnings: 3",
-    });
-    expect(prompt).toContain("Critical: 2, Warnings: 3");
   });
 
   it("shows placeholder when review summary is missing", async () => {

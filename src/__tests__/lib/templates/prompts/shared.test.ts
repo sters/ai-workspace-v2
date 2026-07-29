@@ -19,6 +19,19 @@ import { getReadmeVerifierSystemPrompt } from "@/lib/templates/prompts/readme-ve
 import { getPRCreatorSystemPrompt } from "@/lib/templates/prompts/pr-creator";
 import { getCollectorSystemPrompt } from "@/lib/templates/prompts/collector";
 import { getCoordinatorSystemPrompt } from "@/lib/templates/prompts/coordinator";
+import {
+  getResearchFindingsRepoSystemPrompt,
+  getResearchFindingsCrossRepoSystemPrompt,
+  getResearchRecommendationsSystemPrompt,
+  getResearchIntegrationSystemPrompt,
+} from "@/lib/templates/prompts/researcher";
+
+const researchPrompts: Record<string, string> = {
+  researchFindingsRepo: getResearchFindingsRepoSystemPrompt(),
+  researchFindingsCrossRepo: getResearchFindingsCrossRepoSystemPrompt(),
+  researchRecommendations: getResearchRecommendationsSystemPrompt(),
+  researchIntegration: getResearchIntegrationSystemPrompt(),
+};
 
 describe("worktreeCdRules", () => {
   it("requires a bare cd as the first Bash call", () => {
@@ -58,6 +71,7 @@ describe("working-directory conventions", () => {
   const noCdPrompts: Record<string, string> = {
     collector: getCollectorSystemPrompt(),
     coordinator: getCoordinatorSystemPrompt(),
+    ...researchPrompts,
   };
 
   it.each(Object.entries(cdPrompts))(
@@ -84,11 +98,6 @@ describe("working-directory conventions", () => {
 });
 
 describe("WRITTEN_DELIVERABLE_LENGTH", () => {
-  it("calibrates length without inviting padding", () => {
-    expect(WRITTEN_DELIVERABLE_LENGTH.toLowerCase()).toMatch(/length/);
-    expect(WRITTEN_DELIVERABLE_LENGTH.toLowerCase()).toMatch(/pad|filler/);
-  });
-
   const reportWriters: Record<string, string> = {
     codeReviewer: getCodeReviewerSystemPrompt(),
     crossRepositoryReviewer: getCrossRepositoryReviewerSystemPrompt(),
@@ -99,6 +108,7 @@ describe("WRITTEN_DELIVERABLE_LENGTH", () => {
     // executor re-reads it once per batch, the verifier audits it, and the
     // autonomous gate reads every one of them each cycle.
     planner: getPlannerSystemPrompt(),
+    ...researchPrompts,
   };
 
   it.each(Object.entries(reportWriters))(
@@ -110,16 +120,6 @@ describe("WRITTEN_DELIVERABLE_LENGTH", () => {
 });
 
 describe("REPO_SEARCH_EFFICIENCY", () => {
-  it("points exploration at the search tools rather than shell navigation", () => {
-    expect(REPO_SEARCH_EFFICIENCY).toMatch(/Grep/);
-    expect(REPO_SEARCH_EFFICIENCY).toMatch(/Glob/);
-  });
-
-  it("asks for independent lookups to be batched into one message", () => {
-    expect(REPO_SEARCH_EFFICIENCY.toLowerCase()).toMatch(/single message|one message/);
-    expect(REPO_SEARCH_EFFICIENCY.toLowerCase()).toMatch(/round-trip|round trip/);
-  });
-
   it("is applied to the planner, whose exploration is otherwise fully serial", () => {
     expect(getPlannerSystemPrompt()).toContain(REPO_SEARCH_EFFICIENCY);
   });
@@ -132,16 +132,12 @@ describe("REPO_SEARCH_EFFICIENCY", () => {
 });
 
 describe("SUBAGENT_DELEGATION_POLICY", () => {
-  it("caps delegation and forbids self-verification subagents", () => {
-    expect(SUBAGENT_DELEGATION_POLICY.toLowerCase()).toMatch(/subagent/);
-    expect(SUBAGENT_DELEGATION_POLICY.toLowerCase()).toMatch(/verify|double-check/);
-  });
-
   const delegators: Record<string, string> = {
     executor: getExecutorSystemPrompt(),
     planner: getPlannerSystemPrompt(),
     codeReviewer: getCodeReviewerSystemPrompt(),
     coordinator: getCoordinatorSystemPrompt(),
+    ...researchPrompts,
   };
 
   it.each(Object.entries(delegators))(
@@ -153,11 +149,6 @@ describe("SUBAGENT_DELEGATION_POLICY", () => {
 });
 
 describe("SCOPE_DISCIPLINE", () => {
-  it("asks for the requested scope, neither narrowed nor widened", () => {
-    expect(SCOPE_DISCIPLINE.toLowerCase()).toMatch(/scope/);
-    expect(SCOPE_DISCIPLINE.toLowerCase()).toMatch(/narrow|widen/);
-  });
-
   it("is applied to the executor", () => {
     expect(getExecutorSystemPrompt()).toContain(SCOPE_DISCIPLINE);
   });

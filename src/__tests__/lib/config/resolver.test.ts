@@ -20,67 +20,11 @@ function writeTempConfig(config: Record<string, unknown>): string {
   return filePath;
 }
 
+// mergeConfig picks env > file > default through one shared helper for every
+// scalar field, and app-config.test.ts covers that chain. What is left here is
+// the behaviour that helper does *not* give you for free.
 describe("mergeConfig", () => {
-  it("merges model from file config", () => {
-    const result = mergeConfig(
-      CONFIG_DEFAULTS,
-      { operations: { model: "sonnet" } } as Partial<AppConfig>,
-      {},
-    );
-    expect(result.operations.model).toBe("sonnet");
-  });
-
-  it("env model overrides file model", () => {
-    const result = mergeConfig(
-      CONFIG_DEFAULTS,
-      { operations: { model: "sonnet" } } as Partial<AppConfig>,
-      { operations: { model: "opus" } } as Partial<AppConfig>,
-    );
-    expect(result.operations.model).toBe("opus");
-  });
-
-  it("defaults model is undefined", () => {
-    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
-    expect(result.operations.model).toBeUndefined();
-  });
-
-  it("default disableAccessLog is false", () => {
-    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
-    expect(result.server.disableAccessLog).toBe(false);
-  });
-
-  it("merges disableAccessLog from file config", () => {
-    const result = mergeConfig(
-      CONFIG_DEFAULTS,
-      { server: { disableAccessLog: true } } as Partial<AppConfig>,
-      {},
-    );
-    expect(result.server.disableAccessLog).toBe(true);
-  });
-
-  it("env disableAccessLog overrides file", () => {
-    const result = mergeConfig(
-      CONFIG_DEFAULTS,
-      { server: { disableAccessLog: false } } as Partial<AppConfig>,
-      { server: { disableAccessLog: true } } as Partial<AppConfig>,
-    );
-    expect(result.server.disableAccessLog).toBe(true);
-  });
-
-  it("defaults chat.model to null (CLI default)", () => {
-    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
-    expect(result.chat.model).toBeNull();
-  });
-
-  it("file config overrides chat.model", () => {
-    const result = mergeConfig(
-      CONFIG_DEFAULTS,
-      { chat: { model: "opus" } } as Partial<AppConfig>,
-      {},
-    );
-    expect(result.chat.model).toBe("opus");
-  });
-
+  // `pick` tests `!== undefined`, so an explicit null is a value, not an absence.
   it("file config can null out chat.model", () => {
     const result = mergeConfig(
       CONFIG_DEFAULTS,
@@ -88,20 +32,6 @@ describe("mergeConfig", () => {
       {},
     );
     expect(result.chat.model).toBeNull();
-  });
-
-  it("defaults suggest.enabled to true", () => {
-    const result = mergeConfig(CONFIG_DEFAULTS, null, {});
-    expect(result.suggest.enabled).toBe(true);
-  });
-
-  it("file config can disable suggest.enabled", () => {
-    const result = mergeConfig(
-      CONFIG_DEFAULTS,
-      { suggest: { enabled: false } } as Partial<AppConfig>,
-      {},
-    );
-    expect(result.suggest.enabled).toBe(false);
   });
 
   it("merges steps in typeOverrides", () => {
@@ -191,15 +121,5 @@ describe("normalizeRawConfig", () => {
     const result = normalizeRawConfig(raw);
     expect(result.operations?.typeOverrides?.review?.model).toBe("haiku");
     expect(result.operations?.typeOverrides?.review?.steps?.["code-review"]?.model).toBe("opus");
-  });
-
-  it("preserves model at operations level", () => {
-    const raw = {
-      operations: {
-        model: "sonnet",
-      },
-    };
-    const result = normalizeRawConfig(raw);
-    expect(result.operations?.model).toBe("sonnet");
   });
 });

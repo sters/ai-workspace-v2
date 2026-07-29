@@ -12,7 +12,6 @@ vi.mock("@/lib/workspace/helpers", () => ({
 
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/tmp/test-workspace",
-  getWorkspaceDir: () => "/tmp/test-workspace",
 }));
 
 vi.mock("node:fs", async (importOriginal) => {

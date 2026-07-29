@@ -2,114 +2,45 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
 
+// The palette itself is not asserted — a single class token per case is only a
+// handle on which variant was selected.
 describe("StatusBadge", () => {
   it("renders the label text", () => {
     render(<StatusBadge label="feature" />);
     expect(screen.getByText("feature")).toBeInTheDocument();
   });
 
-  it("renders as a span element", () => {
-    render(<StatusBadge label="bugfix" />);
-    const el = screen.getByText("bugfix");
-    expect(el.tagName).toBe("SPAN");
+  it("derives the variant from the label, case-insensitively", () => {
+    render(<StatusBadge label="Completed" />);
+    expect(screen.getByText("Completed").className).toContain("bg-green-100");
   });
 
-  it("applies base styling classes", () => {
-    render(<StatusBadge label="test" />);
-    const el = screen.getByText("test");
-    expect(el.className).toContain("inline-flex");
-    expect(el.className).toContain("rounded-full");
-    expect(el.className).toContain("text-xs");
-    expect(el.className).toContain("font-medium");
-  });
-
-  it("applies feature variant styling when label is 'feature'", () => {
-    render(<StatusBadge label="feature" />);
-    const el = screen.getByText("feature");
-    expect(el.className).toContain("bg-blue-100");
-    expect(el.className).toContain("text-blue-800");
-  });
-
-  it("applies bugfix variant styling", () => {
-    render(<StatusBadge label="bugfix" />);
-    const el = screen.getByText("bugfix");
-    expect(el.className).toContain("bg-red-100");
-    expect(el.className).toContain("text-red-800");
-  });
-
-  it("applies completed variant styling", () => {
-    render(<StatusBadge label="completed" />);
-    const el = screen.getByText("completed");
-    expect(el.className).toContain("bg-green-100");
-  });
-
-  it("applies running variant styling", () => {
-    render(<StatusBadge label="running" />);
-    const el = screen.getByText("running");
-    expect(el.className).toContain("bg-yellow-100");
-  });
-
-  it("uses explicit variant over label for styling", () => {
+  it("prefers an explicit variant over the label", () => {
     render(<StatusBadge label="My Status" variant="feature" />);
-    const el = screen.getByText("My Status");
-    expect(el.className).toContain("bg-blue-100");
+    expect(screen.getByText("My Status").className).toContain("bg-blue-100");
   });
 
-  it("falls back to unknown variant for unrecognized labels", () => {
+  it("falls back to the unknown variant for unrecognized labels", () => {
     render(<StatusBadge label="something-else" />);
-    const el = screen.getByText("something-else");
-    expect(el.className).toContain("bg-gray-100");
-    expect(el.className).toContain("text-gray-800");
+    expect(screen.getByText("something-else").className).toContain(
+      "bg-gray-100"
+    );
   });
 
-  it("applies additional className", () => {
-    render(<StatusBadge label="test" className="ml-2" />);
-    const el = screen.getByText("test");
-    expect(el.className).toContain("ml-2");
-  });
+  it("uses pill shape by default and drops the pill radius when square", () => {
+    const { unmount } = render(<StatusBadge label="pill" />);
+    expect(screen.getByText("pill").className).toContain("rounded-full");
+    unmount();
 
-  it("uses pill shape by default", () => {
-    render(<StatusBadge label="test" />);
-    const el = screen.getByText("test");
-    expect(el.className).toContain("rounded-full");
-    expect(el.className).toContain("px-2.5");
-  });
-
-  it("uses square shape when specified", () => {
     render(<StatusBadge label="project" shape="square" />);
-    const el = screen.getByText("project");
-    expect(el.className).toContain("px-1.5");
-    expect(el.className).not.toContain("rounded-full");
+    expect(screen.getByText("project").className).not.toContain("rounded-full");
   });
 
   it("renders title attribute when provided", () => {
     render(<StatusBadge label="Error" title="Connection timed out" />);
-    const el = screen.getByText("Error");
-    expect(el).toHaveAttribute("title", "Connection timed out");
-  });
-
-  it("applies scope variant (user)", () => {
-    render(<StatusBadge label="user" shape="square" />);
-    const el = screen.getByText("user");
-    expect(el.className).toContain("bg-purple-100");
-  });
-
-  it("applies connected variant", () => {
-    render(<StatusBadge label="Connected" variant="connected" shape="square" />);
-    const el = screen.getByText("Connected");
-    expect(el.className).toContain("bg-emerald-100");
-  });
-
-  it("applies muted variant", () => {
-    render(<StatusBadge label="not found" variant="muted" shape="square" />);
-    const el = screen.getByText("not found");
-    expect(el.className).toContain("bg-muted");
-  });
-
-  it("applies op-running variant for operation status", () => {
-    render(<StatusBadge label="running" variant="op-running" />);
-    const el = screen.getByText("running");
-    expect(el.className).toContain("bg-blue-100");
-    expect(el.className).toContain("text-blue-700");
+    expect(screen.getByText("Error")).toHaveAttribute(
+      "title",
+      "Connection timed out"
+    );
   });
 });

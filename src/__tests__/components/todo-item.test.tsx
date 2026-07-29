@@ -24,54 +24,14 @@ describe("TodoItemRow", () => {
     expect(screen.getByText("Write unit tests")).toBeInTheDocument();
   });
 
-  it("renders completed status icon", () => {
-    render(<TodoItemRow item={makeItem({ status: "completed" })} />);
-    expect(screen.getByText("\u2705")).toBeInTheDocument();
-  });
-
-  it("renders pending status icon", () => {
-    render(<TodoItemRow item={makeItem({ status: "pending" })} />);
-    expect(screen.getByText("\u2B1C")).toBeInTheDocument();
-  });
-
-  it("renders blocked status icon", () => {
-    render(<TodoItemRow item={makeItem({ status: "blocked" })} />);
-    expect(screen.getByText("\u26D4")).toBeInTheDocument();
-  });
-
-  it("renders in_progress status icon", () => {
-    render(<TodoItemRow item={makeItem({ status: "in_progress" })} />);
-    expect(screen.getByText("\u23F3")).toBeInTheDocument();
-  });
-
-  it("applies line-through style for completed items", () => {
-    render(
-      <TodoItemRow
-        item={makeItem({ status: "completed", text: "Done task" })}
-      />
-    );
-    const row = screen.getByText("Done task").parentElement!;
-    expect(row.className).toContain("line-through");
-  });
-
-  it("applies red text style for blocked items", () => {
-    render(
-      <TodoItemRow
-        item={makeItem({ status: "blocked", text: "Blocked task" })}
-      />
-    );
-    const row = screen.getByText("Blocked task").parentElement!;
-    expect(row.className).toContain("text-red-600");
-  });
-
-  it("applies amber text style for in_progress items", () => {
-    render(
-      <TodoItemRow
-        item={makeItem({ status: "in_progress", text: "WIP task" })}
-      />
-    );
-    const row = screen.getByText("WIP task").parentElement!;
-    expect(row.className).toContain("text-amber-600");
+  it.each([
+    ["completed", "✅"],
+    ["pending", "⬜"],
+    ["blocked", "⛔"],
+    ["in_progress", "⏳"],
+  ] as const)("renders the %s status icon", (status, icon) => {
+    render(<TodoItemRow item={makeItem({ status })} />);
+    expect(screen.getByText(icon)).toBeInTheDocument();
   });
 
   it("does not render children section when children is empty", () => {

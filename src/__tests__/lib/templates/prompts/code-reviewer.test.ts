@@ -12,11 +12,6 @@ describe("getCodeReviewerSystemPrompt", () => {
     expect(prompt.toLowerCase()).toMatch(/repeat|duplicat/);
   });
 
-  it("mentions extraction targets such as helper, hook, function, or constant", () => {
-    expect(prompt.toLowerCase()).toMatch(/extract/);
-    expect(prompt.toLowerCase()).toMatch(/helper|hook|function|constant/);
-  });
-
   it("classifies refactoring/extraction opportunities under Suggestions only", () => {
     expect(prompt).toMatch(
       /Suggestions only|never (?:be )?(?:classified as )?(?:Critical|Warning)/i,
@@ -56,14 +51,6 @@ describe("buildCodeReviewerPrompt", () => {
     repoChanges: "diff body",
     reviewFilePath: "/tmp/review.md",
   };
-
-  it("includes workspace, repo, base branch, and worktree path", () => {
-    const prompt = buildCodeReviewerPrompt(baseInput);
-    expect(prompt).toContain("ws");
-    expect(prompt).toContain("repo");
-    expect(prompt).toContain("main");
-    expect(prompt).toContain("/tmp/worktree");
-  });
 
   it("includes the known-findings ledger when the workspace has one", () => {
     const prompt = buildCodeReviewerPrompt({

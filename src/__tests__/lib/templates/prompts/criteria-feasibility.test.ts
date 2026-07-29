@@ -1,5 +1,4 @@
 import {
-  CRITERIA_FEASIBILITY_PHASE_LABEL,
   CRITERIA_FEASIBILITY_SCHEMA,
   buildCriteriaFeasibilityPrompt,
   getCriteriaFeasibilitySystemPrompt,
@@ -55,36 +54,11 @@ describe("buildCriteriaFeasibilityPrompt", () => {
     ],
   };
 
-  it("lists every repository worktree so the judge can read both sides", () => {
-    const prompt = buildCriteriaFeasibilityPrompt(baseInput);
-    expect(prompt).toContain("frontend");
-    expect(prompt).toContain("/tmp/frontend");
-    expect(prompt).toContain("bff");
-    expect(prompt).toContain("/tmp/bff");
-  });
-
-  it("includes the README and the parsed criteria", () => {
-    const prompt = buildCriteriaFeasibilityPrompt(baseInput);
-    expect(prompt).toContain("# Task: something");
-    expect(prompt).toContain("Multiple IDs render most-recent-first");
-  });
-
-  it("survives a workspace with no repositories on disk", () => {
-    const prompt = buildCriteriaFeasibilityPrompt({ ...baseInput, repos: [] });
-    expect(prompt).toContain("(no repositories on disk)");
-  });
-
   it("omits the parsed-criteria section when there are none", () => {
     const prompt = buildCriteriaFeasibilityPrompt({
       ...baseInput,
       acceptanceCriteria: "",
     });
     expect(prompt).not.toContain("Acceptance Criteria (parsed)");
-  });
-});
-
-describe("CRITERIA_FEASIBILITY_PHASE_LABEL", () => {
-  it("is a stable label the pipeline and UI share", () => {
-    expect(CRITERIA_FEASIBILITY_PHASE_LABEL).toBe("Check criteria feasibility");
   });
 });

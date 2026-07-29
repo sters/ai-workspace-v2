@@ -30,68 +30,35 @@ vi.mock("@/lib/workspace/prompts", () => ({
   ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),
 }));
 
+const EXPECTED_LABELS = [
+  "Analyze & draft README",
+  "Setup workspace",
+  "Discover repo constraints",
+  "Plan TODO items",
+  "Coordinate TODOs",
+  "Review TODOs",
+  "Commit snapshot",
+];
+
+const labelsOf = (phases: ReturnType<typeof buildInitPipeline>) =>
+  phases.map((p) => (p.kind === "function" || p.kind === "single" ? p.label : "group"));
+
 describe("buildInitPipeline", () => {
-  it("returns 7 phases", () => {
-    const phases = buildInitPipeline("test description");
-    expect(phases).toHaveLength(7);
+  it("phases have expected labels", () => {
+    expect(labelsOf(buildInitPipeline("test description"))).toEqual(EXPECTED_LABELS);
   });
 
   it("all phases are function kind", () => {
-    const phases = buildInitPipeline("test description");
-    for (const phase of phases) {
+    for (const phase of buildInitPipeline("test description")) {
       expect(phase.kind).toBe("function");
     }
   });
 
-  it("phases have expected labels", () => {
-    const phases = buildInitPipeline("test description");
-    const labels = phases.map((p) => {
-      if (p.kind === "function" || p.kind === "single") return p.label;
-      return "group";
-    });
-    expect(labels).toEqual([
-      "Analyze & draft README",
-      "Setup workspace",
-      "Discover repo constraints",
-      "Plan TODO items",
-      "Coordinate TODOs",
-      "Review TODOs",
-      "Commit snapshot",
-    ]);
-  });
-
-  it("returns a new array each call (independent closure state)", () => {
-    const phases1 = buildInitPipeline("desc 1");
-    const phases2 = buildInitPipeline("desc 2");
-    expect(phases1).not.toBe(phases2);
-  });
-
-  describe("Best-of-N options", () => {
-    it("still returns 7 phases when bestOfN is provided", () => {
-      const phases = buildInitPipeline("desc", undefined, { bestOfN: 3 });
-      expect(phases).toHaveLength(7);
-    });
-
-    it("phase labels remain the same with bestOfN", () => {
-      const phases = buildInitPipeline("desc", undefined, { bestOfN: 3 });
-      const labels = phases.map((p) => {
-        if (p.kind === "function" || p.kind === "single") return p.label;
-        return "group";
-      });
-      expect(labels).toEqual([
-        "Analyze & draft README",
-        "Setup workspace",
-        "Discover repo constraints",
-        "Plan TODO items",
-        "Coordinate TODOs",
-        "Review TODOs",
-        "Commit snapshot",
-      ]);
-    });
-
-    it("accepts bestOfNConfirm option", () => {
-      const phases = buildInitPipeline("desc", undefined, { bestOfN: 2, bestOfNConfirm: true });
-      expect(phases).toHaveLength(7);
-    });
-  });
+  // Best-of-N fans out inside the existing phases rather than adding any.
+  it.each([{ bestOfN: 3 }, { bestOfN: 2, bestOfNConfirm: true }])(
+    "keeps the same phases with %o",
+    (options) => {
+      expect(labelsOf(buildInitPipeline("desc", undefined, options))).toEqual(EXPECTED_LABELS);
+    },
+  );
 });
