@@ -161,6 +161,24 @@ describe("REVIEW_COVERAGE_POLICY", () => {
     expect(REVIEW_COVERAGE_POLICY).toMatch(/Confidence/);
   });
 
+  // Confidence is the one field with a hard "does not justify a loop" rule
+  // attached downstream, so it must measure exactly one thing. A reviewer that
+  // routed "I verified the mechanism but cannot confirm the input occurs" into a
+  // low confidence got a verified regression dropped by the gate.
+  it("scopes confidence to the mechanism, not the likelihood of the input", () => {
+    expect(REVIEW_COVERAGE_POLICY).toMatch(/mechanism/i);
+    expect(REVIEW_COVERAGE_POLICY).toMatch(/does not lower|not lowered/i);
+    expect(REVIEW_COVERAGE_POLICY).toMatch(/state (it|the unconfirmed)/i);
+  });
+
+  // A "no blocking issues / merge-ready" line is itself filtering, and it is the
+  // one form of it the report template used to invite. The gate is told the review
+  // does not filter, so the two ends disagreed about the same file.
+  it("withholds the ship/no-ship verdict from the reviewer", () => {
+    expect(REVIEW_COVERAGE_POLICY).toMatch(/merge-ready|ready to ship|no blocking/i);
+    expect(REVIEW_COVERAGE_POLICY).toMatch(/do not (state|write|declare)/i);
+  });
+
   it.each([
     ["codeReviewer", getCodeReviewerSystemPrompt()],
     ["crossRepositoryReviewer", getCrossRepositoryReviewerSystemPrompt()],
@@ -177,6 +195,30 @@ describe("SEVERITY_CALIBRATION", () => {
     expect(SEVERITY_CALIBRATION).toMatch(/complete|incomplete/i);
     expect(SEVERITY_CALIBRATION).toMatch(/Suggestion/);
     expect(SEVERITY_CALIBRATION).toMatch(/test coverage/i);
+  });
+
+  // Every fix a cycle lands is itself "changed behavior", so an unscoped coverage
+  // Warning has no fixed point: each cycle's own fix supplies the next cycle's
+  // finding. The scope has to be the contract or a reachable path.
+  it("scopes the coverage warning to contract-required or reachable behavior", () => {
+    expect(SEVERITY_CALIBRATION).toMatch(/test coverage[^.\n]*\b(contract|reach)/i);
+    // ...and names the counter-case on the Suggestion side, or the scoping is
+    // advice with no consequence attached.
+    expect(SEVERITY_CALIBRATION).toMatch(/defensive guard/i);
+  });
+
+  // "This change handles less than the code it replaced" is a diff-level fact,
+  // checkable without knowing production data — so it must not depend on knowing
+  // whether the dropped input occurs. Bounded to the replaced code, so it cannot
+  // fire on pre-existing defects or on speculation about future inputs.
+  it("treats a capability the replaced code had as a Warning", () => {
+    expect(SEVERITY_CALIBRATION).toMatch(/replace[ds]?\b/i);
+    expect(SEVERITY_CALIBRATION).toMatch(/input/i);
+    const warnings = SEVERITY_CALIBRATION.slice(
+      SEVERITY_CALIBRATION.indexOf("**Warnings**"),
+      SEVERITY_CALIBRATION.indexOf("**Suggestions**"),
+    );
+    expect(warnings).toMatch(/replace/i);
   });
 
   // Severity must describe the deliverable, not predict a future reader.

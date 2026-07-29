@@ -48,7 +48,7 @@ export const REVIEW_REPORT_TEMPLATE = `# Code Review: {repository_name}
 
 ## Conclusion
 
-{Final assessment}
+{What this change is and what state it is in. Describe; do not rule. This section must NOT say whether the branch can merge, ship, or is "review-ready", and must NOT call the findings blocking or non-blocking — that decision is made downstream from your findings plus context you cannot see here.}
 
 ## Recurring (previously accepted)
 
@@ -184,7 +184,6 @@ export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
 
 | Metric | Count |
 |--------|-------|
-| Overall Assessment | {assessment} |
 | Critical Issues | {count} |
 | Warnings | {count} |
 | Suggestions | {count} |
@@ -225,6 +224,8 @@ export const SUMMARY_REPORT_TEMPLATE = `# Workspace Review Summary
 ## Overall Recommendations
 
 ## Conclusion
+
+{The state of the work across repositories. Describe; do not rule. This section must NOT say whether the branch can merge, ship, or is "review-ready", and must NOT call the findings blocking or non-blocking — the autonomous gate decides that from this summary plus the acceptance criteria, TODO files, fix verification, and known-findings ledger, none of which are in view here.}
 `;
 
 export const README_VERIFICATION_REPORT_TEMPLATE = `# README Verification: {repository_name}

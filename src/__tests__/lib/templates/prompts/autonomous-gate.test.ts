@@ -120,6 +120,17 @@ describe("buildAutonomousGatePrompt", () => {
     expect(systemPrompt).toMatch(/coverage over filtering/i);
   });
 
+  // The reader half of the same axis the reviewer writes on. A finding that
+  // verified its mechanism and only flagged the triggering input as unconfirmed
+  // is not a suspicion, whatever label it arrived with — mislabelling it low is
+  // how a verified regression this branch introduced got recorded and dropped.
+  it("reads confidence as mechanism certainty, not input likelihood", () => {
+    const systemPrompt = getAutonomousGateSystemPrompt();
+    expect(systemPrompt).toMatch(/mechanism/i);
+    expect(systemPrompt).toMatch(/unconfirmed|whether the (triggering )?input/i);
+    expect(systemPrompt).toMatch(/not low confidence|treat it as high/i);
+  });
+
   it("includes give-up instructions for stagnation detection", () => {
     const systemPrompt = getAutonomousGateSystemPrompt();
     expect(systemPrompt).toContain("giveUp");
@@ -216,7 +227,19 @@ describe("buildAutonomousGatePrompt", () => {
     it("forbids down-labelling a merge-blocking finding to dodge the loop", () => {
       const systemPrompt = getAutonomousGateSystemPrompt();
       expect(systemPrompt).toMatch(/down-label/i);
-      expect(systemPrompt).toMatch(/test coverage for changed code is Should-Fix/i);
+      expect(systemPrompt).toMatch(/test coverage[^.\n]*Should-Fix/i);
+    });
+
+    // The carve-out for coverage sat outside the budget with no scope, and every
+    // fix a cycle lands is "changed code" — so the run's own fix supplied the next
+    // cycle's Should-Fix and no branch could ever be done. Observed: cycle 2
+    // looped solely for an untested NaN guard that cycle 1's fix had introduced.
+    it("scopes the coverage carve-out so a cycle's own fix cannot re-trigger it", () => {
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toMatch(/test coverage[^.\n]*\b(contract|reach)/i);
+      expect(systemPrompt).toMatch(/defensive guard/i);
+      // The reason belongs in the prompt, not only in this test.
+      expect(systemPrompt).toMatch(/guarantee[sd]? (one more|another) cycle/i);
     });
 
     // The gate cannot see the cycle number from its system prompt, and the rule
