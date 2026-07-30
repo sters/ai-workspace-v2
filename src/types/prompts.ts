@@ -100,13 +100,6 @@ export interface FixVerifierInput extends RepoPromptInput {
   sinceTimestamp?: string;
 }
 
-/** Targeted fix round input: the gate's asks, applied to one repository. */
-export interface FixApplierInput extends RepoPromptInput {
-  readmeContent: string;
-  /** The gate's `fixableIssues`, verbatim — the whole scope of the round. */
-  requestedFixes: string[];
-}
-
 /** Cross-repository code-review agent input (multi-repo workspaces only). */
 export interface CrossRepositoryReviewerInput {
   workspaceName: string;

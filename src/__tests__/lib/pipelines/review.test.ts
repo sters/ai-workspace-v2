@@ -694,7 +694,10 @@ describe("buildReviewPipeline — phase order", () => {
   });
 });
 
-describe("buildReviewPipeline — fixes scope", () => {
+// A fix round is reviewed like any other round: the fix diff gets the same
+// defect hunt an execute diff gets. Narrowing happens through the incremental
+// baseline, never by dropping reviewers.
+describe("buildReviewPipeline — a round with requested fixes keeps every reviewer", () => {
   const repo = {
     repoName: "repo-a",
     repoPath: "owner/repo-a",
@@ -708,34 +711,23 @@ describe("buildReviewPipeline — fixes scope", () => {
     mockFileMap.set("/ws/test-ws/TODO-repo-a.md", "- [ ] something");
   });
 
-  it("keeps only the fix and contract verifiers — no fresh defect hunt", async () => {
+  it("keeps the code reviewer and the TODO verifier next to the fix verifier", async () => {
     const phases = await buildReviewPipeline({
       workspace: "test-ws",
-      scope: "fixes",
       requestedFixes: ["fix one"],
     });
     const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
-    expect(labels).toEqual(["verify-fixes-repo-a", "verify-readme-repo-a"]);
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        "verify-fixes-repo-a",
+        "verify-readme-repo-a",
+        "review-repo-a",
+        "verify-todo-repo-a",
+      ]),
+    );
   });
 
-  it("still verifies constraints and collects a summary the gate can read", async () => {
-    const phases = await buildReviewPipeline({
-      workspace: "test-ws",
-      scope: "fixes",
-      requestedFixes: ["fix one"],
-    });
-    expect((phases[0] as PipelinePhaseFunction).label).toBe("Verify constraints");
-    expect((phases[2] as PipelinePhaseFunction).label).toBe("Collect review results");
-  });
-
-  it("falls back to a full review when there is nothing to verify", async () => {
-    const phases = await buildReviewPipeline({ workspace: "test-ws", scope: "fixes" });
-    const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
-    expect(labels).toContain("review-repo-a");
-    expect(labels).toContain("verify-todo-repo-a");
-  });
-
-  it("drops the cross-repository reviewer too", async () => {
+  it("keeps the cross-repository reviewer", async () => {
     mockListWorkspaceRepos.mockReturnValue([
       repo,
       {
@@ -746,10 +738,9 @@ describe("buildReviewPipeline — fixes scope", () => {
     ]);
     const phases = await buildReviewPipeline({
       workspace: "test-ws",
-      scope: "fixes",
       requestedFixes: ["fix one"],
     });
     const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
-    expect(labels).not.toContain("review-cross-repository");
+    expect(labels).toContain("review-cross-repository");
   });
 });
