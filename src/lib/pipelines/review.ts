@@ -47,17 +47,9 @@ export async function buildReviewPipeline(input: {
    * this from TODO checkboxes, which record intent rather than outcome.
    */
   requestedFixes?: string[];
-  /**
-   * `"fixes"` reviews a targeted fix round: only "did the asks land" and "is the
-   * contract still met", no fresh defect hunt. See `buildCycleFixPhase` in
-   * `autonomous.ts` for when that is a fair trade. Falls back to `"full"` when
-   * there are no requested fixes to verify.
-   */
-  scope?: "full" | "fixes";
 }): Promise<PipelinePhase[]> {
   const { workspace, repository, requestedFixes } = input;
   const hasRequestedFixes = requestedFixes !== undefined && requestedFixes.length > 0;
-  const scope = input.scope === "fixes" && hasRequestedFixes ? "fixes" : "full";
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
   const allRepos = input.repos ?? listWorkspaceRepos(workspace);
@@ -134,30 +126,29 @@ export async function buildReviewPipeline(input: {
     const verifyFileName = `VERIFY-TODO-${orgName}_${repo.repoName}.md`;
     const constraintFileName = `CONSTRAINTS-${orgName}_${repo.repoName}.md`;
 
-    // Code reviewer. Absent in `"fixes"` scope: that round exists to land a
-    // short list of asks the previous review already produced, so a fresh
-    // defect hunt over the fix diff is the thing being traded away.
-    if (scope === "full") {
-      reviewChildren.push({
-        label: `review-${repo.repoName}`,
-        stepType: STEP_TYPES.CODE_REVIEW,
-        prompt: buildCodeReviewerPrompt({
-          workspaceName: workspace,
-          repoPath: repo.repoPath,
-          repoName: repo.repoName,
-          baseBranch,
-          reviewTimestamp,
-          readmeContent,
-          worktreePath: repo.worktreePath,
-          repoChanges: repoChangesText,
-          reviewFilePath: path.join(reviewDir, reviewFileName),
-          knownFindings,
-          reviewScope,
-        }),
-        addDirs: [reviewDir],
-        appendSystemPromptFile: ensureSystemPrompt(wsPath, "code-reviewer"),
-      });
-    }
+    // Code reviewer. Runs on every review, including a round that only applies
+    // the previous gate's asks: the fix diff is changed code and gets the same
+    // defect hunt as any other. What narrows a fix round is the incremental
+    // baseline below, not a reduced child set.
+    reviewChildren.push({
+      label: `review-${repo.repoName}`,
+      stepType: STEP_TYPES.CODE_REVIEW,
+      prompt: buildCodeReviewerPrompt({
+        workspaceName: workspace,
+        repoPath: repo.repoPath,
+        repoName: repo.repoName,
+        baseBranch,
+        reviewTimestamp,
+        readmeContent,
+        worktreePath: repo.worktreePath,
+        repoChanges: repoChangesText,
+        reviewFilePath: path.join(reviewDir, reviewFileName),
+        knownFindings,
+        reviewScope,
+      }),
+      addDirs: [reviewDir],
+      appendSystemPromptFile: ensureSystemPrompt(wsPath, "code-reviewer"),
+    });
 
     // Requested-fix verifier — only when a previous cycle actually asked for
     // something. Separate from the code reviewer so the "did the ask land"
@@ -185,17 +176,15 @@ export async function buildReviewPipeline(input: {
       });
     }
 
-    // TODO verifier — skipped when the repo has no TODO file (or it's empty),
-    // since there is nothing for the verifier to check against. Also skipped in
-    // `"fixes"` scope: that round works from the gate's ask list, not from the
-    // TODO file, so it leaves the file exactly as the last full review found it.
+    // TODO verifier — skipped only when the repo has no TODO file (or it's
+    // empty), since there is nothing for the verifier to check against.
     const todoFileName = `TODO-${repo.repoName}.md`;
     const todoFile = Bun.file(path.join(wsPath, todoFileName));
     const todoContent = (await todoFile.exists())
       ? await todoFile.text()
       : "";
 
-    if (scope === "full" && todoContent.trim() !== "") {
+    if (todoContent.trim() !== "") {
       reviewChildren.push({
         label: `verify-todo-${repo.repoName}`,
         stepType: STEP_TYPES.VERIFY_TODO,
@@ -256,7 +245,7 @@ export async function buildReviewPipeline(input: {
   // behind a FIFO semaphore, and this is the longest-running child of the set
   // (it reads across all worktrees). Appending it would put the critical path
   // last in the queue whenever the fan-out exceeds the concurrency limit.
-  if (scope === "full" && !repository && repos.length > 1) {
+  if (!repository && repos.length > 1) {
     reviewChildren.unshift({
       label: "review-cross-repository",
       stepType: STEP_TYPES.CODE_REVIEW,

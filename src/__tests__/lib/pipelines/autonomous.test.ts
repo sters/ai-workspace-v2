@@ -1266,7 +1266,7 @@ describe("buildAutonomousPipeline", () => {
   });
 });
 
-describe("buildAutonomousPipeline — targeted fix round", () => {
+describe("buildAutonomousPipeline — every loop goes through the plan", () => {
   function findPhase(phases: PipelinePhase[], label: string) {
     const p = phases.find((x) => x.kind === "function" && x.label === label);
     if (!p || p.kind !== "function") throw new Error(`no phase ${label}`);
@@ -1305,128 +1305,77 @@ describe("buildAutonomousPipeline — targeted fix round", () => {
     } as ReturnType<typeof mockGetOperation>);
   });
 
-  it("replaces Update TODO + Execute with a single Fix phase", async () => {
+  const UNIFORM_ROUND = [
+    "Cycle 1: Update TODO",
+    "Cycle 2: Execute",
+    "Cycle 2: Review",
+    "Cycle 2: Gate",
+  ];
+
+  it("routes a round of localized fixes through Update TODO + Execute", async () => {
     const { appended } = await runGate({
       shouldLoop: true,
       giveUp: false,
       reason: "one localized fix left",
       fixableIssues: ["include the index in the list key at row.tsx:118"],
-      fixScope: "targeted",
     });
 
-    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
-      "Cycle 2: Fix",
-      "Cycle 2: Review",
-      "Cycle 2: Gate",
-    ]);
+    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual(UNIFORM_ROUND);
   });
 
-  it("scopes the review behind it to fix verification", async () => {
-    const { appended } = await runGate({
-      shouldLoop: true,
-      giveUp: false,
-      reason: "one localized fix left",
-      fixableIssues: ["include the index in the list key"],
-      fixScope: "targeted",
-    });
-
-    await findPhase(appended, "Cycle 2: Review").fn(createMockCtx());
-    expect(mockBuildReview).toHaveBeenCalledWith(
-      expect.objectContaining({
-        scope: "fixes",
-        requestedFixes: ["include the index in the list key"],
-      }),
-    );
-  });
-
-  it("hands the asks to the fix applier verbatim, per repo", async () => {
-    const { appended } = await runGate({
-      shouldLoop: true,
-      giveUp: false,
-      reason: "two localized fixes left",
-      fixableIssues: ["ask one", "ask two"],
-      fixScope: "targeted",
-    });
-
-    const children: { label: string; prompt: string }[] = [];
-    const fixCtx = createMockCtx({
-      runChildGroup: vi.fn(async (cs) => {
-        children.push(...cs.map((c) => ({ label: c.label, prompt: c.prompt })));
-        return cs.map(() => true);
-      }),
-    });
-    await findPhase(appended, "Cycle 2: Fix").fn(fixCtx);
-
-    expect(children.map((c) => c.label)).toEqual(["repo"]);
-    expect(children[0].prompt).toContain("1. ask one");
-    expect(children[0].prompt).toContain("2. ask two");
-  });
-
-  it("leaves the TODO file alone — no strip, no update-todo pipeline", async () => {
-    const { appended } = await runGate({
-      shouldLoop: true,
-      giveUp: false,
-      reason: "one localized fix left",
-      fixableIssues: ["ask one"],
-      fixScope: "targeted",
-    });
-    await findPhase(appended, "Cycle 2: Fix").fn(createMockCtx());
-
-    expect(mockStripCompletedTodos).not.toHaveBeenCalled();
-    expect(mockBuildUpdateTodo).not.toHaveBeenCalled();
-  });
-
-  it("still runs the full round for fixScope: replan", async () => {
+  it("routes a round that needs new work the same way", async () => {
     const { appended } = await runGate({
       shouldLoop: true,
       giveUp: false,
       reason: "needs a new module",
       fixableIssues: ["extract a shared helper"],
-      fixScope: "replan",
     });
 
-    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
-      "Cycle 1: Update TODO",
-      "Cycle 2: Execute",
-      "Cycle 2: Review",
-      "Cycle 2: Gate",
-    ]);
+    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual(UNIFORM_ROUND);
   });
 
-  it.each([undefined, "TARGETED", "something-else"])(
-    "falls back to the full round for an unusable fixScope %p",
-    async (fixScope) => {
-      const { appended } = await runGate({
-        shouldLoop: true,
-        giveUp: false,
-        reason: "work remains",
-        fixableIssues: ["ask one"],
-        fixScope,
-      });
-      expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
-        "Cycle 1: Update TODO",
-        "Cycle 2: Execute",
-        "Cycle 2: Review",
-        "Cycle 2: Gate",
-      ]);
-    },
-  );
+  it("plans the gate's asks into the TODO file before executing", async () => {
+    const { appended } = await runGate({
+      shouldLoop: true,
+      giveUp: false,
+      reason: "two localized fixes left",
+      fixableIssues: ["ask one", "ask two"],
+    });
+    await findPhase(appended, "Cycle 1: Update TODO").fn(createMockCtx());
 
-  it("falls back to the full round when targeted arrives with no asks", async () => {
-    // A targeted round with nothing to apply would land no change and then be
-    // judged again on an identical branch.
+    expect(mockStripCompletedTodos).toHaveBeenCalled();
+    expect(mockBuildUpdateTodo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        instruction: expect.stringContaining("- ask one\n- ask two"),
+      }),
+    );
+  });
+
+  // The fix diff gets the same defect hunt as an execute diff — a full-scope
+  // review, narrowed to the diff by the incremental baseline rather than by a
+  // reduced child set. The asks still ride along so verify-fixes can check each
+  // one landed.
+  it("reviews the fix diff at full scope with the asks attached", async () => {
+    const { appended } = await runGate({
+      shouldLoop: true,
+      giveUp: false,
+      reason: "one localized fix left",
+      fixableIssues: ["include the index in the list key"],
+    });
+
+    await findPhase(appended, "Cycle 2: Review").fn(createMockCtx());
+    const call = mockBuildReview.mock.calls.at(-1)?.[0];
+    expect(call).toMatchObject({ requestedFixes: ["include the index in the list key"] });
+    expect(call).not.toHaveProperty("scope");
+  });
+
+  it("still runs the round when the gate names no specific asks", async () => {
     const { appended } = await runGate({
       shouldLoop: true,
       giveUp: false,
       reason: "work remains but unspecified",
       fixableIssues: [],
-      fixScope: "targeted",
     });
-    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual([
-      "Cycle 1: Update TODO",
-      "Cycle 2: Execute",
-      "Cycle 2: Review",
-      "Cycle 2: Gate",
-    ]);
+    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual(UNIFORM_ROUND);
   });
 });
