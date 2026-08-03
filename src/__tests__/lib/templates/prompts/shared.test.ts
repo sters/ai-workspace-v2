@@ -19,6 +19,7 @@ import { getReadmeVerifierSystemPrompt } from "@/lib/templates/prompts/readme-ve
 import { getPRCreatorSystemPrompt } from "@/lib/templates/prompts/pr-creator";
 import { getCollectorSystemPrompt } from "@/lib/templates/prompts/collector";
 import { getCoordinatorSystemPrompt } from "@/lib/templates/prompts/coordinator";
+import { getUpdaterSystemPrompt } from "@/lib/templates/prompts/updater";
 import {
   getResearchFindingsRepoSystemPrompt,
   getResearchFindingsCrossRepoSystemPrompt,
@@ -196,6 +197,23 @@ describe("SCOPE_DISCIPLINE", () => {
   it("is applied to the executor", () => {
     expect(getExecutorSystemPrompt()).toContain(SCOPE_DISCIPLINE);
   });
+
+  // The updater is the other place a request's scope can grow, because it is what
+  // turns a gate's numbered asks into the items an executor works from. On the run
+  // this was written for, an ask for two SWR options became a TODO prescribing the
+  // neighbouring hook's seven, and undoing the five nobody asked for is what the
+  // final cycle spent its loop on.
+  it("is applied to the TODO updater", () => {
+    expect(getUpdaterSystemPrompt()).toContain(SCOPE_DISCIPLINE);
+  });
+
+  // Citing a neighbour is where that widening came from: the five extra options
+  // were in the pattern, not in the request. So the rule has to name the pattern
+  // itself, not just "don't widen" in the abstract.
+  it("limits an existing pattern to the form of the change, not its extent", () => {
+    expect(SCOPE_DISCIPLINE).toMatch(/form, not extent/i);
+    expect(SCOPE_DISCIPLINE).toMatch(/only the surface the request names/i);
+  });
 });
 
 describe("REVIEW_COVERAGE_POLICY", () => {
@@ -263,6 +281,21 @@ describe("SEVERITY_CALIBRATION", () => {
       SEVERITY_CALIBRATION.indexOf("**Suggestions**"),
     );
     expect(warnings).toMatch(/replace/i);
+  });
+
+  // The mirror of the replaced-capability rule: a construct copied from a
+  // neighbouring call site is new code, but the defect in it belongs to the
+  // repository's convention, not to this change. On the run this was written for,
+  // an option block copied from a sibling hook (five other pre-existing sites had
+  // it verbatim) became the high-confidence Warning that spent the final cycle and
+  // cost the run its PR.
+  it("treats a construct copied from pre-existing sites as a repo-level Suggestion", () => {
+    expect(SEVERITY_CALIBRATION).toMatch(/new but not novel/i);
+    expect(SEVERITY_CALIBRATION).toMatch(/pre-existing sites/i);
+    // Inert unless the reviewer is told to go look for the other sites.
+    expect(SEVERITY_CALIBRATION).toMatch(/check whether it already exists/i);
+    // Coverage is untouched — it is filed lower, not dropped.
+    expect(SEVERITY_CALIBRATION).toMatch(/report it with the sites/i);
   });
 
   // Severity must describe the deliverable, not predict a future reader.
