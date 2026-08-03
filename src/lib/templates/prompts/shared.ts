@@ -121,10 +121,20 @@ export const SUBAGENT_DELEGATION_POLICY = `### Delegation
 
 Delegate to a subagent only for large tracks of work that are genuinely independent and parallelizable — e.g. a wide multi-file investigation you cannot finish in a handful of tool calls. Do NOT delegate work you can complete yourself, and do NOT use subagents to verify or double-check your own output (later pipeline phases already verify it). When one subagent is enough, use one rather than several, and keep spawn counts low.`;
 
-/** Scope calibration: deliver the requested task, neither narrowed nor widened. */
+/**
+ * Scope calibration: deliver the requested task, neither narrowed nor widened.
+ *
+ * The second paragraph is aimed at the one route by which widening looks like
+ * diligence rather than overreach: imitating a neighbouring call site. Asked for
+ * two SWR options on a new query, an updater cited the sibling hook that sets
+ * seven and prescribed all seven; the five nobody asked for became the finding
+ * that spent the run's last cycle, so it never opened a PR.
+ */
 export const SCOPE_DISCIPLINE = `### Scope
 
-Deliver what was asked, at the scope intended. Make routine judgment calls yourself, and finish the whole task rather than leaving stubs or placeholders. If the request looks mistaken or you see a better approach, note it in the TODO/Notes in one sentence and continue with the task as asked — do not quietly narrow, widen, or transform it. Stop short of actions clearly beyond what was asked.`;
+Deliver what was asked, at the scope intended. Make routine judgment calls yourself, and finish the whole task rather than leaving stubs or placeholders. If the request looks mistaken or you see a better approach, note it in the TODO/Notes in one sentence and continue with the task as asked — do not quietly narrow, widen, or transform it. Stop short of actions clearly beyond what was asked.
+
+Citing an existing pattern is about **form, not extent**. When you point at a neighbouring call site, module or option block as the thing to follow, take its shape and change only the surface the request names. Copying the rest of it because the neighbour happens to carry more widens the request into code nobody asked about, and it brings that neighbour's own unexamined choices along with it — the pattern is evidence of how this repository writes something, not evidence that each part of it is right here. Where the request names specific fields, options or values, those are the scope; if the surrounding parts look genuinely necessary too, say so in one line and still deliver what was asked.`;
 
 /**
  * Finding-stage policy for review agents: report everything, let a later stage
@@ -171,7 +181,9 @@ Severity answers one question about the change in front of you: **is it done, an
 
 Place each finding by what it says about the deliverable, not by how easy the fix is. Do not lift a preference to Warning because it would be a one-line change, and do not file real incompleteness under Suggestions because you are unsure it is worth the reader's time — uncertainty belongs in the Confidence annotation, not in the severity.
 
-On that Warning about a **replaced** capability: compare the new code against the code it replaced in this diff, not against the rest of the repository — a defect the change did not introduce is not this change's Warning. "The old code handled input X and the new code does not" is a fact you can establish from the diff alone, so not knowing how often X actually arrives does not soften it; say what you could not confirm and keep the severity. Attach the change you would fall back to if the answer never comes, rather than leaving the finding as a question for a human — a finding whose only exit is someone else's answer is one nothing will act on.`;
+On that Warning about a **replaced** capability: compare the new code against the code it replaced in this diff, not against the rest of the repository — a defect the change did not introduce is not this change's Warning. "The old code handled input X and the new code does not" is a fact you can establish from the diff alone, so not knowing how often X actually arrives does not soften it; say what you could not confirm and keep the severity. Attach the change you would fall back to if the answer never comes, rather than leaving the finding as a question for a human — a finding whose only exit is someone else's answer is one nothing will act on.
+
+The same boundary holds for code that is **new but not novel**. Before filing a Warning against a construct this change took from elsewhere in the repository — the same option block, helper or idiom — check whether it already exists at other, pre-existing sites, and search for them rather than assuming either way. If it does, the finding is about this repository's convention rather than about this change: report it with the sites you found and file it as a **Suggestion**, because changing a convention from inside this change means editing files the task never touched, and every one of those files is diff this review did not ask for. What still carries full severity is this change's *own* use being wrong here — the idiom does something different at this call site, or this call site is the one place the failure reaches a user. "The idiom is unsound" is a repo-level finding, and the pre-existing sites are already carrying it.`;
 
 /**
  * Cross-cycle memory for review agents. Reviewers are spawned fresh each

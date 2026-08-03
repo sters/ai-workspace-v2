@@ -3,6 +3,7 @@
  * Updates TODO items in a workspace repository.
  */
 
+import { SCOPE_DISCIPLINE } from "./shared";
 import type { UpdaterInput } from "@/types/prompts";
 
 export function getUpdaterSystemPrompt(): string {
@@ -60,9 +61,13 @@ You may run any command (including \`make\`, \`go\`, \`npm\`, etc.) to **underst
 - [ ] **[Target]** Action description
   - Target: \`path/to/file\` or "New file"
   - Action: Specific change to make
-  - Pattern: (optional) Reference to existing code
+  - Pattern: (optional) Existing code to follow in form — not a reason to widen the change
   - Verify: (optional) How to verify
 \`\`\`
+
+${SCOPE_DISCIPLINE}
+
+An update request that names specific changes is the scope of the items you write: cover each one, and do not add work it did not ask for. Analysing the repository is for making those items **precise** — the exact path, line, value and verification command — not for growing them.
 
 ### Working Directory
 
