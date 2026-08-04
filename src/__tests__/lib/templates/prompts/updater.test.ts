@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { buildUpdaterPrompt } from "@/lib/templates/prompts/updater";
+import {
+  buildUpdaterPrompt,
+  getUpdaterSystemPrompt,
+} from "@/lib/templates/prompts/updater";
+import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
 import type { UpdaterInput } from "@/types/prompts";
 
 const INTERJECT_MARKER =
@@ -16,6 +20,21 @@ function baseInput(): UpdaterInput {
     instruction: "add tests",
   };
 }
+
+describe("getUpdaterSystemPrompt", () => {
+  const prompt = getUpdaterSystemPrompt();
+
+  // The updater deletes `[x]` items every cycle. If it took the thread record
+  // with them, create-pr would have nothing left to reply to — and the rows it
+  // needs are exactly the ones belonging to the items just deleted.
+  it("protects the PR review thread record from the delete-completed rule", () => {
+    expect(prompt).toContain(PR_REVIEW_THREADS_HEADING);
+    const deleteIdx = prompt.indexOf("ALWAYS delete completed TODO items");
+    const protectIdx = prompt.indexOf(PR_REVIEW_THREADS_HEADING);
+    expect(deleteIdx).toBeGreaterThan(-1);
+    expect(protectIdx).toBeGreaterThan(deleteIdx);
+  });
+});
 
 describe("buildUpdaterPrompt", () => {
   it.each([undefined, false])("omits the interjection notice for interject=%p", (interject) => {

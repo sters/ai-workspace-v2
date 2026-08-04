@@ -4,6 +4,7 @@
  */
 
 import { SCOPE_DISCIPLINE } from "./shared";
+import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
 import type { UpdaterInput } from "@/types/prompts";
 
 export function getUpdaterSystemPrompt(): string {
@@ -34,6 +35,7 @@ You may run any command (including \`make\`, \`go\`, \`npm\`, etc.) to **underst
 2. **Analyze Repository** (for abstract requests): Run commands, read files, explore the codebase to understand what specific TODO items are needed
 3. **Apply Updates to the TODO file**:
    - **ALWAYS delete completed TODO items** (\`[x]\`) to keep file compact
+   - **Never delete or rewrite the \`## ${PR_REVIEW_THREADS_HEADING}\` section.** Its rows map GitHub review threads to TODO items, and a later phase reads them to reply to and resolve those threads. Keep every row verbatim — including rows naming items you just deleted for being complete, which are precisely the ones that get replied to.
    - Preserve overall structure and formatting style
    - New items MUST follow the structured format below
 4. **Commit the TODO file only**:

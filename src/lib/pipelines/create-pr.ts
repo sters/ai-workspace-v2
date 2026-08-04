@@ -1,6 +1,7 @@
 import path from "node:path";
 import { getReadme } from "@/lib/workspace/reader";
 import { parseReadmeMeta } from "@/lib/parsers/readme";
+import { extractPrReviewThreadsSection } from "@/lib/parsers/todo";
 import {
   listWorkspaceRepos,
   detectBaseBranch,
@@ -30,7 +31,9 @@ export async function buildCreatePrPipeline(input: {
     ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
     : allRepos;
 
-  const children = repos.map((repo) => {
+  const wsPath = path.join(getWorkspaceDir(), workspace);
+
+  const children = await Promise.all(repos.map(async (repo) => {
     // Detect base branch from README metadata or repo itself
     const metaRepo = meta.repositories.find(
       (r) => r.path === repo.repoPath || r.alias === repo.repoName,
@@ -40,6 +43,15 @@ export async function buildCreatePrPipeline(input: {
     const changes = getRepoChanges(workspace, repo.repoPath, baseBranch);
     const existingPR = checkExistingPR(repo.worktreePath);
     const prTemplate = readPRTemplate(repo.worktreePath);
+
+    // Review threads an earlier PR-review triage turned into TODO items. This is
+    // the phase that pushes, so it is the first point at which a reply can name a
+    // commit that exists on the remote.
+    const todoFilePath = path.join(wsPath, `TODO-${repo.repoName}.md`);
+    const todoFile = Bun.file(todoFilePath);
+    const prReviewThreads = (await todoFile.exists())
+      ? extractPrReviewThreadsSection(await todoFile.text())
+      : null;
 
     const prompt = buildPRCreatorPrompt({
       workspaceName: workspace,
@@ -54,9 +66,9 @@ export async function buildCreatePrPipeline(input: {
       existingPR: existingPR.exists
         ? { url: existingPR.url!, title: existingPR.title!, body: existingPR.body! }
         : undefined,
+      ...(prReviewThreads && { prReviewThreads, todoFilePath }),
     });
 
-    const wsPath = path.join(getWorkspaceDir(), workspace);
     return {
       label: repo.repoName,
       prompt,
@@ -64,7 +76,7 @@ export async function buildCreatePrPipeline(input: {
       addDirs: [wsPath],
       appendSystemPromptFile: ensureSystemPrompt(wsPath, "pr-creator"),
     };
-  });
+  }));
 
   return [
     { kind: "group", children },
