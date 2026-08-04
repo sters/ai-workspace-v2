@@ -131,6 +131,41 @@ export function stripCompletedTodoItems(content: string): string {
 }
 
 /**
+ * Heading of the TODO-file section where PR review triage records the review
+ * threads it turned into TODO items. Shared by the writer (the address-PR-reviews
+ * instruction) and the reader (`buildCreatePrPipeline`).
+ */
+export const PR_REVIEW_THREADS_HEADING = "PR Review Threads";
+
+/**
+ * Extract the body of the `## PR Review Threads` section, or null when it is
+ * absent or empty.
+ *
+ * The record has to live in non-checkbox lines: `stripCompletedTodoItems` runs
+ * at the start of every cycle's Update TODO, and a completed item is exactly the
+ * one create-pr needs to reply about.
+ */
+export function extractPrReviewThreadsSection(content: string): string | null {
+  const lines = content.split("\n");
+  const body: string[] = [];
+  let inSection = false;
+
+  for (const line of lines) {
+    const heading = line.match(/^##\s+(.+)$/);
+    if (heading) {
+      if (inSection) break;
+      inSection =
+        heading[1].trim().toLowerCase() === PR_REVIEW_THREADS_HEADING.toLowerCase();
+      continue;
+    }
+    if (inSection) body.push(line);
+  }
+
+  const trimmed = body.join("\n").trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+/**
  * Normalize TODO file content to ensure proper checkbox format.
  * Fixes common LLM output mistakes:
  * - Missing checkbox: `- Item` → `- [ ] Item`

@@ -4,6 +4,7 @@
  */
 
 import type { PRCreatorInput } from "@/types/prompts";
+import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
 import { worktreeCdRules } from "./shared";
 
 export function getPRCreatorSystemPrompt(): string {
@@ -54,6 +55,32 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 7. **Update** PR using \`gh pr edit\`
 8. **Preserve the current draft/ready state** — do NOT run \`gh pr ready\` or \`gh pr ready --undo\`. Ignore the \`Draft:\` field below when updating; it only applies to newly created PRs.
 
+### Responding to Addressed Review Threads
+
+Only when the user prompt contains a \`## ${PR_REVIEW_THREADS_HEADING}\` section. Each row there is a review thread that an earlier phase judged valid and turned into a TODO item. You are the phase that closes the loop on those threads, because you are the one that pushes: a reply names a commit, so it must not exist before that commit is on the remote.
+
+Do this **only after the push has succeeded** and the PR has been created or edited. If the push failed, skip this section entirely — leave every thread open.
+
+For each row:
+
+1. **Skip threads GitHub already considers settled.** Check the current state:
+   \`\`\`
+   gh api graphql -f query='query($id:ID!){node(id:$id){... on PullRequestReviewThread{isResolved}}}' -f id=<thread-id>
+   \`\`\`
+   If \`isResolved\` is true, a previous run already handled it — do not reply again.
+2. **Decide whether the work is complete** by looking up the row's TODO item in the TODO file whose path the section gives:
+   - The item is marked \`- [x]\`, **or is absent from the file** → complete. Completed items are deleted from the TODO file between cycles, so absence is the normal signal by the time you run.
+   - The item is still \`- [ ]\` (pending), \`- [~]\` (in progress) or \`- [!]\` (blocked) → **not** complete. Leave that thread exactly as it is: no reply, no resolve, no comment explaining the delay. A human will see the open thread on the PR.
+3. **For complete items only**, reply and then resolve:
+   \`\`\`
+   gh api graphql -f query='mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{url}}}' -f id=<thread-id> -f body=<reply>
+   gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=<thread-id>
+   \`\`\`
+   Resolve only after the reply succeeded. If the reply fails, leave the thread unresolved.
+4. **Write the reply from the pushed code**, not from the TODO item's wording: one or two sentences naming what changed, where (file, and function or symbol), and the commit SHA that carries it (\`git log -1 --format=%H\` or the SHA from the item's commit). Do not paste diffs, do not restate the reviewer's comment back at them, and never describe a change that is not in the pushed commits.
+
+Finally, report which threads you replied to and resolved, and which you left open together with the status of their TODO item.
+
 ${worktreeCdRules({
   examples: "`git push`, `gh pr create`, etc.",
   extra:
@@ -101,6 +128,15 @@ ${input.prTemplate}
 `
       : "";
 
+  const reviewThreadsSection = input.prReviewThreads
+    ? `## ${PR_REVIEW_THREADS_HEADING}
+
+TODO file: \`${input.todoFilePath}\`
+
+${input.prReviewThreads}
+`
+    : "";
+
   return `# Task: ${input.existingPR ? "Update" : "Create"} PR for ${input.repoName}
 
 ## Workspace: ${input.workspaceName}
@@ -119,6 +155,7 @@ ${input.repoChanges}
 
 ${existingPRSection}
 ${prTemplateSection}
+${reviewThreadsSection}
 ### Working Directory
 
 \`\`\`bash

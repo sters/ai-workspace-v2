@@ -151,6 +151,10 @@ export interface PRCreatorInput extends RepoPromptInput {
     title: string;
     body: string;
   };
+  /** Body of the TODO file's `## PR Review Threads` section, when it has one. */
+  prReviewThreads?: string;
+  /** Absolute TODO file path — only set alongside `prReviewThreads`, which is what needs it. */
+  todoFilePath?: string;
 }
 
 export interface ResearcherInput {

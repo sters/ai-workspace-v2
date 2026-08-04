@@ -9,6 +9,7 @@ import {
   statusToMarker,
   stripCompletedTodoItems,
   normalizeTodoCheckboxes,
+  extractPrReviewThreadsSection,
 } from "@/lib/parsers/todo";
 
 describe("parseTodoItems", () => {
@@ -598,5 +599,70 @@ describe("normalizeTodoCheckboxes", () => {
   it("handles case-insensitive Notes heading", () => {
     const content = "## notes\n\n- A note\n- Another note";
     expect(normalizeTodoCheckboxes(content)).toBe(content);
+  });
+});
+
+describe("extractPrReviewThreadsSection", () => {
+  const content = `# TODO: my-repo
+
+## Fixes
+
+- [x] **[api/handler.go]** Add nil check
+- [ ] **[api/router.go]** Rename param
+
+## PR Review Threads
+
+<!-- do not delete -->
+
+| Thread ID | Comment URL | Summary | TODO item |
+|---|---|---|---|
+| PRRT_abc | https://example.com/pull/1#discussion_r1 | Nil check missing | **[api/handler.go]** Add nil check |
+
+## Notes
+
+- Something else`;
+
+  it("returns the section body without the heading", () => {
+    const section = extractPrReviewThreadsSection(content);
+    expect(section).toContain("PRRT_abc");
+    expect(section).not.toContain("## PR Review Threads");
+  });
+
+  it("stops at the next section heading", () => {
+    const section = extractPrReviewThreadsSection(content);
+    expect(section).not.toContain("Something else");
+    expect(section).not.toContain("## Notes");
+  });
+
+  it("returns null when the section is absent", () => {
+    expect(extractPrReviewThreadsSection("# TODO\n\n- [ ] Do a thing")).toBeNull();
+  });
+
+  it("returns null when the section exists but is empty", () => {
+    expect(
+      extractPrReviewThreadsSection("## PR Review Threads\n\n\n## Notes\n\n- x"),
+    ).toBeNull();
+  });
+
+  it("matches the heading case-insensitively", () => {
+    expect(
+      extractPrReviewThreadsSection("## pr review threads\n\n| PRRT_x | u | s | t |"),
+    ).toContain("PRRT_x");
+  });
+
+  // The table rows are the run's only durable record of which thread maps to
+  // which item: `stripCompletedTodoItems` runs at the start of every cycle's
+  // Update TODO, and a completed item is exactly the one we need to reply about.
+  it("survives stripCompletedTodoItems", () => {
+    const stripped = stripCompletedTodoItems(content);
+    expect(extractPrReviewThreadsSection(stripped)).toContain("PRRT_abc");
+  });
+
+  // Table rows do not start with `- `, so the normalizer must leave them alone
+  // rather than turning them into checkbox items.
+  it("survives normalizeTodoCheckboxes", () => {
+    const normalized = normalizeTodoCheckboxes(content);
+    expect(extractPrReviewThreadsSection(normalized)).toContain("PRRT_abc");
+    expect(normalized).not.toContain("- [ ] | PRRT_abc");
   });
 });
