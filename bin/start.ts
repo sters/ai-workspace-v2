@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { INITIAL_SETTINGS_LOCAL } from "../src/lib/templates/settings";
 import { checkForUpdate, GITHUB_REPO_URL } from "../src/lib/update";
+import { describeChildExit } from "../src/lib/process/child-exit";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let packageDir = resolve(__dirname, "..");
@@ -225,7 +226,11 @@ const slackServer = slackEnabled
     })
   : null;
 
-function killAll() {
+let shutdownRequested = false;
+
+function killAll(signal?: string) {
+  shutdownRequested = true;
+  console.log(`[start] received ${signal ?? "shutdown request"}, stopping next/chat/slack`);
   // Start draining stdin immediately to catch terminal escape sequence
   // responses that arrive after child processes are killed. If we wait until
   // after the processes exit, the responses may land in the shell's input
@@ -247,11 +252,40 @@ process.on("SIGTERM", killAll);
 
 // Wait for Next.js to exit, then clean up sibling servers
 const nextExitCode = await nextServer.exited;
+console.log(
+  `[start] ${describeChildExit({
+    name: "next-server",
+    exitCode: nextServer.exitCode,
+    signalCode: nextServer.signalCode,
+    requested: shutdownRequested,
+  })}`,
+);
+if (!shutdownRequested) {
+  console.log("[start] next-server is gone, so stopping chat/slack too (they are tied to it)");
+}
 chatServer.kill();
 slackServer?.kill();
 // Wait for siblings to exit so their cleanup runs before we exit
 await chatServer.exited;
-if (slackServer) await slackServer.exited;
+console.log(
+  `[start] ${describeChildExit({
+    name: "chat-server",
+    exitCode: chatServer.exitCode,
+    signalCode: chatServer.signalCode,
+    requested: true,
+  })}`,
+);
+if (slackServer) {
+  await slackServer.exited;
+  console.log(
+    `[start] ${describeChildExit({
+      name: "slack-server",
+      exitCode: slackServer.exitCode,
+      signalCode: slackServer.signalCode,
+      requested: true,
+    })}`,
+  );
+}
 
 // The SIGINT handler already started draining stdin in raw mode to catch
 // terminal escape sequence responses. Wait a bit for any remaining responses
