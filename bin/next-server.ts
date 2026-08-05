@@ -9,7 +9,7 @@
 import { existsSync, rmSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describeChildExit } from "../src/lib/process/child-exit";
+import { describeChildExit, reraiseSignal, signalExitCode } from "../src/lib/process/child-exit";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectDir = resolve(__dirname, "..");
@@ -45,9 +45,9 @@ const child = Bun.spawn(nextArgs, {
   env: { ...process.env, PORT: port, AIW_PORT: port },
 });
 
-let shutdownRequested = false;
+let stopSignal: string | null = null;
 function stop(signal: string) {
-  shutdownRequested = true;
+  stopSignal = signal;
   console.log(`[next-server] received ${signal}, stopping ${nextArgs.slice(2).join(" ")}`);
   child.kill();
 }
@@ -59,7 +59,16 @@ console.log(
     name: nextArgs.slice(2).join(" "),
     exitCode: child.exitCode,
     signalCode: child.signalCode,
-    requested: shutdownRequested,
+    requested: stopSignal !== null,
   })}`,
 );
+
+// Pass the signal on rather than exiting cleanly: bin/start.ts decides whether
+// the whole tree is coming down by inspecting how we died, and a graceful `0`
+// here reads as a voluntary shutdown no matter who killed us. `pkill -f
+// "next dev"` from an unrelated project is enough to reach this path.
+if (stopSignal) {
+  if (reraiseSignal(stopSignal)) await Bun.sleep(100); // let the signal land
+  process.exit(signalExitCode(stopSignal));
+}
 process.exit(child.exitCode ?? 0);

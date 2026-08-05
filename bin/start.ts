@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
 import { INITIAL_SETTINGS_LOCAL } from "../src/lib/templates/settings";
 import { checkForUpdate, GITHUB_REPO_URL } from "../src/lib/update";
-import { describeChildExit } from "../src/lib/process/child-exit";
+import { describeChildExit, signalExitCode } from "../src/lib/process/child-exit";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let packageDir = resolve(__dirname, "..");
@@ -301,4 +301,6 @@ if (process.stdin.isTTY) {
   }
 }
 
-process.exit(nextExitCode ?? 0);
+// next-server passes on the signal that stopped it, so a tree that was killed
+// from outside exits non-zero here instead of looking like a clean stop.
+process.exit(nextExitCode ?? (nextServer.signalCode ? signalExitCode(nextServer.signalCode) : 0));
