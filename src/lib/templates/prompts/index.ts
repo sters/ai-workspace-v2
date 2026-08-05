@@ -58,3 +58,9 @@ export { getDiscoverySystemPrompt, buildDiscoveryPrompt, DISCOVERY_SCHEMA } from
 export { buildSuggestionAggregatorPrompt, SUGGESTION_AGGREGATION_SCHEMA } from "./suggestion-aggregator";
 export { buildSuggestionPrunerPrompt, SUGGESTION_PRUNE_SCHEMA } from "./suggestion-pruner";
 export { getAddressPrReviewsInstruction } from "./address-pr-reviews";
+export {
+  getPrCommentValidatorSystemPrompt,
+  buildPrCommentValidatorPrompt,
+  PR_COMMENT_VALIDATION_SCHEMA,
+} from "./pr-comment-validator";
+export { buildTriagePrCommentsInstruction } from "./triage-pr-comments";

@@ -50,6 +50,7 @@ import {
   getReviewChatSystemPrompt,
   getResearchChatSystemPrompt,
   getSlackChatSystemPrompt,
+  getPrCommentValidatorSystemPrompt,
 } from "@/lib/templates/prompts";
 
 /** Registry mapping file names to their content generator functions. */
@@ -82,6 +83,7 @@ const SYSTEM_PROMPTS: Record<string, () => string> = {
   "readme-verifier.md": getReadmeVerifierSystemPrompt,
   "todo-verifier.md": getTodoVerifierSystemPrompt,
   "fix-verifier.md": getFixVerifierSystemPrompt,
+  "pr-comment-validator.md": getPrCommentValidatorSystemPrompt,
   "create-todo-planner.md": getCreateTodoPlannerSystemPrompt,
   "workspace-suggester.md": getWorkspaceSuggesterSystemPrompt,
   "chat.md": getChatSystemPrompt,

@@ -17,6 +17,7 @@ import { getCrossRepositoryReviewerSystemPrompt } from "@/lib/templates/prompts/
 import { getTodoVerifierSystemPrompt } from "@/lib/templates/prompts/todo-verifier";
 import { getReadmeVerifierSystemPrompt } from "@/lib/templates/prompts/readme-verifier";
 import { getPRCreatorSystemPrompt } from "@/lib/templates/prompts/pr-creator";
+import { getPrCommentValidatorSystemPrompt } from "@/lib/templates/prompts/pr-comment-validator";
 import { getCollectorSystemPrompt } from "@/lib/templates/prompts/collector";
 import { getCoordinatorSystemPrompt } from "@/lib/templates/prompts/coordinator";
 import { getUpdaterSystemPrompt } from "@/lib/templates/prompts/updater";
@@ -68,6 +69,7 @@ describe("working-directory conventions", () => {
     todoVerifier: getTodoVerifierSystemPrompt(),
     readmeVerifier: getReadmeVerifierSystemPrompt(),
     prCreator: getPRCreatorSystemPrompt(),
+    prCommentValidator: getPrCommentValidatorSystemPrompt(),
   };
   const noCdPrompts: Record<string, string> = {
     collector: getCollectorSystemPrompt(),
@@ -123,6 +125,10 @@ describe("WRITTEN_DELIVERABLE_LENGTH", () => {
 describe("REPO_SEARCH_EFFICIENCY", () => {
   it("is applied to the planner, whose exploration is otherwise fully serial", () => {
     expect(getPlannerSystemPrompt()).toContain(REPO_SEARCH_EFFICIENCY);
+  });
+
+  it("is applied to the PR comment validator, which explores to check one claim", () => {
+    expect(getPrCommentValidatorSystemPrompt()).toContain(REPO_SEARCH_EFFICIENCY);
   });
 
   it("does not contradict the worktree cd rule it travels with", () => {

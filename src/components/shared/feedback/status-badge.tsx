@@ -35,6 +35,19 @@ const variants: Record<string, string> = {
     "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
   "op-asking":
     "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+  // A CI check that has not started. Its own colour rather than `op-running`'s
+  // blue or `muted`'s grey: queued is neither in progress nor finished.
+  "check-queued":
+    "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  // PR review-comment validation verdicts. Coloured by what they ask of the
+  // reader — work to do, nothing to do, a question to answer — rather than by
+  // whether the reviewer was right.
+  "verdict-valid":
+    "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  "verdict-invalid":
+    "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+  "verdict-unclear":
+    "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
   // Muted variant (config editor "not found")
   muted: "bg-muted text-muted-foreground",
 };

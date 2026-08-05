@@ -13,8 +13,11 @@ export function useStartAndNavigate(workspaceName: string) {
   const router = useRouter();
   const { mutate } = useSWRConfig();
 
+  // `unknown` rather than `string` because some operations take a non-scalar
+  // input — `validate-pr-comments` posts an array of thread ids — and JSON is
+  // the wire format either way.
   return useCallback(
-    async (type: OperationType, body: Record<string, string>) => {
+    async (type: OperationType, body: Record<string, unknown>) => {
       const res = await fetch(`/api/operations/${type}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

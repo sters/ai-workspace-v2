@@ -17,6 +17,7 @@ const BASE_TABS = [
   { label: "Memo", segment: "memo", href: "memo" },
   { label: "TODOs", segment: "todo", href: "todo" },
   { label: "Reviews", segment: "review", href: "review" },
+  { label: "Pull Requests", segment: "pull-requests", href: "pull-requests" },
   { label: "Research", segment: "research", href: "research", taskType: "research" },
   { label: "History", segment: "history", href: "history" },
   { label: "Operations", segment: "operations", href: "operations" },

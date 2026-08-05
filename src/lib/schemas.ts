@@ -60,6 +60,17 @@ export const updateTodoSchema = z.object({
   interject: z.coerce.boolean().optional(),
 });
 
+/**
+ * Validate a selection of PR review comments. `threadIds` are GraphQL thread
+ * node ids (`PRRT_…`) as the Pull Requests tab showed them; the pipeline
+ * re-resolves each one against the live PR, so a stale id is skipped rather
+ * than trusted.
+ */
+export const validatePrCommentsSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  threadIds: z.array(z.string().min(1)).min(1, "at least one threadId is required"),
+});
+
 export const createTodoSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   reviewTimestamp: z.string().min(1, "reviewTimestamp is required"),
