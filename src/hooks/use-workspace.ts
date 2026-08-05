@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import useSWR from "swr";
 import type { WorkspaceSummary, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
+import type { WorkspacePullRequestsResult } from "@/types/pull-request";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";
 import { fetcher } from "@/lib/api";
 
@@ -56,6 +57,38 @@ export function useReviews(name: string) {
   );
 
   return { reviews: data ?? [], isLoading, error };
+}
+
+/**
+ * The PRs on this workspace's branches, with their review threads, CI state and
+ * any recorded validation verdicts.
+ *
+ * Deliberately not on `SWR_REFRESH_INTERVAL`: a cold read costs two `gh` network
+ * round trips per repository. The server holds a short TTL cache in front of
+ * that, so the revalidations SWR does on mount and on focus are nearly free —
+ * but a timer would still keep re-rendering for data that changes at the pace of
+ * a human writing a review.
+ *
+ * `refresh` is the deliberate one: it asks past the server cache, which is the
+ * only way to see a comment or a CI result from seconds ago.
+ */
+export function usePullRequests(name: string) {
+  const url = name ? `/api/workspaces/${encodeURIComponent(name)}/pull-requests` : null;
+  const { data, error, isLoading, mutate } = useSWR<WorkspacePullRequestsResult>(url, fetcher);
+
+  const refresh = useCallback(
+    () => (url ? mutate(fetcher(`${url}?refresh=1`)) : mutate()),
+    [url, mutate],
+  );
+
+  return {
+    pullRequests: data?.pullRequests ?? [],
+    problems: data?.problems ?? [],
+    validations: data?.validations ?? {},
+    isLoading,
+    error,
+    refresh,
+  };
 }
 
 export function useHistory(name: string) {

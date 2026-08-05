@@ -4,6 +4,7 @@ export { buildExecutePipeline } from "./execute";
 export { buildReviewPipeline } from "./review";
 export { buildCreatePrPipeline } from "./create-pr";
 export { buildUpdateTodoPipeline } from "./update-todo";
+export { buildValidatePrCommentsPipeline } from "./validate-pr-comments";
 export { buildDeletePipeline } from "./delete";
 export { buildWorkspacePrunePipeline } from "./workspace-prune";
 export { buildMcpAuthPipeline } from "./mcp-auth";

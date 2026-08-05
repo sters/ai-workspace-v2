@@ -29,6 +29,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.DISCOVER_CONSTRAINTS]: "opus",
   [STEP_TYPES.VERIFY_README]: "opus",
   [STEP_TYPES.CRITERIA_FEASIBILITY]: "opus",
+  [STEP_TYPES.VALIDATE_PR_COMMENT]: "opus",
   [STEP_TYPES.CODE_REVIEW]: "opus",
   [STEP_TYPES.REVIEW_TODOS]: "opus",
   [STEP_TYPES.COORDINATE_TODOS]: "opus",
@@ -143,6 +144,13 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // other repositories' source to see whether the contract can carry the data at
   // all, which is more than the `readme-clarity-gate` rung below does.
   [STEP_TYPES.CRITERIA_FEASIBILITY]: "medium",
+  // One bounded question — does this one review comment hold? — but answering it
+  // means reading unfamiliar code to check a claim, which is what puts it here
+  // rather than on the `readme-clarity-gate` rung below. It does not earn `high`:
+  // the comment states what to look at, so the search is directed rather than an
+  // open hunt. A human presses the button and reads the verdict, so a wrong one
+  // costs a second look, not a cycle.
+  [STEP_TYPES.VALIDATE_PR_COMMENT]: "medium",
   // Applies a requested edit to one document, and is forbidden from touching
   // code — the same shape as update-todo.
   [STEP_TYPES.UPDATE_README]: "medium",

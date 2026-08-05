@@ -1,3 +1,4 @@
+import type { PrReviewThread } from "./pull-request";
 import type { WorkspaceRepo } from "./workspace";
 
 export type InteractionLevel = "low" | "mid" | "high";
@@ -98,6 +99,20 @@ export interface FixVerifierInput extends RepoPromptInput {
   /** Baseline the fixes were requested at, when one was recorded. */
   sinceSha?: string;
   sinceTimestamp?: string;
+}
+
+/**
+ * PR review-comment validator input — one thread per call.
+ *
+ * One call per thread rather than one per PR: each verdict has to rest on its own
+ * evidence, and a single call covering ten comments treats the tenth as an
+ * afterthought. The threads are independent, so they also run concurrently.
+ */
+export interface PrCommentValidatorInput extends RepoPromptInput {
+  baseBranch: string;
+  prUrl: string;
+  prTitle?: string;
+  thread: PrReviewThread;
 }
 
 /** Cross-repository code-review agent input (multi-repo workspaces only). */
