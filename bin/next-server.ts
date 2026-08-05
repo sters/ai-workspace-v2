@@ -9,6 +9,7 @@
 import { existsSync, rmSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { describeChildExit } from "../src/lib/process/child-exit";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectDir = resolve(__dirname, "..");
@@ -44,7 +45,21 @@ const child = Bun.spawn(nextArgs, {
   env: { ...process.env, PORT: port, AIW_PORT: port },
 });
 
-process.on("SIGINT", () => child.kill());
-process.on("SIGTERM", () => child.kill());
+let shutdownRequested = false;
+function stop(signal: string) {
+  shutdownRequested = true;
+  console.log(`[next-server] received ${signal}, stopping ${nextArgs.slice(2).join(" ")}`);
+  child.kill();
+}
+process.on("SIGINT", () => stop("SIGINT"));
+process.on("SIGTERM", () => stop("SIGTERM"));
 await child.exited;
+console.log(
+  `[next-server] ${describeChildExit({
+    name: nextArgs.slice(2).join(" "),
+    exitCode: child.exitCode,
+    signalCode: child.signalCode,
+    requested: shutdownRequested,
+  })}`,
+);
 process.exit(child.exitCode ?? 0);
