@@ -9,7 +9,7 @@ vi.mock("@/lib/workspace/reader", () => ({
 }));
 
 vi.mock("@/lib/parsers/readme", () => ({
-  parseReadmeMeta: vi.fn(() => ({ repositories: [] })),
+  parseReadmeMeta: vi.fn(),
 }));
 
 vi.mock("@/lib/workspace", () => ({
@@ -46,11 +46,17 @@ afterAll(() => {
 });
 
 import { buildCreatePrPipeline } from "@/lib/pipelines/create-pr";
-import { listWorkspaceRepos } from "@/lib/workspace";
+import { listWorkspaceRepos, checkExistingPR } from "@/lib/workspace";
+import { parseReadmeMeta } from "@/lib/parsers/readme";
 import { buildPRCreatorPrompt } from "@/lib/templates";
 
 const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
+const mockCheckExistingPR = vi.mocked(checkExistingPR);
+const mockParseReadmeMeta = vi.mocked(parseReadmeMeta);
 const mockBuildPrompt = vi.mocked(buildPRCreatorPrompt);
+
+const meta = (title: string) =>
+  ({ title, repositories: [] }) as ReturnType<typeof parseReadmeMeta>;
 
 const TODO_WITH_THREADS = `# TODO: my-repo
 
@@ -70,6 +76,8 @@ describe("buildCreatePrPipeline", () => {
     vi.clearAllMocks();
     mockFileExists.mockResolvedValue(false);
     mockFileText.mockResolvedValue("");
+    mockParseReadmeMeta.mockReturnValue(meta("Add pagination to user search API"));
+    mockCheckExistingPR.mockReturnValue({ exists: false } as ReturnType<typeof checkExistingPR>);
     mockListWorkspaceRepos.mockReturnValue([
       {
         repoName: "my-repo",
@@ -114,5 +122,59 @@ describe("buildCreatePrPipeline", () => {
 
     const input = mockBuildPrompt.mock.calls[0][0];
     expect(input.prReviewThreads).toBeUndefined();
+  });
+
+  // The README's `# Task:` heading is the one title the whole workspace shares,
+  // so every repo's PR gets the identical string — the children are independent
+  // and would otherwise each paraphrase their own diff.
+  it("gives every repo the README task title verbatim", async () => {
+    mockListWorkspaceRepos.mockReturnValue([
+      {
+        repoName: "api",
+        repoPath: "/repos/api",
+        worktreePath: "/repos/api/worktrees/ws",
+      },
+      {
+        repoName: "web",
+        repoPath: "/repos/web",
+        worktreePath: "/repos/web/worktrees/ws",
+      },
+    ] as ReturnType<typeof listWorkspaceRepos>);
+
+    await buildCreatePrPipeline({ workspace: "ws", draft: true });
+
+    const titles = mockBuildPrompt.mock.calls.map((c) => c[0].sharedTitle);
+    expect(titles).toEqual([
+      "Add pagination to user search API",
+      "Add pagination to user search API",
+    ]);
+  });
+
+  // Reachable through a hand-edited README or `init --only`, where nothing ever
+  // rewrote the heading. Mandating "TBD" as a PR title is worse than composing one.
+  it.each(["TBD", "Untitled", "  ", "Task: TBD"])(
+    "falls back to a composed title when the heading is still %j",
+    async (title) => {
+      mockParseReadmeMeta.mockReturnValue(meta(title));
+
+      await buildCreatePrPipeline({ workspace: "ws", draft: true });
+
+      expect(mockBuildPrompt.mock.calls[0][0].sharedTitle).toBeUndefined();
+    },
+  );
+
+  // An existing PR's title is the user's to keep; the update path only retitles
+  // when scope shifted, so it must not receive a mandated title at all.
+  it("withholds the shared title from a repo that already has a PR", async () => {
+    mockCheckExistingPR.mockReturnValue({
+      exists: true,
+      url: "https://example.com/pull/1",
+      title: "Existing",
+      body: "body",
+    } as ReturnType<typeof checkExistingPR>);
+
+    await buildCreatePrPipeline({ workspace: "ws", draft: true });
+
+    expect(mockBuildPrompt.mock.calls[0][0].sharedTitle).toBeUndefined();
   });
 });

@@ -16,6 +16,22 @@ import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
 
+/**
+ * The README's `# Task:` heading, when it is a real title. Handing the same
+ * string to every repo's child is what stops sibling PRs of one task carrying
+ * unrelated titles — the children run in parallel and each sees only its own
+ * diff, so nothing else can align them.
+ *
+ * Placeholders are rejected rather than mandated: a README that `init-readme`
+ * never rewrote (hand-edited, or `init --only`) still carries the template's
+ * `TBD`, and `parseReadmeMeta` reports a missing heading as `Untitled`.
+ */
+function resolveSharedTitle(title: string): string | null {
+  const trimmed = title.trim().replace(/^Task:\s*/i, "").trim();
+  if (!trimmed || /^(TBD|Untitled)$/i.test(trimmed)) return null;
+  return trimmed;
+}
+
 export async function buildCreatePrPipeline(input: {
   workspace: string;
   draft: boolean;
@@ -32,6 +48,7 @@ export async function buildCreatePrPipeline(input: {
     : allRepos;
 
   const wsPath = path.join(getWorkspaceDir(), workspace);
+  const sharedTitle = resolveSharedTitle(meta.title);
 
   const children = await Promise.all(repos.map(async (repo) => {
     // Detect base branch from README metadata or repo itself
@@ -66,6 +83,9 @@ export async function buildCreatePrPipeline(input: {
       existingPR: existingPR.exists
         ? { url: existingPR.url!, title: existingPR.title!, body: existingPR.body! }
         : undefined,
+      // Only a new PR gets the mandated title: the update path retitles only when
+      // scope shifted, and the existing title may be the user's own wording.
+      ...(!existingPR.exists && sharedTitle && { sharedTitle }),
       ...(prReviewThreads && { prReviewThreads, todoFilePath }),
     });
 

@@ -62,12 +62,40 @@ describe("getPRCreatorSystemPrompt", () => {
   it("skips threads GitHub already reports as resolved", () => {
     expect(prompt).toContain("isResolved");
   });
+
+  // Each repo's PR is composed by an independent child that sees only its own
+  // diff, so a mandated title is the only thing that can make sibling PRs of one
+  // task match. Composing is the fallback, not the rule.
+  it("mandates the provided title verbatim for a new PR", () => {
+    expect(prompt).toContain("## PR Title");
+    expect(prompt).toContain("verbatim");
+  });
+
+  // A repo-name suffix would break the byte-identity that makes the titles
+  // recognizable as one task, and the PR list already names the repository.
+  it("forbids appending the repository name to the mandated title", () => {
+    expect(prompt).toMatch(/do not (append|add).*repository name/i);
+  });
 });
 
 describe("buildPRCreatorPrompt", () => {
   it("omits the review-thread section when there is no record", () => {
     const prompt = buildPRCreatorPrompt(baseInput);
     expect(prompt).not.toContain(PR_REVIEW_THREADS_HEADING);
+  });
+
+  it("omits the title section when no shared title was resolved", () => {
+    const prompt = buildPRCreatorPrompt(baseInput);
+    expect(prompt).not.toContain("## PR Title");
+  });
+
+  it("renders the shared title as the mandated title", () => {
+    const prompt = buildPRCreatorPrompt({
+      ...baseInput,
+      sharedTitle: "Add pagination to user search API",
+    });
+    expect(prompt).toContain("## PR Title");
+    expect(prompt).toContain("Add pagination to user search API");
   });
 
   it("renders the recorded threads and the TODO file path", () => {

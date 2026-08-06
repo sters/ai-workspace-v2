@@ -32,7 +32,8 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 ### If Creating a New PR
 
 1. **Compose PR Content**:
-   - Title: concise, under 70 characters
+   - Title: if the user prompt has a \`## PR Title\` section, **use that string verbatim** as the title. It is the workspace's task title, and every repository of this task is given the same one, so a reviewer looking at several PRs sees one task rather than several. Do not rephrase it, shorten it, or retune it to your repository's diff, and do not append the repository name — the PR list already says which repository it is. The one allowed addition is a prefix your repository's convention requires (e.g. \`feat: \`, visible in its PR template or recent PR titles); the descriptive part after it stays verbatim.
+   - Only when no \`## PR Title\` section is given: compose one yourself, concise and under 70 characters
    - If a PR Template is provided in the user prompt, fill in each section of the template with the relevant change information. Do NOT search for a template file.
    - If no PR Template is provided, use a standard format
    - Do NOT include a list of changed files unless the PR Template explicitly requires it — reviewers can see the diff directly
@@ -97,7 +98,7 @@ ${worktreeCdRules({
 - For new PRs: use draft mode unless Draft is explicitly false
 - For existing PRs: never change the draft/ready state — leave it as the user set it
 - Follow repository's PR template exactly if one exists
-- Keep title concise (under 70 characters)
+- A given \`## PR Title\` is the title; only compose one (concise, under 70 characters) when none is given
 - Include all commits in summary, not just the latest
 - Always include full ticket URLs (not just IDs)
 `;
@@ -128,6 +129,13 @@ ${input.prTemplate}
 `
       : "";
 
+  const titleSection = input.sharedTitle
+    ? `## PR Title
+
+${input.sharedTitle}
+`
+    : "";
+
   const reviewThreadsSection = input.prReviewThreads
     ? `## ${PR_REVIEW_THREADS_HEADING}
 
@@ -154,6 +162,7 @@ ${input.readmeContent}
 ${input.repoChanges}
 
 ${existingPRSection}
+${titleSection}
 ${prTemplateSection}
 ${reviewThreadsSection}
 ### Working Directory
