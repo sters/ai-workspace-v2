@@ -76,6 +76,39 @@ describe("getPRCreatorSystemPrompt", () => {
   it("forbids appending the repository name to the mandated title", () => {
     expect(prompt).toMatch(/do not (append|add).*repository name/i);
   });
+
+  // The body is read next to the diff, so it carries what the diff cannot show.
+  // Without a stated bar the agent explains the whole change end to end.
+  it("bounds the description length", () => {
+    expect(prompt).toContain("### PR Description Length");
+    expect(prompt).toMatch(/\b(20 lines|under a minute)\b/i);
+  });
+
+  // The README is inlined as context for the agent, and restating its Goal /
+  // Requirements / Acceptance Criteria is the single largest source of padding.
+  it("forbids restating the workspace README in the body", () => {
+    expect(prompt).toMatch(/README/);
+    expect(prompt.toLowerCase()).toMatch(/do not (copy|restate|reproduce)[^.]*readme/);
+  });
+
+  // "cover every commit" used to read as "enumerate every commit", which turns a
+  // multi-cycle branch's body into a changelog.
+  it("asks for one description of the final state rather than a commit log", () => {
+    expect(prompt).toMatch(/commit-by-commit|per-commit|changelog/i);
+    expect(prompt).not.toContain("Include all commits in summary, not just the latest");
+  });
+
+  // The update path re-uses the existing body as its base, so an instruction to
+  // reflect "the current full set of changes" grows it once per cycle.
+  it("keeps an updated body the same size rather than growing it", () => {
+    expect(prompt).toMatch(/replace[^.]*rather than append|not grow/i);
+  });
+
+  // A template's own scaffolding is the one thing the agent may not shorten, but
+  // a section with nothing to say still costs a line rather than a paragraph.
+  it("allows a one-line answer for a template section with nothing substantive", () => {
+    expect(prompt).toMatch(/one line/i);
+  });
 });
 
 describe("buildPRCreatorPrompt", () => {
