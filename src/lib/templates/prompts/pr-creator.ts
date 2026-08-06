@@ -35,7 +35,7 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
    - Title: if the user prompt has a \`## PR Title\` section, **use that string verbatim** as the title. It is the workspace's task title, and every repository of this task is given the same one, so a reviewer looking at several PRs sees one task rather than several. Do not rephrase it, shorten it, or retune it to your repository's diff, and do not append the repository name — the PR list already says which repository it is. The one allowed addition is a prefix your repository's convention requires (e.g. \`feat: \`, visible in its PR template or recent PR titles); the descriptive part after it stays verbatim.
    - Only when no \`## PR Title\` section is given: compose one yourself, concise and under 70 characters
    - If a PR Template is provided in the user prompt, fill in each section of the template with the relevant change information. Do NOT search for a template file.
-   - If no PR Template is provided, use a standard format
+   - If no PR Template is provided, use a standard format: a short \`## Summary\` plus, only where they exist, bullets for decisions a reviewer could not infer from the diff
    - Do NOT include a list of changed files unless the PR Template explicitly requires it — reviewers can see the diff directly
    - Include ticket URLs in "Related issues" section
 
@@ -48,13 +48,25 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 ### If Updating an Existing PR
 
 1. **Use the Existing PR Body as the base** — preserve its structure, formatting, and any content the user has manually added
-2. **Update only the sections that describe what this PR is** (summary, implementation details) to reflect the current full set of changes. The description should explain "what this PR is", not log each update or review feedback.
+2. **Update only the sections that describe what this PR is** (summary, implementation details) to reflect the current full set of changes. The description should explain "what this PR is", not log each update or review feedback. **Replace those sections' content rather than appending to it** — the body describes the branch's current state, so an updated body should be about the same size as the one you started from, not grow with every update.
 3. **Do NOT add** update history, incremental change logs, or review feedback sections
 4. **Keep everything else unchanged** — do NOT remove or rewrite user-added notes, QA results, manual annotations, or any human-added content
 5. **Update the title** if the scope of changes has significantly shifted
 6. **Push** latest changes: \`git push\` — if rejected, run \`git pull --no-rebase\` to merge remote changes first. Do NOT force-push.
 7. **Update** PR using \`gh pr edit\`
 8. **Preserve the current draft/ready state** — do NOT run \`gh pr ready\` or \`gh pr ready --undo\`. Ignore the \`Draft:\` field below when updating; it only applies to newly created PRs.
+
+### PR Description Length
+
+The body is read next to the diff, so write only what the diff cannot show: what the change accomplishes, and the decisions or trade-offs behind it that a reviewer could not infer from the code. Aim for something a reviewer takes in under a minute — roughly 20 lines of prose and bullets, excluding a template's own scaffolding and ticket links.
+
+Three specific things keep a body short:
+
+- **Describe the branch as one change, in its final state.** Cover everything the branch does, but as a single description — not commit-by-commit, not a changelog, and not one entry per file or per TODO item.
+- **Do NOT copy or restate the workspace README.** It is given to you as context for understanding the change; its Goal, Requirements and Acceptance Criteria are not PR body content. One sentence of purpose, drawn from it, is enough.
+- **A template section with nothing substantive gets one line**, or "N/A" where the template allows it — never a paragraph written around the absence.
+
+Fill every section a provided PR Template requires; brevity applies to what you write inside them, not to the template's structure.
 
 ### Responding to Addressed Review Threads
 
@@ -99,8 +111,9 @@ ${worktreeCdRules({
 - For existing PRs: never change the draft/ready state — leave it as the user set it
 - Follow repository's PR template exactly if one exists
 - A given \`## PR Title\` is the title; only compose one (concise, under 70 characters) when none is given
-- Include all commits in summary, not just the latest
+- Cover the whole branch, not just the latest commit — as one description of the result, never a per-commit list
 - Always include full ticket URLs (not just IDs)
+- Keep the body within the bar in **PR Description Length** above
 `;
 }
 
