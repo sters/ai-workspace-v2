@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   buildTriagePrCommentsInstruction,
   renderValidationForPrompt,
+  type TriageCiFailure,
 } from "@/lib/templates/prompts/triage-pr-comments";
 import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
 import type { PrThreadValidation } from "@/types/pull-request";
@@ -157,5 +158,104 @@ describe("buildTriagePrCommentsInstruction", () => {
     });
     expect(unanchored).toContain("PRRT_kwDOabc");
     expect(unanchored).not.toContain("null");
+  });
+
+  it("says nothing about CI when only threads were selected", () => {
+    expect(instruction).not.toMatch(/Failing CI checks/);
+  });
+});
+
+const ciFailure: TriageCiFailure = {
+  repoName: "widgets",
+  prUrl: "https://github.com/acme/widgets/pull/42",
+  name: "lint",
+  url: "https://github.com/acme/widgets/actions/runs/1/job/2",
+  excerpt: "src/cache.ts:88:3  error  'lock' is assigned but never used",
+  truncated: false,
+};
+
+describe("buildTriagePrCommentsInstruction — failing CI checks", () => {
+  const instruction = buildTriagePrCommentsInstruction({ ciFailures: [ciFailure] });
+
+  it("names the check, the repo and the logs url", () => {
+    expect(instruction).toContain("lint");
+    expect(instruction).toContain("widgets");
+    expect(instruction).toContain(ciFailure.url!);
+  });
+
+  it("inlines the log excerpt, because nothing downstream may re-fetch it", () => {
+    // The updater has no `gh` grant and the executor's prompt forbids `gh run
+    // view`, so an item that only names the job is not actionable.
+    expect(instruction).toContain("'lock' is assigned but never used");
+  });
+
+  it("requires the item to quote the error line verbatim", () => {
+    expect(instruction).toMatch(/verbatim/);
+  });
+
+  it("sends verification to the repository's own command, not to remote CI", () => {
+    expect(instruction).toMatch(/never (re-run )?remote CI|not.*remote CI/i);
+  });
+
+  it("offers the flake/infra outlet instead of inventing a fix", () => {
+    // The one judgment left to the run: a human sees a red check in the tab but
+    // cannot see from there whether this branch caused it.
+    expect(instruction).toMatch(/## Notes/);
+    expect(instruction).toMatch(/flak|infrastructure|unrelated/i);
+  });
+
+  it("does not ask for a PR Review Threads row for a check", () => {
+    // There is no review thread behind a check, so a row would be a record of
+    // nothing and `create-pr` would try to reply to it.
+    expect(instruction).toMatch(/not add a `## PR Review Threads` row/i);
+  });
+
+  it("says plainly when the log could not be read, with the reason", () => {
+    const noLog = buildTriagePrCommentsInstruction({
+      ciFailures: [
+        {
+          ...ciFailure,
+          excerpt: null,
+          reason: "Not a GitHub Actions check — its log lives on the external CI",
+        },
+      ],
+    });
+    expect(noLog).toMatch(/No log could be read/i);
+    expect(noLog).toContain("external CI");
+    expect(noLog).not.toContain("null");
+  });
+
+  it("marks a truncated excerpt as a tail so an absent earlier error is expected", () => {
+    const long = buildTriagePrCommentsInstruction({
+      ciFailures: [{ ...ciFailure, truncated: true }],
+    });
+    expect(long).toMatch(/tail|earlier lines/i);
+  });
+
+  it("numbers checks apart from threads so items trace back unambiguously", () => {
+    const both = buildTriagePrCommentsInstruction({
+      threads: [thread],
+      ciFailures: [ciFailure, { ...ciFailure, name: "test" }],
+    });
+    expect(both).toContain("### 1.");
+    expect(both).toContain("### C1.");
+    expect(both).toContain("### C2.");
+  });
+
+  it("covers both kinds in one instruction when both are selected", () => {
+    const both = buildTriagePrCommentsInstruction({ threads: [thread], ciFailures: [ciFailure] });
+    expect(both).toContain("PRRT_kwDOabc");
+    expect(both).toContain("'lock' is assigned but never used");
+    // The thread record is still required — the comment still gets a reply.
+    expect(both).toContain(`## ${PR_REVIEW_THREADS_HEADING}`);
+  });
+
+  it("skips the thread-record section when only checks were selected", () => {
+    expect(instruction).not.toContain("| Thread ID | Comment URL | Summary | TODO item |");
+  });
+
+  it("returns an empty string when neither kind was selected", () => {
+    expect(buildTriagePrCommentsInstruction({})).toBe("");
+    expect(buildTriagePrCommentsInstruction({ threads: [], ciFailures: [] })).toBe("");
   });
 });

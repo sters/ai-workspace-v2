@@ -77,6 +77,27 @@ export interface PrChecksSummary {
   reported: boolean;
 }
 
+/**
+ * A failing check's log, read on demand when a human triages it.
+ *
+ * Absent-log cases carry a `reason` instead of an empty `excerpt`, because "the
+ * job printed nothing" and "this check's log lives on an external CI" lead to
+ * different TODO items — one reproduces locally, the other has to say where to
+ * look.
+ */
+export interface PrCheckFailureLog {
+  repoName: string;
+  /** Check name as GitHub reports it, matching `PrCheck.name`. */
+  name: string;
+  url: string | null;
+  /** Failing-step log tail, gh's line prefixes stripped. Null when unreadable. */
+  excerpt: string | null;
+  /** Why there is no excerpt. Set exactly when `excerpt` is null. */
+  reason?: string;
+  /** Whether lines were dropped from the front to fit the excerpt bounds. */
+  truncated: boolean;
+}
+
 export interface WorkspacePullRequest {
   /** Workspace repo alias, e.g. `my-service`. */
   repoName: string;

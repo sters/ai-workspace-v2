@@ -71,6 +71,24 @@ export const validatePrCommentsSchema = z.object({
   threadIds: z.array(z.string().min(1)).min(1, "at least one threadId is required"),
 });
 
+/**
+ * Read the logs of a selection of failing checks, for the tab's triage of a CI
+ * failure. The checks are named as the tab showed them — `url` is GitHub's
+ * details url, which is what locates the Actions job whose log to fetch.
+ */
+export const prCheckLogsSchema = z.object({
+  checks: z
+    .array(
+      z.object({
+        repoName: z.string().min(1),
+        name: z.string().min(1),
+        url: z.string().nullable().optional(),
+      }),
+    )
+    .min(1, "at least one check is required")
+    .max(50, "too many checks"),
+});
+
 export const createTodoSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   reviewTimestamp: z.string().min(1, "reviewTimestamp is required"),
