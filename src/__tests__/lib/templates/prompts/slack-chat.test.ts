@@ -20,6 +20,22 @@ describe("getSlackChatSystemPrompt", () => {
     expect(sys).toMatch(/WebUI|init/);
   });
 
+  it("names the scratch directory as the only place file writes may go", () => {
+    const sys = getSlackChatSystemPrompt();
+    expect(sys).toMatch(/scratch directory/i);
+    // The ai-workspace state directories are read-only, `workspace/` in
+    // particular: a file invented there is invisible to the WebUI.
+    expect(sys).toContain("workspace/");
+    expect(sys).toContain("repositories/");
+    expect(sys).toMatch(/read-only/i);
+  });
+
+  it("routes a PR review request to the WebUI instead of setting anything up", () => {
+    const sys = getSlackChatSystemPrompt();
+    expect(sys).toMatch(/Pull Requests tab/);
+    expect(sys).toMatch(/init/);
+  });
+
   it("lets the model read and write the per-user memory database", () => {
     const sys = getSlackChatSystemPrompt();
     expect(sys).toMatch(/MEMORY/);
@@ -59,6 +75,29 @@ describe("buildSlackChatPrompt", () => {
 
   it("ignores thread context on resume turns", () => {
     expect(buildSlackChatPrompt("/ws", "hi", false, { threadContext: "@U1: ctx" })).toBe("hi");
+  });
+
+  describe("scratch directory", () => {
+    it("folds the scratch directory path into the first turn", () => {
+      const out = buildSlackChatPrompt("/ws", "keep a note for me", true, {
+        scratchDir: "/ws/.ai-workspace/slack-scratch/1712345678.123456",
+      });
+      expect(out).toContain("/ws/.ai-workspace/slack-scratch/1712345678.123456");
+      // The directory is created on demand, so say so rather than assuming it exists.
+      expect(out).toMatch(/mkdir -p/);
+    });
+
+    it("omits the scratch section when no directory is given", () => {
+      const out = buildSlackChatPrompt("/ws", "hi", true);
+      expect(out).not.toMatch(/scratch/i);
+    });
+
+    it("does not fold the scratch directory into resume turns", () => {
+      const out = buildSlackChatPrompt("/ws", "hi", false, {
+        scratchDir: "/ws/.ai-workspace/slack-scratch/1712345678.123456",
+      });
+      expect(out).toBe("hi");
+    });
   });
 
   describe("memory context", () => {

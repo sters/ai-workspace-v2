@@ -143,6 +143,27 @@ describe("converse", () => {
     expect(lastPrompt()).not.toContain("Your memory about this user");
   });
 
+  it("points the first turn at this thread's scratch directory", async () => {
+    runClaudeMock.mockReturnValue(
+      fakeProc({ sessionId: "s", resultText: "ok", events: [complete(0)] }),
+    );
+
+    await converse("1712345678.123456", "keep a note", { userId: "U9" });
+
+    expect(lastPrompt()).toContain("/ws/.ai-workspace/slack-scratch/1712345678.123456");
+  });
+
+  it("does not repeat the scratch directory on resume turns", async () => {
+    setSession("t-resume", "sess", Date.now());
+    runClaudeMock.mockReturnValue(
+      fakeProc({ sessionId: "sess", resultText: "ok", events: [complete(0)] }),
+    );
+
+    await converse("t-resume", "and again", { userId: "U9" });
+
+    expect(lastPrompt()).toBe("and again");
+  });
+
   it("retries fresh when a resumed session fails (stale session id)", async () => {
     setSession("thread-1", "old-sess", Date.now());
     runClaudeMock
