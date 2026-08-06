@@ -14,7 +14,11 @@
  * model's own initiative, writes only when the user explicitly asks (mainly
  * external MCP actions like creating a Jira ticket), and git/codebase changes
  * plus destructive operations forbidden regardless — those still go through the
- * WebUI or `init`.
+ * WebUI or `init`. The one exception is a per-thread scratch directory
+ * (`./chat-scratch`) handed to it as the sole place a requested file write may
+ * land — without one, a request that needs a file gets answered by inventing a
+ * path under `workspace/`, which the WebUI then ignores and the prompt's own
+ * no-destructive-actions rule prevents it from cleaning up.
  *
  * Per-user memory: when `slack.memoryEnabled` is set and a Slack user id is
  * known, the conversation is pointed at a dedicated SQLite file
@@ -28,6 +32,7 @@ import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
 import { deleteSession, getSession, setSession } from "@/lib/db/slack-sessions";
 import { buildSlackChatPrompt } from "@/lib/templates/prompts";
 import { ensureGlobalSystemPrompt } from "@/lib/workspace/prompts";
+import { getSlackScratchDir } from "./chat-scratch";
 import { ensureSlackMemoryDb } from "./memory-db";
 import { summarizeProgress } from "./progress-summary";
 
@@ -102,6 +107,7 @@ export async function converse(
   const runAttempt = (resume: string | undefined): Promise<TurnResult> => {
     const isFirstTurn = resume === undefined;
     const prompt = buildSlackChatPrompt(workspaceRoot, message, isFirstTurn, {
+      scratchDir: getSlackScratchDir(workspaceRoot, threadKey),
       threadContext: opts.threadContext,
       ...memoryOpts(),
     });

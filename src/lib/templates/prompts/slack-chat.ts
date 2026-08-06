@@ -6,7 +6,11 @@
  * enforced at the tool layer — it is enforced entirely by the system prompt
  * below: read-only by default, with writes allowed only when the user
  * explicitly asks for them, and repository/codebase and destructive operations
- * forbidden regardless. Keep that language precise.
+ * forbidden regardless. Keep that language precise. A requested write has one
+ * sanctioned destination — the per-thread scratch directory named in the first
+ * turn (see `@/lib/slack-server/chat-scratch`) — because a model given nothing
+ * but a prohibition picks its own location, and a file it invents under
+ * `workspace/` is invisible to the WebUI and undeletable from Slack.
  *
  * The session is not scoped to a single workspace: it runs at the ai-workspace
  * root so Claude can explore `workspace/` (per-workspace state) and
@@ -28,8 +32,10 @@ DEFAULT TO READ-ONLY. On your own initiative you only investigate and answer —
 
 WRITES REQUIRE AN EXPLICIT REQUEST. When the user explicitly asks you to perform an action (e.g. "create a Jira ticket", "comment on that issue", "update the Notion page"), you may carry out exactly that request and the write operations it directly needs — nothing more. Prefer MCP tools for these external-system actions (creating/updating/commenting Jira issues, Notion pages, sending messages, etc.). If you are unsure whether the user actually asked for a change, ask them first instead of guessing.
 
+FILES YOU WRITE GO IN THE SCRATCH DIRECTORY. When a request genuinely needs a file on disk — notes you were asked to keep, a draft, data you fetched — write it inside the scratch directory whose path is given in the message, and tell the user where you put it. That directory and your memory database (see MEMORY) are the only paths you may write to. Everything else under the ai-workspace root is read-only, including \`workspace/\` (per-workspace pipeline state, one directory per workspace), \`repositories/\` (the checked-out repos) and the rest of \`.ai-workspace/\` (config and operational databases). Do not invent a file under \`workspace/\` to hold a task or a plan: it does not create a workspace, the WebUI ignores it, and you are not allowed to delete it afterwards.
+
 TWO HARD LIMITS — forbidden even when the user explicitly asks. Explain briefly and point them to the WebUI or the \`init\` command instead:
-1. Changes to the git repositories or codebase. NEVER edit, create, or delete tracked source files, and NEVER run repo-mutating commands: no \`git add/commit/push/checkout/reset/rebase/stash\`, no \`gh pr/issue create/edit/merge\`, no installs, no migrations. Code changes are made through the WebUI or \`init\`, not here. Reading the repos is always fine (\`git log/diff/status/show\`, \`ls\`, \`cat\`, \`rg\`, \`gh ... view/list\`).
+1. Changes to the git repositories or codebase. NEVER edit, create, or delete tracked source files, and NEVER run repo-mutating commands: no \`git add/commit/push/checkout/reset/rebase/stash\`, no \`gh pr/issue create/edit/merge\`, no installs, no migrations. Code changes are made through the WebUI or \`init\`, not here. Reading the repos is always fine (\`git log/diff/status/show\`, \`ls\`, \`cat\`, \`rg\`, \`gh ... view/list\`). Asked to review a PR, fix something, or start a piece of work: read and answer here if a read is all it takes, and route the doing — the workspace's Pull Requests tab in the WebUI validates and triages review comments, and \`init <description>\` starts a run. Set nothing up for it yourself.
 2. Destructive or irreversible actions of any kind: no \`rm -rf\`, no force-push, no \`git reset --hard\`, no dropping databases/tables. When unsure whether something is destructive, treat it as forbidden.
 
 MEMORY — you may have a personal memory database (a SQLite file whose path is given in the message). You may read it freely and write to its \`memories\` table (INSERT/UPDATE/DELETE via the \`sqlite3\` CLI) for the current user's rows only. Only write (remember) when the user EXPLICITLY asks you to remember/note something; never write proactively. NEVER \`DROP\`/\`ALTER\` that table or touch any other table or database.
@@ -64,12 +70,30 @@ Take any relevant memories into account when answering. Only when the user EXPLI
 Escape any single quote inside the fact by doubling it (''). Always use this user's id (${userId}); never read or write another user's rows.`;
 }
 
+/**
+ * The one writable directory, folded into the first turn. Named here rather
+ * than in the system prompt because the path is per-thread; the policy that
+ * only this directory may be written lives in the system prompt so it survives
+ * resume turns.
+ */
+function scratchContext(scratchDir: string): string {
+  return `--- Scratch directory ---
+Any file you write goes here, and nowhere else: ${scratchDir}
+It may not exist yet — create it when you first need it (\`mkdir -p '${scratchDir}'\`). Tell the user the path of anything you leave there.`;
+}
+
 export interface SlackChatPromptOptions {
   /**
    * Transcript of the surrounding Slack thread, folded in on the first turn so
    * Claude can answer questions like "summarize this thread".
    */
   threadContext?: string;
+  /**
+   * Absolute path to this thread's scratch directory (see
+   * `@/lib/slack-server/chat-scratch`), the only place the conversation may
+   * write files. Omit to leave it without a sanctioned write target.
+   */
+  scratchDir?: string;
   /** Absolute path to the per-user memory DB. Omit to disable memory. */
   memoryDbPath?: string;
   /** Slack user id owning the memory rows. Required for memory to be included. */
@@ -84,7 +108,8 @@ export interface SlackChatPromptOptions {
  * @param isFirstTurn when true, prepend the working-directory + memory context;
  *   on resume turns pass false so only the message is sent (the CLI session
  *   retains the earlier context, and the system prompt is re-applied anyway).
- * @param opts first-turn extras (thread transcript, memory DB path + user id).
+ * @param opts first-turn extras (scratch dir, thread transcript, memory DB path
+ *   + user id).
  *   All ignored on resume turns.
  */
 export function buildSlackChatPrompt(
@@ -96,6 +121,9 @@ export function buildSlackChatPrompt(
   if (!isFirstTurn) return message;
 
   const parts = [workingContext(workspaceRoot)];
+  if (opts.scratchDir) {
+    parts.push(scratchContext(opts.scratchDir));
+  }
   if (opts.memoryDbPath && opts.userId) {
     parts.push(memoryContext(opts.memoryDbPath, opts.userId));
   }
