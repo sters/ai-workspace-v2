@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { StatusBadge } from "../shared/feedback/status-badge";
 import { Button } from "../shared/buttons/button";
-import type { PrCheckState, PrChecksSummary } from "@/types/pull-request";
+import type { PrCheck, PrCheckState, PrChecksSummary } from "@/types/pull-request";
 
 const STATE_LABEL: Record<PrCheckState, string> = {
   failure: "failing",
@@ -27,12 +27,39 @@ const STATE_VARIANT: Record<PrCheckState, string> = {
 };
 
 /**
+ * Which rows a human can tick for triage.
+ *
+ * `failure` only. A queued or running check has no verdict yet, and `skipped` /
+ * `cancelled` / `unknown` were never run to one — triaging any of them would
+ * commission a fix for a failure nobody has seen.
+ */
+export function isTriageableCheck(check: PrCheck): boolean {
+  return check.state === "failure";
+}
+
+/**
  * The PR's CI, as one badge that expands into the failing checks.
  *
  * Collapsed by default and opened by a failure, because the only rows anyone
  * reads are the ones that did not pass — a green PR needs a badge, not a list.
+ *
+ * A failing row carries a checkbox when the parent supplies `onToggle`, which is
+ * how a red check reaches the same triage the review comments do.
  */
-export function PrChecksSummaryView({ checks }: { checks: PrChecksSummary }) {
+export function PrChecksSummaryView({
+  checks,
+  keyOf,
+  selectedKeys,
+  onToggle,
+  disabled,
+}: {
+  checks: PrChecksSummary;
+  /** Selection key for a check, owned by the parent so both sides agree on it. */
+  keyOf?: (check: PrCheck) => string;
+  selectedKeys?: Set<string>;
+  onToggle?: (key: string) => void;
+  disabled?: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
 
   // "No CI configured" is not "everything passed", so it gets its own wording
@@ -86,6 +113,16 @@ export function PrChecksSummaryView({ checks }: { checks: PrChecksSummary }) {
         <ul className="mt-1 w-full space-y-0.5 text-xs">
           {shown.map((check) => (
             <li key={`${check.name}-${check.state}`} className="flex items-center gap-2">
+              {onToggle && keyOf && isTriageableCheck(check) && (
+                <input
+                  type="checkbox"
+                  className="h-3 w-3 shrink-0 cursor-pointer accent-foreground"
+                  checked={selectedKeys?.has(keyOf(check)) ?? false}
+                  onChange={() => onToggle(keyOf(check))}
+                  disabled={disabled}
+                  aria-label={`Select failing check ${check.name} for triage`}
+                />
+              )}
               <StatusBadge
                 label={STATE_LABEL[check.state]}
                 variant={STATE_VARIANT[check.state]}

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type {
   PrCheck,
@@ -131,10 +131,28 @@ const validation: PrThreadValidation = {
   validatedAt: "2026-08-05T00:00:00.000Z",
 };
 
+const mockFetch = vi.fn();
+
 beforeEach(() => {
   mockStartAndNavigate.mockReset();
   mockRefresh.mockReset();
   workspaceRunning = false;
+  mockFetch.mockReset();
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: async () => ({
+      logs: [
+        {
+          repoName: "widgets",
+          name: "lint",
+          url: "https://ci/lint",
+          excerpt: "src/cache.ts:88:3  error  'lock' is assigned but never used",
+          truncated: false,
+        },
+      ],
+    }),
+  });
+  vi.stubGlobal("fetch", mockFetch);
 });
 
 describe("PullRequestsView", () => {
@@ -304,6 +322,95 @@ describe("PullRequestsView", () => {
       fireEvent.click(screen.getByRole("button", { name: /toggle check details/ }));
       expect(screen.getByText("queued")).toBeInTheDocument();
       expect(screen.getByText("running")).toBeInTheDocument();
+    });
+
+    it("gives a failing check a checkbox, and a passing one none", () => {
+      setData({
+        pullRequests: [
+          pr({
+            checks: checksOf([
+              { name: "lint", state: "failure", url: "https://ci/lint" },
+              { name: "unit", state: "success", url: null },
+            ]),
+          }),
+        ],
+      });
+      render(<PullRequestsView workspaceName="feat" />);
+
+      expect(screen.getByRole("checkbox", { name: /lint/ })).toBeInTheDocument();
+      // A passing check is nothing to triage, so it gets no box even when shown.
+      fireEvent.click(screen.getByRole("button", { name: /toggle check details/ }));
+      expect(screen.queryByRole("checkbox", { name: /unit/ })).not.toBeInTheDocument();
+    });
+
+    it("triages a failing check with its log fetched and inlined", async () => {
+      setData({
+        pullRequests: [
+          pr({ checks: checksOf([{ name: "lint", state: "failure", url: "https://ci/lint" }]) }),
+        ],
+      });
+      render(<PullRequestsView workspaceName="feat" />);
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /lint/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+
+      await waitFor(() => expect(mockStartAndNavigate).toHaveBeenCalled());
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/workspaces/feat/pr-check-logs",
+        expect.objectContaining({ method: "POST" }),
+      );
+      const [type, body] = mockStartAndNavigate.mock.calls[0];
+      expect(type).toBe("autonomous");
+      expect(body).toMatchObject({ workspace: "feat", startWith: "update-todo" });
+      expect(body.instruction).toContain("lint");
+      // Without the log in the instruction the item cannot name a cause: the
+      // updater has no `gh` grant and the executor is forbidden from CI.
+      expect(body.instruction).toContain("'lock' is assigned but never used");
+    });
+
+    it("still triages when the log fetch fails, saying so in the instruction", async () => {
+      mockFetch.mockRejectedValueOnce(new Error("gh not authenticated"));
+      setData({
+        pullRequests: [
+          pr({ checks: checksOf([{ name: "lint", state: "failure", url: "https://ci/lint" }]) }),
+        ],
+      });
+      render(<PullRequestsView workspaceName="feat" />);
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /lint/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+
+      await waitFor(() => expect(mockStartAndNavigate).toHaveBeenCalled());
+      expect(mockStartAndNavigate.mock.calls[0][1].instruction).toMatch(/No log could be read/i);
+    });
+
+    it("keeps Validate to review comments, since a check is not a comment", async () => {
+      setData({
+        pullRequests: [
+          pr({
+            threads: [],
+            checks: checksOf([{ name: "lint", state: "failure", url: "https://ci/lint" }]),
+          }),
+        ],
+      });
+      render(<PullRequestsView workspaceName="feat" />);
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /lint/ }));
+      expect(screen.getByRole("button", { name: "Validate" })).toBeDisabled();
+    });
+
+    it("counts checks and comments separately in the action bar", () => {
+      setData({
+        pullRequests: [
+          pr({ checks: checksOf([{ name: "lint", state: "failure", url: "https://ci/lint" }]) }),
+        ],
+      });
+      render(<PullRequestsView workspaceName="feat" />);
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      fireEvent.click(screen.getByRole("checkbox", { name: /lint/ }));
+      expect(screen.getByText(/1 comment.*1 CI failure/)).toBeInTheDocument();
     });
 
     it("does not call an all-skipped PR passing", () => {
