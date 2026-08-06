@@ -93,6 +93,7 @@ import type { PhaseFunctionContext, PipelinePhaseFunction, PipelinePhaseGroup } 
 import { getRepoChanges } from "@/lib/workspace";
 import {
   buildCodeReviewerPrompt,
+  buildCrossRepositoryReviewerPrompt,
   buildFixVerifierPrompt,
   buildReadmeVerifierPrompt,
 } from "@/lib/templates";
@@ -108,6 +109,7 @@ const mockExecConstraintCommand = vi.mocked(execConstraintCommand);
 const mockBuildNoConstraintsReport = vi.mocked(buildNoConstraintsReport);
 const mockGetRepoChanges = vi.mocked(getRepoChanges);
 const mockBuildCodeReviewerPrompt = vi.mocked(buildCodeReviewerPrompt);
+const mockBuildCrossRepoPrompt = vi.mocked(buildCrossRepositoryReviewerPrompt);
 const mockBuildFixVerifierPrompt = vi.mocked(buildFixVerifierPrompt);
 const mockCaptureRepoHead = vi.mocked(captureRepoHead);
 const mockReadPreviousBaseline = vi.mocked(readPreviousReviewBaseline);
@@ -603,6 +605,103 @@ describe("buildReviewPipeline — incremental review scope", () => {
     expect(mockBuildCodeReviewerPrompt).toHaveBeenCalledWith(
       expect.objectContaining({ reviewScope: undefined }),
     );
+  });
+});
+
+// The cross-repo reviewer used to be the one child exempt from the baseline, so it
+// re-read an unchanged contract surface every cycle. It gets the same per-repo
+// range the code reviewer does; what differs is the rule applied to it (a boundary
+// is in scope when *either* side moved), which lives in the prompt.
+describe("buildReviewPipeline — the cross-repository reviewer is scoped too", () => {
+  const repoA = {
+    repoName: "repo-a",
+    repoPath: "owner/repo-a",
+    worktreePath: "/repos/repo-a/worktrees/test-ws",
+  } as ReturnType<typeof listWorkspaceRepos>[number];
+  const repoB = {
+    repoName: "repo-b",
+    repoPath: "owner/repo-b",
+    worktreePath: "/repos/repo-b/worktrees/test-ws",
+  } as ReturnType<typeof listWorkspaceRepos>[number];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+    mockListWorkspaceRepos.mockReturnValue([repoA, repoB]);
+    mockReadPreviousBaseline.mockResolvedValue(null);
+    mockCaptureRepoHead.mockReturnValue("head0001");
+    mockGetRepoChanges.mockReturnValue({
+      currentBranch: "feature/test",
+      changedFiles: "",
+      diffStat: "",
+      commitLog: "",
+    });
+  });
+
+  it("passes each repo its own scope, tagged with the baseline session", async () => {
+    mockReadPreviousBaseline.mockResolvedValue({
+      timestamp: "20260101-000000",
+      heads: { "repo-a": "olda0001", "repo-b": "oldb0001" },
+    });
+    mockGetRepoChanges.mockImplementation((_ws, repoPath) => ({
+      currentBranch: "feature/test",
+      changedFiles: "M\tfull.ts",
+      diffStat: "full",
+      commitLog: "full log",
+      incremental: {
+        sinceSha: repoPath === "owner/repo-a" ? "olda0001" : "oldb0001",
+        changedFiles: repoPath === "owner/repo-a" ? "M\tinc-a.ts" : "",
+        diffStat: "",
+        commitLog: "",
+        hasChanges: repoPath === "owner/repo-a",
+      },
+    }));
+
+    await buildReviewPipeline({ workspace: "test-ws" });
+
+    expect(mockBuildCrossRepoPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repos: [
+          expect.objectContaining({
+            repoName: "repo-a",
+            reviewScope: expect.objectContaining({
+              sinceSha: "olda0001",
+              sinceTimestamp: "20260101-000000",
+              changedFiles: "M\tinc-a.ts",
+              hasChanges: true,
+            }),
+          }),
+          expect.objectContaining({
+            repoName: "repo-b",
+            reviewScope: expect.objectContaining({
+              sinceSha: "oldb0001",
+              hasChanges: false,
+            }),
+          }),
+        ],
+      }),
+    );
+  });
+
+  it("leaves a repo's scope unset on the first review of the branch", async () => {
+    await buildReviewPipeline({ workspace: "test-ws" });
+
+    const input = mockBuildCrossRepoPrompt.mock.calls[0]?.[0];
+    expect(input?.repos.map((r) => r.reviewScope)).toEqual([undefined, undefined]);
+  });
+
+  // Same failure mode as the code reviewer's: an unusable range must fall back to
+  // the whole branch, never to an empty target the reviewer reads as "nothing new".
+  it("leaves a repo's scope unset when its range was unusable", async () => {
+    mockReadPreviousBaseline.mockResolvedValue({
+      timestamp: "20260101-000000",
+      heads: { "repo-a": "gone0001", "repo-b": "gone0002" },
+    });
+
+    await buildReviewPipeline({ workspace: "test-ws" });
+
+    const input = mockBuildCrossRepoPrompt.mock.calls[0]?.[0];
+    expect(input?.repos.map((r) => r.reviewScope)).toEqual([undefined, undefined]);
   });
 });
 

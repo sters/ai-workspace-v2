@@ -33,6 +33,7 @@ import type { ConstraintExecResult } from "@/lib/workspace/constraint-runner";
 import { getCleanEnv } from "@/lib/env";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
+import type { CrossRepositoryReviewerInput } from "@/types/prompts";
 import type { WorkspaceRepo } from "@/types/workspace";
 import { getTimeoutDefaults } from "@/lib/pipeline-manager";
 
@@ -81,13 +82,7 @@ export async function buildReviewPipeline(input: {
   const reviewChildren: GroupChild[] = [];
   const repoBaseBranches = new Map<string, string>();
   // Collected per-repo context for the cross-repository reviewer (multi-repo only).
-  const crossRepoInputs: {
-    repoName: string;
-    repoPath: string;
-    baseBranch: string;
-    worktreePath: string;
-    repoChanges: string;
-  }[] = [];
+  const crossRepoInputs: CrossRepositoryReviewerInput["repos"] = [];
 
   // What each repo's HEAD was at the previous review, so this one can scope
   // itself to the branch's own work since then instead of re-reviewing every
@@ -113,12 +108,18 @@ export async function buildReviewPipeline(input: {
         ? { ...changes.incremental, sinceTimestamp: previousBaseline.timestamp }
         : undefined;
 
+    // Same range the code reviewer gets. The cross-repo reviewer applies a
+    // different rule to it (a boundary is in scope when *either* side moved, and
+    // it still reads both sides in full), but it is no longer exempt: it was
+    // re-deriving the whole contract surface every cycle from repos that had not
+    // moved, which is the diff-widening the baseline exists to stop.
     crossRepoInputs.push({
       repoName: repo.repoName,
       repoPath: repo.repoPath,
       baseBranch,
       worktreePath: repo.worktreePath,
       repoChanges: repoChangesText,
+      reviewScope,
     });
 
     const orgName = repo.repoPath.split("/").slice(0, -1).join("_") || "local";

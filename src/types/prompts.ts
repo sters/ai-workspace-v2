@@ -66,6 +66,24 @@ export interface TodoReviewFinding {
   suggestedResolution?: string;
 }
 
+/**
+ * One repository's own work since a prior review. Absent on a consumer means no
+ * usable baseline, and the whole branch is that repository's review target.
+ *
+ * Shared by the per-repo code reviewer and the cross-repository reviewer so both
+ * narrow against the same range — the cross-repo reviewer was the only exempt one,
+ * and re-reading an unchanged boundary every cycle is what it cost.
+ */
+export interface ReviewScope {
+  /** Review session the baseline came from, named so the reviewer can cite it. */
+  sinceTimestamp: string;
+  sinceSha: string;
+  changedFiles: string;
+  diffStat: string;
+  commitLog: string;
+  hasChanges: boolean;
+}
+
 export interface CodeReviewerInput extends RepoPromptInput {
   baseBranch: string;
   reviewTimestamp: string;
@@ -78,15 +96,7 @@ export interface CodeReviewerInput extends RepoPromptInput {
    * Narrows the review to the branch's own work since a prior review. Absent
    * means no usable baseline, and the whole branch is the review target.
    */
-  reviewScope?: {
-    /** Review session the baseline came from, named so the reviewer can cite it. */
-    sinceTimestamp: string;
-    sinceSha: string;
-    changedFiles: string;
-    diffStat: string;
-    commitLog: string;
-    hasChanges: boolean;
-  };
+  reviewScope?: ReviewScope;
 }
 
 /** Requested-fix verifier input — checks a previous cycle's asks against the code. */
@@ -129,6 +139,12 @@ export interface CrossRepositoryReviewerInput {
     baseBranch: string;
     worktreePath: string;
     repoChanges: string;
+    /**
+     * This repository's own work since the previous review. Absent means no usable
+     * baseline for it, and its whole branch is in scope. A boundary is new work
+     * when *either* side has a scope naming it — see `buildCrossRepositoryReviewerPrompt`.
+     */
+    reviewScope?: ReviewScope;
   }[];
 }
 
