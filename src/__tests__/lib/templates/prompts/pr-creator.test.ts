@@ -79,16 +79,24 @@ describe("getPRCreatorSystemPrompt", () => {
 
   // The body is read next to the diff, so it carries what the diff cannot show.
   // Without a stated bar the agent explains the whole change end to end.
-  it("bounds the description length", () => {
-    expect(prompt).toContain("### PR Description Length");
-    expect(prompt).toMatch(/\b(20 lines|under a minute)\b/i);
+  it("bounds the description to a rough overview", () => {
+    expect(prompt).toContain("### PR Description: An Overview, Not a Walkthrough");
+    expect(prompt).toMatch(/few sentences/i);
+    expect(prompt).toMatch(/\b10 lines\b/);
+  });
+
+  // "Explain what the diff already shows" is the failure mode: a file-by-file or
+  // function-by-function account of the implementation.
+  it("rules out a walkthrough of the implementation", () => {
+    expect(prompt).toMatch(/walkthrough|file-by-file|function-by-function/i);
+    expect(prompt).toMatch(/answer(ed|able)? by reading the diff/i);
   });
 
   // The README is inlined as context for the agent, and restating its Goal /
   // Requirements / Acceptance Criteria is the single largest source of padding.
-  it("forbids restating the workspace README in the body", () => {
-    expect(prompt).toMatch(/README/);
-    expect(prompt.toLowerCase()).toMatch(/do not (copy|restate|reproduce)[^.]*readme/);
+  it("keeps the workspace README out of the body", () => {
+    expect(prompt).toContain("**The workspace README.**");
+    expect(prompt).toContain("not PR body content");
   });
 
   // "cover every commit" used to read as "enumerate every commit", which turns a
