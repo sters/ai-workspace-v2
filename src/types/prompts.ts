@@ -166,6 +166,12 @@ export interface PRCreatorInput extends RepoPromptInput {
     title: string;
     body: string;
   };
+  /**
+   * Title every repo of this workspace must use verbatim, from the README's
+   * `# Task:` heading. Only set for a new PR: the update path leaves an existing
+   * title alone, and an unfilled heading (`TBD`) is worse than a composed title.
+   */
+  sharedTitle?: string;
   /** Body of the TODO file's `## PR Review Threads` section, when it has one. */
   prReviewThreads?: string;
   /** Absolute TODO file path — only set alongside `prReviewThreads`, which is what needs it. */

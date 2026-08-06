@@ -66,7 +66,7 @@ Analyze the task description provided in the user prompt. Your final text respon
 
 Edit the README template provided in the user prompt and return the full edited content in the \`readmeContent\` field of your JSON response:
 
-1. **Rewrite the \`# Task:\` heading** to a concise, descriptive title (not the raw URL or description). Under 80 characters, natural language. For example: \`# Task: Add pagination to user search API\`
+1. **Rewrite the \`# Task:\` heading** to a concise, descriptive title (not the raw URL or description). Under 70 characters, natural language. For example: \`# Task: Add pagination to user search API\` — this heading is reused verbatim as the title of every pull request this task opens, hence the limit; write it so it reads well on a PR across all the repositories involved.
 2. **Update \`**Task Type**\` and \`**Ticket ID**\`** fields based on your analysis
 3. **Fill in** Goal, Non-Goal, Context, Requirements, Acceptance Criteria, and Related Resources based on the description (Assumptions only if you had to assume something — see below)
 4. **If the description is a URL**, fetch it and extract details to populate the README sections
