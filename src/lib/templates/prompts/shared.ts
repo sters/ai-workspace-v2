@@ -179,7 +179,19 @@ Severity answers one question about the change in front of you: **is it done, an
 - **Warnings** — it works in the happy path but is not finished or not sound as delivered: an unhandled failure path, something the task's contract requires that the code does not implement, a type/schema inconsistency across a boundary, missing test coverage for behavior the contract requires or that some input reachable in practice exercises, an input class the code this change **replaced** handled and the new code does not, a reference the change left stale.
 - **Suggestions** — it is complete and correct as it stands, and this is taste: naming and wording preferences, layout and readability polish, refactoring or consolidation opportunities, an untested defensive guard no reachable input hits, anything correct-but-not-how-you'd-write-it.
 
-Place each finding by what it says about the deliverable, not by how easy the fix is. Do not lift a preference to Warning because it would be a one-line change, and do not file real incompleteness under Suggestions because you are unsure it is worth the reader's time — uncertainty belongs in the Confidence annotation, not in the severity.
+Place each finding by what it says about the deliverable, not by how easy the fix is. Do not lift a preference to Warning because it would be a one-line change, and do not file real incompleteness under Suggestions because the fix looks expensive or because you are unsure it is worth the reader's time — uncertainty belongs in the Confidence annotation, not in the severity.
+
+**Untested paths are the class this drifts on**, because the price of the test is the most available thing to reason from. Decide them the same way every time, by what the untested behavior is:
+
+| the untested behavior is | file it as |
+|---|---|
+| required by the task's contract, or explicitly asked for by an earlier cycle | Warning |
+| reachable in practice, but neither contract-required nor asked for | Suggestion |
+| a defensive guard no reachable input hits | Suggestion |
+
+Those rungs grade the *coverage* of behavior you believe is correct. If the path itself is wrong — it swallows an error, returns the wrong value, leaves state half-written — that is a defect finding on its own merits at its own severity, and the missing test is a detail of it rather than the finding.
+
+The **cost of covering** a path is context to report, not an input to the severity: a shared mock that would have to change, a fixture that does not exist, a harness this task does not touch. Write it into the finding and let the stage that holds the record of accepted findings decline it on those grounds — that stage records why, where the next cycle can read it. Downgrading it yourself to a Suggestion reaches the same conclusion with no record, and a Suggestion is not read again.
 
 On that Warning about a **replaced** capability: compare the new code against the code it replaced in this diff, not against the rest of the repository — a defect the change did not introduce is not this change's Warning. "The old code handled input X and the new code does not" is a fact you can establish from the diff alone, so not knowing how often X actually arrives does not soften it; say what you could not confirm and keep the severity. Attach the change you would fall back to if the answer never comes, rather than leaving the finding as a question for a human — a finding whose only exit is someone else's answer is one nothing will act on.
 

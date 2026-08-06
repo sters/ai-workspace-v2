@@ -275,6 +275,36 @@ describe("SEVERITY_CALIBRATION", () => {
     expect(SEVERITY_CALIBRATION).toMatch(/defensive guard/i);
   });
 
+  // Untested paths are the class the label drifts on across cycles, because the cost
+  // of writing the test is the most available thing to reason from. Measured on
+  // one autonomous run: cycle 1 filed an untested transaction-failure path as a
+  // Suggestion *because* covering it needed a change to a shared mock, and cycle 3
+  // filed untested error returns as Warnings on a diff a tenth the size. Both read
+  // the price of the test into the severity, in opposite directions.
+  it("decides untested paths by what the behavior is, not by what the test costs", () => {
+    expect(SEVERITY_CALIBRATION).toMatch(/untested/i);
+    // Three rungs, and the middle one is the gap: without it every reachable branch
+    // is a Warning, which is the unscoped coverage rule this file already rejects.
+    expect(SEVERITY_CALIBRATION).toMatch(/earlier cycle/i);
+    expect(SEVERITY_CALIBRATION).toMatch(/defensive guard/i);
+  });
+
+  // Declining a finding because covering it is expensive is the gate's call, not the
+  // reviewer's: the gate holds the ledger and records the reason. A reviewer that
+  // pre-declines by filing a Suggestion spends that judgment invisibly.
+  it("keeps the cost of covering a path out of the severity", () => {
+    expect(SEVERITY_CALIBRATION).toMatch(/cost of covering/i);
+    expect(SEVERITY_CALIBRATION).toMatch(/not an input to the severity/i);
+    expect(SEVERITY_CALIBRATION).toMatch(/fix looks expensive/i);
+  });
+
+  // The coverage rungs grade *coverage of behavior believed correct*. A path that is
+  // itself wrong is a defect finding on its own merits, so the middle rung must not
+  // become a way to file a broken error path as taste.
+  it("does not let the coverage rungs downgrade a broken path", () => {
+    expect(SEVERITY_CALIBRATION).toMatch(/on its own merits/i);
+  });
+
   // "This change handles less than the code it replaced" is a diff-level fact,
   // checkable without knowing production data — so it must not depend on knowing
   // whether the dropped input occurs. Bounded to the replaced code, so it cannot
