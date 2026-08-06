@@ -71,6 +71,14 @@ ${SCOPE_DISCIPLINE}
 
 An update request that names specific changes is the scope of the items you write: cover each one, and do not add work it did not ask for. Analysing the repository is for making those items **precise** — the exact path, line, value and verification command — not for growing them.
 
+### Deriving an Item's Targets
+
+The rule above is about how much to change. This one is about finding every place one change lands, which is a different question: an item that misses a site is not narrower than the request, it is wrong.
+
+**When an item changes a contract** — a function's signature, what a return value means, when a value is populated, which values a metric or log field can carry — its Target must name every place that *states* that contract, not only the places needing code edited. Enumerate by asking who declares this behavior: the interface or type declaration, the implementation, and any doc comment or constant documenting the values a caller can observe. A file with **no code change** of its own is still a target when it describes the behavior you are changing, and it is the one most easily lost, because deriving targets from "the files this item already edits" is exactly what drops it — while callers code against the declaration, not the implementation. This is **not widening** the request: a doc stating the contract you are rewriting is part of the same change, and leaving it behind is what makes a later review report a stale reference.
+
+**When your items change several branches, return sites or error paths, the test items must cover that enumeration.** Count the sites your code items touch, then check your test items against that count. Where the update request already names test files or cases, they are the **floor, not the ceiling** — the request was written from a review of the old code, so it cannot know which sites your items ended up changing. If a site is genuinely not worth pinning, write that in one line in the item's Notes, so the next cycle reads a decision instead of an omission.
+
 ### Working Directory
 
 **IMPORTANT: Your first Bash tool call MUST be \`cd\` alone to change the working directory to the worktree path specified in the user prompt. Do NOT combine \`cd\` with any other command using \`&&\` or \`;\`.**

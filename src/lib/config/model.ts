@@ -114,6 +114,20 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // structured summary, but it is a single short call and a wrong answer costs a
   // whole cycle — a needless loop, or stopping with work unfinished.
   [STEP_TYPES.AUTONOMOUS_GATE]: "high",
+  // Reads like translation — the gate's numbered asks become items — but the two
+  // things it must derive are enumerated nowhere: which sites *state* a contract an
+  // ask changes, and which of the sites its own items touch need coverage. Both are
+  // absence-of-a-checklist work, and both were got wrong on the run that moved this:
+  // one cycle's items named four doc sites and missed the interface declaration (the
+  // file with no code change of its own), and changed five return sites while
+  // commissioning tests for two. All three gaps came back as the next review's
+  // Warnings, so the cycle they cost is the same one a wrong gate answer costs.
+  // Cheapest place in the pipeline to buy judgment: ~3 min of an 84-min run, against
+  // 12-22 min for the Execute it feeds. Note `plan-todo-from-review` does the same
+  // shape of work and stays on the default rung — it is a standalone operation whose
+  // TODO a human reads before anything executes, where this one hands straight to an
+  // executor in the same run with nothing in between.
+  [STEP_TYPES.UPDATE_TODO]: "high",
 
   // The TODO the executor consumes is already a plan: the planning steps above
   // decided what to build and later phases verify the result, so this is bounded
@@ -151,13 +165,14 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // open hunt. A human presses the button and reads the verdict, so a wrong one
   // costs a second look, not a cycle.
   [STEP_TYPES.VALIDATE_PR_COMMENT]: "medium",
-  // Applies a requested edit to one document, and is forbidden from touching
-  // code — the same shape as update-todo.
+  // Applies a requested edit to one document, and is forbidden from touching code.
+  // The document it rewrites is the run's done-contract, but the edit itself is
+  // named in the request and lands in one file, so there is nothing to enumerate.
   [STEP_TYPES.UPDATE_README]: "medium",
+  // Turns review findings into TODO items, same shape as `update-todo` on the rung
+  // above — see there for why the two are split.
   [STEP_TYPES.PLAN_TODO_FROM_REVIEW]: "medium",
   [STEP_TYPES.REVIEW_TODOS]: "medium",
-  // Same shape as plan-todo-from-review: turn review findings into TODO items.
-  [STEP_TYPES.UPDATE_TODO]: "medium",
   // Proposes the candidate work items itself rather than reading them off an
   // input, so unlike the rung below it there is nothing to translate from.
   [STEP_TYPES.SUGGEST_WORKSPACE]: "medium",
