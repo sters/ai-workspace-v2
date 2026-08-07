@@ -429,6 +429,136 @@ describe("PullRequestsView", () => {
     });
   });
 
+  describe("repository scope", () => {
+    const gadgets = () =>
+      pr({
+        repoName: "gadgets",
+        repoPath: "github.com/acme/gadgets",
+        repo: "gadgets",
+        number: 7,
+        url: "https://github.com/acme/gadgets/pull/7",
+        title: "Widen gadget schema",
+        threads: [
+          {
+            id: "PRRT_gadgets",
+            isResolved: false,
+            isOutdated: false,
+            path: "src/schema.ts",
+            line: 12,
+            comments: [
+              {
+                url: "https://github.com/acme/gadgets/pull/7#discussion_r9",
+                author: "reviewer",
+                body: "This field should be nullable.",
+                createdAt: "2026-08-04T10:00:00Z",
+              },
+            ],
+          },
+        ],
+      });
+
+    it("scopes the run to the one repository the selection belongs to", () => {
+      setData({ pullRequests: [pr(), gadgets()] });
+      render(<PullRequestsView workspaceName="feat" />);
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+
+      // Without `repo` the run executes, reviews and opens PRs across every
+      // worktree in the workspace, for a comment on one of them.
+      expect(mockStartAndNavigate.mock.calls[0][1]).toMatchObject({ repo: "widgets" });
+    });
+
+    it("scopes a CI-only selection the same way", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          logs: [
+            { repoName: "gadgets", name: "lint", url: "https://ci/lint", excerpt: "boom", truncated: false },
+          ],
+        }),
+      });
+      setData({
+        pullRequests: [
+          pr(),
+          {
+            ...gadgets(),
+            checks: checksOf([{ name: "lint", state: "failure", url: "https://ci/lint" }]),
+          },
+        ],
+      });
+      render(<PullRequestsView workspaceName="feat" />);
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /lint/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+
+      await waitFor(() => expect(mockStartAndNavigate).toHaveBeenCalled());
+      expect(mockStartAndNavigate.mock.calls[0][1]).toMatchObject({ repo: "gadgets" });
+    });
+
+    it("falls back to the whole workspace when the selection spans repositories", () => {
+      // `repo` is a single value in the autonomous API, so a subset of two out of
+      // three repositories cannot be expressed — the run stays workspace-wide.
+      setData({ pullRequests: [pr(), gadgets()] });
+      render(<PullRequestsView workspaceName="feat" />);
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/schema\.ts:12/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+
+      expect(mockStartAndNavigate.mock.calls[0][1].repo).toBeUndefined();
+    });
+
+    it("counts a comment and a check in different repositories as spanning", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          logs: [
+            { repoName: "gadgets", name: "lint", url: "https://ci/lint", excerpt: "boom", truncated: false },
+          ],
+        }),
+      });
+      setData({
+        pullRequests: [
+          pr(),
+          {
+            ...gadgets(),
+            checks: checksOf([{ name: "lint", state: "failure", url: "https://ci/lint" }]),
+          },
+        ],
+      });
+      render(<PullRequestsView workspaceName="feat" />);
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      fireEvent.click(screen.getByRole("checkbox", { name: /lint/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+
+      await waitFor(() => expect(mockStartAndNavigate).toHaveBeenCalled());
+      expect(mockStartAndNavigate.mock.calls[0][1].repo).toBeUndefined();
+    });
+
+    it("tells the human the run is scoped, since it is otherwise invisible", () => {
+      setData({ pullRequests: [pr(), gadgets()] });
+      render(<PullRequestsView workspaceName="feat" />);
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      expect(screen.getByText(/widgets only/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/schema\.ts:12/ }));
+      expect(screen.queryByText(/only/)).not.toBeInTheDocument();
+    });
+
+    it("scopes a single-repository workspace too, so the run reads one worktree", () => {
+      setData();
+      render(<PullRequestsView workspaceName="feat" />);
+
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+
+      expect(mockStartAndNavigate.mock.calls[0][1]).toMatchObject({ repo: "widgets" });
+    });
+  });
+
   it("asks past the server cache when Refresh is pressed", () => {
     setData();
     render(<PullRequestsView workspaceName="feat" />);
