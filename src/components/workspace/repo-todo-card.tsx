@@ -16,6 +16,7 @@ import { showToast } from "../shared/feedback/toast";
 import { openWith } from "@/lib/api";
 import { useOpeners } from "@/hooks/use-openers";
 import {
+  Bot,
   Play,
   ClipboardCheck,
   GitPullRequest,
@@ -63,6 +64,20 @@ export function RepoTodoCard({
         <div className="flex items-center gap-2">
           <h3 className="font-semibold">{todo.repoName}</h3>
           <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost-toggle"
+              className="h-6 w-6 p-0"
+              disabled={disabled}
+              title="Autonomous"
+              onClick={() =>
+                onStartAndNavigate("autonomous", {
+                  ...baseBody,
+                  startWith: "execute",
+                })
+              }
+            >
+              <Bot className="h-3.5 w-3.5" />
+            </Button>
             <Button
               variant="ghost-toggle"
               className="h-6 w-6 p-0"
