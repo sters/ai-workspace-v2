@@ -16,6 +16,8 @@ vi.mock("@xterm/xterm", () => {
         open: mockOpen,
         dispose: mockDispose,
         loadAddon: mockLoadAddon,
+        cols: 97,
+        rows: 31,
       };
     }),
   };
@@ -192,6 +194,62 @@ describe("useTerminal", () => {
     unmount();
 
     expect(mockDispose).toHaveBeenCalled();
+  });
+
+  it("init() fits before returning, so callers read the fitted size", async () => {
+    const { result } = renderHook(() => useTerminal());
+
+    const container = document.createElement("div");
+    Object.defineProperty(result.current.containerRef, "current", {
+      value: container,
+      writable: true,
+    });
+
+    await act(async () => {
+      await result.current.init();
+    });
+
+    // Callers (chat start message, claude-usage request) read term.cols right
+    // after awaiting init(), so the fit cannot be deferred to a later frame.
+    expect(mockFit).toHaveBeenCalled();
+    expect(result.current.termRef.current.cols).toBe(97);
+  });
+
+  it("reports the fitted size to onResize", async () => {
+    const onResize = vi.fn();
+    const { result } = renderHook(() => useTerminal({ onResize }));
+
+    const container = document.createElement("div");
+    Object.defineProperty(result.current.containerRef, "current", {
+      value: container,
+      writable: true,
+    });
+
+    await act(async () => {
+      await result.current.init();
+    });
+
+    expect(onResize).toHaveBeenCalledWith(97, 31);
+  });
+
+  it("does not re-report a size that has not changed", async () => {
+    const onResize = vi.fn();
+    const { result } = renderHook(() => useTerminal({ onResize }));
+
+    const container = document.createElement("div");
+    Object.defineProperty(result.current.containerRef, "current", {
+      value: container,
+      writable: true,
+    });
+
+    await act(async () => {
+      await result.current.init();
+    });
+    act(() => {
+      window.dispatchEvent(new Event("resize"));
+    });
+
+    expect(onResize).toHaveBeenCalledTimes(1);
   });
 
   it("readonly: true hides cursor by setting cursor color to background", async () => {

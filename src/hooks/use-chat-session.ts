@@ -52,7 +52,21 @@ export function useChatSession(
   workspaceId: string,
   options?: { initialPrompt?: string; reviewTimestamp?: string; researchChat?: boolean },
 ) {
-  const { containerRef, termRef, init, dispose } = useTerminal({ webLinks: true });
+  // Forward every layout change to the PTY, so the Claude TUI on the other end
+  // draws for the viewport the browser actually has. Without this the child
+  // keeps its spawn-time size and its boxes and status line wrap.
+  const wsRef = useRef<WebSocket | null>(null); // declared here: the callback below reads it
+  const handleTerminalResize = useCallback((cols: number, rows: number) => {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "resize", cols, rows }));
+    }
+  }, []);
+
+  const { containerRef, termRef, init, dispose } = useTerminal({
+    webLinks: true,
+    onResize: handleTerminalResize,
+  });
   const [state, setState] = useState<SessionState>("idle");
   const [exitCode, setExitCode] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +80,6 @@ export function useChatSession(
   researchChatRef.current = options?.researchChat;
 
   // Refs for websocket (survive re-renders)
-  const wsRef = useRef<WebSocket | null>(null);
   const onDataDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -148,7 +161,9 @@ export function useChatSession(
       }, 5000);
 
       ws.onopen = () => {
-        ws.send(JSON.stringify({ type: "resume", sessionId }));
+        // The reconnecting window may be a different size than the one that
+        // started the session; the server resizes the PTY after the replay.
+        ws.send(JSON.stringify({ type: "resume", sessionId, cols: term.cols, rows: term.rows }));
       };
 
       ws.onmessage = (event) => {
@@ -272,7 +287,7 @@ export function useChatSession(
       const prompt = initialPromptRef.current;
       const review = reviewTimestampRef.current;
       const research = researchChatRef.current;
-      ws.send(JSON.stringify({ type: "start", workspaceId, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }) }));
+      ws.send(JSON.stringify({ type: "start", workspaceId, cols: term.cols, rows: term.rows, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }) }));
     };
 
     ws.onmessage = (event) => {

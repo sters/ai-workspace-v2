@@ -35,12 +35,19 @@ function setChatModel(model: ClaudeModel | null) {
   mockGetConfig.mockReturnValue({ chat: { model } });
 }
 
+let mockPtyResize: ReturnType<typeof vi.fn>;
+/** Settles the spawned process's `exited` promise, for tests about the exit path. */
+let exitSpawnedProcess!: (code: number) => void;
+
 beforeEach(() => {
   mockSpawnClaudeTerminal.mockReset();
+  mockPtyResize = vi.fn();
+  // A pending `exited` keeps the session live, as a real one is while the user
+  // is typing in it. Resolving it eagerly marked every session exited.
   mockSpawnClaudeTerminal.mockReturnValue({
-    terminal: { write: vi.fn() },
+    terminal: { write: vi.fn(), resize: mockPtyResize },
     kill: vi.fn(),
-    exited: Promise.resolve(0),
+    exited: new Promise<number>((resolve) => { exitSpawnedProcess = resolve; }),
   });
   mockGetConfig.mockReset();
   mockEnsureSessionSystemPrompt.mockReset();
@@ -66,10 +73,10 @@ function makeWs() {
   };
 }
 
-async function startSession() {
+async function startSession(size?: { cols: number; rows: number }) {
   const { handleStart } = await import("@/lib/chat-server/handlers");
   const ws = makeWs();
-  await handleStart(ws, { type: "start", workspaceId: "demo" });
+  await handleStart(ws, { type: "start", workspaceId: "demo", ...size });
   return ws;
 }
 
@@ -116,5 +123,95 @@ describe("handleStart", () => {
     expect(wsPath).toBe("/mock/workspace-root/workspace/demo");
     expect(agentName).toBe("chat");
     expect(context).toEqual({ workspaceId: "demo" });
+  });
+
+  it("spawns the PTY at the size the browser terminal reported", async () => {
+    await startSession({ cols: 97, rows: 31 });
+
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    expect(opts.cols).toBe(97);
+    expect(opts.rows).toBe(31);
+  });
+
+  it("clamps an absurd reported size instead of spawning at it", async () => {
+    await startSession({ cols: 0, rows: 99999 });
+
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    expect(opts.cols).toBeGreaterThanOrEqual(20);
+    expect(opts.rows).toBeLessThanOrEqual(300);
+  });
+
+  it("falls back to the PTY defaults when the client reports no size", async () => {
+    await startSession();
+
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    expect(opts.cols).toBeUndefined();
+    expect(opts.rows).toBeUndefined();
+  });
+});
+
+describe("handleResize", () => {
+  it("resizes the PTY of the active session", async () => {
+    const { handleResize } = await import("@/lib/chat-server/handlers");
+    const ws = await startSession({ cols: 100, rows: 30 });
+
+    handleResize(ws, { type: "resize", cols: 140, rows: 45 });
+
+    expect(mockPtyResize).toHaveBeenCalledWith(140, 45);
+  });
+
+  it("skips a resize to the size the PTY already has", async () => {
+    const { handleResize } = await import("@/lib/chat-server/handlers");
+    const ws = await startSession({ cols: 100, rows: 30 });
+
+    handleResize(ws, { type: "resize", cols: 100, rows: 30 });
+
+    expect(mockPtyResize).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when the connection has no session", async () => {
+    const { handleResize } = await import("@/lib/chat-server/handlers");
+    const ws = makeWs();
+
+    expect(() => handleResize(ws, { type: "resize", cols: 100, rows: 30 })).not.toThrow();
+  });
+
+  it("skips the resize once the process has exited", async () => {
+    const { handleResize } = await import("@/lib/chat-server/handlers");
+    const ws = await startSession({ cols: 100, rows: 30 });
+
+    exitSpawnedProcess(0);
+    await new Promise((r) => setTimeout(r, 0));
+    handleResize(ws, { type: "resize", cols: 140, rows: 45 });
+
+    expect(mockPtyResize).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleResume", () => {
+  it("resizes the PTY to the reconnecting browser's size, after the replay", async () => {
+    const { handleResume } = await import("@/lib/chat-server/handlers");
+    const ws = await startSession({ cols: 100, rows: 30 });
+    const target = makeWs();
+
+    let sentWhenResized: string[] = [];
+    mockPtyResize.mockImplementation(() => {
+      sentWhenResized = [...target.sent];
+    });
+    handleResume(target, { type: "resume", sessionId: ws.data.sessionId!, cols: 140, rows: 45 });
+
+    expect(mockPtyResize).toHaveBeenCalledWith(140, 45);
+    // The repaint SIGWINCH must land after the old-width buffer has been
+    // replayed, or Claude's redraw is overwritten by history.
+    expect(sentWhenResized.some(m => JSON.parse(m).type === "replay_done")).toBe(true);
+  });
+
+  it("does not resize when the reconnecting browser has the same size", async () => {
+    const { handleResume } = await import("@/lib/chat-server/handlers");
+    const ws = await startSession({ cols: 100, rows: 30 });
+
+    handleResume(makeWs(), { type: "resume", sessionId: ws.data.sessionId!, cols: 100, rows: 30 });
+
+    expect(mockPtyResize).not.toHaveBeenCalled();
   });
 });
