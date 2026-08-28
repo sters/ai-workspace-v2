@@ -5,7 +5,9 @@ export type DataListener = (data: string, rawData: Uint8Array) => void;
  * Type definitions may lag behind runtime support, so we define our own interface.
  */
 export interface TerminalSubprocess {
-  terminal: { write(data: string): void };
+  // `resize` is optional because an older Bun's `terminal` object has no such
+  // method; callers reach it through `resizeTerminal()` rather than directly.
+  terminal: { write(data: string): void; resize?(cols: number, rows: number): void };
   kill(): void;
   exited: Promise<number>;
 }

@@ -1,5 +1,6 @@
 import path from "node:path";
 import { spawnClaudeTerminal } from "../claude/cli";
+import { clampPtySize, resizeTerminal, DEFAULT_PTY_COLS, DEFAULT_PTY_ROWS } from "../pty";
 import type { DataListener } from "@/types/pty";
 import { buildInitPrompt, buildReviewChatPrompt, buildResearchChatPrompt } from "@/lib/templates";
 import { ensureSessionSystemPrompt, cleanupSessionSystemPrompt } from "@/lib/workspace/prompts";
@@ -59,9 +60,19 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
   const chatModel = getConfig().chat.model;
   const modelArgs = chatModel ? ["--model", chatModel] : [];
 
+  // The browser's xterm is the real viewport, so the PTY is born its size.
+  // Spawning at a fixed default and never correcting it is what made Claude's
+  // TUI draw boxes and status lines at a width the viewport does not have.
+  const size = msg.cols != null && msg.rows != null ? clampPtySize(msg.cols, msg.rows) : null;
+
   let proc;
   try {
-    proc = spawnClaudeTerminal({ args: ["--append-system-prompt-file", systemPromptFile, ...modelArgs, initPrompt], cwd: root, listeners });
+    proc = spawnClaudeTerminal({
+      args: ["--append-system-prompt-file", systemPromptFile, ...modelArgs, initPrompt],
+      cwd: root,
+      listeners,
+      ...(size && { cols: size.cols, rows: size.rows }),
+    });
   } catch (err) {
     send(ws, {
       type: "error",
@@ -81,6 +92,8 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     activeWs: ws,
     exitedAt: null,
     startedAt: Date.now(),
+    cols: size?.cols ?? DEFAULT_PTY_COLS,
+    rows: size?.rows ?? DEFAULT_PTY_ROWS,
   };
   store.__chatSessions!.set(sessionId, session);
   persistSessionCreated(session);
@@ -153,9 +166,41 @@ export function handleResume(ws: Ws, msg: Extract<ClientMessage, { type: "resume
   // Signal replay complete
   send(ws, { type: "replay_done" });
 
+  // Only now resize, and only if the reconnecting browser is a different size:
+  // the replayed bytes were drawn for the old size, so the SIGWINCH repaint has
+  // to land after them or history overwrites the repaint. An identical size
+  // needs no repaint — the replay reproduces the frame as it was drawn.
+  if (msg.cols != null && msg.rows != null) {
+    applyResize(session, msg.cols, msg.rows);
+  }
+
   console.log(
     `[chat-server] Session ${session.id} resumed (${session.outputBuffer.length} buffered chunks, exited=${session.exited})`,
   );
+}
+
+/**
+ * Push a new size into a live PTY and record it. Skips a resize to the size the
+ * PTY already has, since that raises no SIGWINCH and buys nothing.
+ */
+function applyResize(session: ChatSession, cols: number, rows: number): void {
+  if (session.exited) return;
+  const next = clampPtySize(cols, rows);
+  if (next.cols === session.cols && next.rows === session.rows) return;
+  if (!resizeTerminal(session.proc, next.cols, next.rows)) return;
+  session.cols = next.cols;
+  session.rows = next.rows;
+}
+
+export function handleResize(ws: Ws, msg: Extract<ClientMessage, { type: "resize" }>): void {
+  const store = getStore();
+  const session = ws.data.sessionId
+    ? store.__chatSessions!.get(ws.data.sessionId)
+    : null;
+  // A resize for a gone session is not worth an error frame — the browser
+  // reports one on every layout change, including while a session is ending.
+  if (!session) return;
+  applyResize(session, msg.cols, msg.rows);
 }
 
 export function handleInput(ws: Ws, msg: Extract<ClientMessage, { type: "input" }>): void {

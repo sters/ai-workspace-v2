@@ -1,6 +1,12 @@
 export interface UseTerminalOptions {
   readonly?: boolean;
   webLinks?: boolean;
+  /**
+   * Called with the fitted size after init and after every layout change that
+   * moved it. Consumers backed by a PTY forward this so the child process is
+   * told its viewport changed.
+   */
+  onResize?: (cols: number, rows: number) => void;
 }
 
 export interface UseTerminalReturn {

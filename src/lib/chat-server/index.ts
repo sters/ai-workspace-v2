@@ -13,7 +13,7 @@ import { send } from "./handlers";
 import { GC_INTERVAL_MS } from "./constants";
 import { getStore } from "./store";
 import { runGc } from "./gc";
-import { handleStart, handleResume, handleInput, handleKill, handleClose } from "./handlers";
+import { handleStart, handleResume, handleInput, handleResize, handleKill, handleClose } from "./handlers";
 import { handleHealthCheck, handleSessionKill, handleSessionsList } from "./routes";
 
 // Re-exports for testing
@@ -89,8 +89,7 @@ export function startChatServer(port: number) {
             handleInput(ws, msg);
             break;
           case "resize":
-            // PTY resize is not directly supported by Bun.spawn terminal option yet.
-            // This is a no-op for now but the protocol supports it for future use.
+            handleResize(ws, msg);
             break;
           case "kill":
             handleKill(ws);

@@ -33,6 +33,14 @@ export function useTerminal(options?: UseTerminalOptions): UseTerminalReturn {
   const termRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fitAddonRef = useRef<any>(null);
+  // Last size handed to onResize, so a layout change that did not move the
+  // character grid does not send a redundant resize down the WebSocket.
+  const reportedSizeRef = useRef<{ cols: number; rows: number } | null>(null);
+
+  // Kept in a ref so `fit` never has to be rebuilt when the callback identity
+  // changes — a rebuilt `init` would tear down and respawn the terminal.
+  const onResizeRef = useRef(options?.onResize);
+  onResizeRef.current = options?.onResize;
 
   const dispose = useCallback(() => {
     if (termRef.current) {
@@ -40,6 +48,26 @@ export function useTerminal(options?: UseTerminalOptions): UseTerminalReturn {
       termRef.current = null;
     }
     fitAddonRef.current = null;
+    reportedSizeRef.current = null;
+  }, []);
+
+  /** Fit to the container and report the resulting size if it moved. */
+  const fit = useCallback(() => {
+    const fitAddon = fitAddonRef.current;
+    const term = termRef.current;
+    if (!fitAddon || !term) return;
+    try {
+      fitAddon.fit();
+    } catch {
+      // ignore fit errors during transitions
+      return;
+    }
+    const { cols, rows } = term;
+    if (!cols || !rows) return;
+    const last = reportedSizeRef.current;
+    if (last && last.cols === cols && last.rows === rows) return;
+    reportedSizeRef.current = { cols, rows };
+    onResizeRef.current?.(cols, rows);
   }, []);
 
   const init = useCallback(async () => {
@@ -93,29 +121,34 @@ export function useTerminal(options?: UseTerminalOptions): UseTerminalReturn {
     term.open(containerRef.current);
     termRef.current = term;
 
-    requestAnimationFrame(() => {
-      try {
-        fitAddon.fit();
-      } catch {
-        // ignore fit errors during transitions
-      }
-    });
-  }, [options?.readonly, options?.webLinks, dispose]);
+    // Fit before returning rather than in a later frame: callers read
+    // `term.cols`/`term.rows` straight after awaiting init() to size the PTY
+    // (chat's start message, the claude-usage request), and a deferred fit
+    // hands them xterm's 80x24 construction default instead.
+    await new Promise<void>(r => requestAnimationFrame(() => r()));
+    if (termRef.current !== term) return;
+    fit();
+  }, [options?.readonly, options?.webLinks, dispose, fit]);
 
-  // Handle window resize
+  // Refit on any layout change, not just a window resize: the terminal shares
+  // the page with a collapsible sidebar and tab chrome, which move its width
+  // without the window changing size at all.
   useEffect(() => {
-    const handleResize = () => {
-      if (fitAddonRef.current) {
-        try {
-          fitAddonRef.current.fit();
-        } catch {
-          // ignore fit errors during transitions
-        }
-      }
-    };
+    const handleResize = () => fit();
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+
+    const container = containerRef.current;
+    let observer: ResizeObserver | null = null;
+    if (container && typeof ResizeObserver !== "undefined") {
+      observer = new ResizeObserver(handleResize);
+      observer.observe(container);
+    }
+
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      observer?.disconnect();
+    };
+  }, [fit]);
 
   // Auto-dispose on unmount
   useEffect(() => {

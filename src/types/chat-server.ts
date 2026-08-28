@@ -15,6 +15,9 @@ export interface ChatSession {
   activeWs: { send(data: string): void } | null;
   exitedAt: number | null;
   startedAt: number;
+  /** Size the PTY currently has, so a no-op resize can be skipped. */
+  cols: number;
+  rows: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -35,6 +38,9 @@ interface StartMessage {
   initialPrompt?: string;
   reviewTimestamp?: string;
   researchChat?: boolean;
+  /** Size of the browser terminal, so the PTY is born at the right size. */
+  cols?: number;
+  rows?: number;
 }
 
 interface InputMessage {
@@ -55,6 +61,9 @@ interface KillMessage {
 interface ResumeMessage {
   type: "resume";
   sessionId: string;
+  /** Size of the reconnecting browser terminal; may differ from the PTY's. */
+  cols?: number;
+  rows?: number;
 }
 
 export type ClientMessage = StartMessage | InputMessage | ResizeMessage | KillMessage | ResumeMessage;

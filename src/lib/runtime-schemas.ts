@@ -115,6 +115,8 @@ const wsStartSchema = z.object({
   initialPrompt: z.string().optional(),
   reviewTimestamp: z.string().optional(),
   researchChat: z.boolean().optional(),
+  cols: z.number().optional(),
+  rows: z.number().optional(),
 });
 
 const wsInputSchema = z.object({
@@ -135,6 +137,8 @@ const wsKillSchema = z.object({
 const wsResumeSchema = z.object({
   type: z.literal("resume"),
   sessionId: z.string().min(1),
+  cols: z.number().optional(),
+  rows: z.number().optional(),
 });
 
 export const clientMessageSchema = z.discriminatedUnion("type", [
