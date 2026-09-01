@@ -21,7 +21,10 @@ import {
   ClipboardCheck,
   GitPullRequest,
   FolderOpen,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
+import { useState } from "react";
 
 export function RepoTodoCard({
   todo,
@@ -37,6 +40,8 @@ export function RepoTodoCard({
   repoPath: string | undefined;
   onStartAndNavigate: (type: OperationType, body: Record<string, string>) => void;
 }) {
+  const [expanded, setExpanded] = useState(true);
+  const bodyId = `repo-todo-body-${todo.filename}`;
   const { openers } = useOpeners();
   const openerItems: DropdownItem[] = openers.map((opener) => ({
     kind: "leaf" as const,
@@ -62,7 +67,22 @@ export function RepoTodoCard({
     <Card>
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold">{todo.repoName}</h3>
+          <h3 className="font-semibold">
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-controls={bodyId}
+              onClick={() => setExpanded((v) => !v)}
+              className="-mx-1 flex cursor-pointer items-center gap-1 rounded px-1 transition-colors hover:bg-muted/50"
+            >
+              {expanded ? (
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+              {todo.repoName}
+            </button>
+          </h3>
           <div className="flex items-center gap-0.5">
             <Button
               variant="ghost-toggle"
@@ -144,44 +164,52 @@ export function RepoTodoCard({
           )}
         </div>
       </div>
-      <ProgressBar value={todo.progress} className="mb-3" />
+      {/* Stays visible while collapsed: one line, and progress is what a
+          collapsed card is scanned for. */}
+      <ProgressBar value={todo.progress} className={expanded ? "mb-3" : ""} />
 
-      <div className="mb-3">
-        <UpdateForm
-          label="Start autonomous"
-          placeholder={`Update TODOs for ${todo.repoName}...`}
-          disabled={disabled}
-          onSubmit={(instruction, interactionLevel) => {
-            onStartAndNavigate("autonomous", {
-              ...baseBody,
-              workspace: workspacePath,
-              instruction,
-              interactionLevel,
-              startWith: "update-todo",
-            });
-          }}
-          batchItems={(instruction, interactionLevel) => [
-            {
-              label: "Update TODOs only",
-              onClick: () =>
-                onStartAndNavigate("update-todo", {
+      {expanded && (
+        <div id={bodyId}>
+          <div className="mb-3">
+            <UpdateForm
+              label="Start autonomous"
+              placeholder={`Update TODOs for ${todo.repoName}...`}
+              disabled={disabled}
+              onSubmit={(instruction, interactionLevel) => {
+                onStartAndNavigate("autonomous", {
                   ...baseBody,
                   workspace: workspacePath,
-                  instruction: instruction.trim(),
+                  instruction,
                   interactionLevel,
-                }),
-            },
-          ]}
-        />
-      </div>
+                  startWith: "update-todo",
+                });
+              }}
+              batchItems={(instruction, interactionLevel) => [
+                {
+                  label: "Update TODOs only",
+                  onClick: () =>
+                    onStartAndNavigate("update-todo", {
+                      ...baseBody,
+                      workspace: workspacePath,
+                      instruction: instruction.trim(),
+                      interactionLevel,
+                    }),
+                },
+              ]}
+            />
+          </div>
 
-      <div className="space-y-3">
-        {todo.sections.length > 0
-          ? todo.sections.map((section, i) => (
-              <SectionBlock key={i} section={section} />
-            ))
-          : todo.items.map((item, i) => <TodoItemRow key={i} item={item} />)}
-      </div>
+          <div className="space-y-3">
+            {todo.sections.length > 0
+              ? todo.sections.map((section, i) => (
+                  <SectionBlock key={i} section={section} />
+                ))
+              : todo.items.map((item, i) => (
+                  <TodoItemRow key={i} item={item} />
+                ))}
+          </div>
+        </div>
+      )}
     </Card>
   );
 }
