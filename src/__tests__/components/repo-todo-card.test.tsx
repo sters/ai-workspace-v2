@@ -95,15 +95,8 @@ describe("RepoTodoCard collapsing", () => {
     return screen.getByRole("button", { name: /repo-a/ });
   }
 
-  it("starts expanded", () => {
+  it("starts collapsed, hiding the items and the update form", () => {
     renderCard(todoWithItems);
-    expect(toggle()).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("first item")).toBeInTheDocument();
-  });
-
-  it("hides the items and the update form when the repo name is clicked", () => {
-    renderCard(todoWithItems);
-    fireEvent.click(toggle());
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("first item")).not.toBeInTheDocument();
     expect(
@@ -113,16 +106,25 @@ describe("RepoTodoCard collapsing", () => {
 
   it("keeps the counts and the per-repo actions reachable while collapsed", () => {
     renderCard(todoWithItems);
-    fireEvent.click(toggle());
     expect(screen.getByText("0/1 done")).toBeInTheDocument();
     expect(screen.getByTitle("Autonomous")).toBeInTheDocument();
   });
 
-  it("expands again on a second click", () => {
+  it("shows the items and the update form when the repo name is clicked", () => {
     renderCard(todoWithItems);
-    fireEvent.click(toggle());
     fireEvent.click(toggle());
     expect(toggle()).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("first item")).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText(/Update TODOs for repo-a/),
+    ).toBeInTheDocument();
+  });
+
+  it("collapses again on a second click", () => {
+    renderCard(todoWithItems);
+    fireEvent.click(toggle());
+    fireEvent.click(toggle());
+    expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("first item")).not.toBeInTheDocument();
   });
 });
