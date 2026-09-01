@@ -40,7 +40,7 @@ export function RepoTodoCard({
   repoPath: string | undefined;
   onStartAndNavigate: (type: OperationType, body: Record<string, string>) => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const bodyId = `repo-todo-body-${todo.filename}`;
   const { openers } = useOpeners();
   const openerItems: DropdownItem[] = openers.map((opener) => ({
