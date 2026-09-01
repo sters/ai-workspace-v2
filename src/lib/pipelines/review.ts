@@ -24,6 +24,7 @@ import {
 } from "@/lib/workspace/review-baseline";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { readKnownFindings } from "@/lib/workspace/known-findings";
+import { findingsFilePath } from "@/lib/workspace/review-findings";
 import {
   execConstraintCommand,
   buildConstraintReport,
@@ -144,6 +145,9 @@ export async function buildReviewPipeline(input: {
         worktreePath: repo.worktreePath,
         repoChanges: repoChangesText,
         reviewFilePath: path.join(reviewDir, reviewFileName),
+        // Second deliverable: the same findings as data, so the review tab can
+        // offer them individually for posting on the PR as inline comments.
+        findingsFilePath: findingsFilePath(reviewDir, repo.repoPath, repo.repoName),
         knownFindings,
         reviewScope,
       }),

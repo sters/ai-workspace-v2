@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import useSWR from "swr";
 import type { WorkspaceSummary, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
 import type { WorkspacePullRequestsResult } from "@/types/pull-request";
+import type { ReviewFindingsResult } from "@/types/review-findings";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";
 import { fetcher } from "@/lib/api";
 
@@ -88,6 +89,30 @@ export function usePullRequests(name: string) {
     isLoading,
     error,
     refresh,
+  };
+}
+
+/**
+ * A review's structured findings, resolved against the PR they would be posted to.
+ *
+ * `revalidateOnFocus` is off because this read costs `gh` round trips and a
+ * `git diff` per repository, and it changes at the pace of a human reading a
+ * review — the tab has a Refresh button for the rest.
+ */
+export function useReviewFindings(name: string, timestamp: string | null) {
+  const url =
+    name && timestamp
+      ? `/api/workspaces/${encodeURIComponent(name)}/reviews/${timestamp}/findings`
+      : null;
+  const { data, error, isLoading, mutate } = useSWR<ReviewFindingsResult>(url, fetcher, {
+    revalidateOnFocus: false,
+  });
+
+  return {
+    repos: data?.repos ?? [],
+    isLoading,
+    error,
+    refresh: useCallback(() => mutate(), [mutate]),
   };
 }
 

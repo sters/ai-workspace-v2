@@ -48,6 +48,14 @@ const variants: Record<string, string> = {
     "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
   "verdict-unclear":
     "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  // Review finding severities. Red / amber / grey tracks the autonomous loop
+  // bar: only the first two clear it, and only they are ticked by default when
+  // findings are offered for posting on a PR.
+  "severity-critical":
+    "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  "severity-warning":
+    "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  "severity-suggestion": "bg-muted text-muted-foreground",
   // Muted variant (config editor "not found")
   muted: "bg-muted text-muted-foreground",
 };

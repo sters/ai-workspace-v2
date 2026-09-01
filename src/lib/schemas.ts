@@ -89,6 +89,25 @@ export const prCheckLogsSchema = z.object({
     .max(50, "too many checks"),
 });
 
+/**
+ * A post of selected review findings. Only ids and edited bodies cross the wire:
+ * the path, line and side are re-read server-side from the review's own findings
+ * file, so a client cannot aim a comment at a location the reviewer never named.
+ */
+export const postReviewCommentsSchema = z.object({
+  findings: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        body: z.string().optional(),
+      }),
+    )
+    .min(1, "at least one finding is required")
+    .max(50, "too many findings"),
+  /** Omitted or false leaves the review pending for a human to submit. */
+  submit: z.coerce.boolean().optional(),
+});
+
 export const createTodoSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   reviewTimestamp: z.string().min(1, "reviewTimestamp is required"),
