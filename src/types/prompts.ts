@@ -90,6 +90,12 @@ export interface CodeReviewerInput extends RepoPromptInput {
   readmeContent: string;
   repoChanges: string;
   reviewFilePath: string;
+  /**
+   * Where to write the machine-readable copy of the findings, which is what the
+   * review tab offers for posting on the PR as inline comments. Absent omits the
+   * second deliverable entirely.
+   */
+  findingsFilePath?: string;
   /** Raw `artifacts/known-findings.md` content, or "" / undefined when absent. */
   knownFindings?: string;
   /**

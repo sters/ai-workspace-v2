@@ -42,6 +42,38 @@ export function getCodeReviewerSystemPrompt(): string {
 
 5. **Write Review Report** to the specified file path
 
+6. **Write the findings file** to the JSON path the task gives, when it gives one. See below.
+
+### The Findings File
+
+The report is prose for a reader. The findings file is the same findings as data, so a human can tick individual ones and post them on the pull request as inline comments — which is the only thing that reads it. Write it after the report, as a JSON object:
+
+\`\`\`json
+{
+  "version": 1,
+  "findings": [
+    {
+      "path": "src/api/user.ts",
+      "line": 42,
+      "startLine": null,
+      "side": "RIGHT",
+      "severity": "warning",
+      "confidence": "high",
+      "title": "Rejection from fetchUser is unhandled",
+      "body": "\`fetchUser\` can reject and nothing catches it, so a network failure here becomes an unhandled rejection rather than the error state the caller renders.",
+      "suggestion": null
+    }
+  ]
+}
+\`\`\`
+
+- **One entry per finding you reported** under Critical Issues, Warnings or Suggestions, with the **same** severity and confidence as the report. Positive Feedback and \`(Recurring)\` findings are not findings to post — leave them out.
+- \`path\` is repository-relative. \`line\` is the line in the file **as it now stands** (\`side: "RIGHT"\`), which is what an inline comment anchors to; use \`"LEFT"\` and the pre-change line number only for a finding about code the change removed. \`line: null\` is fine for a finding about the file as a whole.
+- \`startLine\` marks the first line when the finding is about a range; otherwise \`null\`.
+- \`body\` is written **for the pull request**, not copied from the report: what is wrong, and what it causes, in two or three sentences. The reader is looking at the line, so do not restate it.
+- \`suggestion\` is replacement source for exactly the lines \`startLine\`..\`line\`, and only when the fix is that small and you are confident in it — it is rendered as a one-click applicable block. Otherwise \`null\`.
+- A finding you cannot place at a path does not belong in this file. Everything stays in the report either way, so leaving one out costs coverage nothing.
+
 ### Review Scope
 
 The task may split the changes into a **Change Context** section and a **Review Target** section. When it does, the Review Target is the branch's own work since the review named there, and it is what you report on. The Change Context is the branch as a whole, already reviewed in earlier sessions — it is there so you can tell *why* the target's code looks the way it does, not to be reviewed again.
@@ -141,7 +173,15 @@ Write the review report to: ${input.reviewFilePath}
 
 Read the review report template file at: workspace/${input.workspaceName}/templates/review-report-template.md
 Use it as the base structure for the report.
+${
+  input.findingsFilePath
+    ? `
+## Findings File
 
+Also write the structured findings to: ${input.findingsFilePath}
+`
+    : ""
+}
 ### Working Directory
 
 \`\`\`bash

@@ -11,6 +11,7 @@ import { MarkdownRenderer } from "../shared/content/markdown-renderer";
 import { Textarea } from "../shared/forms/textarea";
 import { InteractionLevelSelector } from "../shared/forms/interaction-level-selector";
 import { StatusText } from "../shared/feedback/status-text";
+import { ReviewFindingsList } from "./review-findings-list";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import type { InteractionLevel } from "@/types/prompts";
@@ -78,6 +79,8 @@ export function ReviewDetail({
           </div>
         </Card>
       )}
+
+      <ReviewFindingsList workspaceName={workspaceName} timestamp={timestamp} />
 
       {summary && (
         <div>
