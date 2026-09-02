@@ -314,13 +314,23 @@ export function ReviewFindingsList({
       return { ...prev, [id]: body };
     });
 
-  const selectAllPostable = () => {
-    const next = new Set<string>();
+  /**
+   * Everything that could be posted: a finding needs a PR to go on and must not
+   * already be there. Also the ceiling the toggle compares against, so a
+   * selection can never look short of "all" because of a row nobody can tick.
+   */
+  const postableIds = useMemo(() => {
+    const ids: string[] = [];
     for (const { repo, finding } of findingsById.values()) {
-      if (repo.pr && !finding.posted) next.add(finding.id);
+      if (repo.pr && !finding.posted) ids.push(finding.id);
     }
-    setSelectedIds(next);
-  };
+    return ids;
+  }, [findingsById]);
+
+  const allSelected = postableIds.length > 0 && selectedIds.size === postableIds.length;
+
+  const toggleAll = () =>
+    setSelectedIds(allSelected ? new Set() : new Set(postableIds));
 
   const handlePost = async () => {
     setIsPosting(true);
@@ -390,9 +400,14 @@ export function ReviewFindingsList({
           </StatusText>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" onClick={selectAllPostable} disabled={isRunning || isPosting}>
-            Select all
-          </Button>
+          {/* One button, not a Select all here and a Clear in the action bar:
+              undoing the default selection was otherwise a trip to the bottom of
+              a long list. */}
+          {postableIds.length > 0 && (
+            <Button variant="ghost" onClick={toggleAll} disabled={isRunning || isPosting}>
+              {allSelected ? "Clear selection" : `Select all (${postableIds.length})`}
+            </Button>
+          )}
           <Button variant="outline" onClick={() => refresh()} disabled={isPosting}>
             <RefreshCw className="h-3 w-3" /> Refresh
           </Button>
