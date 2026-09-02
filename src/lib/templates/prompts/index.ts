@@ -63,4 +63,9 @@ export {
   buildPrCommentValidatorPrompt,
   PR_COMMENT_VALIDATION_SCHEMA,
 } from "./pr-comment-validator";
+export {
+  getFindingGrounderSystemPrompt,
+  buildFindingGrounderPrompt,
+  FINDING_GROUNDING_SCHEMA,
+} from "./finding-grounder";
 export { buildTriagePrCommentsInstruction } from "./triage-pr-comments";

@@ -2,11 +2,13 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type {
   AnchoredReviewFinding,
+  FindingGrounding,
   FindingsTargetPr,
   RepoReviewFindings,
 } from "@/types/review-findings";
 
 const mockUseReviewFindings = vi.fn();
+const mockStartAndNavigate = vi.fn();
 const mockRefresh = vi.fn();
 let workspaceRunning = false;
 
@@ -15,6 +17,10 @@ vi.mock("@/hooks/use-running-operations", () => ({
     isWorkspaceRunning: () => workspaceRunning,
     isWorkspaceTypeRunning: () => false,
   }),
+}));
+
+vi.mock("@/hooks/use-start-and-navigate", () => ({
+  useStartAndNavigate: () => mockStartAndNavigate,
 }));
 
 vi.mock("@/hooks/use-workspace", () => ({
@@ -59,6 +65,21 @@ function finding(overrides: Partial<AnchoredReviewFinding> = {}): AnchoredReview
   };
 }
 
+function grounding(overrides: Partial<FindingGrounding> = {}): FindingGrounding {
+  return {
+    findingId: "id-warning",
+    repoName: "widgets",
+    holds: "yes",
+    scope: "pr",
+    evidence: ["src/a.ts:11"],
+    comment: "posted text",
+    reason: "confirmed",
+    posted: true,
+    groundedAt: "2026-09-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 function repo(overrides: Partial<RepoReviewFindings> = {}): RepoReviewFindings {
   return {
     repoName: "widgets",
@@ -69,9 +90,10 @@ function repo(overrides: Partial<RepoReviewFindings> = {}): RepoReviewFindings {
   };
 }
 
-function setRepos(repos: RepoReviewFindings[]) {
+function setData(repos: RepoReviewFindings[], groundings: Record<string, FindingGrounding> = {}) {
   mockUseReviewFindings.mockReturnValue({
     repos,
+    groundings,
     isLoading: false,
     error: undefined,
     refresh: mockRefresh,
@@ -85,11 +107,7 @@ function renderList() {
 beforeEach(() => {
   vi.clearAllMocks();
   workspaceRunning = false;
-  setRepos([repo()]);
-  global.fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ reviews: [], results: [] }),
-  }) as unknown as typeof fetch;
+  setData([repo()]);
 });
 
 describe("ReviewFindingsList", () => {
@@ -103,7 +121,7 @@ describe("ReviewFindingsList", () => {
   // The pre-selection is the "not everything" part of the feature: the list is
   // complete, and only what a human would act on starts ticked.
   it("pre-selects Critical and Warning but not Suggestions", () => {
-    setRepos([
+    setData([
       repo({
         findings: [
           finding({ id: "c", severity: "critical" }),
@@ -120,16 +138,14 @@ describe("ReviewFindingsList", () => {
     expect(screen.getByText("2 findings selected")).toBeInTheDocument();
   });
 
-  // Low confidence means the reviewer could not establish the mechanism, which
-  // is not something to assert on someone else's PR unprompted.
   it("leaves a low-confidence finding unticked even at Warning", () => {
-    setRepos([repo({ findings: [finding({ confidence: "low" })] })]);
+    setData([repo({ findings: [finding({ confidence: "low" })] })]);
     renderList();
     expect(screen.getByRole("checkbox")).not.toBeChecked();
   });
 
   it("shows a finding already on the PR as posted and refuses to re-select it", () => {
-    setRepos([repo({ findings: [finding({ posted: true })] })]);
+    setData([repo({ findings: [finding({ posted: true })] })]);
     renderList();
     expect(screen.getByText("posted")).toBeInTheDocument();
     const box = screen.getByRole("checkbox");
@@ -138,7 +154,7 @@ describe("ReviewFindingsList", () => {
   });
 
   it("says why a finding cannot be posted inline", () => {
-    setRepos([
+    setData([
       repo({
         findings: [
           finding({
@@ -153,77 +169,28 @@ describe("ReviewFindingsList", () => {
   });
 
   it("disables selection for a repository whose branch has no PR", () => {
-    setRepos([repo({ pr: null, problem: "No pull request readable for this branch" })]);
+    setData([repo({ pr: null, problem: "No pull request readable for this branch" })]);
     renderList();
     expect(screen.getByText("no PR")).toBeInTheDocument();
     expect(screen.getByRole("checkbox")).toBeDisabled();
-    expect(
-      screen.getByText("No pull request readable for this branch"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No pull request readable for this branch")).toBeInTheDocument();
   });
 
   it("flags a pending review, which would make the post fail", () => {
-    setRepos([repo({ pr: targetPr({ hasPendingReview: true }) })]);
+    setData([repo({ pr: targetPr({ hasPendingReview: true }) })]);
     renderList();
     expect(screen.getByText("pending review exists")).toBeInTheDocument();
   });
 
-  // The anchors came from the local diff, so a worktree that is not at the PR
-  // head means the line numbers on screen are not the ones GitHub will use.
   it("flags a worktree behind the PR head", () => {
-    setRepos([repo({ pr: targetPr({ staleWorktree: true }) })]);
+    setData([repo({ pr: targetPr({ staleWorktree: true }) })]);
     renderList();
     expect(screen.getByText("worktree behind PR head")).toBeInTheDocument();
   });
 
-  it("posts the selected ids and leaves the review pending by default", async () => {
-    renderList();
-    fireEvent.click(screen.getByRole("button", { name: /post as pending/i }));
-
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    const [url, init] = (global.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(url).toContain("/reviews/20260901-101010/post-comments");
-    expect(JSON.parse(init.body)).toEqual({
-      submit: false,
-      findings: [{ id: "id-warning" }],
-    });
-  });
-
-  it("submits immediately only when asked", async () => {
-    renderList();
-    fireEvent.click(screen.getByLabelText(/submit immediately/i));
-    fireEvent.click(screen.getByRole("button", { name: /post & submit/i }));
-
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    const [, init] = (global.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(JSON.parse(init.body).submit).toBe(true);
-  });
-
-  it("sends the body the human edited", async () => {
-    renderList();
-    fireEvent.click(screen.getByRole("button", { name: /edit comment/i }));
-    fireEvent.change(screen.getByRole("textbox"), { target: { value: "my own wording" } });
-    fireEvent.click(screen.getByRole("button", { name: /^done$/i }));
-    fireEvent.click(screen.getByRole("button", { name: /post as pending/i }));
-
-    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    const [, init] = (global.fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
-    expect(JSON.parse(init.body).findings).toEqual([
-      { id: "id-warning", body: "my own wording" },
-    ]);
-  });
-
-  it("blocks posting while an operation is running for the workspace", () => {
-    workspaceRunning = true;
-    renderList();
-    expect(screen.getByRole("button", { name: /post as pending/i })).toBeDisabled();
-  });
-
-  // One button rather than a Select all at the top and a Clear at the bottom of
-  // a long list: undoing the default selection was a trip to the action bar.
   describe("the select-all toggle", () => {
     it("offers to select everything postable, counted", () => {
-      setRepos([
+      setData([
         repo({
           findings: [
             finding({ id: "w", severity: "warning" }),
@@ -237,20 +204,16 @@ describe("ReviewFindingsList", () => {
     });
 
     it("turns into a clear once everything is selected", () => {
-      setRepos([repo({ findings: [finding({ severity: "warning" })] })]);
+      setData([repo({ findings: [finding({ severity: "warning" })] })]);
       renderList();
-      // The default selection already covers the only finding.
-      const button = screen.getByRole("button", { name: "Clear selection" });
-      fireEvent.click(button);
+      fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
       expect(screen.queryByText(/finding.* selected/)).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Select all (1)" })).toBeInTheDocument();
     });
 
     it("counts neither a posted finding nor a repository without a PR", () => {
-      setRepos([
+      setData([
         repo({
-          // A Suggestion, so the default selection leaves the toggle offering
-          // rather than clearing and the count is the thing on screen.
           findings: [
             finding({ id: "open", severity: "suggestion" }),
             finding({ id: "done", posted: true }),
@@ -263,14 +226,115 @@ describe("ReviewFindingsList", () => {
     });
 
     it("is not offered when nothing could be posted", () => {
-      setRepos([repo({ pr: null, findings: [finding()] })]);
+      setData([repo({ pr: null, findings: [finding()] })]);
       renderList();
       expect(screen.queryByRole("button", { name: /select all/i })).not.toBeInTheDocument();
     });
   });
 
+  // The button no longer posts directly: each selected finding is checked against
+  // the pushed code first, and that check decides what goes out.
+  describe("starting the grounding operation", () => {
+    it("sends the selected ids and leaves the review pending by default", async () => {
+      renderList();
+      fireEvent.click(screen.getByRole("button", { name: /ground & post/i }));
+
+      await waitFor(() => expect(mockStartAndNavigate).toHaveBeenCalled());
+      expect(mockStartAndNavigate).toHaveBeenCalledWith("post-review-findings", {
+        workspace: "feat-x",
+        reviewTimestamp: "20260901-101010",
+        findingIds: ["id-warning"],
+        submit: "false",
+      });
+    });
+
+    it("submits immediately only when asked", async () => {
+      renderList();
+      fireEvent.click(screen.getByLabelText(/submit immediately/i));
+      fireEvent.click(screen.getByRole("button", { name: /ground & post/i }));
+
+      await waitFor(() => expect(mockStartAndNavigate).toHaveBeenCalled());
+      expect(mockStartAndNavigate.mock.calls[0][1].submit).toBe("true");
+    });
+
+    it("blocks starting while an operation is running for the workspace", () => {
+      workspaceRunning = true;
+      renderList();
+      expect(screen.getByRole("button", { name: /ground & post/i })).toBeDisabled();
+    });
+  });
+
+  // A verdict from a previous post is the record of a decision. Showing it is
+  // what stops the same refuted finding being re-grounded on every visit.
+  describe("a previous run's verdicts", () => {
+    it("shows why a finding was refuted and leaves it unticked", () => {
+      setData([repo()], {
+        "id-warning": grounding({
+          holds: "no",
+          comment: "",
+          reason: "handled by the caller at src/b.ts:10",
+          posted: false,
+        }),
+      });
+      renderList();
+      expect(screen.getByText("refuted")).toBeInTheDocument();
+      expect(screen.getByText(/handled by the caller/)).toBeInTheDocument();
+      expect(screen.getByRole("checkbox")).not.toBeChecked();
+    });
+
+    it("names a local-only problem as such", () => {
+      setData([repo()], {
+        "id-warning": grounding({
+          scope: "local-only",
+          comment: "",
+          reason: "the change is not committed",
+          posted: false,
+        }),
+      });
+      renderList();
+      expect(screen.getByText("local-only")).toBeInTheDocument();
+    });
+
+    it("names a pre-existing defect as such", () => {
+      setData([repo()], {
+        "id-warning": grounding({ scope: "pre-existing", comment: "", posted: false }),
+      });
+      renderList();
+      expect(screen.getByText("pre-existing")).toBeInTheDocument();
+    });
+
+    it("names what the code could not settle", () => {
+      setData([repo()], {
+        "id-warning": grounding({ holds: "unclear", comment: "", posted: false }),
+      });
+      renderList();
+      expect(screen.getByText("unclear")).toBeInTheDocument();
+    });
+
+    // Re-selectable on purpose: a verdict is a record, not a lock, and the
+    // branch may have moved since.
+    it("still allows re-selecting a refuted finding by hand", () => {
+      setData([repo()], {
+        "id-warning": grounding({ holds: "no", comment: "", posted: false }),
+      });
+      renderList();
+      const box = screen.getByRole("checkbox");
+      expect(box).not.toBeDisabled();
+      fireEvent.click(box);
+      expect(box).toBeChecked();
+    });
+
+    it("shows the comment a grounding actually posted", () => {
+      setData([repo({ findings: [finding({ posted: true })] })], {
+        "id-warning": grounding({ comment: "この reject は捕捉されていません。" }),
+      });
+      renderList();
+      expect(screen.getByText(/この reject は捕捉されていません/)).toBeInTheDocument();
+    });
+  });
+
   it("says there is nothing to post for a review with no structured findings", () => {
-    setRepos([repo({ findings: [] })]);
+    setData([repo({ findings: [] })]);
     renderList();
     expect(screen.getByText(/recorded no structured findings/i)).toBeInTheDocument();
   });

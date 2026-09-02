@@ -110,6 +110,7 @@ export function useReviewFindings(name: string, timestamp: string | null) {
 
   return {
     repos: data?.repos ?? [],
+    groundings: data?.groundings ?? {},
     isLoading,
     error,
     refresh: useCallback(() => mutate(), [mutate]),

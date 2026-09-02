@@ -1,4 +1,5 @@
 import type { PrReviewThread } from "./pull-request";
+import type { AnchoredReviewFinding } from "./review-findings";
 import type { WorkspaceRepo } from "./workspace";
 
 export type InteractionLevel = "low" | "mid" | "high";
@@ -103,6 +104,23 @@ export interface CodeReviewerInput extends RepoPromptInput {
    * means no usable baseline, and the whole branch is the review target.
    */
   reviewScope?: ReviewScope;
+}
+
+/**
+ * Finding-grounder input — checks one of *our* review findings before it becomes
+ * a comment on a PR. The outbound mirror of `PrCommentValidatorInput`.
+ */
+export interface FindingGrounderInput {
+  workspaceName: string;
+  repoName: string;
+  repoPath: string;
+  worktreePath: string;
+  baseBranch: string;
+  prUrl: string;
+  prTitle?: string;
+  finding: AnchoredReviewFinding;
+  /** Existing review comments on the PR, as the sample of its conventions. */
+  conventionSamples?: { author: string; body: string }[];
 }
 
 /** Requested-fix verifier input — checks a previous cycle's asks against the code. */

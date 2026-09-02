@@ -30,6 +30,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.VERIFY_README]: "opus",
   [STEP_TYPES.CRITERIA_FEASIBILITY]: "opus",
   [STEP_TYPES.VALIDATE_PR_COMMENT]: "opus",
+  [STEP_TYPES.GROUND_FINDING]: "opus",
   [STEP_TYPES.CODE_REVIEW]: "opus",
   [STEP_TYPES.REVIEW_TODOS]: "opus",
   [STEP_TYPES.COORDINATE_TODOS]: "opus",
@@ -165,6 +166,15 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // open hunt. A human presses the button and reads the verdict, so a wrong one
   // costs a second look, not a cycle.
   [STEP_TYPES.VALIDATE_PR_COMMENT]: "medium",
+  // The mirror of validate-pr-comment, pointed outward: does *our* review finding
+  // hold against the pushed code, and does it deserve a comment on the PR. Same
+  // shape, so the same rung — the finding names the file and the claim, so the
+  // search is directed. What it does not earn is `high`: the claim is already
+  // written and the job is to confirm or refute it, not to hunt. What makes a
+  // wrong answer here more expensive than validate's is that nobody reads it
+  // before it reaches someone else's PR, which the prompt's bias toward
+  // `unclear` answers rather than a rung.
+  [STEP_TYPES.GROUND_FINDING]: "medium",
   // Applies a requested edit to one document, and is forbidden from touching code.
   // The document it rewrites is the run's done-contract, but the edit itself is
   // named in the request and lands in one file, so there is nothing to enumerate.
