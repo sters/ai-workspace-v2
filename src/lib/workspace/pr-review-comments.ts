@@ -29,12 +29,6 @@ const GH_TIMEOUT_MS = 60_000;
 /** Well past what any PR carries, and one page — see `extractPostedIds`. */
 const PER_PAGE = 100;
 
-const SEVERITY_LABEL: Record<AnchoredReviewFinding["severity"], string> = {
-  critical: "Critical",
-  warning: "Warning",
-  suggestion: "Suggestion",
-};
-
 /**
  * The tag that ties a posted comment back to the finding it came from.
  *
@@ -86,25 +80,28 @@ export function parsePendingReviewId(raw: string): number | null {
 /**
  * The comment as it will appear on the PR.
  *
- * The severity label leads because the reader's first question is how much this
- * matters, and confidence is stated whenever it is not high — the reviewer's read
- * of whether the mechanism is real is something a human on the PR is entitled to
- * weigh rather than receive as a flat assertion.
+ * `comment` is the grounding pass's own text, written in the repository's
+ * convention, and nothing is prepended to it: an English severity label or a
+ * `(confidence: low)` note would undo exactly what that pass is for. Urgency is
+ * the comment's own job to convey, in the repository's words.
+ *
+ * The two additions are mechanical. A location line, only when the comment could
+ * not be anchored to the line it is about — a file-level or body comment has lost
+ * it, and without it the reader cannot find what is being discussed. And the
+ * marker, which is how a re-run knows this finding is already on the PR.
  */
 export function buildCommentBody(
   finding: AnchoredReviewFinding,
-  overrideBody?: string,
+  comment: string,
 ): string {
-  const parts = [`**${SEVERITY_LABEL[finding.severity]}**`];
-  // An inline comment already sits on the line; anything else has lost it, and
-  // without it the reader cannot find what is being talked about.
+  const lines: string[] = [];
   if (finding.anchor !== "inline") {
-    parts.push(`\`${finding.path}${finding.line !== null ? `:${finding.line}` : ""}\``);
+    lines.push(
+      `\`${finding.path}${finding.line !== null ? `:${finding.line}` : ""}\``,
+      "",
+    );
   }
-  if (finding.confidence !== "high") parts.push(`(confidence: ${finding.confidence})`);
-
-  const text = (overrideBody ?? finding.body).trim();
-  const lines = [parts.join(" "), "", text];
+  lines.push(comment.trim());
   if (finding.suggestion) {
     lines.push("", "```suggestion", finding.suggestion, "```");
   }
@@ -138,10 +135,10 @@ export interface ReviewPayload {
  */
 export function buildReviewPayload(input: {
   findings: AnchoredReviewFinding[];
+  /** The grounding pass's comment per finding id. A finding without one is not posted. */
+  comments: Record<string, string>;
   commitSha: string;
   submit: boolean;
-  /** Bodies the human edited before sending, by finding id. */
-  bodies?: Record<string, string>;
 }): { payload: ReviewPayload; results: PostedFindingResult[]; hasContent: boolean } {
   const comments: ReviewCommentPayload[] = [];
   const bodyFindings: string[] = [];
@@ -157,7 +154,19 @@ export function buildReviewPayload(input: {
       continue;
     }
 
-    const body = buildCommentBody(finding, input.bodies?.[finding.id]);
+    const grounded = input.comments[finding.id];
+    if (grounded === undefined || grounded.trim() === "") {
+      // The grounding pass decides what gets posted, so a finding it wrote no
+      // comment for is not one to fall back to the reviewer's own wording on.
+      results.push({
+        id: finding.id,
+        status: "failed",
+        reason: "no grounded comment was produced for this finding",
+      });
+      continue;
+    }
+
+    const body = buildCommentBody(finding, grounded);
 
     if (finding.anchor === "pr-body") {
       bodyFindings.push(`- ${body.split("\n").filter((l) => l !== "").join(" ")}`);
@@ -346,14 +355,14 @@ export async function postReviewComments(input: {
   pr: FindingsTargetPr;
   worktreePath: string;
   findings: AnchoredReviewFinding[];
-  bodies?: Record<string, string>;
+  comments: Record<string, string>;
   submit: boolean;
 }): Promise<PostCommentsResult> {
   const { payload, results, hasContent } = buildReviewPayload({
     findings: input.findings,
+    comments: input.comments,
     commitSha: input.pr.headSha,
     submit: input.submit,
-    bodies: input.bodies,
   });
 
   if (!hasContent) {

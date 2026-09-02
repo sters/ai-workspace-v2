@@ -1,20 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { useReviewFindings } from "@/hooks/use-workspace";
 import { useRunningOperations } from "@/hooks/use-running-operations";
+import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { Button } from "../shared/buttons/button";
 import { Card } from "../shared/containers/card";
 import { Callout } from "../shared/containers/callout";
 import { MarkdownRenderer } from "../shared/content/markdown-renderer";
 import { StatusBadge } from "../shared/feedback/status-badge";
 import { StatusText } from "../shared/feedback/status-text";
-import { Textarea } from "../shared/forms/textarea";
 import { cn } from "@/lib/utils";
 import type {
   AnchoredReviewFinding,
-  PostCommentsResponse,
+  FindingGrounding,
   RepoReviewFindings,
 } from "@/types/review-findings";
 
@@ -25,44 +25,61 @@ const ANCHOR_LABEL: Record<AnchoredReviewFinding["anchor"], string> = {
 };
 
 const ANCHOR_HINT: Record<AnchoredReviewFinding["anchor"], string> = {
-  inline: "Will be posted on this line",
-  file: "GitHub cannot anchor this to a line, so it goes on the file",
-  "pr-body": "Not in the PR's diff, so it goes in the review's body",
+  inline: "Would be posted on this line",
+  file: "GitHub cannot anchor this to a line, so it would go on the file",
+  "pr-body": "Not in the PR's diff, so it would go in the review's body",
 };
+
+/**
+ * How a previous run's verdict reads on the row.
+ *
+ * Named by *why* it did not go out rather than by the field it came from: the
+ * reader's question is what happened to this finding, and "refuted" or
+ * "local-only" answers it where `holds: no` does not.
+ */
+function groundingLabel(grounding: FindingGrounding): string {
+  if (grounding.posted) return "posted";
+  if (grounding.holds === "no") return "refuted";
+  if (grounding.holds === "unclear") return "unclear";
+  if (grounding.scope === "local-only") return "local-only";
+  if (grounding.scope === "pre-existing") return "pre-existing";
+  return "not posted";
+}
 
 /**
  * Which findings are ticked when the list first renders.
  *
  * Critical and Warning at medium confidence or better — the same bar the
  * autonomous gate loops on. Suggestions and low-confidence findings render but
- * stay unticked: they are the ones whose posting would fill someone else's PR
- * with things nobody has to act on, which is the whole reason this is a selection
- * rather than a "post the review" button.
+ * stay unticked, and so does anything a previous run already checked and
+ * declined: re-grounding a refuted finding on every visit spends a child to
+ * reach the verdict already on the row.
  */
-function isDefaultSelected(finding: AnchoredReviewFinding, hasPr: boolean): boolean {
+function isDefaultSelected(
+  finding: AnchoredReviewFinding,
+  hasPr: boolean,
+  grounding: FindingGrounding | undefined,
+): boolean {
   if (!hasPr || finding.posted) return false;
+  if (grounding) return false;
   if (finding.confidence === "low") return false;
   return finding.severity === "critical" || finding.severity === "warning";
 }
 
 function FindingRow({
   finding,
+  grounding,
   selected,
   onToggle,
-  editedBody,
-  onEditBody,
   disabled,
 }: {
   finding: AnchoredReviewFinding;
+  grounding: FindingGrounding | undefined;
   selected: boolean;
   onToggle: (id: string) => void;
-  editedBody: string | undefined;
-  onEditBody: (id: string, body: string | undefined) => void;
   disabled: boolean;
 }) {
-  const [isEditing, setIsEditing] = useState(false);
   const location = `${finding.path}${finding.line !== null ? `:${finding.line}` : ""}`;
-  const body = editedBody ?? finding.body;
 
   return (
     <div
@@ -110,6 +127,14 @@ function FindingRow({
                 title="Anchored to the pre-change side of the diff"
               />
             )}
+            {grounding && !finding.posted && (
+              <StatusBadge
+                label={groundingLabel(grounding)}
+                variant={grounding.posted ? "completed" : "verdict-invalid"}
+                shape="square"
+                title={`Checked against the code ${grounding.groundedAt}`}
+              />
+            )}
             {finding.posted && (
               <StatusBadge
                 label="posted"
@@ -121,48 +146,33 @@ function FindingRow({
           </div>
 
           <p className="text-sm font-medium">{finding.title}</p>
+          <div className="mt-0.5 text-sm">
+            <MarkdownRenderer content={finding.body} />
+          </div>
 
-          {isEditing ? (
-            <div className="mt-1.5 space-y-2">
-              <Textarea
-                value={body}
-                onChange={(e) => onEditBody(finding.id, e.target.value)}
-                rows={4}
-                disabled={disabled}
-              />
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" onClick={() => setIsEditing(false)}>
-                  Done
-                </Button>
-                {editedBody !== undefined && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      onEditBody(finding.id, undefined);
-                      setIsEditing(false);
-                    }}
-                  >
-                    Revert
-                  </Button>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="mt-0.5 text-sm">
-              <MarkdownRenderer content={body} />
-              {finding.suggestion && (
-                <pre className="mt-1.5 overflow-x-auto rounded-md border bg-muted/50 p-2 text-xs">
-                  <code>{finding.suggestion}</code>
-                </pre>
+          {grounding && (
+            <div className="mt-2 rounded-md border border-dashed p-2.5 text-xs">
+              <p className="mb-1 font-medium">
+                {grounding.posted
+                  ? "Posted after checking against the code"
+                  : `Not posted — ${groundingLabel(grounding)}`}
+              </p>
+              {grounding.reason && (
+                <p className="text-muted-foreground">{grounding.reason}</p>
               )}
-              <div className="mt-1 flex items-center gap-2">
-                <Button variant="ghost" onClick={() => setIsEditing(true)} disabled={disabled}>
-                  Edit comment
-                </Button>
-                {editedBody !== undefined && (
-                  <StatusText className="text-xs">edited</StatusText>
-                )}
-              </div>
+              {grounding.posted && grounding.comment && (
+                <div className="mt-1.5 border-t pt-1.5">
+                  <MarkdownRenderer content={grounding.comment} />
+                </div>
+              )}
+              {grounding.evidence.length > 0 && (
+                <p className="mt-1 text-muted-foreground">
+                  Evidence:{" "}
+                  {grounding.evidence.map((e) => (
+                    <code key={e} className="mr-1.5">{e}</code>
+                  ))}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -173,17 +183,15 @@ function FindingRow({
 
 function RepoSection({
   repo,
+  groundings,
   selectedIds,
   onToggle,
-  edited,
-  onEditBody,
   disabled,
 }: {
   repo: RepoReviewFindings;
+  groundings: Record<string, FindingGrounding>;
   selectedIds: Set<string>;
   onToggle: (id: string) => void;
-  edited: Record<string, string>;
-  onEditBody: (id: string, body: string | undefined) => void;
   disabled: boolean;
 }) {
   return (
@@ -233,10 +241,9 @@ function RepoSection({
         <FindingRow
           key={finding.id}
           finding={finding}
+          grounding={groundings[finding.id]}
           selected={selectedIds.has(finding.id)}
           onToggle={onToggle}
-          editedBody={edited[finding.id]}
-          onEditBody={onEditBody}
           disabled={disabled || !repo.pr}
         />
       ))}
@@ -245,12 +252,17 @@ function RepoSection({
 }
 
 /**
- * The review's findings, offered one by one for posting on the PR.
+ * The review's findings, offered for posting on the PR.
  *
- * The list is complete — every finding the reviewer recorded is here, at the
- * severity it gave — and the *selection* is what narrows it. That split is
- * deliberate: `REVIEW_COVERAGE_POLICY` has the reviewer report everything
- * precisely so filtering happens downstream, and here the filter is a human.
+ * The selection is a set of **candidates**, not of comments. Each one is checked
+ * against the pushed code by its own agent, and that check decides whether it is
+ * posted at all and writes the comment in the repository's own conventions — a
+ * review finding is a claim, and `REVIEW_COVERAGE_POLICY` has the reviewer report
+ * claims it is unsure of on purpose.
+ *
+ * The list itself stays complete for the same reason: filtering belongs
+ * downstream, and here downstream is a human choosing candidates and then an
+ * agent checking them.
  */
 export function ReviewFindingsList({
   workspaceName,
@@ -259,19 +271,24 @@ export function ReviewFindingsList({
   workspaceName: string;
   timestamp: string;
 }) {
-  const { repos, isLoading, error, refresh } = useReviewFindings(workspaceName, timestamp);
+  const { repos, groundings, isLoading, error, refresh } = useReviewFindings(
+    workspaceName,
+    timestamp,
+  );
   const { isWorkspaceRunning } = useRunningOperations();
+  const startAndNavigate = useStartAndNavigate(workspaceName);
   // The anchors were resolved against the worktree's diff, so an operation
   // editing it means the line numbers on screen are not the ones that would be
-  // posted.
+  // posted — and the grounding children would read that tree mid-edit.
   const isRunning = isWorkspaceRunning(workspaceName);
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [edited, setEdited] = useState<Record<string, string>>({});
+  // The selection carries the finding set it was seeded for, so re-seeding is a
+  // comparison during render rather than an effect — see below.
+  const [selection, setSelection] = useState<{ key: string; ids: Set<string> }>({
+    key: "",
+    ids: new Set(),
+  });
   const [submitNow, setSubmitNow] = useState(false);
-  const [isPosting, setIsPosting] = useState(false);
-  const [result, setResult] = useState<PostCommentsResponse | null>(null);
-  const [postError, setPostError] = useState<string | null>(null);
 
   const withFindings = useMemo(() => repos.filter((r) => r.findings.length > 0), [repos]);
 
@@ -283,36 +300,34 @@ export function ReviewFindingsList({
     return map;
   }, [withFindings]);
 
-  // Seed the default selection once per set of findings. Keyed on the ids so a
-  // refresh that changed nothing does not undo the human's own ticking.
+  // Keyed on the ids, not on the fetch: a refresh that changed nothing must not
+  // undo the human's own ticking.
   const seedKey = useMemo(() => [...findingsById.keys()].sort().join(","), [findingsById]);
-  const seededRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (seededRef.current === seedKey) return;
-    seededRef.current = seedKey;
-    const next = new Set<string>();
+
+  const defaultIds = useMemo(() => {
+    const ids = new Set<string>();
     for (const { repo, finding } of findingsById.values()) {
-      if (isDefaultSelected(finding, repo.pr !== null)) next.add(finding.id);
-    }
-    setSelectedIds(next);
-  }, [seedKey, findingsById]);
-
-  const toggle = (id: string) =>
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
-  const onEditBody = (id: string, body: string | undefined) =>
-    setEdited((prev) => {
-      if (body === undefined) {
-        const { [id]: _dropped, ...rest } = prev;
-        return rest;
+      if (isDefaultSelected(finding, repo.pr !== null, groundings[finding.id])) {
+        ids.add(finding.id);
       }
-      return { ...prev, [id]: body };
-    });
+    }
+    return ids;
+  }, [findingsById, groundings]);
+
+  // Adjusted during render rather than in an effect: the default selection is
+  // derived from the data, and an effect would paint one frame of the wrong
+  // selection before correcting it.
+  if (selection.key !== seedKey) setSelection({ key: seedKey, ids: defaultIds });
+  const selectedIds = selection.key === seedKey ? selection.ids : defaultIds;
+
+  const setSelectedIds = (ids: Set<string>) => setSelection({ key: seedKey, ids });
+
+  const toggle = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
 
   /**
    * Everything that could be posted: a finding needs a PR to go on and must not
@@ -329,38 +344,15 @@ export function ReviewFindingsList({
 
   const allSelected = postableIds.length > 0 && selectedIds.size === postableIds.length;
 
-  const toggleAll = () =>
-    setSelectedIds(allSelected ? new Set() : new Set(postableIds));
+  const toggleAll = () => setSelectedIds(allSelected ? new Set() : new Set(postableIds));
 
-  const handlePost = async () => {
-    setIsPosting(true);
-    setPostError(null);
-    setResult(null);
-    try {
-      const res = await fetch(
-        `/api/workspaces/${encodeURIComponent(workspaceName)}/reviews/${timestamp}/post-comments`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            submit: submitNow,
-            findings: [...selectedIds].map((id) => ({
-              id,
-              ...(edited[id] !== undefined ? { body: edited[id] } : {}),
-            })),
-          }),
-        },
-      );
-      if (!res.ok) throw new Error(await res.text());
-      setResult((await res.json()) as PostCommentsResponse);
-      setSelectedIds(new Set());
-      // Re-read so the findings that landed come back marked posted.
-      await refresh();
-    } catch (err) {
-      setPostError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsPosting(false);
-    }
+  const handleStart = async () => {
+    await startAndNavigate("post-review-findings", {
+      workspace: workspaceName,
+      reviewTimestamp: timestamp,
+      findingIds: [...selectedIds],
+      submit: String(submitNow),
+    });
   };
 
   if (isLoading) return <StatusText>Loading findings…</StatusText>;
@@ -385,18 +377,14 @@ export function ReviewFindingsList({
     );
   }
 
-  const failures = result?.results.filter((r) => r.status === "failed") ?? [];
-  const posted = result?.results.filter((r) => r.status === "posted").length ?? 0;
-  const skipped = result?.results.filter((r) => r.status === "skipped").length ?? 0;
-
   return (
     <div className="space-y-4 pb-24">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-medium">Post findings on the PR</h3>
           <StatusText className="text-xs">
-            Ticked findings are posted as one review per repository. Critical and Warning are
-            pre-selected; the rest are here to be chosen.
+            Each ticked finding is checked against the pushed code first; only the ones that hold
+            and belong to this PR are commented, in the repository&apos;s own conventions.
           </StatusText>
         </div>
         <div className="flex items-center gap-2">
@@ -404,69 +392,24 @@ export function ReviewFindingsList({
               undoing the default selection was otherwise a trip to the bottom of
               a long list. */}
           {postableIds.length > 0 && (
-            <Button variant="ghost" onClick={toggleAll} disabled={isRunning || isPosting}>
+            <Button variant="ghost" onClick={toggleAll} disabled={isRunning}>
               {allSelected ? "Clear selection" : `Select all (${postableIds.length})`}
             </Button>
           )}
-          <Button variant="outline" onClick={() => refresh()} disabled={isPosting}>
+          <Button variant="outline" onClick={() => refresh()}>
             <RefreshCw className="h-3 w-3" /> Refresh
           </Button>
         </div>
       </div>
 
-      {result && (
-        <Callout variant={failures.length > 0 ? "error" : "info"}>
-          <p className="text-sm font-medium">
-            {posted} comment{posted === 1 ? "" : "s"} posted
-            {skipped > 0 && `, ${skipped} already on the PR`}
-            {failures.length > 0 && `, ${failures.length} failed`}
-          </p>
-          {result.reviews.map((review) => (
-            <StatusText key={review.repoName} className="mt-1 block text-xs">
-              <span className="font-medium">{review.repoName}</span>:{" "}
-              {review.problem ??
-                (review.pending
-                  ? "left pending — submit it on GitHub to publish"
-                  : "submitted")}
-              {review.reviewUrl && (
-                <>
-                  {" "}
-                  <a
-                    href={review.reviewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                  >
-                    open on GitHub
-                  </a>
-                </>
-              )}
-            </StatusText>
-          ))}
-          {failures.map((f) => (
-            <StatusText key={f.id} className="mt-1 block text-xs">
-              {f.id}: {f.reason}
-            </StatusText>
-          ))}
-        </Callout>
-      )}
-
-      {postError && (
-        <Callout variant="error">
-          <p className="text-sm font-medium">Posting failed</p>
-          <StatusText className="mt-1">{postError}</StatusText>
-        </Callout>
-      )}
-
       {withFindings.map((repo) => (
         <RepoSection
           key={repo.repoName}
           repo={repo}
+          groundings={groundings}
           selectedIds={selectedIds}
           onToggle={toggle}
-          edited={edited}
-          onEditBody={onEditBody}
-          disabled={isRunning || isPosting}
+          disabled={isRunning}
         />
       ))}
 
@@ -485,21 +428,21 @@ export function ReviewFindingsList({
                   type="checkbox"
                   checked={submitNow}
                   onChange={(e) => setSubmitNow(e.target.checked)}
-                  disabled={isRunning || isPosting}
+                  disabled={isRunning}
                 />
                 Submit immediately
               </label>
               <Button
                 variant="primary"
-                disabled={isRunning || isPosting}
-                onClick={handlePost}
+                disabled={isRunning}
+                onClick={handleStart}
                 title={
                   submitNow
-                    ? "Post and publish the review on the PR"
-                    : "Post as a pending review — you submit it on GitHub"
+                    ? "Check each finding against the code, then publish the surviving comments"
+                    : "Check each finding against the code, then leave the surviving comments in a pending review"
                 }
               >
-                {isPosting ? "Posting…" : submitNow ? "Post & submit" : "Post as pending"}
+                Ground &amp; post
               </Button>
             </div>
             {isRunning && (

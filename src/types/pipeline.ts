@@ -24,6 +24,7 @@ export const STEP_TYPES = {
   README_CLARITY_GATE: "readme-clarity-gate",
   CRITERIA_FEASIBILITY: "criteria-feasibility",
   VALIDATE_PR_COMMENT: "validate-pr-comment",
+  GROUND_FINDING: "ground-finding",
   /** Code candidates: picks a winner AND merges implementations in the worktree. */
   BEST_OF_N_REVIEWER: "best-of-n-reviewer",
   /** Markdown candidates: picks a winner / decides to synthesize, writes nothing. */

@@ -90,18 +90,17 @@ export const prCheckLogsSchema = z.object({
 });
 
 /**
- * A post of selected review findings. Only ids and edited bodies cross the wire:
- * the path, line and side are re-read server-side from the review's own findings
- * file, so a client cannot aim a comment at a location the reviewer never named.
+ * A post of selected review findings. Only ids cross the wire: everything that
+ * decides where a comment lands is re-read server-side from the review's own
+ * findings file, and the comment text itself is written by the grounding pass, so
+ * a client can neither aim a comment at a location the reviewer never named nor
+ * choose its wording.
  */
-export const postReviewCommentsSchema = z.object({
-  findings: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        body: z.string().optional(),
-      }),
-    )
+export const postReviewFindingsSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  reviewTimestamp: z.string().min(1, "reviewTimestamp is required"),
+  findingIds: z
+    .array(z.string().min(1))
     .min(1, "at least one finding is required")
     .max(50, "too many findings"),
   /** Omitted or false leaves the review pending for a human to submit. */

@@ -53,6 +53,46 @@ export interface AnchoredReviewFinding extends ReviewFinding {
   posted: boolean;
 }
 
+/**
+ * Whether a finding's claim survives being checked against the pushed code.
+ *
+ * `unclear` is not posted: the finding is going onto someone else's PR, and a
+ * claim the code could not settle is not one to assert there unprompted.
+ */
+export type GroundingVerdict = "yes" | "no" | "unclear";
+
+/**
+ * Whose problem it is, once the claim holds.
+ *
+ * Only `pr` earns a comment. `local-only` is the case this exists for — a finding
+ * that reproduces from uncommitted or stale local state and is not in the branch
+ * anyone else can see.
+ */
+export type GroundingScope = "pr" | "local-only" | "pre-existing";
+
+/** One finding's grounding verdict, and the comment it earned if it did. */
+export interface FindingGrounding {
+  findingId: string;
+  repoName: string;
+  holds: GroundingVerdict;
+  scope: GroundingScope;
+  /** `file:line` references the verdict rests on. */
+  evidence: string[];
+  /** The comment as rewritten for this repository, empty when none was earned. */
+  comment: string;
+  /** Why it was not posted, or how the claim was confirmed. */
+  reason: string;
+  /** Whether this grounding's comment actually went out. */
+  posted: boolean;
+  groundedAt: string;
+}
+
+export interface FindingGroundingStore {
+  version: 1;
+  /** Keyed by finding id. */
+  groundings: Record<string, FindingGrounding>;
+}
+
 /** The PR a repository's findings would be posted to. */
 export interface FindingsTargetPr {
   repoName: string;
@@ -89,6 +129,12 @@ export interface RepoReviewFindings {
 export interface ReviewFindingsResult {
   timestamp: string;
   repos: RepoReviewFindings[];
+  /**
+   * What a previous post decided about each finding, by finding id. Carried back
+   * so a later visit shows which findings were dropped and why, instead of
+   * offering them again as if nothing had happened.
+   */
+  groundings: Record<string, FindingGrounding>;
 }
 
 /** One finding's fate in a post request. */
