@@ -219,6 +219,56 @@ describe("ReviewFindingsList", () => {
     expect(screen.getByRole("button", { name: /post as pending/i })).toBeDisabled();
   });
 
+  // One button rather than a Select all at the top and a Clear at the bottom of
+  // a long list: undoing the default selection was a trip to the action bar.
+  describe("the select-all toggle", () => {
+    it("offers to select everything postable, counted", () => {
+      setRepos([
+        repo({
+          findings: [
+            finding({ id: "w", severity: "warning" }),
+            finding({ id: "s", severity: "suggestion" }),
+          ],
+        }),
+      ]);
+      renderList();
+      fireEvent.click(screen.getByRole("button", { name: "Select all (2)" }));
+      expect(screen.getByText("2 findings selected")).toBeInTheDocument();
+    });
+
+    it("turns into a clear once everything is selected", () => {
+      setRepos([repo({ findings: [finding({ severity: "warning" })] })]);
+      renderList();
+      // The default selection already covers the only finding.
+      const button = screen.getByRole("button", { name: "Clear selection" });
+      fireEvent.click(button);
+      expect(screen.queryByText(/finding.* selected/)).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Select all (1)" })).toBeInTheDocument();
+    });
+
+    it("counts neither a posted finding nor a repository without a PR", () => {
+      setRepos([
+        repo({
+          // A Suggestion, so the default selection leaves the toggle offering
+          // rather than clearing and the count is the thing on screen.
+          findings: [
+            finding({ id: "open", severity: "suggestion" }),
+            finding({ id: "done", posted: true }),
+          ],
+        }),
+        repo({ repoName: "gadgets", pr: null, findings: [finding({ id: "no-pr" })] }),
+      ]);
+      renderList();
+      expect(screen.getByRole("button", { name: "Select all (1)" })).toBeInTheDocument();
+    });
+
+    it("is not offered when nothing could be posted", () => {
+      setRepos([repo({ pr: null, findings: [finding()] })]);
+      renderList();
+      expect(screen.queryByRole("button", { name: /select all/i })).not.toBeInTheDocument();
+    });
+  });
+
   it("says there is nothing to post for a review with no structured findings", () => {
     setRepos([repo({ findings: [] })]);
     renderList();
