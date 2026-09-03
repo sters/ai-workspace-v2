@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, getResearchChatSystemPrompt, buildReviewChatPrompt } from "@/lib/templates/prompts/chat";
+import {
+  getChatSystemPrompt,
+  buildInitPrompt,
+  getReviewChatSystemPrompt,
+  buildReviewChatPrompt,
+  getResearchChatSystemPrompt,
+  buildResearchChatPrompt,
+} from "@/lib/templates/prompts/chat";
 
 describe("getChatSystemPrompt", () => {
   const systemPrompt = getChatSystemPrompt();
@@ -8,6 +15,11 @@ describe("getChatSystemPrompt", () => {
     // Positive examples steer better than a stack of "Do NOT" lines.
     expect(systemPrompt).toContain('"Ready."');
     expect(systemPrompt).toMatch(/first turn/i);
+  });
+
+  it("makes reading the README part of that first turn", () => {
+    expect(systemPrompt).toMatch(/one Read call/i);
+    expect(systemPrompt).toContain("README.md");
   });
 
   it("defers reading, analysis and next-step proposals to the user's request", () => {
@@ -27,49 +39,16 @@ describe("getChatSystemPrompt", () => {
   });
 });
 
-describe("buildInitPrompt", () => {
-  const workspaceId = "my-project";
-  const workspacePath = "/root/workspace/my-project";
-
-  it("shows placeholder when README is missing", async () => {
-    const prompt = await buildInitPrompt(workspaceId, workspacePath, {
-      readme: null,
-      todos: [],
-    });
-    expect(prompt).toContain("(no README.md)");
-  });
-
-  it("renders each TODO file as a progress count plus checkbox lines", async () => {
-    const prompt = await buildInitPrompt(workspaceId, workspacePath, {
-      readme: "# Test",
-      todos: [
-        {
-          filename: "TODO-repo.md",
-          repoName: "repo",
-          items: [
-            { text: "Fix bug", status: "pending", indent: 0, children: [] },
-            { text: "Done task", status: "completed", indent: 0, children: [] },
-          ],
-          sections: [],
-          completed: 1,
-          pending: 1,
-          blocked: 0,
-          inProgress: 0,
-          total: 2,
-          progress: 50,
-        },
-      ],
-    });
-    expect(prompt).toContain("TODO-repo.md: 1/2 completed");
-    expect(prompt).toContain("[ ] Fix bug");
-  });
-
-  it("shows placeholder when no TODO files", async () => {
-    const prompt = await buildInitPrompt(workspaceId, workspacePath, {
-      readme: "# Test",
-      todos: [],
-    });
-    expect(prompt).toContain("(no TODO files)");
+describe.each([
+  ["chat", getChatSystemPrompt()],
+  ["review chat", getReviewChatSystemPrompt()],
+  ["research chat", getResearchChatSystemPrompt()],
+])("%s system prompt", (_name, systemPrompt) => {
+  it("leaves the TODO files and remaining artifacts to be read on demand", () => {
+    // Anything pre-loaded is a snapshot: an operation can rewrite the TODO files
+    // and artifacts while the conversation is open.
+    expect(systemPrompt).toMatch(/is pre-loaded/i);
+    expect(systemPrompt).toMatch(/current state/i);
   });
 });
 
@@ -82,6 +61,11 @@ describe.each([
     expect(systemPrompt).toContain(`${topic} topic`);
   });
 
+  it("names both the summary and the README as the first turn's reads", () => {
+    expect(systemPrompt).toMatch(/Read calls/i);
+    expect(systemPrompt).toContain("README.md");
+  });
+
   it("ties further tool use to the user's question rather than forbidding it", () => {
     expect(systemPrompt).toMatch(/once the user's question calls for them/i);
   });
@@ -92,27 +76,62 @@ describe.each([
   });
 });
 
-describe("buildReviewChatPrompt", () => {
-  const workspaceId = "my-project";
-  const workspacePath = "/root/workspace/my-project";
-  const reviewTimestamp = "20260214-235920";
+const workspaceId = "my-project";
+const workspacePath = "/root/workspace/my-project";
 
-  it("includes the review timestamp and artifacts path", async () => {
-    const prompt = await buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp, {
-      readme: "# Test",
-      todos: [],
-      reviewSummary: "All good",
-    });
+describe("buildInitPrompt", () => {
+  const prompt = buildInitPrompt(workspaceId, workspacePath);
+
+  it("points the first turn at the README instead of embedding it", () => {
+    expect(prompt).toContain(`cd ${workspacePath}`);
+    expect(prompt).toContain(`${workspacePath}/README.md`);
+  });
+
+  it("says where the TODO files and artifacts are without reading them", () => {
+    expect(prompt).toContain(`${workspacePath}/TODO-*.md`);
+    expect(prompt).toContain(`${workspacePath}/artifacts/`);
+  });
+});
+
+describe("buildReviewChatPrompt", () => {
+  const reviewTimestamp = "20260214-235920";
+  const prompt = buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp);
+
+  it("includes the review timestamp and artifacts path", () => {
     expect(prompt).toContain(reviewTimestamp);
     expect(prompt).toContain(`artifacts/reviews/${reviewTimestamp}/`);
   });
 
-  it("shows placeholder when review summary is missing", async () => {
-    const prompt = await buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp, {
-      readme: "# Test",
-      todos: [],
-      reviewSummary: null,
-    });
-    expect(prompt).toContain("(no SUMMARY.md found)");
+  it("names the review SUMMARY.md as a first-turn read", () => {
+    expect(prompt).toContain(
+      `${workspacePath}/artifacts/reviews/${reviewTimestamp}/SUMMARY.md`,
+    );
+    expect(prompt).toContain(`${workspacePath}/README.md`);
+  });
+});
+
+describe("buildResearchChatPrompt", () => {
+  const prompt = buildResearchChatPrompt(workspaceId, workspacePath);
+
+  it("names the research summary as a first-turn read", () => {
+    expect(prompt).toContain(`${workspacePath}/artifacts/research/summary.md`);
+    expect(prompt).toContain(`${workspacePath}/README.md`);
+  });
+
+  it("states the topic of the conversation", () => {
+    expect(prompt).toContain(workspaceId);
+    expect(prompt).toMatch(/research/i);
+  });
+});
+
+describe.each([
+  ["init", () => buildInitPrompt(workspaceId, workspacePath)],
+  ["review", () => buildReviewChatPrompt(workspaceId, workspacePath, "20260214-235920")],
+  ["research", () => buildResearchChatPrompt(workspaceId, workspacePath)],
+])("%s prompt carries no pre-read file content", (_name, build) => {
+  it("stays a short set of pointers rather than an embedded corpus", () => {
+    // The README body and a TODO progress table used to be inlined here, which
+    // both dumped the README into the browser terminal and pinned a snapshot.
+    expect(build().length).toBeLessThan(1200);
   });
 });
