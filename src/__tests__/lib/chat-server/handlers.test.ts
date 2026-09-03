@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import type { ClaudeModel } from "@/types/claude";
 
 const mockSpawnClaudeTerminal = vi.fn();
@@ -6,18 +9,32 @@ const mockGetConfig = vi.fn();
 const mockEnsureSessionSystemPrompt = vi.fn();
 const mockCleanupSessionSystemPrompt = vi.fn();
 
+// A real workspace root: the README gate in handleStart hits the filesystem,
+// and `node:fs` is not interceptable under the bun runtime the suite uses.
+const tmpRoot = mkdtempSync(path.join(os.tmpdir(), "aiw-chat-handlers-"));
+const WITH_README = "demo";
+const WITHOUT_README = "no-readme";
+mkdirSync(path.join(tmpRoot, "workspace", WITH_README), { recursive: true });
+writeFileSync(path.join(tmpRoot, "workspace", WITH_README, "README.md"), "# demo\n");
+mkdirSync(path.join(tmpRoot, "workspace", WITHOUT_README), { recursive: true });
+
+afterAll(() => {
+  rmSync(tmpRoot, { recursive: true, force: true });
+});
+
 vi.mock("@/lib/claude/cli", () => ({
   spawnClaudeTerminal: (...args: unknown[]) => mockSpawnClaudeTerminal(...args),
 }));
 
 vi.mock("@/lib/config", () => ({
   getConfig: () => mockGetConfig(),
-  getResolvedWorkspaceRoot: () => "/mock/workspace-root",
+  getResolvedWorkspaceRoot: () => tmpRoot,
 }));
 
 vi.mock("@/lib/templates", () => ({
-  buildInitPrompt: () => Promise.resolve("init-prompt-body"),
-  buildReviewChatPrompt: () => Promise.resolve("review-prompt-body"),
+  buildInitPrompt: () => "init-prompt-body",
+  buildReviewChatPrompt: () => "review-prompt-body",
+  buildResearchChatPrompt: () => "research-prompt-body",
 }));
 
 vi.mock("@/lib/workspace/prompts", () => ({
@@ -76,7 +93,7 @@ function makeWs() {
 async function startSession(size?: { cols: number; rows: number }) {
   const { handleStart } = await import("@/lib/chat-server/handlers");
   const ws = makeWs();
-  await handleStart(ws, { type: "start", workspaceId: "demo", ...size });
+  await handleStart(ws, { type: "start", workspaceId: WITH_README, ...size });
   return ws;
 }
 
@@ -120,9 +137,9 @@ describe("handleStart", () => {
 
     expect(mockEnsureSessionSystemPrompt).toHaveBeenCalledTimes(1);
     const [wsPath, agentName, _sessionId, context] = mockEnsureSessionSystemPrompt.mock.calls[0];
-    expect(wsPath).toBe("/mock/workspace-root/workspace/demo");
+    expect(wsPath).toBe(path.join(tmpRoot, "workspace", WITH_README));
     expect(agentName).toBe("chat");
-    expect(context).toEqual({ workspaceId: "demo" });
+    expect(context).toEqual({ workspaceId: WITH_README });
   });
 
   it("spawns the PTY at the size the browser terminal reported", async () => {
@@ -147,6 +164,50 @@ describe("handleStart", () => {
     const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
     expect(opts.cols).toBeUndefined();
     expect(opts.rows).toBeUndefined();
+  });
+
+  it("refuses to start a session for a workspace with no README", async () => {
+    // The init prompt has the session read the README on its first turn, so
+    // without one there is nothing to start from.
+    const { handleStart } = await import("@/lib/chat-server/handlers");
+    const ws = makeWs();
+
+    await handleStart(ws, { type: "start", workspaceId: WITHOUT_README });
+
+    expect(mockSpawnClaudeTerminal).not.toHaveBeenCalled();
+    const errors = ws.sent
+      .map((m) => JSON.parse(m))
+      .filter((m) => m.type === "error");
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toMatch(/README/);
+  });
+
+  it("leaves the caller's live session intact when a start is refused", async () => {
+    const ws = await startSession();
+    const liveSessionId = ws.data.sessionId!;
+
+    const { handleStart } = await import("@/lib/chat-server/handlers");
+    await handleStart(ws, { type: "start", workspaceId: WITHOUT_README });
+
+    const sessions = (globalThis as unknown as { __chatSessions: Map<string, unknown> })
+      .__chatSessions;
+    expect(sessions.has(liveSessionId)).toBe(true);
+    expect(ws.data.sessionId).toBe(liveSessionId);
+  });
+
+  it("starts with a caller-supplied prompt even without a README", async () => {
+    const { handleStart } = await import("@/lib/chat-server/handlers");
+    const ws = makeWs();
+
+    await handleStart(ws, {
+      type: "start",
+      workspaceId: WITHOUT_README,
+      initialPrompt: "custom",
+    });
+
+    expect(mockSpawnClaudeTerminal).toHaveBeenCalledTimes(1);
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    expect(opts.args).toContain("custom");
   });
 });
 

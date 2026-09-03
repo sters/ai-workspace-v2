@@ -1,4 +1,5 @@
 import path from "node:path";
+import { existsSync } from "node:fs";
 import { spawnClaudeTerminal } from "../claude/cli";
 import { clampPtySize, resizeTerminal, DEFAULT_PTY_COLS, DEFAULT_PTY_ROWS } from "../pty";
 import type { DataListener } from "@/types/pty";
@@ -20,6 +21,21 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
   const store = getStore();
   const wsData = ws.data;
 
+  const root = getResolvedWorkspaceRoot();
+  const workspacePath = path.join(root, "workspace", msg.workspaceId);
+
+  // Every built init prompt has the session read the README on its first turn,
+  // so a workspace without one starts a session that can only go hunting for
+  // the file. Refuse before touching the caller's existing session — a rejected
+  // start must not cost them a live one. A caller-supplied prompt opts out.
+  if (!msg.initialPrompt && !existsSync(path.join(workspacePath, "README.md"))) {
+    send(ws, {
+      type: "error",
+      message: `Workspace "${msg.workspaceId}" has no README.md — run init before starting a chat session.`,
+    });
+    return;
+  }
+
   if (wsData.sessionId) {
     // Kill existing session
     const existing = store.__chatSessions!.get(wsData.sessionId);
@@ -37,17 +53,15 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
   wsData.sessionId = sessionId;
 
   const listeners = new Set<DataListener>();
-  const root = getResolvedWorkspaceRoot();
-  const workspacePath = path.join(root, "workspace", msg.workspaceId);
 
   const isReviewChat = !msg.initialPrompt && !!msg.reviewTimestamp;
   const isResearchChat = !msg.initialPrompt && !msg.reviewTimestamp && !!msg.researchChat;
   const initPrompt = msg.initialPrompt
     || (msg.reviewTimestamp
-      ? await buildReviewChatPrompt(msg.workspaceId, workspacePath, msg.reviewTimestamp)
+      ? buildReviewChatPrompt(msg.workspaceId, workspacePath, msg.reviewTimestamp)
       : msg.researchChat
-        ? await buildResearchChatPrompt(msg.workspaceId, workspacePath)
-        : await buildInitPrompt(msg.workspaceId, workspacePath));
+        ? buildResearchChatPrompt(msg.workspaceId, workspacePath)
+        : buildInitPrompt(msg.workspaceId, workspacePath));
 
   const agentName = isReviewChat ? "review-chat" : isResearchChat ? "research-chat" : "chat";
   const systemPromptFile = ensureSessionSystemPrompt(

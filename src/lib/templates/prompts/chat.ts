@@ -1,65 +1,43 @@
-import path from "node:path";
-import { existsSync } from "node:fs";
-import type { TodoFile } from "@/types/workspace";
+/**
+ * Prompts for interactive chat sessions.
+ *
+ * The opening user message is a set of pointers, not a corpus: the session's
+ * first turn cds into the workspace and reads the README itself. Embedding the
+ * README body and a TODO progress table instead cost nothing at startup but
+ * pinned a snapshot of files an operation may rewrite mid-conversation, and
+ * dumped the whole README into the browser terminal as the visible first
+ * message. The chat server refuses to start a session whose workspace has no
+ * README, so the read below always has a target.
+ */
+
+const WORKSPACE_LAYOUT =
+  "You are working on an ai-workspace. The workspace directory contains README.md (workspace overview and plan), TODO-*.md files (task tracking), and artifacts/ (review and research reports).";
+
+/**
+ * Why only the startup files are read up front. Applies to every chat variant:
+ * whatever is read on the first turn is a snapshot, and the TODO files and
+ * artifacts are the parts a running operation rewrites.
+ */
+const ON_DEMAND_READING =
+  "Nothing beyond those files is pre-loaded. Read the TODO files and the remaining artifacts when a question calls for them, so you see their current state rather than a snapshot taken before the conversation started — an operation may be rewriting them while we talk.";
 
 /**
  * System prompt for interactive chat sessions.
- * Constrains the startup behavior so Claude does not turn the embedded
- * README/TODO context into an excuse for proactive investigation.
+ * Bounds the first turn to cd + one README read + a one-line acknowledgement,
+ * so startup neither investigates on its own initiative nor reports back.
  */
 export function getChatSystemPrompt(): string {
-  return `You are working on an ai-workspace. The workspace directory contains README.md (workspace overview and plan), TODO files (task tracking), and review artifacts.
+  return `${WORKSPACE_LAYOUT}
 
-The initial user message embeds the current README and TODO summary as REFERENCE MATERIAL only.
-
-Your first turn consists of exactly two things:
+Your first turn consists of exactly three things:
 
 1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
-2. One short sentence, e.g. "Ready." — then stop and wait for the user's next message.
+2. One Read call: the workspace \`README.md\`, at the path in the user prompt.
+3. One short sentence, e.g. "Ready." — then stop and wait for the user's next message.
 
-Treat the embedded README/TODO/review content as silent reference: it is there so you don't have to read it later, not as a topic to open with. Investigating (Read/Grep/Glob, git status, git log, gh pr, ls), summarizing that content, and proposing next steps all belong to later turns, only once the user asks — that is what the rest of the conversation is for.`;
-}
+Treat what you read as silent reference: it is there so you have the workspace's goal and plan in hand, not as a topic to open with. Summarizing it, further investigating (Read/Grep/Glob, git status, git log, gh pr, ls), and proposing next steps all belong to later turns, only once the user asks — that is what the rest of the conversation is for.
 
-/** Format TODO files into a concise summary string. */
-function formatTodoSummary(todos: TodoFile[]): string {
-  if (todos.length === 0) return "(no TODO files)";
-  return todos
-    .map((t) => {
-      const line = `${t.filename}: ${t.completed}/${t.total} completed`;
-      const pending = t.items
-        .filter((i) => i.status === "pending" || i.status === "in_progress")
-        .map((i) => `  - [${i.status === "in_progress" ? "~" : " "}] ${i.text}`)
-        .join("\n");
-      return pending ? `${line}\n${pending}` : line;
-    })
-    .join("\n\n");
-}
-
-/**
- * Build the initial prompt sent to Claude when starting an interactive chat session.
- * Embeds README content and TODO summary so Claude doesn't need to read files at startup.
- */
-export async function buildInitPrompt(
-  workspaceId: string,
-  workspacePath: string,
-  options?: { readme?: string | null; todos?: TodoFile[] },
-): Promise<string> {
-  const readme = options?.readme ?? await readFileIfExists(path.join(workspacePath, "README.md"));
-  const todos = options?.todos ?? await listTodoFilesRaw(workspacePath);
-
-  const parts = [
-    workingDirectorySection(workspacePath),
-    "## Reference Material (do NOT analyze, summarize, or act on this until I explicitly ask)",
-    "",
-    "The README and TODO summary below are pre-loaded so you don't have to read them with the Read tool. Treat them as silent reference. After your `cd`, just acknowledge readiness in one short sentence and wait for my question.",
-    "",
-    "### README.md",
-    readme || "(no README.md)",
-    "",
-    "### TODO Progress",
-    formatTodoSummary(todos),
-  ];
-  return parts.join("\n");
+${ON_DEMAND_READING}`;
 }
 
 /**
@@ -69,49 +47,17 @@ export async function buildInitPrompt(
  * sprawl into unrelated investigation at startup.
  */
 export function getReviewChatSystemPrompt(): string {
-  return `You are working on an ai-workspace. The workspace directory contains README.md (workspace overview and plan), TODO files (task tracking), and review artifacts.
+  return `${WORKSPACE_LAYOUT}
 
-The initial user message includes the current README, TODO summary, and review summary so you have context for the discussion.
+Your first turn consists of exactly three things:
 
-Your first turn consists of exactly two things:
+1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
+2. Read calls for the two files the user prompt names — the review \`SUMMARY.md\` and the workspace \`README.md\`. Issue them together in this turn.
+3. A brief acknowledgement (1-2 sentences) about the review topic, then wait for the user's question.
 
-1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command.
-2. A brief acknowledgement (1-2 sentences) about the review topic, then wait for the user's question.
+That acknowledgement is all the first turn produces. Reach for the per-repository review reports beside the SUMMARY, or for the code itself (Read/Glob/Grep, git status, git log, gh pr), once the user's question calls for them.
 
-The context you need for that acknowledgement is already in this message. Reach for files (Read/Glob/Grep) or verification commands (git status, git log, gh pr) once the user's question calls for them.`;
-}
-
-/**
- * Build the initial prompt for a chat session focused on a specific review.
- * Embeds README, TODO summary, and review SUMMARY.md content.
- */
-export async function buildReviewChatPrompt(
-  workspaceId: string,
-  workspacePath: string,
-  reviewTimestamp: string,
-  options?: { readme?: string | null; todos?: TodoFile[]; reviewSummary?: string | null },
-): Promise<string> {
-  const readme = options?.readme ?? await readFileIfExists(path.join(workspacePath, "README.md"));
-  const todos = options?.todos ?? await listTodoFilesRaw(workspacePath);
-  const reviewSummary = options?.reviewSummary ?? await readFileIfExists(
-    path.join(workspacePath, "artifacts", "reviews", reviewTimestamp, "SUMMARY.md"),
-  );
-
-  const parts = [
-    workingDirectorySection(workspacePath),
-    `I want to discuss the review session from timestamp "${reviewTimestamp}".`,
-    `The review artifacts are located at: ${workspacePath}/artifacts/reviews/${reviewTimestamp}/`,
-    "",
-    "## README.md",
-    readme || "(no README.md)",
-    "",
-    "## TODO Progress",
-    formatTodoSummary(todos),
-    "",
-    "## Review Summary",
-    reviewSummary || "(no SUMMARY.md found)",
-  ];
-  return parts.join("\n");
+${ON_DEMAND_READING}`;
 }
 
 /**
@@ -120,58 +66,66 @@ export async function buildReviewChatPrompt(
  * is the topic), but startup must not sprawl into unrelated investigation.
  */
 export function getResearchChatSystemPrompt(): string {
-  return `You are working on an ai-workspace. The workspace directory contains README.md (workspace overview and plan), TODO files (task tracking), and research artifacts.
+  return `${WORKSPACE_LAYOUT}
 
-The initial user message includes the current README, TODO summary, and research summary so you have context for the discussion.
+Your first turn consists of exactly three things:
 
-Your first turn consists of exactly two things:
+1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
+2. Read calls for the two files the user prompt names — the research \`summary.md\` and the workspace \`README.md\`. Issue them together in this turn.
+3. A brief acknowledgement (1-2 sentences) about the research topic, then wait for the user's question.
 
-1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command.
-2. A brief acknowledgement (1-2 sentences) about the research topic, then wait for the user's question.
+That acknowledgement is all the first turn produces. Reach for the per-repository research reports beside the summary, or for the code itself (Read/Glob/Grep, git status, git log, gh pr), once the user's question calls for them.
 
-The context you need for that acknowledgement is already in this message. Reach for files (Read/Glob/Grep) or verification commands (git status, git log, gh pr) once the user's question calls for them.`;
+${ON_DEMAND_READING}`;
+}
+
+/**
+ * Build the initial prompt sent to Claude when starting an interactive chat session.
+ */
+export function buildInitPrompt(workspaceId: string, workspacePath: string): string {
+  return firstTurnSection(workspacePath);
+}
+
+/**
+ * Build the initial prompt for a chat session focused on a specific review.
+ */
+export function buildReviewChatPrompt(
+  workspaceId: string,
+  workspacePath: string,
+  reviewTimestamp: string,
+): string {
+  const reviewDir = `${workspacePath}/artifacts/reviews/${reviewTimestamp}/`;
+  return [
+    firstTurnSection(workspacePath, [`${reviewDir}SUMMARY.md`]),
+    `I want to discuss the review session from timestamp "${reviewTimestamp}".`,
+    `The rest of that session's artifacts are beside the summary, in ${reviewDir}`,
+  ].join("\n");
 }
 
 /**
  * Build the initial prompt for a chat session focused on research results.
- * Embeds README, TODO summary, and research summary.md content.
  */
-export async function buildResearchChatPrompt(
+export function buildResearchChatPrompt(
   workspaceId: string,
   workspacePath: string,
-  options?: { readme?: string | null; todos?: TodoFile[]; researchSummary?: string | null },
-): Promise<string> {
-  const readme = options?.readme ?? await readFileIfExists(path.join(workspacePath, "README.md"));
-  const todos = options?.todos ?? await listTodoFilesRaw(workspacePath);
-  const researchSummary = options?.researchSummary ?? await readFileIfExists(
-    path.join(workspacePath, "artifacts", "research", "summary.md"),
-  );
-
-  const parts = [
-    workingDirectorySection(workspacePath),
+): string {
+  const researchDir = `${workspacePath}/artifacts/research/`;
+  return [
+    firstTurnSection(workspacePath, [`${researchDir}summary.md`]),
     `I want to discuss the research results for workspace "${workspaceId}".`,
-    `The research artifacts are located at: ${workspacePath}/artifacts/research/`,
-    "",
-    "## README.md",
-    readme || "(no README.md)",
-    "",
-    "## TODO Progress",
-    formatTodoSummary(todos),
-    "",
-    "## Research Summary",
-    researchSummary || "(no summary.md found)",
-  ];
-  return parts.join("\n");
+    `The rest of the research artifacts are beside the summary, in ${researchDir}`,
+  ].join("\n");
 }
 
 /**
- * Build the "Working Directory" preamble injected at the top of every chat
- * init prompt. The Claude CLI is spawned with cwd = ai-workspace root so that
- * `.claude/settings.local.json` (permissions + managed hooks) is auto-loaded;
- * we then instruct Claude to cd into the feature workspace, mirroring how
- * pipeline prompts (`executor.ts` etc.) handle the same constraint.
+ * Build the preamble injected at the top of every chat init prompt. The Claude
+ * CLI is spawned with cwd = ai-workspace root so that `.claude/settings.local.json`
+ * (permissions + managed hooks) is auto-loaded; we then instruct Claude to cd
+ * into the feature workspace, mirroring how pipeline prompts (`executor.ts` etc.)
+ * handle the same constraint.
  */
-function workingDirectorySection(workspacePath: string): string {
+function firstTurnSection(workspacePath: string, extraReads: string[] = []): string {
+  const reads = [`${workspacePath}/README.md`, ...extraReads];
   return [
     "### Working Directory",
     "",
@@ -183,30 +137,9 @@ function workingDirectorySection(workspacePath: string): string {
     `cd ${workspacePath}`,
     "```",
     "",
-    "Issue it on its own, then follow the first-turn shape in the system prompt (brief acknowledgement, then wait for the user).",
+    `Then read ${reads.map((f) => `\`${f}\``).join(" and ")}, and follow the first-turn shape in the system prompt (brief acknowledgement, then wait for the user).`,
+    "",
+    `The TODO files (\`${workspacePath}/TODO-*.md\`) and the other artifacts (\`${workspacePath}/artifacts/\`) are there for later questions — leave them until one calls for them.`,
     "",
   ].join("\n");
-}
-
-// ---------------------------------------------------------------------------
-// Helpers — lightweight file I/O to avoid importing the full workspace reader
-// ---------------------------------------------------------------------------
-
-async function readFileIfExists(filePath: string): Promise<string | null> {
-  const file = Bun.file(filePath);
-  return (await file.exists()) ? file.text() : null;
-}
-
-import { parseTodoFile } from "@/lib/parsers/todo";
-
-async function listTodoFilesRaw(wsPath: string): Promise<TodoFile[]> {
-  if (!existsSync(wsPath)) return [];
-  const glob = new Bun.Glob("TODO-*.md");
-  const files = [...glob.scanSync({ cwd: wsPath })].filter((f) => f !== "TODO-template.md");
-  const results: TodoFile[] = [];
-  for (const f of files) {
-    const content = await Bun.file(path.join(wsPath, f)).text();
-    results.push(parseTodoFile(f, content));
-  }
-  return results;
 }
