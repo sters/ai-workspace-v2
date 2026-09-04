@@ -2,7 +2,10 @@ import { getReviewSessions, getReviewDetail, getTodos, getReadme } from "@/lib/w
 import { stripCompletedTodosFromWorkspace } from "@/lib/workspace/todo-cleanup";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
 import { readWorkspaceReadme, parseAcceptanceCriteria } from "@/lib/parsers/readme";
-import { syncReadmeRepositories } from "./actions/ensure-repositories";
+import {
+  syncReadmeRepositories,
+  discoverConstraintsForNewRepos,
+} from "./actions/ensure-repositories";
 import { buildInitTodoAnalysisPhases } from "./actions/init-todo-analysis";
 import { buildInitPipeline } from "./init";
 import { buildExecutePipeline } from "./execute";
@@ -231,7 +234,8 @@ export function buildAutonomousPipeline(input: {
     return {
       kind: "function",
       label: "Ensure repositories",
-      timeoutMs: 10 * 60 * 1000,
+      // Covers a clone plus one constraint-discovery child per new repository.
+      timeoutMs: 20 * 60 * 1000,
       maxRetries: 0,
       fn: async (ctx) => {
         const ws = resolveWorkspace(ctx.operationId, workspace);
@@ -273,6 +277,15 @@ export function buildAutonomousPipeline(input: {
           ctx.emitResult(
             `Set up ${res.setUp.length} repositor${res.setUp.length === 1 ? "y" : "ies"}: ${res.setUp.join(", ")}`,
           );
+          // Discovery otherwise only runs on the init path, so a salvaged repo
+          // would reach review with its commands NOT DECLARED. Incomplete
+          // discovery is reported, not fatal — the worktree is what the run
+          // needs, and the executor resolves the toolchain itself.
+          if (!(await discoverConstraintsForNewRepos(ctx, ws, res.setUpRepos))) {
+            ctx.emitStatus(
+              "Constraint discovery did not complete for every new repository",
+            );
+          }
         } else {
           ctx.emitStatus(
             `All ${res.metaRepoCount} README repositor${res.metaRepoCount === 1 ? "y" : "ies"} already set up`,
