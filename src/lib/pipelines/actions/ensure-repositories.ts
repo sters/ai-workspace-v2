@@ -10,6 +10,8 @@ import { getWorkspaceDir } from "@/lib/config";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
 import { readWorkspaceReadme, denormalizeRepoPath } from "@/lib/parsers/readme";
 import { setupRepository } from "./setup-repository";
+import { buildDiscoverConstraintsPhase } from "./discover-constraints";
+import type { PhaseFunctionContext } from "@/types/pipeline";
 
 export interface SyncReadmeReposResult {
   /** Number of repositories declared in the README. */
@@ -18,6 +20,12 @@ export interface SyncReadmeReposResult {
   existingCount: number;
   /** Repo paths newly set up during this run. */
   setUp: string[];
+  /**
+   * The `setUp` paths resolved to their on-disk worktrees. Follow-on setup work
+   * (constraint discovery) needs the repo name and worktree path, which only
+   * the post-setup listing knows.
+   */
+  setUpRepos: { repoName: string; worktreePath: string }[];
   /** README repo paths still absent after the setup attempt (failed or skipped). */
   stillMissing: string[];
   /** Set when the README could not be read; no setup is attempted in that case. */
@@ -45,6 +53,7 @@ export async function syncReadmeRepositories(
       metaRepoCount: 0,
       existingCount: listWorkspaceRepos(workspace).length,
       setUp: [],
+      setUpRepos: [],
       stillMissing: [],
       readError: String(err),
     };
@@ -59,6 +68,7 @@ export async function syncReadmeRepositories(
       metaRepoCount: metaRepos.length,
       existingCount: existing.length,
       setUp: [],
+      setUpRepos: [],
       stillMissing: [],
     };
   }
@@ -81,11 +91,39 @@ export async function syncReadmeRepositories(
     }
   }
 
-  const afterPaths = new Set(listWorkspaceRepos(workspace).map((r) => r.repoPath));
+  const after = listWorkspaceRepos(workspace);
+  const afterPaths = new Set(after.map((r) => r.repoPath));
+  const setUp = missing.filter((r) => afterPaths.has(r.path)).map((r) => r.path);
+  const setUpPaths = new Set(setUp);
   return {
     metaRepoCount: metaRepos.length,
     existingCount: existing.length,
-    setUp: missing.filter((r) => afterPaths.has(r.path)).map((r) => r.path),
+    setUp,
+    setUpRepos: after
+      .filter((r) => setUpPaths.has(r.repoPath))
+      .map((r) => ({ repoName: r.repoName, worktreePath: r.worktreePath })),
     stillMissing: metaRepos.filter((r) => !afterPaths.has(r.path)).map((r) => r.path),
   };
+}
+
+/**
+ * Discover lint/test/build constraints for worktrees that were just created.
+ *
+ * The discovery phase itself only runs on the init path, so a repository added
+ * to an existing workspace reached review with its commands undeclared — which
+ * `buildNoConstraintsReport` reports as `NOT DECLARED` and nothing else runs.
+ * Callers treat a `false` return as incomplete, never as fatal: the executor
+ * resolves its own toolchain and runs the repo's commands regardless.
+ */
+export async function discoverConstraintsForNewRepos(
+  ctx: PhaseFunctionContext,
+  workspace: string,
+  repos: { repoName: string; worktreePath: string }[],
+): Promise<boolean> {
+  if (repos.length === 0) return true;
+  return buildDiscoverConstraintsPhase({
+    workspace,
+    wsPath: path.join(getWorkspaceDir(), workspace),
+    repos,
+  }).fn(ctx);
 }

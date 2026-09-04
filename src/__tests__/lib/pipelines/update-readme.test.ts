@@ -14,8 +14,10 @@ vi.mock("@/lib/workspace/prompts", () => ({
 }));
 
 const mockSyncReadmeRepositories = vi.fn();
+const mockDiscoverConstraints = vi.fn(async () => true);
 vi.mock("@/lib/pipelines/actions/ensure-repositories", () => ({
   syncReadmeRepositories: (...args: unknown[]) => mockSyncReadmeRepositories(...args),
+  discoverConstraintsForNewRepos: (...args: unknown[]) => mockDiscoverConstraints(...args),
 }));
 
 // Dependencies of the criteria-feasibility phase this pipeline now appends.
@@ -83,8 +85,10 @@ describe("buildUpdateReadmePipeline", () => {
       metaRepoCount: 0,
       existingCount: 0,
       setUp: [],
+      setUpRepos: [],
       stillMissing: [],
     });
+    mockDiscoverConstraints.mockResolvedValue(true);
   });
 
   it("returns 'Update README', then 'Ensure repositories', then the feasibility judge", async () => {
@@ -126,6 +130,7 @@ describe("buildUpdateReadmePipeline", () => {
         metaRepoCount: 2,
         existingCount: 1,
         setUp: ["github.com/a/new"],
+        setUpRepos: [{ repoName: "new", worktreePath: "/b" }],
         stillMissing: [],
       });
       const phase = await getEnsurePhase();
@@ -147,6 +152,7 @@ describe("buildUpdateReadmePipeline", () => {
         metaRepoCount: 1,
         existingCount: 0,
         setUp: [],
+        setUpRepos: [],
         stillMissing: ["github.com/x/y"],
       });
       const phase = await getEnsurePhase();
@@ -163,6 +169,7 @@ describe("buildUpdateReadmePipeline", () => {
         metaRepoCount: 0,
         existingCount: 0,
         setUp: [],
+        setUpRepos: [],
         stillMissing: [],
         readError: "boom",
       });
@@ -182,6 +189,48 @@ describe("buildUpdateReadmePipeline", () => {
 
       expect(result).toBe(true);
       expect(ctx.emitResult).not.toHaveBeenCalled();
+      // Nothing to discover for; the helper's own no-op is tested with it.
+      expect(mockDiscoverConstraints).toHaveBeenCalledWith(ctx, "test-ws", []);
+    });
+
+    // Constraint discovery otherwise only runs on the init path, so a
+    // repository added to an existing workspace reached review with its
+    // commands NOT DECLARED — indistinguishable from a clean run.
+    it("discovers constraints for the repositories it just set up", async () => {
+      mockSyncReadmeRepositories.mockResolvedValue({
+        metaRepoCount: 2,
+        existingCount: 1,
+        setUp: ["github.com/a/new"],
+        setUpRepos: [{ repoName: "new", worktreePath: "/b" }],
+        stillMissing: [],
+      });
+      const phase = await getEnsurePhase();
+      const ctx = createMockCtx();
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockDiscoverConstraints).toHaveBeenCalledWith(
+        ctx,
+        "test-ws",
+        [{ repoName: "new", worktreePath: "/b" }],
+      );
+    });
+
+    it("reports but does not fail on incomplete constraint discovery", async () => {
+      mockSyncReadmeRepositories.mockResolvedValue({
+        metaRepoCount: 1,
+        existingCount: 0,
+        setUp: ["github.com/a/new"],
+        setUpRepos: [{ repoName: "new", worktreePath: "/b" }],
+        stillMissing: [],
+      });
+      mockDiscoverConstraints.mockResolvedValue(false);
+      const phase = await getEnsurePhase();
+      const ctx = createMockCtx();
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(ctx.emitResult).toHaveBeenCalledWith(
+        expect.stringContaining("Repository Constraints"),
+      );
     });
   });
 

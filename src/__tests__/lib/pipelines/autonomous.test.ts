@@ -58,6 +58,7 @@ vi.mock("@/lib/parsers/readme", () => ({
   })),
   denormalizeRepoPath: (s: string) => s.replace("___", ":"),
   parseAcceptanceCriteria: vi.fn(() => []),
+  parseConstraints: vi.fn(() => []),
 }));
 vi.mock("@/lib/pipelines/actions/setup-repository", () => ({
   setupRepository: vi.fn(() => ({
@@ -944,6 +945,75 @@ describe("buildAutonomousPipeline", () => {
         "main",
         expect.any(Function),
       );
+    });
+
+    // Constraint discovery otherwise only runs on the init path, so a repo
+    // salvaged into an existing workspace reached review with its commands
+    // NOT DECLARED — which reads exactly like a clean run.
+    it("discovers constraints for the repository it just set up", async () => {
+      mockListWorkspaceRepos
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce([
+          { repoPath: "github.com/sters/new", repoName: "new", worktreePath: "/b" },
+        ]);
+      mockReadWorkspaceReadme.mockResolvedValue({
+        content: "",
+        meta: {
+          title: "t",
+          taskType: "feature",
+          ticketId: "",
+          date: "",
+          repositories: [
+            { alias: "new", path: "github.com/sters/new", baseBranch: "main" },
+          ],
+        },
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const ensurePhase = phases[0];
+      if (ensurePhase.kind !== "function") return;
+
+      const ctx = createMockCtx();
+      expect(await ensurePhase.fn(ctx)).toBe(true);
+
+      const groupCalls = vi.mocked(ctx.runChildGroup).mock.calls;
+      expect(groupCalls).toHaveLength(1);
+      expect(groupCalls[0][0].map((c) => c.label)).toEqual(["constraints-new"]);
+    });
+
+    it("does not fail the run when constraint discovery does not complete", async () => {
+      mockListWorkspaceRepos
+        .mockReturnValueOnce([])
+        .mockReturnValueOnce([
+          { repoPath: "github.com/sters/new", repoName: "new", worktreePath: "/b" },
+        ]);
+      mockReadWorkspaceReadme.mockResolvedValue({
+        content: "",
+        meta: {
+          title: "t",
+          taskType: "feature",
+          ticketId: "",
+          date: "",
+          repositories: [
+            { alias: "new", path: "github.com/sters/new", baseBranch: "main" },
+          ],
+        },
+      });
+
+      const phases = buildAutonomousPipeline({
+        startWith: "execute",
+        workspace: "test-ws",
+      });
+      const ensurePhase = phases[0];
+      if (ensurePhase.kind !== "function") return;
+
+      // The worktree is there; only the discovery child failed. Failing here
+      // would abort the run over a report the executor can do without.
+      const ctx = createMockCtx({ runChildGroup: vi.fn(async () => [false]) });
+      expect(await ensurePhase.fn(ctx)).toBe(true);
     });
 
     it("returns false when README has no repos and no worktrees exist", async () => {

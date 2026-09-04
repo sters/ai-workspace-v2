@@ -2,7 +2,10 @@ import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { buildReadmeUpdaterPrompt } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
-import { syncReadmeRepositories } from "./actions/ensure-repositories";
+import {
+  syncReadmeRepositories,
+  discoverConstraintsForNewRepos,
+} from "./actions/ensure-repositories";
 import { buildCriteriaFeasibilityPhase } from "./actions/criteria-feasibility";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
@@ -47,13 +50,16 @@ export async function buildUpdateReadmePipeline(input: {
       allowedTools,
       appendSystemPromptFile: ensureSystemPrompt(workspacePath, "readme-updater"),
     },
-    // After the README is updated, set up any repositories newly declared in it.
+    // After the README is updated, set up any repositories newly declared in it
+    // and discover their constraints — the updater agent can only write the
+    // README, and discovery needs to probe tool invocations in the worktree.
     // Best-effort: the README update itself has already succeeded, so repository
     // setup problems are reported but never fail the operation.
     {
       kind: "function",
       label: "Ensure repositories",
-      timeoutMs: 10 * 60 * 1000,
+      // Covers a clone plus one constraint-discovery child per new repository.
+      timeoutMs: 20 * 60 * 1000,
       maxRetries: 0,
       fn: async (ctx) => {
         const res = await syncReadmeRepositories(workspace, ctx.emitStatus, ctx.signal);
@@ -72,6 +78,11 @@ export async function buildUpdateReadmePipeline(input: {
         if (res.stillMissing.length > 0) {
           ctx.emitResult(
             `Could not set up: ${res.stillMissing.join(", ")}. Check the repository entries in README.md.`,
+          );
+        }
+        if (!(await discoverConstraintsForNewRepos(ctx, workspace, res.setUpRepos))) {
+          ctx.emitResult(
+            "Constraint discovery did not complete for every new repository — check `## Repository Constraints` in README.md.",
           );
         }
         return true;
