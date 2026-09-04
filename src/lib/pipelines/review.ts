@@ -25,6 +25,9 @@ import {
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { readKnownFindings } from "@/lib/workspace/known-findings";
 import { findingsFilePath } from "@/lib/workspace/review-findings";
+import { collectPostedAsks } from "@/lib/workspace/posted-findings";
+import { buildRefreshWorktreesPhase } from "./actions/refresh-worktrees";
+import { runSubPhases } from "./actions/run-sub-phases";
 import {
   execConstraintCommand,
   buildConstraintReport,
@@ -38,7 +41,7 @@ import type { CrossRepositoryReviewerInput } from "@/types/prompts";
 import type { WorkspaceRepo } from "@/types/workspace";
 import { getTimeoutDefaults } from "@/lib/pipeline-manager";
 
-export async function buildReviewPipeline(input: {
+export interface ReviewPipelineInput {
   workspace: string;
   repository?: string;
   /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
@@ -49,8 +52,64 @@ export async function buildReviewPipeline(input: {
    * this from TODO checkboxes, which record intent rather than outcome.
    */
   requestedFixes?: string[];
-}): Promise<PipelinePhase[]> {
+  /**
+   * Fast-forward each worktree onto the branch it tracks first, so the review
+   * reads the pull request as it now stands rather than as it was checked out.
+   * This is what makes a re-review of an updated PR possible at all; see
+   * `actions/refresh-worktrees.ts`.
+   */
+  refreshFromRemote?: boolean;
+  /**
+   * Verify the findings this workspace already posted on its PRs, alongside the
+   * review. Off for an autonomous cycle, whose asks come from its own gate; on
+   * for a review a human started, where the outstanding asks are the comments
+   * on the PR.
+   */
+  carryPostedFindings?: boolean;
+}
+
+/**
+ * Budget for a review run as a sub-pipeline of one function phase.
+ *
+ * `runSubPhases` discards the inner phases' own `timeoutMs`, so this is the only
+ * budget that applies once the review is built inside a phase. Sized like the
+ * autonomous cycle's review phase: the reviewer group scales with repo count,
+ * plus 10 min of constraints and the collector.
+ */
+const REVIEW_SUBPIPELINE_BUDGET_MS = 45 * 60 * 1000;
+
+/**
+ * A review built at run time and executed as a sub-pipeline.
+ *
+ * Needed because everything below — each repo's HEAD, its diff, the review
+ * scope, the baseline — is resolved while the pipeline is *built*. A phase that
+ * moves HEAD therefore has to run before the build, not before the first review
+ * child, so the build is deferred into a phase of its own.
+ */
+export function buildDeferredReviewPhase(input: ReviewPipelineInput): PipelinePhase {
+  return {
+    kind: "function",
+    label: "Review",
+    timeoutMs: REVIEW_SUBPIPELINE_BUDGET_MS,
+    fn: async (ctx) => {
+      const phases = await buildReviewPipeline(input);
+      return runSubPhases(ctx, phases);
+    },
+  };
+}
+
+export async function buildReviewPipeline(
+  input: ReviewPipelineInput,
+): Promise<PipelinePhase[]> {
   const { workspace, repository, requestedFixes } = input;
+
+  if (input.refreshFromRemote) {
+    return [
+      buildRefreshWorktreesPhase({ workspace, repository }),
+      buildDeferredReviewPhase({ ...input, refreshFromRemote: false }),
+    ];
+  }
+
   const hasRequestedFixes = requestedFixes !== undefined && requestedFixes.length > 0;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
@@ -72,6 +131,14 @@ export async function buildReviewPipeline(input: {
   // Findings earlier cycles decided not to act on. Reviewers are spawned fresh
   // each cycle, so this is their only memory of that decision.
   const knownFindings = await readKnownFindings(wsPath);
+
+  // Comments this workspace already posted on its PRs, per repository. Used
+  // only when the caller has no asks of its own: a cycle's gate asks are the
+  // ones that cycle stands behind, and the gate is the only thing that can
+  // retire them.
+  const postedAsks = input.carryPostedFindings && !hasRequestedFixes
+    ? await collectPostedAsks(workspace)
+    : new Map<string, string[]>();
 
   // Pre-render the Acceptance Criteria checklist so the README verifier gets an
   // unambiguous auto/manual split instead of re-parsing prose.
@@ -155,11 +222,17 @@ export async function buildReviewPipeline(input: {
       appendSystemPromptFile: ensureSystemPrompt(wsPath, "code-reviewer"),
     });
 
-    // Requested-fix verifier — only when a previous cycle actually asked for
-    // something. Separate from the code reviewer so the "did the ask land"
-    // verdict and the "is this code good" verdict stay in different files with
-    // different scopes.
-    if (hasRequestedFixes) {
+    // Requested-fix verifier — only when something was actually asked for,
+    // either by a previous cycle's gate (all repos get the same list, since a
+    // gate ask can name any of them) or by a human posting findings on this
+    // repository's PR. Separate from the code reviewer so the "did the ask
+    // land" verdict and the "is this code good" verdict stay in different files
+    // with different scopes.
+    const repoFixes = hasRequestedFixes
+      ? requestedFixes
+      : postedAsks.get(repo.repoName) ?? [];
+
+    if (repoFixes.length > 0) {
       const fixVerifyFileName = `VERIFY-FIXES-${orgName}_${repo.repoName}.md`;
       reviewChildren.push({
         label: `verify-fixes-${repo.repoName}`,
@@ -170,7 +243,8 @@ export async function buildReviewPipeline(input: {
           repoName: repo.repoName,
           baseBranch,
           reviewTimestamp,
-          requestedFixes,
+          requestedFixes: repoFixes,
+          askSource: hasRequestedFixes ? "gate" : "pr-comments",
           worktreePath: repo.worktreePath,
           verifyFilePath: path.join(reviewDir, fixVerifyFileName),
           sinceSha: reviewScope?.sinceSha,

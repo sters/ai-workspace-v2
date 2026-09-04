@@ -4,6 +4,7 @@ import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-ma
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildReviewPipeline } from "@/lib/pipelines/review";
 import { buildBestOfNPipeline } from "@/lib/pipelines/best-of-n";
+import { buildRefreshWorktreesPhase } from "@/lib/pipelines/actions/refresh-worktrees";
 import { reviewSchema } from "@/lib/schemas";
 import { parseBody, applyOperationDefaults } from "@/lib/validate";
 
@@ -27,26 +28,47 @@ export async function POST(request: Request) {
 
   const bestOfN = data.bestOfN ?? getOperationConfig("review").bestOfN;
   const bestOfNFromConfig = data.bestOfN == null;
+  // A review a human started verifies the comments already on the PR alongside
+  // the code. An autonomous cycle does not: its asks come from its own gate.
+  const reviewInput = {
+    workspace,
+    repository: data.repository,
+    carryPostedFindings: true,
+  };
 
   try {
     let phases;
     if (bestOfN >= 2) {
-      phases = await buildBestOfNPipeline({
+      const bestOfNPhases = await buildBestOfNPipeline({
         workspace,
         n: bestOfN,
         operationType: "review",
         buildCandidatePhases: (candidateRepos) =>
-          buildReviewPipeline({ workspace, repos: candidateRepos }),
+          buildReviewPipeline({ ...reviewInput, repository: undefined, repos: candidateRepos }),
         repos,
         confirm: bestOfNFromConfig,
-        buildNormalPhases: () => buildReviewPipeline({ workspace, repository: data.repository }),
+        buildNormalPhases: () => buildReviewPipeline(reviewInput),
         interactionLevel: data.interactionLevel,
       });
+      // The refresh is prepended here rather than passed through, because
+      // Best-of-N already builds both its candidate and its fall-back phases
+      // lazily — inside a phase that runs after this one. The plain path below
+      // has to defer its build instead, which `refreshFromRemote` does for it.
+      phases = data.refreshFromRemote
+        ? [buildRefreshWorktreesPhase({ workspace, repository: data.repository }), ...bestOfNPhases]
+        : bestOfNPhases;
     } else {
-      phases = await buildReviewPipeline({ workspace, repository: data.repository });
+      phases = await buildReviewPipeline({
+        ...reviewInput,
+        refreshFromRemote: data.refreshFromRemote,
+      });
     }
+    const inputs: Record<string, string> = {
+      ...(bestOfN >= 2 ? { bestOfN: String(bestOfN) } : {}),
+      ...(data.refreshFromRemote ? { refreshFromRemote: "true" } : {}),
+    };
     const operation = startOperationPipeline("review", workspace, phases, undefined,
-      bestOfN >= 2 ? { bestOfN: String(bestOfN) } : undefined,
+      Object.keys(inputs).length > 0 ? inputs : undefined,
     );
     return NextResponse.json(operation);
   } catch (err) {

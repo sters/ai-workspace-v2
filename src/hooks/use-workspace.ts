@@ -5,6 +5,7 @@ import useSWR from "swr";
 import type { WorkspaceSummary, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
 import type { WorkspacePullRequestsResult } from "@/types/pull-request";
 import type { ReviewFindingsResult } from "@/types/review-findings";
+import type { ReviewFreshnessResult } from "@/types/review-freshness";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";
 import { fetcher } from "@/lib/api";
 
@@ -114,6 +115,33 @@ export function useReviewFindings(name: string, timestamp: string | null) {
     isLoading,
     error,
     refresh: useCallback(() => mutate(), [mutate]),
+  };
+}
+
+/**
+ * Whether each repository's PR has moved since the last review judged it.
+ *
+ * Same read profile as `usePullRequests` — it shares that read's server-side TTL
+ * cache — so no timer and no focus revalidation: a PR moves when a human
+ * pushes, and the answer is only acted on by clicking Re-review.
+ */
+export function useReviewFreshness(name: string) {
+  const url = name ? `/api/workspaces/${encodeURIComponent(name)}/review-freshness` : null;
+  const { data, error, isLoading, mutate } = useSWR<ReviewFreshnessResult>(url, fetcher, {
+    revalidateOnFocus: false,
+  });
+
+  const refresh = useCallback(
+    () => (url ? mutate(fetcher(`${url}?refresh=1`)) : mutate()),
+    [url, mutate],
+  );
+
+  return {
+    repos: data?.repos ?? [],
+    anyUpdatedSinceReview: data?.anyUpdatedSinceReview ?? false,
+    isLoading,
+    error,
+    refresh,
   };
 }
 

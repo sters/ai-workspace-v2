@@ -102,13 +102,23 @@ export function OperationPanel({
             },
           ]}
         />
-        <Button
+        <SplitButton
           variant="secondary"
+          label={<><ClipboardCheck className="h-3.5 w-3.5" /> Review</>}
           onClick={() => startAndNavigate("review", body())}
           disabled={isWorkspaceTypeRunning(workspaceName, "review")}
-        >
-          <ClipboardCheck className="h-3.5 w-3.5" /> Review
-        </Button>
+          items={[
+            {
+              // Fetches and fast-forwards each worktree first, so a PR that
+              // moved since checkout is reviewed as it now stands. Not the
+              // default: on a workspace the pipeline is writing to, moving HEAD
+              // is the wrong thing to do.
+              label: "Re-review (fetch PR updates first)",
+              onClick: () =>
+                startAndNavigate("review", body({ refreshFromRemote: "true" })),
+            },
+          ]}
+        />
         <RepositoryActionButton
           label={<><GitPullRequest className="h-3.5 w-3.5" /> Create PR</>}
           onClick={() => startAndNavigate("create-pr", body())}

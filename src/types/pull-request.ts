@@ -116,6 +116,12 @@ export interface WorkspacePullRequest {
   state: string;
   isDraft: boolean;
   headRefName: string;
+  /**
+   * Head commit as GitHub has it. Compared against what the last review
+   * recorded, to tell whether the PR has moved since — and against the
+   * worktree's HEAD, to tell whether the local checkout still matches it.
+   */
+  headSha: string;
   baseRefName: string;
   author: string;
   updatedAt: string;
