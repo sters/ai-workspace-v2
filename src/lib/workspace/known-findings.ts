@@ -21,7 +21,11 @@ export const KNOWN_FINDING_KINDS = [
   "pending-human",
   /** No change within this workspace's repos can satisfy it. */
   "infeasible",
-  /** Environment/tooling failure that predates the change. */
+  /**
+   * Real, but not introduced by the change: a tooling failure that predates it,
+   * a defect in code the branch never touched, or state that exists only in
+   * this checkout.
+   */
   "pre-existing",
   /** Reported as a suspicion the gate declined to chase. */
   "low-confidence",

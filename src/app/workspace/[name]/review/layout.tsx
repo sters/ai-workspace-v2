@@ -4,8 +4,9 @@ import { use } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useReviews } from "@/hooks/use-workspace";
-import { cn } from "@/lib/utils";
+import { cn, formatReviewTimestamp } from "@/lib/utils";
 import { StatusText } from "@/components/shared/feedback/status-text";
+import { ReviewFreshnessBanner } from "@/components/workspace/review-freshness-banner";
 
 export default function ReviewLayout({
   params,
@@ -27,6 +28,9 @@ export default function ReviewLayout({
 
   return (
     <div className="space-y-4">
+      {/* Above the session list, because it is about the workspace's newest
+          review rather than the session being read. */}
+      <ReviewFreshnessBanner workspaceName={decodedName} />
       <div className="flex flex-wrap items-center gap-2">
         {reviews.map((r) => {
           const isActive = activeTimestamp === r.timestamp;
@@ -41,7 +45,7 @@ export default function ReviewLayout({
                   : "hover:bg-accent"
               )}
             >
-              <div className="font-medium">{formatTimestamp(r.timestamp)}</div>
+              <div className="font-medium">{formatReviewTimestamp(r.timestamp)}</div>
               <div className="mt-1 flex gap-2 text-xs text-muted-foreground">
                 <span>{r.repos} repos</span>
                 {r.critical > 0 && (
@@ -57,10 +61,4 @@ export default function ReviewLayout({
       {children}
     </div>
   );
-}
-
-function formatTimestamp(ts: string): string {
-  const m = ts.match(/^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})$/);
-  if (!m) return ts;
-  return `${m[1]}-${m[2]}-${m[3]} ${m[4]}:${m[5]}:${m[6]}`;
 }

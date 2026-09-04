@@ -34,6 +34,11 @@ export const reviewSchema = z.object({
   repository: z.string().optional(),
   interactionLevel: interactionLevelEnum.optional(),
   bestOfN: z.coerce.number().min(0).max(5).optional(),
+  /**
+   * Fast-forward each worktree onto the branch it tracks before reviewing — the
+   * re-review path, for a PR that moved since it was checked out.
+   */
+  refreshFromRemote: z.coerce.boolean().optional(),
 });
 
 export const createPrSchema = z.object({

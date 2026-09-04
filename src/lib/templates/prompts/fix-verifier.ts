@@ -84,7 +84,11 @@ git diff origin/${input.baseBranch}...HEAD
 
 ## Requested Fixes
 
-A previous review cycle asked for the following ${input.requestedFixes.length} change(s):
+${
+  input.askSource === "pr-comments"
+    ? `The following ${input.requestedFixes.length} change(s) were asked for in review comments already posted on this repository's pull request. The PR's author is the one who acts on them, so a declined ask is answered in the comment thread rather than in a TODO file:`
+    : `A previous review cycle asked for the following ${input.requestedFixes.length} change(s):`
+}
 
 ${numbered}
 

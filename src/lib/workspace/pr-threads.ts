@@ -75,7 +75,7 @@ export const REVIEW_THREADS_QUERY = `query($owner:String!,$name:String!,$number:
 }`;
 
 const PR_VIEW_FIELDS =
-  "number,url,title,state,isDraft,headRefName,baseRefName,author,updatedAt";
+  "number,url,title,state,isDraft,headRefName,headRefOid,baseRefName,author,updatedAt";
 
 export interface PrLocator {
   host: string;
@@ -129,6 +129,7 @@ export function parsePrView(
     state: typeof json.state === "string" ? json.state : "OPEN",
     isDraft: json.isDraft === true,
     headRefName: typeof json.headRefName === "string" ? json.headRefName : "",
+    headSha: typeof json.headRefOid === "string" ? json.headRefOid : "",
     baseRefName: typeof json.baseRefName === "string" ? json.baseRefName : "",
     author: login(json.author),
     updatedAt: typeof json.updatedAt === "string" ? json.updatedAt : "",

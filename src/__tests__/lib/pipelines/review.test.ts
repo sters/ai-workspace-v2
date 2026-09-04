@@ -42,6 +42,10 @@ vi.mock("@/lib/workspace/review-baseline", () => ({
   writeReviewBaseline: vi.fn(async () => {}),
 }));
 
+vi.mock("@/lib/workspace/posted-findings", () => ({
+  collectPostedAsks: vi.fn(async () => new Map<string, string[]>()),
+}));
+
 vi.mock("@/lib/workspace/prompts", () => ({
   ensureSystemPrompt: vi.fn(() => "/mock/prompts/agent.md"),
 }));
@@ -83,6 +87,8 @@ afterAll(() => {
 
 import { buildReviewPipeline } from "@/lib/pipelines/review";
 import { listWorkspaceRepos } from "@/lib/workspace";
+import { prepareReviewDir } from "@/lib/workspace";
+import { collectPostedAsks } from "@/lib/workspace/posted-findings";
 import { parseConstraints } from "@/lib/parsers/readme";
 import {
   execConstraintCommand,
@@ -114,6 +120,7 @@ const mockBuildFixVerifierPrompt = vi.mocked(buildFixVerifierPrompt);
 const mockCaptureRepoHead = vi.mocked(captureRepoHead);
 const mockReadPreviousBaseline = vi.mocked(readPreviousReviewBaseline);
 const mockWriteReviewBaseline = vi.mocked(writeReviewBaseline);
+const mockCollectPostedAsks = vi.mocked(collectPostedAsks);
 
 describe("buildReviewPipeline — skip verify-todo when TODO file is missing", () => {
   beforeEach(() => {
@@ -841,5 +848,108 @@ describe("buildReviewPipeline — a round with requested fixes keeps every revie
     });
     const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
     expect(labels).toContain("review-cross-repository");
+  });
+});
+
+describe("buildReviewPipeline — refreshFromRemote", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+    mockCollectPostedAsks.mockResolvedValue(new Map());
+  });
+
+  it("puts the refresh ahead of a review built at run time", async () => {
+    mockListWorkspaceRepos.mockReturnValue([]);
+
+    const phases = await buildReviewPipeline({
+      workspace: "test-ws",
+      refreshFromRemote: true,
+    });
+
+    expect(phases.map((p) => ("label" in p ? p.label : p.kind))).toEqual([
+      "Refresh worktrees",
+      "Review",
+    ]);
+    // The review's diff, scope and baseline are all resolved while it is built,
+    // so nothing about it may be built before the refresh has run.
+    expect(vi.mocked(prepareReviewDir)).not.toHaveBeenCalled();
+    expect(mockWriteReviewBaseline).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh on the plain path", async () => {
+    mockListWorkspaceRepos.mockReturnValue([]);
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    expect(phases.map((p) => ("label" in p ? p.label : p.kind))).not.toContain(
+      "Refresh worktrees",
+    );
+  });
+});
+
+describe("buildReviewPipeline — carrying posted findings", () => {
+  const repos = [
+    {
+      repoName: "svc",
+      repoPath: "owner/svc",
+      worktreePath: "/repos/svc/worktrees/test-ws",
+    },
+    {
+      repoName: "web",
+      repoPath: "owner/web",
+      worktreePath: "/repos/web/worktrees/test-ws",
+    },
+  ] as ReturnType<typeof listWorkspaceRepos>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+    mockCollectPostedAsks.mockResolvedValue(new Map());
+  });
+
+  it("verifies each repo's own posted comments and skips repos with none", async () => {
+    mockListWorkspaceRepos.mockReturnValue(repos);
+    mockCollectPostedAsks.mockResolvedValue(new Map([["svc", ["fix the guard"]]]));
+
+    const phases = await buildReviewPipeline({
+      workspace: "test-ws",
+      carryPostedFindings: true,
+    });
+
+    const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
+    expect(labels).toContain("verify-fixes-svc");
+    expect(labels).not.toContain("verify-fixes-web");
+    expect(mockBuildFixVerifierPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repoName: "svc",
+        requestedFixes: ["fix the guard"],
+        askSource: "pr-comments",
+      }),
+    );
+  });
+
+  it("does not read posted findings unless asked to", async () => {
+    mockListWorkspaceRepos.mockReturnValue(repos);
+    await buildReviewPipeline({ workspace: "test-ws" });
+    expect(mockCollectPostedAsks).not.toHaveBeenCalled();
+  });
+
+  it("gives a cycle's gate asks precedence over the comments on the PR", async () => {
+    mockListWorkspaceRepos.mockReturnValue([repos[0]]);
+    mockCollectPostedAsks.mockResolvedValue(new Map([["svc", ["fix the guard"]]]));
+
+    await buildReviewPipeline({
+      workspace: "test-ws",
+      carryPostedFindings: true,
+      requestedFixes: ["the gate asked for this"],
+    });
+
+    // Only the gate can retire its own asks, so a cycle's list is never diluted
+    // with comments it did not write.
+    expect(mockCollectPostedAsks).not.toHaveBeenCalled();
+    expect(mockBuildFixVerifierPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestedFixes: ["the gate asked for this"],
+        askSource: "gate",
+      }),
+    );
   });
 });

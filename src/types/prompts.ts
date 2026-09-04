@@ -129,6 +129,12 @@ export interface FixVerifierInput extends RepoPromptInput {
   reviewTimestamp: string;
   /** The previous cycle's gate `fixableIssues`, verbatim. */
   requestedFixes: string[];
+  /**
+   * Where the asks came from. `pr-comments` are review comments already on the
+   * PR, so the author is the one who acts on them and a declined ask is
+   * recorded in the thread rather than in a TODO file. Defaults to `gate`.
+   */
+  askSource?: "gate" | "pr-comments";
   verifyFilePath: string;
   /** Baseline the fixes were requested at, when one was recorded. */
   sinceSha?: string;

@@ -49,20 +49,16 @@ export async function writeReviewBaseline(
 }
 
 /**
- * Newest baseline strictly older than `beforeTimestamp`.
+ * Newest baseline whose session timestamp the caller accepts.
  *
- * Strictly older matters: `prepareReviewDir` has already created the current
- * session's directory by the time this is read, so including it would make a
- * review its own baseline and leave an empty review target. Session directory
- * names are `YYYYMMDD-HHMMSS`, so lexical ordering is chronological.
- *
- * Returns null when no prior session recorded one — every session predating this
- * feature, which is what makes a full-branch review the fallback rather than an
- * error.
+ * Session directory names are `YYYYMMDD-HHMMSS`, so lexical ordering is
+ * chronological. Returns null when no accepted session recorded one — every
+ * session predating this feature, which is what makes a full-branch review the
+ * fallback rather than an error.
  */
-export async function readPreviousReviewBaseline(
+async function findBaseline(
   wsPath: string,
-  beforeTimestamp: string,
+  accept: (timestamp: string) => boolean,
 ): Promise<{ timestamp: string; heads: Record<string, string> } | null> {
   const reviewsDir = reviewsDirPath(wsPath);
   if (!existsSync(reviewsDir)) return null;
@@ -70,7 +66,7 @@ export async function readPreviousReviewBaseline(
   let candidates: string[];
   try {
     candidates = readdirSync(reviewsDir, { withFileTypes: true })
-      .filter((e) => e.isDirectory() && e.name < beforeTimestamp)
+      .filter((e) => e.isDirectory() && accept(e.name))
       .map((e) => e.name)
       .sort((a, b) => b.localeCompare(a));
   } catch {
@@ -97,4 +93,29 @@ export async function readPreviousReviewBaseline(
   }
 
   return null;
+}
+
+/**
+ * Baseline of the session strictly older than `beforeTimestamp`.
+ *
+ * Strictly older matters: `prepareReviewDir` has already created the current
+ * session's directory by the time this is read, so including it would make a
+ * review its own baseline and leave an empty review target.
+ */
+export async function readPreviousReviewBaseline(
+  wsPath: string,
+  beforeTimestamp: string,
+): Promise<{ timestamp: string; heads: Record<string, string> } | null> {
+  return findBaseline(wsPath, (timestamp) => timestamp < beforeTimestamp);
+}
+
+/**
+ * Baseline of the most recent session that recorded one — what the workspace
+ * last actually reviewed. Read outside the pipeline, to tell whether a pull
+ * request has moved since.
+ */
+export async function readLatestReviewBaseline(
+  wsPath: string,
+): Promise<{ timestamp: string; heads: Record<string, string> } | null> {
+  return findBaseline(wsPath, () => true);
 }

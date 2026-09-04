@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   parseGroundingResult,
   postReviewFindingsBudgetMs,
+  knownFindingsFromGroundings,
   summarizeGroundings,
 } from "@/lib/pipelines/post-review-findings";
 import type { FindingGrounding } from "@/types/review-findings";
@@ -109,5 +110,62 @@ describe("postReviewFindingsBudgetMs", () => {
 
   it("budgets at least one finding for an empty selection", () => {
     expect(postReviewFindingsBudgetMs(0)).toBe(postReviewFindingsBudgetMs(1));
+  });
+});
+
+describe("knownFindingsFromGroundings", () => {
+  function entry(overrides: Partial<FindingGrounding>, title = "Null deref on payload") {
+    return { grounding: grounding(overrides), title };
+  }
+
+  it("records a refuted claim as low-confidence", () => {
+    const [finding] = knownFindingsFromGroundings([
+      entry({ holds: "no", reason: "the guard is on line 12" }),
+    ]);
+    expect(finding.kind).toBe("low-confidence");
+    expect(finding.summary).toBe("Null deref on payload");
+    expect(finding.reason).toContain("refuted: the guard is on line 12");
+  });
+
+  it("records an unsettled claim as low-confidence", () => {
+    const [finding] = knownFindingsFromGroundings([entry({ holds: "unclear" })]);
+    expect(finding.kind).toBe("low-confidence");
+    expect(finding.reason).toContain("could not settle");
+  });
+
+  it("records a confirmed pre-existing defect as pre-existing", () => {
+    const [finding] = knownFindingsFromGroundings([
+      entry({ holds: "yes", scope: "pre-existing", reason: "present before the branch" }),
+    ]);
+    expect(finding.kind).toBe("pre-existing");
+    expect(finding.reason).toContain("not introduced by this branch");
+  });
+
+  it("distinguishes a local-only artifact in its reason", () => {
+    const [finding] = knownFindingsFromGroundings([
+      entry({ holds: "yes", scope: "local-only" }),
+    ]);
+    expect(finding.kind).toBe("pre-existing");
+    expect(finding.reason).toContain("only from local state");
+  });
+
+  it("never ledgers a finding that earned a comment, even when the post failed", () => {
+    // `posted: false` here is GitHub's outcome, not the grounder's verdict. The
+    // ask still stands, and listing it would tell the next review to compress it.
+    expect(
+      knownFindingsFromGroundings([
+        entry({ holds: "yes", scope: "pr", comment: "please add the guard", posted: false }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("skips a confirmed finding the grounder wrote no comment for", () => {
+    expect(
+      knownFindingsFromGroundings([entry({ holds: "yes", scope: "pr", comment: "" })]),
+    ).toEqual([]);
+  });
+
+  it("skips an entry whose title could not be resolved", () => {
+    expect(knownFindingsFromGroundings([entry({ holds: "no" }, "  ")])).toEqual([]);
   });
 });

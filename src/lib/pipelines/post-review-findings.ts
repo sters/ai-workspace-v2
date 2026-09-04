@@ -27,6 +27,8 @@ import {
   shouldPost,
   writeFindingGroundings,
 } from "@/lib/workspace/finding-groundings";
+import { appendKnownFindings } from "@/lib/workspace/known-findings";
+import type { KnownFinding } from "@/lib/workspace/known-findings";
 import { postReviewComments } from "@/lib/workspace/pr-review-comments";
 import { loadReviewFindings } from "@/lib/workspace/review-findings";
 import { listWorkspacePullRequests } from "@/lib/workspace/pr-threads";
@@ -95,6 +97,64 @@ export function parseGroundingResult(
     posted: false,
     groundedAt: context.groundedAt,
   };
+}
+
+/**
+ * The declined findings, as ledger entries for the next review.
+ *
+ * Without this the ledger has no writer outside the autonomous gate, so a
+ * workspace that only ever reviews — a PR-review workspace, or any review a
+ * human starts — re-derives and re-reports at full length exactly the findings
+ * a grounding pass already checked and dropped. `RECURRING_FINDINGS_POLICY`
+ * compresses a listed finding to one line, which is what this buys.
+ *
+ * The filter is `shouldPost`, not `posted`: a finding that earned a comment and
+ * failed to reach GitHub is still an ask the human wants made, and recording it
+ * here would tell the next reviewer to stop mentioning it. Only what the
+ * grounding pass itself declined goes in.
+ */
+export function knownFindingsFromGroundings(
+  entries: { grounding: FindingGrounding; title: string }[],
+): KnownFinding[] {
+  const findings: KnownFinding[] = [];
+
+  for (const { grounding, title } of entries) {
+    if (shouldPost(grounding)) continue;
+    const summary = title.trim();
+    if (summary === "") continue;
+    const reason = grounding.reason.trim() || "no reason recorded";
+
+    if (grounding.holds === "no") {
+      findings.push({
+        summary,
+        kind: "low-confidence",
+        reason: `Checked against the pushed code and refuted: ${reason}`,
+      });
+    } else if (grounding.holds === "unclear") {
+      findings.push({
+        summary,
+        kind: "low-confidence",
+        reason: `The code could not settle the claim: ${reason}`,
+      });
+    } else if (grounding.scope === "local-only") {
+      findings.push({
+        summary,
+        kind: "pre-existing",
+        reason: `Reproduces only from local state, not from the pushed branch: ${reason}`,
+      });
+    } else if (grounding.scope === "pre-existing") {
+      findings.push({
+        summary,
+        kind: "pre-existing",
+        reason: `Real, but not introduced by this branch: ${reason}`,
+      });
+    }
+    // `yes` + `pr` with an empty comment is the remaining case: the grounder
+    // confirmed the finding and wrote nothing to say about it, which is not a
+    // decision to stop reporting it.
+  }
+
+  return findings;
 }
 
 /** One line naming what went out and what each dropped finding was dropped for. */
@@ -324,6 +384,27 @@ export function buildPostReviewFindingsPipeline(input: {
 
         if (groundings.length > 0) await writeFindingGroundings(wsPath, groundings);
 
+        // Hand the declined findings to the next review, so it compresses them
+        // instead of re-deriving them at full length.
+        let ledgered: KnownFinding[] = [];
+        if (groundings.length > 0) {
+          const titles = new Map(targets.map((t) => [t.finding.id, t.finding.title]));
+          ledgered = await appendKnownFindings(
+            wsPath,
+            knownFindingsFromGroundings(
+              groundings.map((grounding) => ({
+                grounding,
+                title: titles.get(grounding.findingId) ?? "",
+              })),
+            ),
+          );
+          if (ledgered.length > 0) {
+            ctx.emitStatus(
+              `Recorded ${ledgered.length} declined finding(s) in the known-findings ledger`,
+            );
+          }
+        }
+
         const dropped = groundings.filter((g) => !g.posted);
         const report = [
           `Grounded ${groundings.length} of ${targets.length} selected finding(s): ${summarizeGroundings(groundings)}`,
@@ -336,6 +417,12 @@ export function buildPostReviewFindingsPipeline(input: {
                   (g) =>
                     `- \`${g.findingId}\` (${g.holds === "yes" ? g.scope : g.holds}) — ${g.reason || "no reason given"}`,
                 ),
+              ]
+            : []),
+          ...(ledgered.length > 0
+            ? [
+                "",
+                `${ledgered.length} declined finding(s) went to \`artifacts/known-findings.md\`, so the next review reports them as one \`(Recurring)\` line rather than deriving them again.`,
               ]
             : []),
           ...(unreadable.length > 0
