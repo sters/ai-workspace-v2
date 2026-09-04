@@ -1,7 +1,9 @@
 "use client";
 
 import type { TodoFile } from "@/types/workspace";
+import { Bot } from "lucide-react";
 import { Card } from "../shared/containers/card";
+import { Button } from "../shared/buttons/button";
 import { StatusText } from "../shared/feedback/status-text";
 import { UpdateForm } from "./update-form";
 import { RepoTodoCard } from "./repo-todo-card";
@@ -20,6 +22,15 @@ function findRepoPath(
   return undefined;
 }
 
+/**
+ * The worktree directory name, which is also the repo's `TODO-<name>.md` name.
+ * For a parallel worktree the README path keeps the `___alias` suffix, so the
+ * last segment matches what `setupRepository` wrote.
+ */
+function repoNameOf(repo: { alias: string; path: string }): string {
+  return repo.path.split("/").pop() ?? repo.alias;
+}
+
 export function TodoUpdater({
   todos,
   workspacePath,
@@ -36,7 +47,15 @@ export function TodoUpdater({
   const canInterject = !isUpdateTodoRunning && isWorkspaceRunning(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
 
-  if (todos.length === 0) {
+  // Declared in the README (so `Ensure TODOs` will plan it) but with no TODO
+  // file on disk yet. Rendering the tab from `todos` alone dropped these
+  // repositories silently, which is what a repo added after init looks like.
+  const unplanned = (repositories ?? []).filter((repo) => {
+    const name = repoNameOf(repo);
+    return !todos.some((t) => t.repoName === name || t.repoName === repo.alias);
+  });
+
+  if (todos.length === 0 && unplanned.length === 0) {
     return <StatusText>No TODO files found.</StatusText>;
   }
 
@@ -52,47 +71,49 @@ export function TodoUpdater({
   return (
     <div className="space-y-6">
       {/* Workspace-wide update form */}
-      <Card variant="dashed">
-        <p className="mb-2 text-sm font-medium">Update workspace TODOs</p>
-        {canInterject && (
-          <p className="mb-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-900 dark:text-amber-200">
-            An operation is currently running. Submitting will interrupt it, update TODOs, then restart autonomous from execute.
-          </p>
-        )}
-        {canInterject ? (
-          <UpdateForm
-            label="Interject + restart"
-            placeholder="Describe TODO changes to apply across all repositories..."
-            disabled={false}
-            onSubmit={interjectSubmit}
-          />
-        ) : (
-          <UpdateForm
-            label="Start autonomous"
-            placeholder="Describe TODO changes to apply across all repositories..."
-            disabled={isUpdateTodoRunning}
-            onSubmit={(instruction, interactionLevel) => {
-              startAndNavigate("autonomous", {
-                workspace: workspacePath,
-                instruction,
-                interactionLevel,
-                startWith: "update-todo",
-              });
-            }}
-            batchItems={(instruction, interactionLevel) => [
-              {
-                label: "Update TODOs only",
-                onClick: () =>
-                  startAndNavigate("update-todo", {
-                    workspace: workspacePath,
-                    instruction: instruction.trim(),
-                    interactionLevel,
-                  }),
-              },
-            ]}
-          />
-        )}
-      </Card>
+      {todos.length > 0 && (
+        <Card variant="dashed">
+          <p className="mb-2 text-sm font-medium">Update workspace TODOs</p>
+          {canInterject && (
+            <p className="mb-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-900 dark:text-amber-200">
+              An operation is currently running. Submitting will interrupt it, update TODOs, then restart autonomous from execute.
+            </p>
+          )}
+          {canInterject ? (
+            <UpdateForm
+              label="Interject + restart"
+              placeholder="Describe TODO changes to apply across all repositories..."
+              disabled={false}
+              onSubmit={interjectSubmit}
+            />
+          ) : (
+            <UpdateForm
+              label="Start autonomous"
+              placeholder="Describe TODO changes to apply across all repositories..."
+              disabled={isUpdateTodoRunning}
+              onSubmit={(instruction, interactionLevel) => {
+                startAndNavigate("autonomous", {
+                  workspace: workspacePath,
+                  instruction,
+                  interactionLevel,
+                  startWith: "update-todo",
+                });
+              }}
+              batchItems={(instruction, interactionLevel) => [
+                {
+                  label: "Update TODOs only",
+                  onClick: () =>
+                    startAndNavigate("update-todo", {
+                      workspace: workspacePath,
+                      instruction: instruction.trim(),
+                      interactionLevel,
+                    }),
+                },
+              ]}
+            />
+          )}
+        </Card>
+      )}
 
       {/* Per-repo cards */}
       {todos.map((todo) => (
@@ -105,6 +126,40 @@ export function TodoUpdater({
           onStartAndNavigate={startAndNavigate}
         />
       ))}
+
+      {/* Declared repositories with nothing planned for them yet */}
+      {unplanned.map((repo) => {
+        const repoName = repoNameOf(repo);
+        return (
+          <Card key={repo.path} variant="dashed">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <h3 className="font-semibold">{repoName}</h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  No TODO file. Planning it also discovers this repository&apos;s
+                  lint / test / build commands, then the run implements and reviews it.
+                </p>
+              </div>
+              <Button
+                disabled={isWorkspaceRunning(workspaceName)}
+                onClick={() =>
+                  startAndNavigate("autonomous", {
+                    workspace: workspacePath,
+                    // `execute` is what reaches the Ensure repositories +
+                    // Ensure TODOs salvage phases; `update-todo` would ask an
+                    // updater to write the plan without the planning phases.
+                    startWith: "execute",
+                    repo: repoName,
+                  })
+                }
+              >
+                <Bot className="h-3.5 w-3.5" />
+                Plan TODOs
+              </Button>
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
