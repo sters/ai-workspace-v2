@@ -9,6 +9,60 @@ import { getWorkspaceDir } from "@/lib/config";
 import { exec, repoDir, detectBaseBranch, remoteBranchExists } from "@/lib/workspace/helpers";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 
+/** Waits before each retry of the initial fetch; its length is the attempt count. */
+const FETCH_RETRY_DELAYS_MS = [500, 2000];
+
+/**
+ * Git reports why a fetch failed at the *end* of its transcript of ref updates,
+ * so on a repository with thousands of branches the first lines of stderr say
+ * nothing about the failure. Keep the `error:` / `fatal:` lines.
+ */
+function gitFailureReason(err: unknown): string {
+  const lines = String(err)
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const reasons = lines.filter((l) => /^(error|fatal):/.test(l));
+  return (reasons.length > 0 ? reasons : lines.slice(0, 1)).slice(0, 3).join(" ");
+}
+
+/**
+ * Fetch every remote, retrying a failure a few times, and report whether the
+ * refs on disk ended up current.
+ *
+ * A fetch of a busy repository fails for reasons that have nothing to do with
+ * this workspace, and it fails *after* updating most refs: a ref that moved
+ * mid-fetch (`incorrect old value provided`) clears on a retry, while a remote
+ * carrying two refs that differ only in casing cannot be stored on a
+ * case-insensitive filesystem at all and fails every time. Neither is a reason
+ * to abandon setup — the worktree is created from `origin/<base>`, which is
+ * either present (possibly a few commits stale) or missing, and `worktree add`
+ * says so loudly.
+ */
+function fetchAllWithRetries(
+  repoAbsPath: string,
+  emitStatus: (message: string) => void,
+): boolean {
+  for (let attempt = 0; attempt <= FETCH_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      exec(`git -C "${repoAbsPath}" fetch --all --prune`);
+      return true;
+    } catch (err) {
+      const reason = gitFailureReason(err);
+      const delay = FETCH_RETRY_DELAYS_MS[attempt];
+      if (delay === undefined) {
+        emitStatus(
+          `Warning: fetch failed after ${attempt + 1} attempts, continuing with the refs already on disk: ${reason}`,
+        );
+        return false;
+      }
+      emitStatus(`fetch failed, retrying in ${delay}ms: ${reason}`);
+      Bun.sleepSync(delay);
+    }
+  }
+  return false;
+}
+
 export function setupRepository(
   workspaceName: string,
   repositoryPathArg: string,
@@ -47,7 +101,7 @@ export function setupRepository(
     } catch (err) { console.debug("[setup] set-head failed (non-critical):", err); }
   } else {
     emitStatus(`Repository found locally, fetching latest...`);
-    exec(`git -C "${repoAbsPath}" fetch --all --prune`);
+    fetchAllWithRetries(repoAbsPath, emitStatus);
     try {
       exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
     } catch (err) { console.debug("[setup] set-head failed (non-critical):", err); }
