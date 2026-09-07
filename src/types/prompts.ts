@@ -155,6 +155,23 @@ export interface PrCommentValidatorInput extends RepoPromptInput {
   thread: PrReviewThread;
 }
 
+/**
+ * Merge-conflict resolver input — one repository per call, mid-merge.
+ *
+ * `conflictedFiles` is git's own unmerged list rather than anything the agent
+ * discovers, and it is also the scope: the same list is what the deterministic
+ * side scans for leftover markers before committing.
+ */
+export interface ConflictResolverInput extends RepoPromptInput {
+  /** The pull request's branch, i.e. `ours` in the merge. */
+  branch: string;
+  /** The branch being merged in, without the `origin/` prefix. */
+  baseBranch: string;
+  prUrl?: string;
+  prTitle?: string;
+  conflictedFiles: string[];
+}
+
 /** Cross-repository code-review agent input (multi-repo workspaces only). */
 export interface CrossRepositoryReviewerInput {
   workspaceName: string;

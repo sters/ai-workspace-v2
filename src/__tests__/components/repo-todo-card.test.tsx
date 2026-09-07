@@ -26,12 +26,16 @@ function makeTodo(overrides: Partial<TodoFile> = {}): TodoFile {
   };
 }
 
-function renderCard(todo: TodoFile = makeTodo()) {
+function renderCard(
+  todo: TodoFile = makeTodo(),
+  props: { disabled?: boolean; workspaceBusy?: boolean } = {},
+) {
   return render(
     <RepoTodoCard
       todo={todo}
       workspacePath="/ws/ws"
-      disabled={false}
+      disabled={props.disabled ?? false}
+      workspaceBusy={props.workspaceBusy}
       repoPath="github.com/acme/repo-a"
       onStartAndNavigate={mockStartAndNavigate}
     />,
@@ -126,5 +130,38 @@ describe("RepoTodoCard collapsing", () => {
     fireEvent.click(toggle());
     expect(toggle()).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("first item")).not.toBeInTheDocument();
+  });
+});
+
+describe("RepoTodoCard base-branch merge", () => {
+  const todoWithItems = makeTodo({
+    items: [{ text: "first item", status: "pending", indent: 0, children: [] }],
+    total: 1,
+    pending: 1,
+  });
+
+  function expand() {
+    fireEvent.click(screen.getByRole("button", { name: /repo-a/ }));
+  }
+
+  it("starts the merge scoped to this repository", () => {
+    renderCard(todoWithItems);
+    expand();
+    fireEvent.click(screen.getByRole("button", { name: /solve pr base branch conflicts/i }));
+    expect(mockStartAndNavigate).toHaveBeenCalledWith("resolve-base-conflicts", {
+      workspace: "/ws/ws",
+      repo: "repo-a",
+    });
+  });
+
+  // The merge writes to the worktree and pushes, so it must not start under a
+  // running executor — which this card's own `disabled` (its update-todo) does
+  // not cover.
+  it("is disabled while any operation runs on the workspace", () => {
+    renderCard(todoWithItems, { workspaceBusy: true });
+    expand();
+    expect(
+      screen.getByRole("button", { name: /solve pr base branch conflicts/i }),
+    ).toBeDisabled();
   });
 });

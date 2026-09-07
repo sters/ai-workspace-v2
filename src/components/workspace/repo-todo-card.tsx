@@ -5,6 +5,7 @@ import type { OperationType } from "@/types/operation";
 import { TodoItemRow } from "./todo-item";
 import { SectionBlock } from "./todo-viewer";
 import { UpdateForm } from "./update-form";
+import { SolveBaseConflictsButton } from "./solve-base-conflicts-button";
 import { Card } from "../shared/containers/card";
 import { ProgressBar } from "../shared/feedback/progress-bar";
 import { Button } from "../shared/buttons/button";
@@ -30,12 +31,19 @@ export function RepoTodoCard({
   todo,
   workspacePath,
   disabled,
+  workspaceBusy,
   repoPath,
   onStartAndNavigate,
 }: {
   todo: TodoFile;
   workspacePath: string;
   disabled: boolean;
+  /**
+   * Whether any operation is running on the workspace. Separate from `disabled`
+   * (which is this repo's update-todo) because merging the base branch writes to
+   * the worktree and pushes, so it must not start under a running executor.
+   */
+  workspaceBusy?: boolean;
   /** Full repository path (e.g. "github.com/org/repo") for per-repo operations. */
   repoPath: string | undefined;
   onStartAndNavigate: (type: OperationType, body: Record<string, string>) => void;
@@ -196,6 +204,14 @@ export function RepoTodoCard({
                     }),
                 },
               ]}
+              extraActions={
+                <SolveBaseConflictsButton
+                  workspacePath={workspacePath}
+                  repo={todo.repoName}
+                  disabled={disabled || Boolean(workspaceBusy)}
+                  onStart={onStartAndNavigate}
+                />
+              }
             />
           </div>
 

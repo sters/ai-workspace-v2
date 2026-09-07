@@ -69,3 +69,8 @@ export {
   FINDING_GROUNDING_SCHEMA,
 } from "./finding-grounder";
 export { buildTriagePrCommentsInstruction } from "./triage-pr-comments";
+export {
+  getConflictResolverSystemPrompt,
+  buildConflictResolverPrompt,
+  CONFLICT_RESOLUTION_SCHEMA,
+} from "./conflict-resolver";

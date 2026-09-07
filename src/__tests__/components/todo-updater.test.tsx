@@ -191,6 +191,49 @@ describe("TodoUpdater", () => {
     });
   });
 
+  // Not a quick-fill like the button next to it: there is no instruction a
+  // TODO-driven run could carry, since the executor may not push and the merge
+  // must be committed and pushed by the phase that verified it.
+  describe("Solve PR base branch conflicts", () => {
+    function renderTab() {
+      render(
+        <TodoUpdater
+          todos={[makeTodo()]}
+          workspacePath="/ws/ws"
+          workspaceName="ws"
+          repositories={[]}
+        />,
+      );
+    }
+
+    it("starts the merge for the whole workspace with no instruction", () => {
+      setRunning({});
+      renderTab();
+
+      fireEvent.click(
+        screen.getAllByRole("button", { name: /solve pr base branch conflicts/i })[0],
+      );
+
+      expect(mockStartAndNavigate).toHaveBeenCalledWith("resolve-base-conflicts", {
+        workspace: "/ws/ws",
+      });
+    });
+
+    it("is disabled while an operation runs, including in interject mode", () => {
+      // An interject restarts autonomous; this operation is not part of that
+      // restart, and it writes to the worktrees the running one is editing.
+      setRunning({ workspaceRunning: true });
+      renderTab();
+
+      for (const button of screen.getAllByRole("button", {
+        name: /solve pr base branch conflicts/i,
+      })) {
+        expect(button).toBeDisabled();
+      }
+      expect(screen.getByRole("button", { name: /interject \+ restart/i })).toBeInTheDocument();
+    });
+  });
+
   it("submits update-todo with interject=true in interject mode", () => {
     setRunning({ workspaceRunning: true });
     render(

@@ -7,6 +7,7 @@ import { Button } from "../shared/buttons/button";
 import { StatusText } from "../shared/feedback/status-text";
 import { UpdateForm } from "./update-form";
 import { RepoTodoCard } from "./repo-todo-card";
+import { SolveBaseConflictsButton } from "./solve-base-conflicts-button";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 
@@ -59,6 +60,17 @@ export function TodoUpdater({
     return <StatusText>No TODO files found.</StatusText>;
   }
 
+  // The merge writes to every worktree and pushes, so it waits for whatever else
+  // is running on the workspace — including the operation an interject would
+  // interrupt, since this one is not part of that restart.
+  const solveConflicts = (
+    <SolveBaseConflictsButton
+      workspacePath={workspacePath}
+      disabled={isWorkspaceRunning(workspaceName)}
+      onStart={startAndNavigate}
+    />
+  );
+
   const interjectSubmit = (instruction: string, interactionLevel: string) => {
     startAndNavigate("update-todo", {
       workspace: workspacePath,
@@ -85,6 +97,7 @@ export function TodoUpdater({
               placeholder="Describe TODO changes to apply across all repositories..."
               disabled={false}
               onSubmit={interjectSubmit}
+              extraActions={solveConflicts}
             />
           ) : (
             <UpdateForm
@@ -110,6 +123,7 @@ export function TodoUpdater({
                     }),
                 },
               ]}
+              extraActions={solveConflicts}
             />
           )}
         </Card>
@@ -122,6 +136,7 @@ export function TodoUpdater({
           todo={todo}
           workspacePath={workspacePath}
           disabled={isRepoTypeRunning(workspaceName, "update-todo", todo.repoName)}
+          workspaceBusy={isWorkspaceRunning(workspaceName)}
           repoPath={findRepoPath(todo.repoName, repositories ?? [])}
           onStartAndNavigate={startAndNavigate}
         />
