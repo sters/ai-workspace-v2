@@ -2,8 +2,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import "@testing-library/jest-dom/vitest";
-
 // Use in-memory SQLite for all tests
 import { _setDbPath, _resetDb } from "@/lib/db";
 _setDbPath(":memory:");
