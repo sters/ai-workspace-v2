@@ -13,6 +13,14 @@ import type { SetupRepositoryResult } from "@/types/pipeline";
 const FETCH_RETRY_DELAYS_MS = [500, 2000];
 
 /**
+ * Caps the search for an unused branch name. The probe asks git whether a name
+ * is taken, so a git that answers "yes" to everything makes the search endless
+ * — and the search runs one subprocess per name, which is why it has to be the
+ * search that stops rather than the caller.
+ */
+const MAX_BRANCH_NAME_ATTEMPTS = 100;
+
+/**
  * Git reports why a fetch failed at the *end* of its transcript of ref updates,
  * so on a repository with thousands of branches the first lines of stderr say
  * nothing about the failure. Keep the `error:` / `fatal:` lines.
@@ -215,11 +223,22 @@ export function setupRepository(
       if (branchExists(branchName)) {
         const origName = branchName;
         let suffix = 2;
-        while (branchExists(`${origName}-${suffix}`)) {
+        while (suffix <= MAX_BRANCH_NAME_ATTEMPTS && branchExists(`${origName}-${suffix}`)) {
           suffix++;
         }
-        branchName = `${origName}-${suffix}`;
-        emitStatus(`Branch ${origName} already exists, using ${branchName} instead.`);
+        if (suffix > MAX_BRANCH_NAME_ATTEMPTS) {
+          // A timestamp needs no probe to be unused, and the point of the search
+          // was only ever a fresh name. If this one is somehow taken as well,
+          // `worktree add -b` refuses it and says so — git is the authority here,
+          // not the probe that just claimed a hundred names in a row.
+          branchName = `${origName}-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`;
+          emitStatus(
+            `Warning: ${MAX_BRANCH_NAME_ATTEMPTS} names from ${origName} are all reported as taken, using ${branchName} instead.`,
+          );
+        } else {
+          branchName = `${origName}-${suffix}`;
+          emitStatus(`Branch ${origName} already exists, using ${branchName} instead.`);
+        }
         try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
       }
     }
