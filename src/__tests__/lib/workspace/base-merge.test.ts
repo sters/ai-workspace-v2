@@ -6,8 +6,11 @@ import {
   isBaseMergeProblem,
   mergeBaseIntoBranch,
   pushMergedBranch,
+  summarizeBaseMergeAttempts,
   summarizeBaseMerges,
+  type BaseMergeAttempt,
   type BaseMergeOutcome,
+  type BaseMergeStage,
   type GitExec,
 } from "@/lib/workspace/base-merge";
 
@@ -424,6 +427,49 @@ function outcome(overrides: Partial<BaseMergeOutcome> = {}): BaseMergeOutcome {
     ...overrides,
   };
 }
+
+describe("summarizeBaseMergeAttempts", () => {
+  function attempt(stage: BaseMergeStage, repoName = "widgets"): BaseMergeAttempt {
+    return {
+      repoName,
+      stage,
+      conflictedFiles: [],
+      fromSha: HEAD_SHA,
+      branch: "feature/widget-x",
+      detail: `${repoName}: ${stage}`,
+    };
+  }
+
+  it("counts the states the merge phase can leave behind", () => {
+    const text = summarizeBaseMergeAttempts([
+      attempt("clean"),
+      attempt("conflicted", "api"),
+      attempt("unpushed", "web"),
+    ]);
+    expect(text).toContain("1 merged cleanly");
+    expect(text).toContain("1 with conflicts to resolve");
+    expect(text).toContain("1 already merged but unpushed");
+    expect(text).toContain("- api: conflicted");
+  });
+
+  it("groups the three untouched states as left alone", () => {
+    const text = summarizeBaseMergeAttempts([
+      attempt("dirty"),
+      attempt("stale", "api"),
+      attempt("failed", "web"),
+    ]);
+    expect(text).toContain("3 left alone");
+  });
+
+  // It says what the merge did; the push phase's summary says what reached the
+  // pull request. A reader of a three-phase log needs the first without the
+  // second being implied.
+  it("does not claim anything about the pull request", () => {
+    const text = summarizeBaseMergeAttempts([attempt("clean")]);
+    expect(text).not.toContain("pushed");
+    expect(text).not.toContain("lint / test / build");
+  });
+});
 
 describe("isBaseMergeProblem", () => {
   it("counts only the two settled states as fine", () => {
