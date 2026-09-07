@@ -27,14 +27,21 @@ export type GitExec = (args: string[], cwd: string) => { ok: boolean; out: strin
 
 /** What the deterministic merge attempt left behind. */
 export type BaseMergeStage =
-  /** `origin/<base>` is already an ancestor of HEAD — nothing to merge. */
+  /** The base is in HEAD *and* in the commit the pull request holds. Nothing to do. */
   | "already-current"
+  /**
+   * The base is in HEAD but not in the pull request's head commit: the merge
+   * exists only in this worktree. Nothing to merge, everything to push.
+   */
+  | "unpushed"
   /** `git merge --no-ff` succeeded on its own and created the merge commit. */
   | "clean"
   /** The merge stopped with conflicts; the index holds them, awaiting resolution. */
   | "conflicted"
   /** Uncommitted changes — nothing was attempted, since a merge would touch them. */
   | "dirty"
+  /** The pull request holds commits this worktree does not, so any push would be rejected. */
+  | "stale"
   /** A git command failed, or the worktree is not in a state to merge into. */
   | "failed";
 
@@ -92,6 +99,10 @@ function firstLine(text: string): string {
   return text.split("\n")[0]?.trim() ?? "";
 }
 
+function shortSha(sha: string): string {
+  return sha.slice(0, 8);
+}
+
 function lines(text: string): string[] {
   return text
     .split("\n")
@@ -125,12 +136,32 @@ export function findConflictMarkers(
 /**
  * Fetch `origin/<base>` and merge it into the worktree's branch with `--no-ff`.
  *
- * Ordering carries the substance:
+ * **The question is about the commit the pull request holds, not about the
+ * worktree**, and conflating the two is what made the first version of this
+ * report a lie. It decided "nothing to do" from `merge-base --is-ancestor
+ * origin/<base> HEAD` alone, so a merge sitting unpushed in the worktree — a
+ * push this operation had failed to land, a human merging by hand, an
+ * autonomous run's own mid-run merge — read as `already contains origin/<base>`
+ * while GitHub went on showing the pull request as conflicting, because GitHub
+ * judges the *pushed* head. Both facts were true and the conclusion was wrong.
+ * So `prHeadSha` (from `gh pr view`, i.e. the commit GitHub judged) decides what
+ * counts as done, and the base being contained locally without being contained
+ * there is `unpushed`: nothing to merge, everything to push.
  *
+ * The ordering around that carries the rest:
+ *
+ * - **The base ref is fetched with an explicit forced refspec.** `git fetch
+ *   origin <base>` leaves updating `refs/remotes/origin/<base>` to git's
+ *   opportunistic behaviour, which depends on the clone's configured refspec,
+ *   and it exits 0 either way — so the ancestry test could be answered by a ref
+ *   from an earlier fetch while the log reported a successful one.
  * - **The branch is checked against the PR's head ref before anything moves.**
  *   Everything downstream pushes to the branch the PR is open on, so a worktree
  *   sitting somewhere else must not be merged into — the push would land this
  *   branch's commits on someone else's PR.
+ * - **A worktree behind the pushed head is refused up front** rather than merged
+ *   and pushed: that push is rejected as a non-fast-forward, and finding out
+ *   afterwards costs a conflict resolution against code that is not current.
  * - **A merge already in progress is refused, not continued.** It belongs to
  *   whoever started it, and its index is the one thing the resolver reads.
  * - **A failed fetch is not fatal**, matching `refreshWorktree`: a locally known
@@ -142,10 +173,22 @@ export function findConflictMarkers(
  * - **A merge that failed with no unmerged paths is rolled back.** That is not
  *   the conflict case — it is git refusing for some other reason — and leaving
  *   the worktree half-merged would strand every later phase.
+ *
+ * Every verdict names the shas it rests on, because the report that was wrong
+ * named none and so could not be checked after the fact.
  */
 export function mergeBaseIntoBranch(
   repo: { repoName: string; worktreePath: string },
-  opts: { baseBranch: string; expectedBranch?: string },
+  opts: {
+    baseBranch: string;
+    expectedBranch?: string;
+    /**
+     * The pull request's head commit, as GitHub holds it. Absent falls back to
+     * the local `refs/remotes/origin/<branch>`, which keeps the function usable
+     * without a PR at the cost of trusting a ref this run did not refresh.
+     */
+    prHeadSha?: string;
+  },
   git: GitExec = runGit,
 ): BaseMergeAttempt {
   const { repoName, worktreePath } = repo;
@@ -197,27 +240,73 @@ export function mergeBaseIntoBranch(
     };
   }
 
-  const fetched = git(["fetch", "origin", baseBranch], worktreePath);
+  const fetched = git(
+    ["fetch", "--force", "origin", `refs/heads/${baseBranch}:refs/remotes/origin/${baseBranch}`],
+    worktreePath,
+  );
   const fetchNote = fetched.ok ? "" : ` (fetch failed: ${firstLine(fetched.out)})`;
 
-  const baseSha = git(["rev-parse", "--verify", baseRef], worktreePath);
-  if (!baseSha.ok || baseSha.out === "") {
+  const baseRev = git(["rev-parse", "--verify", baseRef], worktreePath);
+  if (!baseRev.ok || baseRev.out === "") {
     return {
       ...base,
       fromSha,
       branch,
       stage: "failed",
-      detail: `${repoName}: \`${baseRef}\` could not be resolved${fetchNote || ` — ${firstLine(baseSha.out)}`}`,
+      detail: `${repoName}: \`${baseRef}\` could not be resolved${fetchNote || ` — ${firstLine(baseRev.out)}`}`,
     };
   }
+  const baseSha = baseRev.out;
 
-  if (git(["merge-base", "--is-ancestor", baseRef, "HEAD"], worktreePath).ok) {
+  // What the pull request actually holds. Everything below is judged against
+  // this rather than against the worktree, since that is the commit GitHub
+  // computes the PR's mergeability from.
+  const pushedSha = (() => {
+    const given = opts.prHeadSha?.trim();
+    if (given) return given;
+    const tracked = git(["rev-parse", "--verify", `refs/remotes/origin/${branch}`], worktreePath);
+    return tracked.ok ? tracked.out : "";
+  })();
+  const pushedLabel = pushedSha === "" ? "(unknown)" : shortSha(pushedSha);
+
+  const pushedIsBehind =
+    pushedSha === "" ||
+    pushedSha === fromSha ||
+    git(["merge-base", "--is-ancestor", pushedSha, "HEAD"], worktreePath).ok;
+
+  if (!pushedIsBehind) {
     return {
       ...base,
       fromSha,
       branch,
-      stage: "already-current",
-      detail: `${repoName}: \`${branch}\` already contains ${baseRef}${fetchNote}`,
+      stage: "stale",
+      detail:
+        `${repoName}: the worktree is at ${shortSha(fromSha)} but the pull request's head is ${pushedLabel}, ` +
+        `which this worktree does not contain${fetchNote} — a merge here could only be pushed as a ` +
+        `non-fast-forward, so nothing was attempted. Bring the worktree onto the pushed branch and run this again.`,
+    };
+  }
+
+  if (git(["merge-base", "--is-ancestor", baseRef, "HEAD"], worktreePath).ok) {
+    if (pushedSha === fromSha) {
+      return {
+        ...base,
+        fromSha,
+        branch,
+        stage: "already-current",
+        detail:
+          `${repoName}: \`${branch}\` already contains ${baseRef} ${shortSha(baseSha)}, and the pull request ` +
+          `holds that same commit ${shortSha(fromSha)}${fetchNote}`,
+      };
+    }
+    return {
+      ...base,
+      fromSha,
+      branch,
+      stage: "unpushed",
+      detail:
+        `${repoName}: \`${branch}\` contains ${baseRef} ${shortSha(baseSha)} at ${shortSha(fromSha)}, but the ` +
+        `pull request's head ${pushedLabel} does not — the merge is local only${fetchNote}`,
     };
   }
 
@@ -241,7 +330,7 @@ export function mergeBaseIntoBranch(
       fromSha,
       branch,
       stage: "clean",
-      detail: `${repoName}: merged ${baseRef} into \`${branch}\` with no conflicts${fetchNote}`,
+      detail: `${repoName}: merged ${baseRef} ${shortSha(baseSha)} into \`${branch}\` with no conflicts${fetchNote}`,
     };
   }
 
@@ -263,7 +352,7 @@ export function mergeBaseIntoBranch(
     branch,
     conflictedFiles: unmerged,
     stage: "conflicted",
-    detail: `${repoName}: merging ${baseRef} conflicts in ${unmerged.length} file(s): ${unmerged.join(", ")}`,
+    detail: `${repoName}: merging ${baseRef} ${shortSha(baseSha)} conflicts in ${unmerged.length} file(s): ${unmerged.join(", ")}`,
   };
 }
 
@@ -405,9 +494,12 @@ export function summarizeBaseMerges(outcomes: BaseMergeOutcome[]): string {
     problems.length > 0 ? `${problems.length} needing attention` : null,
   ].filter(Boolean);
 
+  // "already contains its base" as a headline was the claim that was wrong, so
+  // it now says whose state it is describing: the pull request's, not the
+  // worktree's.
   const headline =
     problems.length === 0 && pushed.length === 0
-      ? "Every pull request's branch already contains its base"
+      ? "Every pull request already holds its base branch"
       : parts.join(", ");
 
   const body = outcomes.map((o) => `- ${o.detail}${o.prUrl ? `\n  - ${o.prUrl}` : ""}`);

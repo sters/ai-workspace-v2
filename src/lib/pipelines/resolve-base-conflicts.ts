@@ -167,7 +167,14 @@ export function buildResolveBaseConflictsPipeline(input: {
           ctx.emitStatus(`${pr.repoName}: merging origin/${baseBranch} into ${pr.headRefName}...`);
           const attempt = mergeBaseIntoBranch(
             { repoName: pr.repoName, worktreePath: pr.worktreePath },
-            { baseBranch, expectedBranch: pr.headRefName },
+            {
+              baseBranch,
+              expectedBranch: pr.headRefName,
+              // `headRefOid` — the commit GitHub judged the PR's mergeability
+              // from. Without it the verdict is about the worktree, which is
+              // how an unpushed merge came back as "already contains".
+              prHeadSha: pr.headSha,
+            },
           );
           ctx.emitStatus(`[${attempt.stage}] ${attempt.detail}`);
           attempts.push({ pr, attempt });
@@ -249,16 +256,27 @@ export function buildResolveBaseConflictsPipeline(input: {
               conflictedFiles: attempt.conflictedFiles,
             };
 
-            if (attempt.stage === "already-current" || attempt.stage === "dirty" || attempt.stage === "failed") {
+            // Nothing to push: either it is genuinely done, or this repository
+            // was left alone with a reason. `stale` reports as failed — the
+            // worktree is behind the pushed head, which is a state to fix, not
+            // a merge that happened.
+            const settled =
+              attempt.stage === "already-current" ? ("already-current" as const)
+              : attempt.stage === "dirty" ? ("dirty" as const)
+              : attempt.stage === "failed" || attempt.stage === "stale" ? ("failed" as const)
+              : null;
+            if (settled) {
               outcomes.push({
                 ...record,
-                status: attempt.stage === "already-current" ? "already-current" : attempt.stage,
+                status: settled,
                 aiResolved: false,
                 detail: attempt.detail,
               });
               continue;
             }
 
+            // `clean` and `unpushed` both go straight to the push; only
+            // `conflicted` needs the resolution committed first.
             const aiResolved = attempt.stage === "conflicted";
             let committedDetail = attempt.detail;
 

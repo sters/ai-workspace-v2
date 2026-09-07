@@ -31,12 +31,17 @@ function fakeGit(
 
 const repo = { repoName: "widgets", worktreePath: "/ws/task/widgets" };
 const HEAD_SHA = "1111111111111111111111111111111111111111";
+const PUSHED_SHA = "3333333333333333333333333333333333333333";
 
 const HEAD = "rev-parse HEAD";
 const BRANCH = "symbolic-ref --short HEAD";
 const MERGE_HEAD = "rev-parse --verify --quiet MERGE_HEAD";
-const FETCH = "fetch origin main";
+// An explicit forced refspec, not `fetch origin main`: that form leaves the
+// remote-tracking update to git's opportunistic behaviour and exits 0 either way.
+const FETCH = "fetch --force origin refs/heads/main:refs/remotes/origin/main";
 const BASE_SHA = "rev-parse --verify origin/main";
+const TRACKED = "rev-parse --verify refs/remotes/origin/feature/widget-x";
+const PUSHED_IS_BEHIND = `merge-base --is-ancestor ${PUSHED_SHA} HEAD`;
 const IS_ANCESTOR = "merge-base --is-ancestor origin/main HEAD";
 const STATUS = "status --porcelain --untracked-files=no";
 const MERGE = "merge --no-ff --no-edit origin/main";
@@ -44,7 +49,10 @@ const UNMERGED = "diff --name-only --diff-filter=U";
 const ABORT = "merge --abort";
 const COMMIT = "commit --no-edit";
 
-/** The happy path up to (not including) the merge itself. */
+/**
+ * The happy path up to (not including) the merge itself: the worktree is at the
+ * pull request's head and the base is not contained yet.
+ */
 function upToMerge(extra: Record<string, { ok: boolean; out: string }>) {
   return fakeGit({
     [HEAD]: { ok: true, out: HEAD_SHA },
@@ -52,6 +60,7 @@ function upToMerge(extra: Record<string, { ok: boolean; out: string }>) {
     [MERGE_HEAD]: { ok: false, out: "" },
     [FETCH]: { ok: true, out: "" },
     [BASE_SHA]: { ok: true, out: "2".repeat(40) },
+    [TRACKED]: { ok: true, out: HEAD_SHA },
     [IS_ANCESTOR]: { ok: false, out: "" },
     [STATUS]: { ok: true, out: "" },
     ...extra,
@@ -59,16 +68,92 @@ function upToMerge(extra: Record<string, { ok: boolean; out: string }>) {
 }
 
 describe("mergeBaseIntoBranch", () => {
-  it("reports already-current without inspecting the working tree", () => {
+  it("reports already-current only when the pull request holds that commit too", () => {
     const git = upToMerge({ [IS_ANCESTOR]: { ok: true, out: "" } });
 
-    const attempt = mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
+    const attempt = mergeBaseIntoBranch(
+      repo,
+      { baseBranch: "main", prHeadSha: HEAD_SHA },
+      git,
+    );
 
     expect(attempt.stage).toBe("already-current");
     // A branch with nothing to merge must not be judged for local edits: a dirty
     // tree that nothing is about to touch is not a problem to report.
     expect(git.calls).not.toContain(STATUS);
     expect(git.calls).not.toContain(MERGE);
+  });
+
+  // The bug this exists for: the first version answered from `--is-ancestor
+  // origin/<base> HEAD` alone, so a merge sitting unpushed in the worktree came
+  // back as "already contains origin/master" while GitHub went on showing the
+  // pull request as conflicting — GitHub judges the pushed head.
+  it("calls a locally-merged, unpushed branch unpushed rather than current", () => {
+    const git = upToMerge({
+      [IS_ANCESTOR]: { ok: true, out: "" },
+      [PUSHED_IS_BEHIND]: { ok: true, out: "" },
+    });
+
+    const attempt = mergeBaseIntoBranch(
+      repo,
+      { baseBranch: "main", prHeadSha: PUSHED_SHA },
+      git,
+    );
+
+    expect(attempt.stage).toBe("unpushed");
+    expect(attempt.detail).toContain("local only");
+    // Nothing to merge — the work left is the push, which the caller does.
+    expect(git.calls).not.toContain(MERGE);
+  });
+
+  it("names the shas every verdict rests on", () => {
+    // The report that was wrong named none, so it could not be checked after
+    // the fact.
+    const git = upToMerge({ [IS_ANCESTOR]: { ok: true, out: "" } });
+
+    const attempt = mergeBaseIntoBranch(
+      repo,
+      { baseBranch: "main", prHeadSha: HEAD_SHA },
+      git,
+    );
+
+    expect(attempt.detail).toContain("2".repeat(8));
+    expect(attempt.detail).toContain("1".repeat(8));
+  });
+
+  it("refuses a worktree that is behind the pushed head", () => {
+    // Merging here could only be pushed as a non-fast-forward, and finding that
+    // out afterwards costs a conflict resolution against code that is not current.
+    const git = upToMerge({ [PUSHED_IS_BEHIND]: { ok: false, out: "" } });
+
+    const attempt = mergeBaseIntoBranch(
+      repo,
+      { baseBranch: "main", prHeadSha: PUSHED_SHA },
+      git,
+    );
+
+    expect(attempt.stage).toBe("stale");
+    expect(git.calls).not.toContain(MERGE);
+  });
+
+  it("falls back to the remote-tracking ref when no PR head is given", () => {
+    const git = upToMerge({
+      [IS_ANCESTOR]: { ok: true, out: "" },
+      [TRACKED]: { ok: true, out: PUSHED_SHA },
+      [PUSHED_IS_BEHIND]: { ok: true, out: "" },
+    });
+
+    expect(mergeBaseIntoBranch(repo, { baseBranch: "main" }, git).stage).toBe("unpushed");
+    expect(git.calls).toContain(TRACKED);
+  });
+
+  it("treats a branch with no pushed state as needing the push", () => {
+    const git = upToMerge({
+      [IS_ANCESTOR]: { ok: true, out: "" },
+      [TRACKED]: { ok: false, out: "fatal: Needed a single revision" },
+    });
+
+    expect(mergeBaseIntoBranch(repo, { baseBranch: "main" }, git).stage).toBe("unpushed");
   });
 
   it("creates the merge commit when there are no conflicts", () => {
@@ -351,9 +436,11 @@ describe("isBaseMergeProblem", () => {
 });
 
 describe("summarizeBaseMerges", () => {
-  it("says nothing was pending when every branch already had its base", () => {
+  it("says nothing was pending when every pull request already had its base", () => {
     const text = summarizeBaseMerges([outcome({ status: "already-current" })]);
-    expect(text).toContain("already contains");
+    // The headline says whose state it describes — the pull request's, not the
+    // worktree's, which is the distinction the wrong report collapsed.
+    expect(text).toContain("Every pull request already holds its base branch");
     // No merge was pushed, so the CI caveat would be about nothing.
     expect(text).not.toContain("lint / test / build");
   });
