@@ -51,6 +51,12 @@ function fetchCalls(): string[] {
     .filter((cmd) => cmd.includes("fetch --all"));
 }
 
+function revParseCalls(): string[] {
+  return mockExec.mock.calls
+    .map((c) => String(c[0]))
+    .filter((cmd) => cmd.includes("rev-parse --verify"));
+}
+
 function setup(emitStatus = vi.fn()) {
   return setupRepository(
     WORKSPACE,
@@ -114,6 +120,26 @@ describe("setupRepository", () => {
       .find((m) => m.startsWith("Warning:"));
     expect(warning).toMatch(/case-insensitive filesystem/);
     expect(warning).toMatch(/continuing with the refs already on disk/);
+  });
+
+  it("gives up on the suffix search and takes a timestamped name when every name reads as taken", () => {
+    // A `rev-parse --verify` that never fails: what a broken git looks like, and
+    // what an over-permissive test mock looks like. The search must not be the
+    // thing that decides when to stop.
+    mockExec.mockImplementation(() => "");
+    const emitStatus = vi.fn();
+
+    const result = setup(emitStatus);
+
+    expect(revParseCalls().length).toBeLessThan(300);
+    expect(result.branchName).toMatch(/^feature\/ABC-1-thing-dev-\d{14}$/);
+    expect(
+      mockExec.mock.calls.some((c) => String(c[0]).includes("worktree add")),
+    ).toBe(true);
+    const warning = emitStatus.mock.calls
+      .map((c) => String(c[0]))
+      .find((m) => m.startsWith("Warning:"));
+    expect(warning).toMatch(/reported as taken/);
   });
 
   it("still fails when the repository cannot be cloned", () => {
