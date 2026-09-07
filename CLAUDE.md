@@ -332,7 +332,13 @@ Prompt wording follows Anthropic's Claude Opus 5 / Sonnet 5 prompting guides: pr
 
 ## Testing
 
-Vitest with jsdom, `@testing-library/react`, `@testing-library/jest-dom`. Globals enabled (no need to import `describe`/`it`/`expect`). `tsconfig.json` excludes test files — Vitest handles type-checking separately from `tsc --noEmit`.
+Vitest with `@testing-library/react`, `@testing-library/jest-dom`. Globals enabled (no need to import `describe`/`it`/`expect`). `tsconfig.json` excludes test files — Vitest handles type-checking separately from `tsc --noEmit`.
+
+**A DOM is granted by directory, not by extension** — `vitest.config.ts` declares two projects: `dom` (`environment: "jsdom"`, plus `src/test-setup-dom.ts` for the jest-dom matchers) covering `src/__tests__/components/**` and `src/__tests__/hooks/**`, and `node` covering everything else. A render test placed outside those two directories gets no `document` and fails on a name a `.tsx` extension would suggest it has; `hooks/` is matched as a directory for the mirror-image reason, since two of its render tests are `.ts`.
+
+The split is there because `forks` + `isolate` (both Vitest defaults) give every test file its own process, so a jsdom built for the whole suite is built 159 times and shared by nothing: cumulative environment setup was **264s against a 22s wall clock**, more than every other phase of the run combined. Restricting it to the 24 files that render takes the suite from ~28s to ~14s. What it does *not* buy is a lower peak — that is set by the worker count times a worker, which is what root-level `maxWorkers: "60%"` addresses; the default of one worker per core bar one measured slower *and* larger, because the main vite process and the workers contend.
+
+Neither knob is what makes a run eat the machine. That is an unbounded loop calling a `vi.fn()`, which retains every call's arguments in `mock.calls`: measured at ~275 bytes and ~2.75M calls per second, a spin reaches tens of GB in a couple of minutes and takes the machine into swap. `setup-repository.ts`'s branch-name search is bounded (`MAX_BRANCH_NAME_ATTEMPTS`) for that reason — a mock permissive enough to answer "yes, that branch exists" to every name is the ordinary way to write one. And **`pkill -f "vitest run <path>"` does not stop it**: a worker's command line is `vitest/dist/workers/forks.js` and carries no test path, so the pattern kills the parent and reparents the spinning worker to launchd, where it keeps growing. Kill the worker by pid.
 
 ## Gotchas
 
