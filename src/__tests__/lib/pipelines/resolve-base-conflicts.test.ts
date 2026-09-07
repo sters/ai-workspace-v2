@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  mergeBasePhaseBudgetMs,
   parseConflictResolution,
-  resolveBaseConflictsBudgetMs,
+  pushMergePhaseBudgetMs,
+  resolveConflictsPhaseBudgetMs,
   selectTargetPullRequests,
 } from "@/lib/pipelines/resolve-base-conflicts";
 import type { WorkspacePullRequest } from "@/types/pull-request";
@@ -36,15 +38,27 @@ function makePr(overrides: Partial<WorkspacePullRequest> = {}): WorkspacePullReq
   };
 }
 
-describe("resolveBaseConflictsBudgetMs", () => {
-  it("scales with the number of repositories", () => {
-    // The resolver children queue behind the group concurrency cap, so a flat
-    // budget would kill the tail of a wide workspace mid-merge.
-    expect(resolveBaseConflictsBudgetMs(4)).toBeGreaterThan(resolveBaseConflictsBudgetMs(1));
+describe("phase budgets", () => {
+  const budgets = [
+    ["merge", mergeBasePhaseBudgetMs],
+    ["resolve", resolveConflictsPhaseBudgetMs],
+    ["push", pushMergePhaseBudgetMs],
+  ] as const;
+
+  it.each(budgets)("the %s phase scales with the number of repositories", (_name, budget) => {
+    // The resolver children queue behind the group concurrency cap and the git
+    // commands run in series, so a flat budget would kill the tail of a wide
+    // workspace mid-merge.
+    expect(budget(4)).toBeGreaterThan(budget(1));
   });
 
-  it("gives an empty workspace a usable budget rather than zero", () => {
-    expect(resolveBaseConflictsBudgetMs(0)).toBeGreaterThan(0);
+  it.each(budgets)("the %s phase gives an empty workspace a usable budget", (_name, budget) => {
+    expect(budget(0)).toBeGreaterThan(0);
+  });
+
+  it("gives the resolution the largest share, since it is the only model call", () => {
+    expect(resolveConflictsPhaseBudgetMs(2)).toBeGreaterThan(mergeBasePhaseBudgetMs(2));
+    expect(resolveConflictsPhaseBudgetMs(2)).toBeGreaterThan(pushMergePhaseBudgetMs(2));
   });
 });
 

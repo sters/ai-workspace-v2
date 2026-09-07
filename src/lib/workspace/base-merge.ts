@@ -470,6 +470,34 @@ export function pushMergedBranch(
   };
 }
 
+/**
+ * The merge phase's own result block: what state each repository's worktree is
+ * in before anything is resolved, committed or pushed.
+ *
+ * Separate from `summarizeBaseMerges` because they answer different questions —
+ * this one says what the merge did, that one says what reached the pull request
+ * — and a reader looking at a three-phase log needs the first answer without the
+ * second being implied.
+ */
+export function summarizeBaseMergeAttempts(attempts: BaseMergeAttempt[]): string {
+  if (attempts.length === 0) return "No repositories were merged.";
+
+  const count = (...stages: BaseMergeStage[]) =>
+    attempts.filter((a) => stages.includes(a.stage)).length;
+
+  const parts = [
+    count("clean") > 0 ? `${count("clean")} merged cleanly` : null,
+    count("conflicted") > 0 ? `${count("conflicted")} with conflicts to resolve` : null,
+    count("unpushed") > 0 ? `${count("unpushed")} already merged but unpushed` : null,
+    count("already-current") > 0 ? `${count("already-current")} already current` : null,
+    count("dirty", "stale", "failed") > 0
+      ? `${count("dirty", "stale", "failed")} left alone`
+      : null,
+  ].filter(Boolean);
+
+  return [parts.join(", "), "", ...attempts.map((a) => `- ${a.detail}`)].join("\n");
+}
+
 /** Whether an outcome is one a human has to look at. */
 export function isBaseMergeProblem(status: BaseMergeOutcome["status"]): boolean {
   return status !== "already-current" && status !== "pushed";
