@@ -31,6 +31,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.CRITERIA_FEASIBILITY]: "opus",
   [STEP_TYPES.VALIDATE_PR_COMMENT]: "opus",
   [STEP_TYPES.GROUND_FINDING]: "opus",
+  [STEP_TYPES.RESOLVE_CONFLICTS]: "opus",
   [STEP_TYPES.CODE_REVIEW]: "opus",
   [STEP_TYPES.REVIEW_TODOS]: "opus",
   [STEP_TYPES.COORDINATE_TODOS]: "opus",
@@ -175,6 +176,14 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // before it reaches someone else's PR, which the prompt's bias toward
   // `unclear` answers rather than a rung.
   [STEP_TYPES.GROUND_FINDING]: "medium",
+  // Writes the merged content of an enumerated set of conflicted files, which is
+  // bounded implementation like `execute`: git has already named every file and
+  // marked both sides, so the work is deciding what the two intents come to
+  // rather than hunting for anything. What keeps it off the rung below is that a
+  // conflict is routinely a symptom — the base renamed or moved what this branch
+  // edited — so resolving inside the markers alone produces a file that merges
+  // and does not work.
+  [STEP_TYPES.RESOLVE_CONFLICTS]: "medium",
   // Applies a requested edit to one document, and is forbidden from touching code.
   // The document it rewrites is the run's done-contract, but the edit itself is
   // named in the request and lands in one file, so there is nothing to enumerate.

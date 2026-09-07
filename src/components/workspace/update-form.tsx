@@ -15,6 +15,7 @@ export function UpdateForm({
   onSubmit,
   disabled,
   batchItems,
+  extraActions,
 }: {
   label: ReactNode;
   placeholder: string;
@@ -22,6 +23,12 @@ export function UpdateForm({
   disabled: boolean;
   /** When provided, renders a SplitButton with batch dropdown items. */
   batchItems?: (instruction: string, interactionLevel: InteractionLevel) => SplitButtonItem[];
+  /**
+   * Rendered to the left of the quick-fill button. For actions that start their
+   * own operation rather than filling this form's textarea, so they need the
+   * caller's workspace and repo scope.
+   */
+  extraActions?: ReactNode;
 }) {
   const [instruction, setInstruction] = useState("");
   const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
@@ -50,7 +57,8 @@ export function UpdateForm({
         disabled={disabled}
         rows={2}
       />
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {extraActions}
         <button
           type="button"
           className="rounded border border-border bg-muted px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"

@@ -66,6 +66,16 @@ export const updateTodoSchema = z.object({
 });
 
 /**
+ * Merge each open pull request's base branch back into the branch it targets.
+ * `repo` narrows it to one worktree, matching the review pipeline's filter —
+ * either the worktree directory name or the full repository path.
+ */
+export const resolveBaseConflictsSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  repo: z.string().optional(),
+});
+
+/**
  * Validate a selection of PR review comments. `threadIds` are GraphQL thread
  * node ids (`PRRT_…`) as the Pull Requests tab showed them; the pipeline
  * re-resolves each one against the live PR, so a stale id is skipped rather
