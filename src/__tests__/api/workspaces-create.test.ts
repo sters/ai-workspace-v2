@@ -64,9 +64,9 @@ describe("POST /api/workspaces", () => {
     );
   });
 
-  it("defaults the task type to bugfix", async () => {
+  it("defaults the task type to feature", async () => {
     await post({ name: "n", repositories: ["github.com/acme/web"] });
-    expect(mockCreateQuickWorkspace.mock.calls[0][0].taskType).toBe("bugfix");
+    expect(mockCreateQuickWorkspace.mock.calls[0][0].taskType).toBe("feature");
   });
 
   it("drops a repository listed twice", async () => {

@@ -11,7 +11,8 @@ import { postJson } from "@/lib/api";
 import { dateStamp, deriveBranchName, sanitizeSlug, workspaceDirName } from "@/lib/naming";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 
-const TASK_TYPES = ["bugfix", "feature", "research", "review"] as const;
+/** The default first, since it is also the dropdown's initial value. */
+const TASK_TYPES = ["feature", "bugfix", "research", "review"] as const;
 
 interface QuickCreateResponse {
   workspace: string;
@@ -31,7 +32,7 @@ export function QuickCreateForm() {
   const { repositories, isLoading, error: listError } = useRepositories();
 
   const [name, setName] = useState("");
-  const [taskType, setTaskType] = useState<(typeof TASK_TYPES)[number]>("bugfix");
+  const [taskType, setTaskType] = useState<(typeof TASK_TYPES)[number]>("feature");
   const [selected, setSelected] = useState<string[]>([]);
   const [extra, setExtra] = useState("");
   const [filter, setFilter] = useState("");
