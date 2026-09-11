@@ -6,6 +6,7 @@
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
+import { dateStamp, deriveBranchName } from "@/lib/naming";
 import { exec, repoDir, detectBaseBranch, remoteBranchExists } from "@/lib/workspace/helpers";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 
@@ -180,36 +181,7 @@ export function setupRepository(
   } else {
     // --- Create new branch (default behavior) ---
 
-    // Extract task info from workspace name for branch naming
-    const parts = workspaceName.split("-");
-    const taskType = parts[0];
-    const dateMatch = workspaceName.match(/(\d{8})$/);
-    const date = dateMatch?.[1] ?? new Date().toISOString().slice(0, 10).replace(/-/g, "");
-
-    // Detect ticket ID
-    let ticketId = "";
-    let description: string;
-    if (parts.length > 1 && /^[A-Z]+[-]?\d+$/i.test(parts[1])) {
-      ticketId = parts[1];
-      description = workspaceName
-        .replace(new RegExp(`^${taskType}-${ticketId}-`), "")
-        .replace(new RegExp(`-${date}$`), "");
-    } else {
-      description = workspaceName
-        .replace(new RegExp(`^${taskType}-`), "")
-        .replace(new RegExp(`-${date}$`), "");
-    }
-
-    // Build branch name
-    if (ticketId) {
-      branchName = repoAlias
-        ? `${taskType}/${ticketId}-${description}-${repoAlias}`
-        : `${taskType}/${ticketId}-${description}`;
-    } else {
-      branchName = repoAlias
-        ? `${taskType}/${description}-${repoAlias}`
-        : `${taskType}/${description}-${date}`;
-    }
+    branchName = deriveBranchName(workspaceName, repoAlias, dateStamp(new Date()));
 
     // If the branch already exists (locally or on remote), always use a new name
     // to avoid inheriting commits from the existing branch.

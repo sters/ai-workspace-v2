@@ -8,6 +8,7 @@ import { Input, Textarea } from "@/components/shared/forms";
 import { Spinner } from "@/components/shared/feedback";
 import { useRepositories } from "@/hooks/use-repositories";
 import { postJson } from "@/lib/api";
+import { dateStamp, deriveBranchName, sanitizeSlug, workspaceDirName } from "@/lib/naming";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 
 const TASK_TYPES = ["bugfix", "feature", "research", "review"] as const;
@@ -42,6 +43,24 @@ export function QuickCreateForm() {
     () => [...new Set([...selected, ...parseExtraRepositories(extra)])],
     [selected, extra],
   );
+
+  /**
+   * The names the server will produce, from the same functions it uses. It
+   * renders only once a name is typed, which also keeps it out of the server
+   * render — `new Date()` on both sides would mismatch across midnight.
+   */
+  const preview = useMemo(() => {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    const stamp = dateStamp(new Date());
+    const workspace = workspaceDirName({ taskType, name: trimmed, dateStamp: stamp });
+    return {
+      workspace,
+      branch: deriveBranchName(workspace, "", stamp),
+      // Asking for `workspace` is not the fallback firing.
+      collapsed: sanitizeSlug(trimmed) === "workspace" && !/workspace/i.test(trimmed),
+    };
+  }, [name, taskType]);
 
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
@@ -95,9 +114,24 @@ export function QuickCreateForm() {
           autoFocus
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          Becomes the README title. Its ASCII slug names the workspace directory and every
-          branch: <code>{taskType}/&lt;slug&gt;-&lt;date&gt;</code>.
+          Becomes the README title verbatim. Its ASCII slug names the workspace directory and
+          every branch.
         </p>
+        {preview && (
+          <div className="mt-1 space-y-0.5 text-xs">
+            <p className="text-muted-foreground">
+              Workspace <code className="font-mono">{preview.workspace}</code>
+              {" · "}branch <code className="font-mono">{preview.branch}</code>
+            </p>
+            {preview.collapsed && (
+              <p className="text-amber-700 dark:text-amber-400">
+                The name has nothing that survives slugging, so the directory and branch fall
+                back to <code className="font-mono">workspace</code>. Add an ASCII name to make
+                the branch say what it is.
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div>
