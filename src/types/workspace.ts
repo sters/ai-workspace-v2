@@ -96,6 +96,17 @@ export interface WorkspaceRepo {
   worktreePath: string;
 }
 
+/**
+ * A cloned repository offered to the quick-create picker. `baseBranch` is read
+ * from the refs already on disk and is empty when they don't say — the branch
+ * the worktree actually gets is decided at setup time.
+ */
+export interface SelectableRepository {
+  repoPath: string;
+  repoName: string;
+  baseBranch: string;
+}
+
 export interface TaskAnalysis {
   taskType: string;
   slug: string;
