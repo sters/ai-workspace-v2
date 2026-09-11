@@ -65,6 +65,41 @@ describe("QuickCreateForm", () => {
     expect(screen.getByText("master")).toBeInTheDocument();
   });
 
+  it("previews the directory and branch the name will produce", () => {
+    render(<QuickCreateForm />);
+    expect(screen.queryByText(/^bugfix\//)).not.toBeInTheDocument();
+
+    fillName("Login Crash");
+
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    expect(screen.getByText(`bugfix-login-crash-${stamp}`)).toBeInTheDocument();
+    expect(screen.getByText(`bugfix/login-crash-${stamp}`)).toBeInTheDocument();
+  });
+
+  it("warns when the name has nothing ASCII to slug", () => {
+    render(<QuickCreateForm />);
+    fillName("ログイン時のクラッシュ");
+
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    expect(screen.getByText(`bugfix/workspace-${stamp}`)).toBeInTheDocument();
+    expect(screen.getByText(/nothing that survives/i)).toBeInTheDocument();
+  });
+
+  it("does not warn about a name that asked for `workspace`", () => {
+    render(<QuickCreateForm />);
+    fillName("workspace tidy up");
+    expect(screen.queryByText(/nothing that survives/i)).not.toBeInTheDocument();
+  });
+
+  it("follows the task type into the preview", () => {
+    render(<QuickCreateForm />);
+    fillName("retry");
+    fireEvent.change(screen.getByLabelText(/task type/i), { target: { value: "feature" } });
+
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    expect(screen.getByText(`feature/retry-${stamp}`)).toBeInTheDocument();
+  });
+
   it("needs both a name and a repository before it can create", () => {
     render(<QuickCreateForm />);
     const button = screen.getByRole("button", { name: /create workspace/i });

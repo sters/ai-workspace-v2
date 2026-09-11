@@ -46,27 +46,11 @@ export function repoDir(): string {
 }
 
 /**
- * Convert any input string to a filesystem-safe ASCII slug.
- * - Replaces non-ASCII characters, spaces, and special chars with hyphens
- * - Collapses multiple hyphens
- * - Trims hyphens from start/end
- * - Lowercases everything
- * - Truncates to maxLength (default 50)
- * - Falls back to "workspace" if result is empty (e.g., pure non-ASCII input)
+ * Re-exported so the many existing importers keep their path. It lives in
+ * `@/lib/naming` because the quick-create form runs it in the browser, and
+ * this module imports `node:fs`.
  */
-export function sanitizeSlug(input: string, maxLength = 50): string {
-  let slug = input
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "-")  // Replace non-ASCII, spaces, special chars with hyphens
-    .replace(/-+/g, "-")          // Collapse multiple hyphens
-    .replace(/^-+|-+$/g, "");     // Trim leading/trailing hyphens
-
-  if (slug.length > maxLength) {
-    slug = slug.slice(0, maxLength).replace(/-+$/, ""); // Trim trailing hyphens from truncation
-  }
-
-  return slug || "workspace";
-}
+export { sanitizeSlug } from "@/lib/naming";
 
 // ---------------------------------------------------------------------------
 // Staleness utilities

@@ -6,8 +6,9 @@ import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { listOperations } from "../db/operations";
+import { dateStamp, sanitizeSlug, workspaceDirName } from "../naming";
 import { buildReadmeContent } from "../templates";
-import { exec, sanitizeSlug } from "./helpers";
+import { exec } from "./helpers";
 import { writeSystemPrompts } from "./prompts";
 import type { TaskAnalysis } from "@/types/workspace";
 import type { SetupWorkspaceResult } from "@/types/operation";
@@ -69,27 +70,13 @@ export async function setupWorkspace(
   ticketId?: string,
   preGeneratedSlug?: string,
 ): Promise<SetupWorkspaceResult> {
-  // Use pre-generated slug if provided, otherwise sanitize the description
-  let slug = preGeneratedSlug
-    ? sanitizeSlug(preGeneratedSlug)
-    : sanitizeSlug(description);
-
-  // Strip ticket ID from slug if already provided separately
-  if (ticketId) {
-    const tLower = ticketId.toLowerCase();
-    slug = slug
-      .replace(new RegExp(`^${tLower}-`), "")
-      .replace(new RegExp(`-${tLower}-`, "g"), "-")
-      .replace(new RegExp(`-${tLower}$`), "");
-    if (slug === tLower) slug = "";
-    slug = slug.replace(/^-+|-+$/g, "");
-    if (!slug) slug = "workspace";
-  }
-
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-  let dirName = ticketId
-    ? `${taskType}-${ticketId}-${slug}-${date}`
-    : `${taskType}-${slug}-${date}`;
+  const date = dateStamp(new Date());
+  let dirName = workspaceDirName({
+    taskType,
+    name: preGeneratedSlug || description,
+    ticketId,
+    dateStamp: date,
+  });
 
   // If the directory already exists OR the name is already used in SQLite
   // (e.g. a previous workspace was deleted from disk but DB records remain),
