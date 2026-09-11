@@ -31,7 +31,7 @@ export const workspaceSchema = z.object({
  */
 export const quickCreateWorkspaceSchema = z.object({
   name: z.string().trim().min(1, "name is required"),
-  taskType: z.enum(["bugfix", "feature", "research", "review"]).default("bugfix"),
+  taskType: z.enum(["feature", "bugfix", "research", "review"]).default("feature"),
   repositories: z
     .array(z.string().trim().min(1))
     .min(1, "select at least one repository")

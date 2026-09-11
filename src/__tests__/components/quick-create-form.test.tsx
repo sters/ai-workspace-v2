@@ -67,13 +67,13 @@ describe("QuickCreateForm", () => {
 
   it("previews the directory and branch the name will produce", () => {
     render(<QuickCreateForm />);
-    expect(screen.queryByText(/^bugfix\//)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^feature\//)).not.toBeInTheDocument();
 
     fillName("Login Crash");
 
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    expect(screen.getByText(`bugfix-login-crash-${stamp}`)).toBeInTheDocument();
-    expect(screen.getByText(`bugfix/login-crash-${stamp}`)).toBeInTheDocument();
+    expect(screen.getByText(`feature-login-crash-${stamp}`)).toBeInTheDocument();
+    expect(screen.getByText(`feature/login-crash-${stamp}`)).toBeInTheDocument();
   });
 
   it("warns when the name has nothing ASCII to slug", () => {
@@ -81,7 +81,7 @@ describe("QuickCreateForm", () => {
     fillName("ログイン時のクラッシュ");
 
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    expect(screen.getByText(`bugfix/workspace-${stamp}`)).toBeInTheDocument();
+    expect(screen.getByText(`feature/workspace-${stamp}`)).toBeInTheDocument();
     expect(screen.getByText(/nothing that survives/i)).toBeInTheDocument();
   });
 
@@ -94,10 +94,10 @@ describe("QuickCreateForm", () => {
   it("follows the task type into the preview", () => {
     render(<QuickCreateForm />);
     fillName("retry");
-    fireEvent.change(screen.getByLabelText(/task type/i), { target: { value: "feature" } });
+    fireEvent.change(screen.getByLabelText(/task type/i), { target: { value: "bugfix" } });
 
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    expect(screen.getByText(`feature/retry-${stamp}`)).toBeInTheDocument();
+    expect(screen.getByText(`bugfix/retry-${stamp}`)).toBeInTheDocument();
   });
 
   it("needs both a name and a repository before it can create", () => {
@@ -116,14 +116,14 @@ describe("QuickCreateForm", () => {
     render(<QuickCreateForm />);
     fillName("login crash");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-    fireEvent.change(screen.getByLabelText(/task type/i), { target: { value: "feature" } });
+    fireEvent.change(screen.getByLabelText(/task type/i), { target: { value: "bugfix" } });
     fireEvent.change(screen.getByLabelText(/note/i), { target: { value: "crash on submit" } });
     fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
     await waitFor(() => expect(mockPostJson).toHaveBeenCalled());
     expect(mockPostJson).toHaveBeenCalledWith("/api/workspaces", {
       name: "login crash",
-      taskType: "feature",
+      taskType: "bugfix",
       repositories: ["github.com/acme/web"],
       note: "crash on submit",
     });
