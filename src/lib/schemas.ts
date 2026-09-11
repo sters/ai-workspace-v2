@@ -22,6 +22,23 @@ export const workspaceSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
 });
 
+/**
+ * Create a workspace and its worktrees with no model call anywhere — the
+ * caller supplies everything `init` would have asked Claude to infer. The task
+ * type is an enum rather than free text because it prefixes both the workspace
+ * directory and every branch, and the rest of the pipeline reads those four
+ * values (see `INIT_ANALYSIS_SCHEMA`).
+ */
+export const quickCreateWorkspaceSchema = z.object({
+  name: z.string().trim().min(1, "name is required"),
+  taskType: z.enum(["bugfix", "feature", "research", "review"]).default("bugfix"),
+  repositories: z
+    .array(z.string().trim().min(1))
+    .min(1, "select at least one repository")
+    .transform((repos) => [...new Set(repos)]),
+  note: z.string().optional(),
+});
+
 export const executeSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   repository: z.string().optional(),
