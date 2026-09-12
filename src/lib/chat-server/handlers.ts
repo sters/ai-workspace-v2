@@ -95,6 +95,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     return;
   }
 
+  const startedAt = Date.now();
   const session: ChatSession = {
     id: sessionId,
     workspaceId: msg.workspaceId,
@@ -105,7 +106,8 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     outputBuffer: [],
     activeWs: ws,
     exitedAt: null,
-    startedAt: Date.now(),
+    startedAt,
+    lastOutputAt: startedAt,
     cols: size?.cols ?? DEFAULT_PTY_COLS,
     rows: size?.rows ?? DEFAULT_PTY_ROWS,
   };
@@ -114,6 +116,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
 
   // Forward PTY output to buffer (raw bytes) + active WebSocket (decoded text)
   const outputListener: DataListener = (data, rawData) => {
+    session.lastOutputAt = Date.now();
     session.outputBuffer.push(rawData);
     session.outputBuffer = trimBuffer(session.outputBuffer);
     if (session.activeWs) {

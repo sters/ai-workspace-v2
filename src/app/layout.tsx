@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AppSidebar } from "@/components/shared/app-sidebar";
+import { WorkspaceSidebar } from "@/components/shared/workspace-sidebar";
 import { ToastHost } from "@/components/shared/feedback/toast";
 import "./globals.css";
 
@@ -21,9 +22,10 @@ export default function RootLayout({
       <body className="min-h-screen bg-background font-sans antialiased">
         <div className="flex min-h-screen">
           <AppSidebar />
+          <WorkspaceSidebar />
 
           {/* Main */}
-          <main className="flex-1 overflow-auto">
+          <main className="min-w-0 flex-1 overflow-auto">
             <div className="mx-auto max-w-6xl p-6">{children}</div>
           </main>
         </div>
