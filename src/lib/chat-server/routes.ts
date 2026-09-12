@@ -1,3 +1,5 @@
+import type { ChatSessionInfo } from "@/types/chat";
+import { CHAT_BUSY_IDLE_MS } from "./constants";
 import { getStore, persistSessionDeleted } from "./store";
 
 export function handleHealthCheck(): Response {
@@ -31,13 +33,15 @@ export async function handleSessionKill(req: Request): Promise<Response> {
 
 export function handleSessionsList(): Response {
   const store = getStore();
-  const sessions: Array<{ id: string; workspaceId: string; startedAt: number }> = [];
+  const now = Date.now();
+  const sessions: ChatSessionInfo[] = [];
   for (const session of store.__chatSessions!.values()) {
     if (!session.exited) {
       sessions.push({
         id: session.id,
         workspaceId: session.workspaceId,
         startedAt: session.startedAt,
+        busy: now - session.lastOutputAt < CHAT_BUSY_IDLE_MS,
       });
     }
   }

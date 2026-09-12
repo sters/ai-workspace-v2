@@ -249,6 +249,41 @@ describe("handleResize", () => {
   });
 });
 
+describe("PTY activity clock", () => {
+  /** The one session in the store, typed to the fields these tests read. */
+  function onlySession(): { lastOutputAt: number; startedAt: number } {
+    const sessions = (globalThis as unknown as {
+      __chatSessions: Map<string, { lastOutputAt: number; startedAt: number }>;
+    }).__chatSessions;
+    return [...sessions.values()][0];
+  }
+
+  /** Push a chunk through every listener the spawn was handed. */
+  function emitPtyOutput() {
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    for (const listener of opts.listeners) {
+      listener("frame", new Uint8Array([0x61]));
+    }
+  }
+
+  it("starts the clock at spawn, so a booting session reads as busy", async () => {
+    await startSession();
+    const session = onlySession();
+
+    expect(session.lastOutputAt).toBe(session.startedAt);
+  });
+
+  it("advances the clock on each chunk the PTY writes", async () => {
+    await startSession();
+    const session = onlySession();
+    session.lastOutputAt = session.startedAt - 60_000;
+
+    emitPtyOutput();
+
+    expect(session.lastOutputAt).toBeGreaterThan(session.startedAt - 60_000);
+  });
+});
+
 describe("handleResume", () => {
   it("resizes the PTY to the reconnecting browser's size, after the replay", async () => {
     const { handleResume } = await import("@/lib/chat-server/handlers");

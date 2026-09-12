@@ -15,6 +15,11 @@ export interface ChatSession {
   activeWs: { send(data: string): void } | null;
   exitedAt: number | null;
   startedAt: number;
+  /**
+   * When the PTY last wrote. Seeded with `startedAt`, so a session that has not
+   * drawn its first frame yet reads as working rather than as idle.
+   */
+  lastOutputAt: number;
   /** Size the PTY currently has, so a no-op resize can be skipped. */
   cols: number;
   rows: number;
