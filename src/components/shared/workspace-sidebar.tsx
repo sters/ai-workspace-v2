@@ -9,7 +9,9 @@ import {
   Loader2,
   MessageCircleQuestion,
   Terminal,
+  type LucideIcon,
 } from "lucide-react";
+import type { OperationListItem } from "@/types/operation";
 import type { WorkspaceListItem } from "@/types/workspace";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { useRunningOperations } from "@/hooks/use-running-operations";
@@ -30,10 +32,6 @@ function activeWorkspaceName(pathname: string): string | null {
   }
 }
 
-/**
- * The chat half of a row's indicator cluster. Absent when the workspace has no
- * live session, since most do not and a permanent glyph says nothing.
- */
 const CHAT_LABELS: Record<ChatActivity, string> = {
   busy: "Chat working",
   waiting: "Chat waiting for input",
@@ -42,21 +40,35 @@ const CHAT_LABELS: Record<ChatActivity, string> = {
   unknown: "Chat open",
 };
 
-function ChatIndicator({ activity }: { activity: ChatActivity }) {
-  const busy = activity === "busy";
-  const label = CHAT_LABELS[activity];
+/**
+ * One indicator: a link to the thing it reports on, named by the state it
+ * shows. The label carries both, since a link whose name is only its
+ * destination would drop the state a screen reader came for.
+ *
+ * `pointer-events-auto` is what lifts it out of the row overlay described in
+ * `WorkspaceRow`, and the `title` lives here rather than on the icon because a
+ * `title` attribute on an <svg> renders no tooltip.
+ */
+function Indicator({
+  href,
+  label,
+  icon: Icon,
+  className,
+}: {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  className: string;
+}) {
   return (
-    // The tooltip lives on a wrapper: a `title` attribute on an <svg> renders
-    // no tooltip, and a terminal glyph in two colours needs the words.
-    <span title={label} className="flex shrink-0 items-center">
-      <Terminal
-        aria-label={label}
-        className={cn(
-          "h-3.5 w-3.5",
-          busy ? "animate-pulse text-blue-500" : "text-muted-foreground",
-        )}
-      />
-    </span>
+    <Link
+      href={href}
+      aria-label={label}
+      title={label}
+      className="pointer-events-auto flex shrink-0 items-center rounded-sm hover:bg-background/80"
+    >
+      <Icon className={cn("h-3.5 w-3.5", className)} />
+    </Link>
   );
 }
 
@@ -64,6 +76,7 @@ function WorkspaceRow({
   workspace,
   active,
   isRunning,
+  operationId,
   isAsking,
   chatActivity,
   archived,
@@ -71,38 +84,70 @@ function WorkspaceRow({
   workspace: WorkspaceListItem;
   active: boolean;
   isRunning?: boolean;
+  /** The operation to open, when the running one is known. */
+  operationId?: string;
   isAsking?: boolean;
   chatActivity?: ChatActivity;
   archived?: boolean;
 }) {
   const { name, title, overallProgress, totalCompleted, totalItems } =
     workspace;
+  const base = `/workspace/${encodeURIComponent(name)}`;
+  const operationHref = operationId
+    ? `${base}/operations?operationId=${encodeURIComponent(operationId)}`
+    : `${base}/operations`;
 
   return (
-    <Link
-      href={`/workspace/${encodeURIComponent(name)}`}
-      aria-current={active ? "page" : undefined}
+    // The row's own link is an overlay rather than a wrapper, so the
+    // indicators can be links too: an <a> inside an <a> is invalid and
+    // browsers drop the inner one. The content above it is
+    // `pointer-events-none` so a click anywhere but an indicator still falls
+    // through to the overlay, and the overlay is named by the title because
+    // the visible text is no longer inside it.
+    <div
       className={cn(
-        "block border-l-2 px-2 py-1.5 transition-colors hover:bg-accent/60",
+        "relative border-l-2 px-2 py-1.5 transition-colors hover:bg-accent/60",
         active
           ? "border-primary bg-accent"
           : "border-transparent hover:border-border",
         archived && "opacity-60",
       )}
     >
-      <div className="flex items-center gap-1.5">
+      <Link
+        href={base}
+        aria-label={title}
+        aria-current={active ? "page" : undefined}
+        className="absolute inset-0"
+      />
+      <div className="pointer-events-none relative flex items-center gap-1.5">
         {isAsking ? (
-          <MessageCircleQuestion
-            aria-label="Waiting for an answer"
-            className="h-3.5 w-3.5 shrink-0 animate-pulse text-orange-500"
+          <Indicator
+            href={operationHref}
+            label="Waiting for an answer"
+            icon={MessageCircleQuestion}
+            className="animate-pulse text-orange-500"
           />
         ) : isRunning ? (
-          <Loader2
-            aria-label="Operation running"
-            className="h-3.5 w-3.5 shrink-0 animate-spin text-primary"
+          <Indicator
+            href={operationHref}
+            label="Operation running"
+            icon={Loader2}
+            className="animate-spin text-primary"
           />
         ) : null}
-        {chatActivity && <ChatIndicator activity={chatActivity} />}
+        {chatActivity && (
+          <Indicator
+            // `/chat` has no index route, so the tab's own href is the target.
+            href={`${base}/chat/interactive`}
+            label={CHAT_LABELS[chatActivity]}
+            icon={Terminal}
+            className={
+              chatActivity === "busy"
+                ? "animate-pulse text-blue-500"
+                : "text-muted-foreground"
+            }
+          />
+        )}
         <span
           className={cn(
             "truncate text-sm",
@@ -112,7 +157,7 @@ function WorkspaceRow({
           {title}
         </span>
       </div>
-      <div className="mt-1 flex items-center gap-2">
+      <div className="pointer-events-none relative mt-1 flex items-center gap-2">
         <div className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
           <div
             className={cn(
@@ -126,7 +171,7 @@ function WorkspaceRow({
           {totalCompleted}/{totalItems}
         </span>
       </div>
-    </Link>
+    </div>
   );
 }
 
@@ -142,9 +187,16 @@ export function WorkspaceSidebar() {
   const { runningWorkspaces, operations } = useRunningOperations();
   const { chatActivity } = useChatSessions();
 
-  const askingWorkspaces = new Set(
-    operations.filter((op) => op.hasPendingAsk).map((op) => op.workspace),
-  );
+  // The operation a row's indicator opens, preferring one that is waiting for
+  // an answer: with several running, that is the one the user is being asked
+  // to go and look at.
+  const linkedOperations = new Map<string, OperationListItem>();
+  for (const op of operations) {
+    const current = linkedOperations.get(op.workspace);
+    if (!current || (op.hasPendingAsk && !current.hasPendingAsk)) {
+      linkedOperations.set(op.workspace, op);
+    }
+  }
   const active = activeWorkspaceName(pathname);
 
   const activeWorkspaces = showArchived
@@ -160,7 +212,8 @@ export function WorkspaceSidebar() {
       workspace={ws}
       active={ws.name === active}
       isRunning={runningWorkspaces.has(ws.name)}
-      isAsking={askingWorkspaces.has(ws.name)}
+      operationId={linkedOperations.get(ws.name)?.id}
+      isAsking={linkedOperations.get(ws.name)?.hasPendingAsk}
       chatActivity={chatActivity.get(ws.name)}
       archived={archived}
     />
