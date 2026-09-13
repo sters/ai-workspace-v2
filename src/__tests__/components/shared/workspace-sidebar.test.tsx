@@ -41,7 +41,7 @@ vi.mock("@/hooks/use-workspaces", () => ({
 const mockUseRunningOperations = vi.fn<
   () => {
     runningWorkspaces: Set<string>;
-    operations: { hasPendingAsk?: boolean; workspace: string }[];
+    operations: { id?: string; hasPendingAsk?: boolean; workspace: string }[];
   }
 >();
 vi.mock("@/hooks/use-running-operations", () => ({
@@ -152,7 +152,7 @@ describe("WorkspaceSidebar", () => {
   it("flags running and asking workspaces", () => {
     mockUseRunningOperations.mockReturnValue({
       runningWorkspaces: new Set(["ws-run", "ws-ask"]),
-      operations: [{ workspace: "ws-ask", hasPendingAsk: true }],
+      operations: [{ id: "op-1", workspace: "ws-ask", hasPendingAsk: true }],
     });
     mockWorkspaces([
       makeWorkspace("ws-idle", "Idle"),
@@ -165,6 +165,84 @@ describe("WorkspaceSidebar", () => {
     expect(screen.getByLabelText("Waiting for an answer")).toBeInTheDocument();
   });
 
+  it("opens the running operation straight from its indicator", () => {
+    mockUseRunningOperations.mockReturnValue({
+      runningWorkspaces: new Set(["ws-ask"]),
+      operations: [{ id: "op-42", workspace: "ws-ask", hasPendingAsk: true }],
+    });
+    mockWorkspaces([makeWorkspace("ws-ask", "Asking")]);
+    render(<WorkspaceSidebar />);
+
+    expect(screen.getByLabelText("Waiting for an answer")).toHaveAttribute(
+      "href",
+      "/workspace/ws-ask/operations?operationId=op-42",
+    );
+  });
+
+  it("links the asking operation rather than another running one", () => {
+    mockUseRunningOperations.mockReturnValue({
+      runningWorkspaces: new Set(["ws"]),
+      operations: [
+        { id: "op-quiet", workspace: "ws" },
+        { id: "op-asking", workspace: "ws", hasPendingAsk: true },
+      ],
+    });
+    mockWorkspaces([makeWorkspace("ws", "Both")]);
+    render(<WorkspaceSidebar />);
+
+    expect(screen.getByLabelText("Waiting for an answer")).toHaveAttribute(
+      "href",
+      "/workspace/ws/operations?operationId=op-asking",
+    );
+  });
+
+  it("falls back to the operations tab when no operation id is known", () => {
+    mockUseRunningOperations.mockReturnValue({
+      runningWorkspaces: new Set(["ws-run"]),
+      operations: [],
+    });
+    mockWorkspaces([makeWorkspace("ws-run", "Running")]);
+    render(<WorkspaceSidebar />);
+
+    expect(screen.getByLabelText("Operation running")).toHaveAttribute(
+      "href",
+      "/workspace/ws-run/operations",
+    );
+  });
+
+  it("opens the chat straight from its indicator", () => {
+    mockUseChatSessions.mockReturnValue({
+      chatActivity: new Map<string, ChatActivity>([["ws chat", "busy"]]),
+    });
+    mockWorkspaces([makeWorkspace("ws chat", "Spaced name")]);
+    render(<WorkspaceSidebar />);
+
+    // The chat tab has no index route — `/chat` alone is a 404.
+    expect(screen.getByLabelText("Chat working")).toHaveAttribute(
+      "href",
+      "/workspace/ws%20chat/chat/interactive",
+    );
+  });
+
+  it("keeps the row itself a link to the workspace", () => {
+    mockUseRunningOperations.mockReturnValue({
+      runningWorkspaces: new Set(["ws"]),
+      operations: [{ id: "op-1", workspace: "ws" }],
+    });
+    mockUseChatSessions.mockReturnValue({
+      chatActivity: new Map<string, ChatActivity>([["ws", "busy"]]),
+    });
+    mockWorkspaces([makeWorkspace("ws", "Alpha Project")]);
+    render(<WorkspaceSidebar />);
+
+    // An <a> inside an <a> is invalid and browsers drop the inner one, so the
+    // row's link is an overlay named by the title rather than a wrapper.
+    expect(screen.getByRole("link", { name: "Alpha Project" })).toHaveAttribute(
+      "href",
+      "/workspace/ws",
+    );
+  });
+
   it("flags workspaces with a chat session by what the chat is doing", () => {
     mockUseChatSessions.mockReturnValue({
       chatActivity: new Map<string, ChatActivity>([
@@ -172,10 +250,12 @@ describe("WorkspaceSidebar", () => {
         ["ws-waiting", "waiting"],
       ]),
     });
+    // Titles kept clear of the indicator labels: the row's own overlay link is
+    // named by the title, so a workspace called "Chat working" matches both.
     mockWorkspaces([
-      makeWorkspace("ws-none", "No chat"),
-      makeWorkspace("ws-busy", "Chat working"),
-      makeWorkspace("ws-waiting", "Chat idle"),
+      makeWorkspace("ws-none", "Untouched"),
+      makeWorkspace("ws-busy", "Busy one"),
+      makeWorkspace("ws-waiting", "Idle one"),
     ]);
     render(<WorkspaceSidebar />);
 
