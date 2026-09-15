@@ -2,7 +2,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { getCleanEnv } from "../env";
-import { getArchivedNameSet } from "../db/archives";
+import { getArchivedNameSet, isWorkspaceArchived } from "../db/archives";
 import { parseTodoFile } from "../parsers/todo";
 import { parseReadmeMeta } from "../parsers/readme";
 import { parseReviewSummary } from "../parsers/review";
@@ -136,7 +136,11 @@ export async function getWorkspaceSummary(name: string): Promise<WorkspaceSummar
   const wsPath = path.join(getWorkspaceDir(), name);
   if (!existsSync(wsPath)) return null;
 
-  return buildWorkspaceSummary(name, wsPath);
+  const summary = await buildWorkspaceSummary(name, wsPath);
+  // Only this path needs it: `listWorkspaces` drops archived workspaces before
+  // building their summaries.
+  summary.archived = isWorkspaceArchived(name);
+  return summary;
 }
 
 async function buildWorkspaceSummary(

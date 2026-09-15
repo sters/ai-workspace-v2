@@ -63,6 +63,7 @@ export interface WorkspaceSummary {
   totalCompleted: number;
   totalItems: number;
   lastModified: string;
+  archived?: boolean;
 }
 
 /** Lightweight summary for workspace list / card rendering. */
