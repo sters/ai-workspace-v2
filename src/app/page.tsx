@@ -11,7 +11,7 @@ function DashboardContent() {
   const [searchActive, setSearchActive] = useState(false);
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-6xl">
       <PageHeader title="Workspaces" />
 
       <WorkspaceSearch onSearchActiveChange={setSearchActive} />

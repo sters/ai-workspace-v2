@@ -21,7 +21,7 @@ export default function SuggestionsLayout({
   const activeSegment = pathname.replace("/suggestions", "").replace(/^\//, "").split("/")[0] || "";
 
   return (
-    <div>
+    <div className="mx-auto w-full max-w-6xl">
       <PageHeader
         title="Suggestions"
         description="Out-of-scope items discovered during operations. Click a suggestion to create a new workspace."
