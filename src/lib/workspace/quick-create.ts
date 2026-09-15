@@ -10,14 +10,19 @@
  * branch, and a README whose `## Repositories` section the rest of the tooling
  * can read.
  *
- * The contract sections (Goal, Non-Goal, Acceptance Criteria, …) are left as
- * the template's comments. The README verifier and the autonomous gate treat
- * them as authoritative, so filling them from a one-line name would hand every
- * later phase a contract nobody wrote; an empty one is honest, and
- * `update-readme` is the path that fills it if the task turns out to be bigger.
- * The same reasoning leaves out the TODO file: the TODO tab renders a
- * `No TODO file` card for a declared repository without one, and that card
- * starts the autonomous path that plans properly.
+ * The contract sections (Non-Goal, Assumptions, Requirements, Acceptance
+ * Criteria) are left as the template's comments. The README verifier and the
+ * autonomous gate treat them as authoritative, so filling them from a one-line
+ * name would hand every later phase a contract nobody wrote; an empty one is
+ * honest, and `update-readme` is the path that fills it if the task turns out
+ * to be bigger. The same reasoning leaves out the TODO file: the TODO tab
+ * renders a `No TODO file` card for a declared repository without one, and that
+ * card starts the autonomous path that plans properly.
+ *
+ * The `# Task:` heading written here is provisional, and `## Goal` is the one
+ * contract section that does get written — not here, but on the first turn of
+ * the chat this creation hands over to, which is the first thing on the path
+ * holding both the request and a model (`getTaskChatSystemPrompt`).
  */
 
 import path from "node:path";

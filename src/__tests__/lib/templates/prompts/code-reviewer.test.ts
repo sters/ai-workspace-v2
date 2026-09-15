@@ -127,7 +127,6 @@ describe("getCodeReviewerSystemPrompt — incremental scope contract", () => {
   // Without this the incremental scope would silently drop the regression net:
   // a reviewer told "only look here" must still be allowed to read outward.
   it("still permits reading outside the target for context", () => {
-    expect(prompt.toLowerCase()).toContain("read");
     expect(prompt).toMatch(/outside the .*target|beyond the .*target/i);
   });
 });

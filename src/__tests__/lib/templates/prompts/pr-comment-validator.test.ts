@@ -41,8 +41,7 @@ describe("getPrCommentValidatorSystemPrompt", () => {
   it("forbids replying to or resolving the thread", () => {
     // The reply belongs to the phase that pushes: a reply names a commit, and at
     // validate time no commit exists. Same rule the triage instruction carries.
-    expect(prompt).toMatch(/do NOT (reply|respond)/i);
-    expect(prompt).toMatch(/resolve/i);
+    expect(prompt).toMatch(/do NOT reply to the review comment and you do NOT resolve the thread/i);
   });
 
   it("defines the three verdicts it is allowed to return", () => {
@@ -63,18 +62,11 @@ describe("getPrCommentValidatorSystemPrompt", () => {
     expect(prompt).toMatch(/what would settle it/i);
   });
 
-  it("carries the canonical worktree cd rule", () => {
-    expect(prompt).toMatch(/first Bash tool call MUST be `cd` alone/);
-  });
-
-  it("does not also carry the no-cd convention", () => {
-    expect(prompt).not.toContain("NEVER use `cd` in Bash commands");
-  });
-
-  it("tells the agent to explore with Grep/Glob/Read", () => {
-    expect(prompt).toContain("### Searching the Repository");
-  });
-
+  // Adoption of the cd rule and the search fragment, and the invariant that no
+  // prompt states both working-directory conventions, are owned by
+  // shared.test.ts — which asserts them against the exported fragments rather
+  // than against a heading this file would have to keep in sync. Only the
+  // ordering is this prompt's own business.
   it("renders the search fragment after the cd rule, not before it", () => {
     expect(prompt.indexOf("### Working Directory")).toBeLessThan(
       prompt.indexOf("### Searching the Repository"),
@@ -82,7 +74,7 @@ describe("getPrCommentValidatorSystemPrompt", () => {
   });
 
   it("keeps its answer short, since a triage re-embeds it verbatim", () => {
-    expect(prompt).toMatch(/re-?embed|verbatim|downstream/i);
+    expect(prompt).toMatch(/re-embedded verbatim into the instruction that plans the fix/);
   });
 });
 

@@ -55,11 +55,10 @@ describe("buildAutonomousGatePrompt", () => {
     expect(prompt).not.toContain("FINAL cycle");
   });
 
-  it("instructs to evaluate all severity levels including warnings and suggestions", () => {
-    const systemPrompt = getAutonomousGateSystemPrompt();
-    expect(systemPrompt).toContain("warnings");
-    expect(systemPrompt).toContain("suggestions");
-    expect(systemPrompt).toContain("every severity level");
+  it("has it read the whole review rather than the blocking findings alone", () => {
+    // Coverage on the reading side: the loop bar narrows what may *cause* a
+    // cycle, and that is only safe if the gate has seen everything first.
+    expect(getAutonomousGateSystemPrompt()).toContain("every severity level");
   });
 
   // The bar is the run's own deliverable: is the contract implemented, correct
@@ -264,9 +263,13 @@ describe("buildAutonomousGatePrompt", () => {
     it("makes a PR conditional on the work actually being finished", () => {
       const systemPrompt = getAutonomousGateSystemPrompt();
       expect(systemPrompt).toContain("### Completion Bar");
-      expect(systemPrompt).toMatch(/pending|\[ \]/);
+      expect(systemPrompt).toMatch(/the only thing that triggers PR creation/);
+      // All four conditions, contiguously numbered — a dropped one is a PR
+      // opened over unfinished work.
+      const bar = systemPrompt.slice(systemPrompt.indexOf("### Completion Bar"));
+      const numbers = [...bar.matchAll(/^(\d+)\. /gm)].map((m) => Number(m[1])).slice(0, 4);
+      expect(numbers).toEqual([1, 2, 3, 4]);
       expect(systemPrompt).toMatch(/`\[~\]`/);
-      expect(systemPrompt).toMatch(/PR/);
     });
 
     it("keeps a human-blocked TODO item from blocking the PR forever", () => {

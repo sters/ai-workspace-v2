@@ -43,7 +43,9 @@ describe("getReviewerSystemPrompt", () => {
   });
 
   it("flags prescribed code that changes a contract today's callers rely on", () => {
-    expect(prompt).toMatch(/nullability|contract/i);
+    expect(prompt).toMatch(/changes a contract existing callers rely on/);
+    // The named shapes, or the rule is an abstraction with nothing to match on.
+    expect(prompt).toMatch(/nullability or a sentinel/);
   });
 
   // Two writers to one TODO file is the defect the revision step exists to avoid.
@@ -94,8 +96,9 @@ describe("buildTodoReviewResolutionInstruction", () => {
 
   it("names both exits: amend the item, or record it as a blocked item", () => {
     const instruction = buildTodoReviewResolutionInstruction({ findings });
+    expect(instruction).toMatch(/Amend the item/i);
+    expect(instruction).toMatch(/Record it as a blocked item/i);
     expect(instruction).toMatch(/- \[!\]/);
-    expect(instruction).toMatch(/Action|Verify/);
   });
 
   // The whole point of the step: nothing may vanish the way the old verdict did.

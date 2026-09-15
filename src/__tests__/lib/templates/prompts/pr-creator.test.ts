@@ -115,7 +115,7 @@ describe("getPRCreatorSystemPrompt", () => {
   // A template's own scaffolding is the one thing the agent may not shorten, but
   // a section with nothing to say still costs a line rather than a paragraph.
   it("allows a one-line answer for a template section with nothing substantive", () => {
-    expect(prompt).toMatch(/one line/i);
+    expect(prompt).toMatch(/nothing substantive gets one line/);
   });
 });
 
