@@ -43,6 +43,13 @@ interface StartMessage {
   initialPrompt?: string;
   reviewTimestamp?: string;
   researchChat?: boolean;
+  /**
+   * Text to type into the prompt box and leave there, unsent. Unlike
+   * `initialPrompt` — which replaces the built init prompt and is submitted as
+   * the session's first turn — this is the human's own draft, waiting on their
+   * Enter.
+   */
+  seedInput?: string;
   /** Size of the browser terminal, so the PTY is born at the right size. */
   cols?: number;
   rows?: number;
