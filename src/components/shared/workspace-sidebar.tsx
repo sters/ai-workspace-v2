@@ -157,6 +157,15 @@ function WorkspaceRow({
           {title}
         </span>
       </div>
+      {name !== title && (
+        // The directory the workspace lives in, which is what git branches and
+        // paths are named after. Omitted when it *is* the title, since
+        // `listWorkspaces` falls back to the directory name for a README with
+        // no heading.
+        <div className="pointer-events-none relative truncate text-[10px] text-muted-foreground">
+          {name}
+        </div>
+      )}
       <div className="pointer-events-none relative mt-1 flex items-center gap-2">
         <div className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
           <div
