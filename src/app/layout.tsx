@@ -24,9 +24,10 @@ export default function RootLayout({
           <AppSidebar />
           <WorkspaceSidebar />
 
-          {/* Main */}
+          {/* Main. The reading-width constraint belongs to each section's own
+              layout, since the workspace detail pages want the full width. */}
           <main className="min-w-0 flex-1 overflow-auto">
-            <div className="mx-auto max-w-6xl p-6">{children}</div>
+            <div className="p-6">{children}</div>
           </main>
         </div>
         <ToastHost />
