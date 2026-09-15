@@ -58,6 +58,16 @@ export function QuickCreateForm() {
   const [openChat, setOpenChat] = useState(true);
   const [result, setResult] = useState<QuickCreateResponse | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  /**
+   * `sent` is terminal, and it is what stops a second workspace being created.
+   * The in-flight click is already swallowed by `Button`, but the success path
+   * navigates with `router.push`, which leaves this form mounted and clickable
+   * until the new route renders — and a POST landing in that window creates a
+   * whole second workspace (`setupWorkspace` gives the collision a `-2`), not a
+   * retry. Only a request the server *refused* returns to `idle`, since that is
+   * the one answer that says nothing was created.
+   */
+  const [status, setStatus] = useState<"idle" | "creating" | "sent">("idle");
 
   const chosen = useMemo(
     () => [...new Set([...selected, ...parseExtraRepositories(extra)])],
@@ -103,21 +113,36 @@ export function QuickCreateForm() {
   const create = async () => {
     setFailure(null);
     setResult(null);
+    setStatus("creating");
 
-    const response = await postJson<QuickCreateResponse>("/api/workspaces", {
-      // Sent as typed — the server derives from the note with the same rule,
-      // so an empty name is not a second copy of the derivation.
-      name: name.trim(),
-      taskType,
-      repositories: chosen,
-      ...(note.trim() ? { note: note.trim() } : {}),
-    });
+    let response;
+    try {
+      response = await postJson<QuickCreateResponse>("/api/workspaces", {
+        // Sent as typed — the server derives from the note with the same rule,
+        // so an empty name is not a second copy of the derivation.
+        name: name.trim(),
+        taskType,
+        repositories: chosen,
+        ...(note.trim() ? { note: note.trim() } : {}),
+      });
+    } catch (err) {
+      // The request never came back, so whether it created anything is unknown.
+      // Staying disabled is the safe half of that: a blind retry is how the
+      // duplicate gets made.
+      setStatus("sent");
+      setFailure(
+        `${String(err)} — the workspace may still have been created. Check the dashboard before creating it again.`,
+      );
+      return;
+    }
 
     if (!response.ok) {
+      setStatus("idle");
       setFailure(response.error);
       return;
     }
 
+    setStatus("sent");
     setResult(response.data);
     // A clean run has nothing left to read here. Anything that failed is the
     // one thing worth staying for, so that case reports instead of navigating.
@@ -282,8 +307,18 @@ export function QuickCreateForm() {
         </span>
       </label>
 
-      <Button onClick={create} disabled={!effectiveName || chosen.length === 0}>
-        Create workspace
+      <Button
+        onClick={create}
+        disabled={!effectiveName || chosen.length === 0 || status !== "idle"}
+      >
+        {status === "creating" ? (
+          <>
+            <Spinner />
+            Creating workspace…
+          </>
+        ) : (
+          "Create workspace"
+        )}
       </Button>
 
       {failure && (

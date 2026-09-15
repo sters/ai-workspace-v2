@@ -242,4 +242,77 @@ describe("QuickCreateForm", () => {
     await waitFor(() => expect(screen.getByText(/name is required/)).toBeInTheDocument());
     expect(mockPush).not.toHaveBeenCalled();
   });
+
+  describe("a second click never creates a second workspace", () => {
+    function ready() {
+      render(<QuickCreateForm />);
+      fillName("login crash");
+      fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+      return screen.getByRole("button", { name: /create workspace/i });
+    }
+
+    it("says it is creating while the request is in flight", async () => {
+      let settle: (value: unknown) => void = () => {};
+      mockPostJson.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+
+      const button = ready();
+      fireEvent.click(button);
+
+      await waitFor(() => expect(button).toHaveTextContent(/creating workspace/i));
+      expect(button).toBeDisabled();
+
+      settle(ok());
+      await waitFor(() => expect(mockPush).toHaveBeenCalled());
+    });
+
+    it("stays disabled while the router navigates to the created workspace", async () => {
+      const button = ready();
+      fireEvent.click(button);
+      await waitFor(() => expect(mockPush).toHaveBeenCalled());
+
+      // The form is still mounted until the new route renders, so the click
+      // lands here — and a second POST is a second workspace, not a retry.
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(mockPostJson).toHaveBeenCalledTimes(1);
+    });
+
+    it("stays disabled after a partial failure, since the workspace exists", async () => {
+      mockPostJson.mockResolvedValue(
+        ok({ problems: [{ repository: "github.com/acme/api", error: "fatal: no such remote" }] }),
+      );
+
+      const button = ready();
+      fireEvent.click(button);
+      await waitFor(() => expect(screen.getByText(/no such remote/)).toBeInTheDocument());
+
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(mockPostJson).toHaveBeenCalledTimes(1);
+    });
+
+    it("stays disabled when the request itself threw, which says nothing either way", async () => {
+      mockPostJson.mockRejectedValue(new Error("Failed to fetch"));
+
+      const button = ready();
+      fireEvent.click(button);
+      await waitFor(() => expect(screen.getByText(/may still have been created/i)).toBeInTheDocument());
+
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(mockPostJson).toHaveBeenCalledTimes(1);
+    });
+
+    it("can be retried once the server refused to create anything", async () => {
+      mockPostJson.mockResolvedValue({ ok: false, error: "name is required" });
+
+      const button = ready();
+      fireEvent.click(button);
+      await waitFor(() => expect(screen.getByText(/name is required/)).toBeInTheDocument());
+
+      expect(button).toBeEnabled();
+      fireEvent.click(button);
+      await waitFor(() => expect(mockPostJson).toHaveBeenCalledTimes(2));
+    });
+  });
 });
