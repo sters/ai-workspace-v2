@@ -121,6 +121,22 @@ describe("WorkspaceSidebar", () => {
     );
   });
 
+  it("shows the directory slug alongside the title", () => {
+    mockWorkspaces([makeWorkspace("feature-alpha-2026-01-01", "Alpha Project")]);
+    render(<WorkspaceSidebar />);
+
+    expect(screen.getByText("feature-alpha-2026-01-01")).toBeInTheDocument();
+  });
+
+  it("leaves out the slug when the title is already the slug", () => {
+    // `listWorkspaces` falls back to the directory name when the README has no
+    // title, so the two are the same string and one of them is noise.
+    mockWorkspaces([makeWorkspace("ws-untitled", "ws-untitled")]);
+    render(<WorkspaceSidebar />);
+
+    expect(screen.getAllByText("ws-untitled")).toHaveLength(1);
+  });
+
   it("marks the workspace of the current route as current", () => {
     mockPathname.mockReturnValue("/workspace/ws-beta/todo");
     mockWorkspaces([
