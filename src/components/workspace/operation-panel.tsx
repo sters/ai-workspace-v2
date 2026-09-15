@@ -19,17 +19,28 @@ import {
   GitPullRequest,
   FolderOpen,
   Trash2,
+  Archive,
+  ArchiveRestore,
 } from "lucide-react";
 
 export function OperationPanel({
   workspaceName,
   workspacePath,
   repositories,
+  archived,
+  onArchived,
 }: {
   workspaceName: string;
   workspacePath: string;
   /** Repository metadata from workspace README for "Open in editor" dropdown. */
   repositories?: { alias: string; path: string }[];
+  archived?: boolean;
+  /**
+   * Called after the archive state was toggled, so the caller can re-read it.
+   * The button is omitted without it — a toggle nothing re-reads leaves the
+   * label stating the opposite of the truth.
+   */
+  onArchived?: () => void;
 }) {
   const { operations, isWorkspaceRunning, isWorkspaceTypeRunning } = useRunningOperations();
   const isRunning = isWorkspaceRunning(workspaceName);
@@ -61,6 +72,27 @@ export function OperationPanel({
       },
     })),
   }));
+
+  const toggleArchive = async () => {
+    try {
+      const res = await fetch(
+        `/api/workspaces/${encodeURIComponent(workspaceName)}/archive`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
+      onArchived?.();
+    } catch (err) {
+      showToast(
+        err instanceof Error
+          ? err.message
+          : `Failed to ${archived ? "unarchive" : "archive"} workspace`,
+        "error",
+      );
+    }
+  };
 
   /** Build body with workspace path and current interaction level. */
   const body = (extra?: Record<string, string>) => ({
@@ -139,16 +171,30 @@ export function OperationPanel({
             items={openerMenuItems}
           />
         )}
-        <Button
-          variant="destructive"
-          className="ml-auto"
-          onClick={() =>
-            startAndNavigate("delete", { workspace: workspacePath })
-          }
-          disabled={isWorkspaceTypeRunning(workspaceName, "delete")}
-        >
-          <Trash2 className="h-3.5 w-3.5" /> Delete workspace
-        </Button>
+        <div className="ml-auto flex items-center gap-2">
+          {onArchived && (
+            <Button variant="secondary" onClick={toggleArchive}>
+              {archived ? (
+                <>
+                  <ArchiveRestore className="h-3.5 w-3.5" /> Unarchive
+                </>
+              ) : (
+                <>
+                  <Archive className="h-3.5 w-3.5" /> Archive
+                </>
+              )}
+            </Button>
+          )}
+          <Button
+            variant="destructive"
+            onClick={() =>
+              startAndNavigate("delete", { workspace: workspacePath })
+            }
+            disabled={isWorkspaceTypeRunning(workspaceName, "delete")}
+          >
+            <Trash2 className="h-3.5 w-3.5" /> Delete workspace
+          </Button>
+        </div>
       </div>
       {isRunning && runningOp && (
         <p className="text-sm text-muted-foreground">

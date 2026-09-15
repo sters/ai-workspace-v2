@@ -33,7 +33,7 @@ export function WorkspaceLayoutContent({
 }) {
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
-  const { workspace, isLoading, error } = useWorkspace(decodedName);
+  const { workspace, isLoading, error, refresh } = useWorkspace(decodedName);
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -108,6 +108,11 @@ export function WorkspaceLayoutContent({
             <p className="text-sm text-muted-foreground">{decodedName}</p>
           </div>
           <div className="flex items-center gap-2">
+            {workspace.archived && (
+              <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                Archived
+              </span>
+            )}
             <StatusBadge label={workspace.meta.taskType} />
             {workspace.meta.ticketId && (
               <span className="text-sm text-muted-foreground">
@@ -138,6 +143,8 @@ export function WorkspaceLayoutContent({
           workspaceName={decodedName}
           workspacePath={workspace.path}
           repositories={workspace.meta.repositories}
+          archived={workspace.archived}
+          onArchived={() => refresh()}
         />
       </div>
 
