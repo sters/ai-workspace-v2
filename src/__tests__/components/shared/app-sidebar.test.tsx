@@ -95,6 +95,93 @@ describe("AppSidebar", () => {
     expect(localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY)).toBe("false");
   });
 
+  it("reveals a section's sub-items in a flyout while hovering the collapsed rail", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "true");
+    render(<AppSidebar />);
+
+    expect(screen.queryByText("Claude Usage")).not.toBeInTheDocument();
+
+    await user.hover(screen.getByRole("link", { name: "Utilities" }));
+    expect(screen.getByRole("link", { name: "Claude Usage" })).toHaveAttribute(
+      "href",
+      "/utilities/claude-usage",
+    );
+    // Only the hovered section opens
+    expect(screen.queryByText("Quick (no AI)")).not.toBeInTheDocument();
+
+    await user.unhover(screen.getByRole("link", { name: "Utilities" }));
+    expect(screen.queryByText("Claude Usage")).not.toBeInTheDocument();
+  });
+
+  it("renders the flyout inside the hovered item so the pointer can reach it", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "true");
+    render(<AppSidebar />);
+
+    const icon = screen.getByRole("link", { name: "New Workspace" });
+    await user.hover(icon);
+
+    // The element that closes on mouse leave has to contain the sub-items,
+    // or moving the pointer onto one of them dismisses the flyout.
+    expect(icon.parentElement).toContainElement(
+      screen.getByRole("link", { name: "Quick (no AI)" }),
+    );
+  });
+
+  it("opens the flyout for keyboard focus and keeps it open inside", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "true");
+    render(<AppSidebar />);
+
+    // Expand button, Dashboard, then New Workspace
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    expect(screen.getByRole("link", { name: "New Workspace" })).toHaveFocus();
+    expect(screen.getByRole("link", { name: "Quick (no AI)" })).toBeVisible();
+
+    await user.tab();
+    expect(screen.getByRole("link", { name: "Quick (no AI)" })).toHaveFocus();
+  });
+
+  it("closes the flyout once focus leaves the section", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "true");
+    render(<AppSidebar />);
+
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    expect(screen.getByText("Quick (no AI)")).toBeInTheDocument();
+
+    // Past the flyout's own links, into Utilities
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    await user.tab();
+    expect(screen.getByRole("link", { name: "Utilities" })).toHaveFocus();
+    expect(screen.queryByText("Quick (no AI)")).not.toBeInTheDocument();
+    expect(screen.getByText("Claude Usage")).toBeInTheDocument();
+  });
+
+  it("has no flyout for a section without sub-items", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "true");
+    render(<AppSidebar />);
+
+    await user.hover(screen.getByRole("link", { name: "Dashboard" }));
+    expect(screen.getAllByRole("link", { name: "Dashboard" })).toHaveLength(1);
+  });
+
+  it("does not leave a flyout open across a collapse", async () => {
+    const user = userEvent.setup();
+    render(<AppSidebar />);
+
+    await user.click(screen.getByRole("button", { name: /collapse sidebar/i }));
+    expect(screen.queryByText("Claude Usage")).not.toBeInTheDocument();
+  });
+
   it("marks the section matching the current path as current", () => {
     mockPathname.mockReturnValue("/utilities/claude-usage");
     render(<AppSidebar />);

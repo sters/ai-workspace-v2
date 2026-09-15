@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -80,16 +80,20 @@ function isSectionActive(pathname: string, section: NavSection): boolean {
 export function AppSidebar() {
   const pathname = usePathname();
   const collapsed = useSidebarCollapsed();
+  const [openSection, setOpenSection] = useState<string | null>(null);
 
-  const toggle = useCallback(
-    () => setSidebarCollapsed(!collapsed),
-    [collapsed],
-  );
+  const toggle = useCallback(() => {
+    setOpenSection(null);
+    setSidebarCollapsed(!collapsed);
+  }, [collapsed]);
 
   return (
     <aside
       className={cn(
-        "shrink-0 border-r bg-card",
+        // Elevated above the workspace sidebar: the sticky child below is its
+        // own stacking context, so the hover flyout's z-index cannot reach out
+        // of it and the later sibling would otherwise paint over the flyout.
+        "relative z-30 shrink-0 border-r bg-card",
         collapsed ? "w-12" : "w-56",
       )}
     >
@@ -110,22 +114,65 @@ export function AppSidebar() {
               {NAV_SECTIONS.map((section) => {
                 const Icon = section.icon;
                 const active = isSectionActive(pathname, section);
+                const open = !!section.children && openSection === section.href;
                 return (
-                  <Link
+                  <div
                     key={section.href}
-                    href={section.href}
-                    aria-label={section.label}
-                    title={section.label}
-                    aria-current={active ? "page" : undefined}
-                    className={cn(
-                      "rounded-md p-2 hover:bg-accent",
-                      active
-                        ? "bg-accent text-foreground"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
+                    className="relative"
+                    onMouseEnter={() => setOpenSection(section.href)}
+                    onMouseLeave={() => setOpenSection(null)}
+                    onFocus={() => setOpenSection(section.href)}
+                    onBlur={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget)) {
+                        setOpenSection(null);
+                      }
+                    }}
                   >
-                    <Icon className="h-4 w-4" />
-                  </Link>
+                    <Link
+                      href={section.href}
+                      aria-label={section.label}
+                      title={section.label}
+                      aria-current={active ? "page" : undefined}
+                      aria-expanded={section.children ? open : undefined}
+                      className={cn(
+                        "block rounded-md p-2 hover:bg-accent",
+                        active
+                          ? "bg-accent text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </Link>
+                    {open && (
+                      // Padded rather than offset with a margin: the gap has to
+                      // belong to the hoverable wrapper, or crossing it closes
+                      // the flyout before the pointer arrives.
+                      <div className="absolute left-full top-0 z-50 pl-1">
+                        <div className="max-h-[calc(100vh-1rem)] w-52 overflow-y-auto rounded-md border bg-card py-1 shadow-md">
+                          <div className="px-3 py-1 text-xs font-semibold text-muted-foreground">
+                            {section.label}
+                          </div>
+                          {section.children?.map((item) => (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              aria-current={
+                                pathname === item.href ? "page" : undefined
+                              }
+                              className={cn(
+                                "block px-3 py-1.5 text-xs hover:bg-accent hover:text-foreground",
+                                pathname === item.href
+                                  ? "bg-accent text-foreground"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              {item.label}
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </nav>
