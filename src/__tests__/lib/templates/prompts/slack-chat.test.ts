@@ -2,45 +2,42 @@ import { describe, expect, it } from "vitest";
 import { buildSlackChatPrompt, getSlackChatSystemPrompt } from "@/lib/templates/prompts/slack-chat";
 
 describe("getSlackChatSystemPrompt", () => {
-  it("defaults to read-only but permits explicitly-requested writes", () => {
+  it("gates a write on an explicit request rather than the model's initiative", () => {
     const sys = getSlackChatSystemPrompt();
     expect(sys).toContain("READ-ONLY");
-    // Writes are gated on an explicit user request, not the model's initiative.
-    expect(sys).toMatch(/EXPLICIT/);
-    expect(sys).toMatch(/MCP/);
+    expect(sys).toContain("WRITES REQUIRE AN EXPLICIT REQUEST");
   });
 
-  it("keeps repository/codebase changes and destructive actions forbidden even on request", () => {
+  it("keeps repository changes and destructive actions forbidden even on request", () => {
     const sys = getSlackChatSystemPrompt();
-    expect(sys).toMatch(/NEVER/);
-    expect(sys).toMatch(/git/);
-    // Irreversible/destructive operations stay off-limits.
+    expect(sys).toMatch(/NEVER run repo-mutating commands/);
     expect(sys).toMatch(/reset --hard|force-push|rm -rf/);
-    // Code changes are routed to the WebUI / init instead.
-    expect(sys).toMatch(/WebUI|init/);
+    expect(sys).toContain("through the WebUI or");
   });
 
   it("names the scratch directory as the only place file writes may go", () => {
     const sys = getSlackChatSystemPrompt();
     expect(sys).toMatch(/scratch directory/i);
-    // The ai-workspace state directories are read-only, `workspace/` in
-    // particular: a file invented there is invisible to the WebUI.
-    expect(sys).toContain("workspace/");
-    expect(sys).toContain("repositories/");
-    expect(sys).toMatch(/read-only/i);
+    expect(sys).toMatch(/Everything else under the ai-workspace root is read-only/);
+    expect(sys).toContain("`workspace/`");
+    expect(sys).toContain("`repositories/`");
   });
 
-  it("routes a PR review request to the WebUI instead of setting anything up", () => {
+  it("says a file invented under workspace/ does not create a workspace", () => {
+    // The recorded failure this outlet exists for: asked to review a PR, the
+    // conversation wrote `workspace/<name>.yml`, which the WebUI's listing skips
+    // and hard limit (2) forbids it from deleting afterwards.
     const sys = getSlackChatSystemPrompt();
+    expect(sys).toMatch(/does not create a workspace/);
     expect(sys).toMatch(/Pull Requests tab/);
-    expect(sys).toMatch(/init/);
+    expect(sys).toContain("init <description>");
   });
 
-  it("lets the model read and write the per-user memory database", () => {
+  it("scopes memory writes to the memories table and an explicit request", () => {
     const sys = getSlackChatSystemPrompt();
-    expect(sys).toMatch(/MEMORY/);
-    expect(sys).toContain("memories");
-    expect(sys).toMatch(/EXPLICITLY/);
+    expect(sys).toMatch(/write to its `memories` table/);
+    expect(sys).toMatch(/Only write \(remember\) when the user EXPLICITLY asks/);
+    expect(sys).toMatch(/NEVER `DROP`\/`ALTER`/);
   });
 });
 

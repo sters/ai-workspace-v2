@@ -4,10 +4,6 @@ import {
   getResearchPlannerSystemPrompt,
   buildPlannerPrompt,
 } from "@/lib/templates/prompts/planner";
-import {
-  REPO_SEARCH_EFFICIENCY,
-  WRITTEN_DELIVERABLE_LENGTH,
-} from "@/lib/templates/prompts/shared";
 
 describe("getPlannerSystemPrompt", () => {
   const prompt = getPlannerSystemPrompt();
@@ -36,15 +32,13 @@ describe("getPlannerSystemPrompt", () => {
     expect(prompt).toMatch(/NOT "ensure it works"/);
   });
 
-  it("tells the planner to write only what changes the executor's behavior", () => {
-    expect(prompt).toContain(WRITTEN_DELIVERABLE_LENGTH);
-    // The old wording pushed the opposite way ("never trade rigor of the format
-    // for brevity"), which is what produced 500-line TODO files.
+  // Adoption of WRITTEN_DELIVERABLE_LENGTH and REPO_SEARCH_EFFICIENCY is owned by
+  // shared.test.ts, which checks every prompt that should carry them against the
+  // exported fragment. What is this file's own business is that the wording they
+  // replaced is gone: it pushed the opposite way ("never trade rigor of the
+  // format for brevity"), which is what produced 500-line TODO files.
+  it("no longer tells the planner that format rigor outranks brevity", () => {
     expect(prompt).not.toMatch(/never trade rigor of the \*?format/i);
-  });
-
-  it("carries the repo search efficiency policy", () => {
-    expect(prompt).toContain(REPO_SEARCH_EFFICIENCY);
   });
 
   it("requires path:line or path + symbol/function for Target on code-change tasks", () => {
@@ -57,7 +51,7 @@ describe("getPlannerSystemPrompt", () => {
   });
 
   it("still allows looser format for doc-only / config-only tasks", () => {
-    expect(prompt).toMatch(/(documentation|doc-only|config-only|non-code)/i);
+    expect(prompt).toMatch(/Doc-only \/ config-only \/ non-code items/);
   });
 });
 

@@ -95,6 +95,20 @@ ${ON_DEMAND_READING}`;
  * are the ones a waiting turn was incidentally providing: publishing is not
  * this session's to do, and an unguessable decision still comes back to the
  * user rather than being resolved by a guess.
+ *
+ * It is also the one variant that writes the README, and the only place that
+ * can: quick create fills the title from the note's first line and calls no
+ * model at all, so the workspace reaches this session with a `# Task:` heading
+ * that is raw prose and an empty `## Goal`. Both are read later by things that
+ * cannot ask — the heading is every PR's title verbatim, and the Goal is what
+ * a review or an `update-readme` run starts from. Writing them here costs one
+ * Edit against a request the session is already holding.
+ *
+ * It stops at those two. Non-Goal, Assumptions, Requirements and Acceptance
+ * Criteria are the done-contract the README verifier and the autonomous gate
+ * enforce, so filling them from a one-line note hands every later phase a
+ * contract nobody wrote — the same reason `createQuickWorkspace` leaves them
+ * as the template's comments.
  */
 export function getTaskChatSystemPrompt(): string {
   return `${WORKSPACE_LAYOUT}
@@ -103,13 +117,16 @@ The user's request is in the first message. Your first turn is:
 
 1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
 2. One Read call: the workspace \`README.md\`, at the path in the user prompt. It says which repositories have worktrees here and where they are.
-3. Then start on the request, without asking for permission to begin.
+3. One Edit call on that \`README.md\`, before any code: rewrite the \`# Task:\` heading into a concise title for the request — under 70 characters, since it is reused verbatim as the title of any pull request this task opens — and replace the \`## Goal\` comment with a few lines saying what must be true once the request is done. Write both in English even when the request is in another language; \`## Initial Request\` keeps the request verbatim and stays as it is.
+4. Then start on the request, without asking for permission to begin.
 
-Work it through: find the code involved, make the change in the worktrees the README declares, and verify it with the repository's own checks (its lint / test / build commands, as the repository defines them — a repository with a \`## Repository Constraints\` section in the README has them listed there). Report what you did when you are done.
+Step 3 is the whole of what you write there, and it is a rough sketch grounded in the request — not a contract. Leave \`## Non-Goal\`, \`## Assumptions\`, \`## Requirements\` and \`## Acceptance Criteria\` as the template's comments, and leave the \`TODO-*.md\` files alone: the README verifier and the autonomous gate treat those sections as authoritative, and the pipeline's own phases write them. If the task turns out to need a real contract, say so and point the user at the \`update-readme\` operation.
+
+Work the request through: find the code involved, make the change in the worktrees the README declares, and verify it with the repository's own checks (its lint / test / build commands, as the repository defines them — a repository with a \`## Repository Constraints\` section in the README has them listed there). Report what you did when you are done.
 
 Ask the user when a decision is genuinely theirs — an ambiguity in the request where the choices lead to materially different work, or a change that reaches further than they asked for. For anything you can settle from the code, settle it and say which assumption you took. A question you could have answered by reading the repository is a turn the user has to sit through.
 
-Two things are out of scope. **Publishing**: no \`git push\`, no \`gh pr create\`, no merging — the WebUI has operations for that, and the user is sitting in front of this session. Committing in the worktree is fine. **The workspace contract**: leave \`README.md\` and the \`TODO-*.md\` files alone unless the user asks; the pipeline's phases treat them as authoritative and write them themselves.
+**Publishing is out of scope**: no \`git push\`, no \`gh pr create\`, no merging — the WebUI has operations for that, and the user is sitting in front of this session. Committing in the worktree is fine.
 
 ${ON_DEMAND_READING}`;
 }
@@ -135,7 +152,11 @@ export function buildTaskChatPrompt(
   task: string,
 ): string {
   return [
-    firstTurnSection(workspacePath, [], "start on the request below"),
+    firstTurnSection(
+      workspacePath,
+      [],
+      "write its `# Task:` heading and `## Goal` from the request below, then start on the request itself",
+    ),
     "### What I want to do",
     "",
     task,

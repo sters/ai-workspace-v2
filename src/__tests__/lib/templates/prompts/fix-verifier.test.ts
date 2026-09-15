@@ -31,8 +31,8 @@ describe("getFixVerifierSystemPrompt", () => {
   // A NOT LANDED verdict is a hard loop reason downstream, so the verifier must
   // hand the gate the reason rather than deciding validity itself.
   it("asks it to quote a recorded contrary decision instead of judging the ask", () => {
-    expect(prompt.toLowerCase()).toMatch(/quote|record/);
-    expect(prompt).toMatch(/gate|decide/i);
+    expect(prompt).toMatch(/\*\*quote it\*\*/);
+    expect(prompt).toMatch(/the gate decides that/);
   });
 });
 
