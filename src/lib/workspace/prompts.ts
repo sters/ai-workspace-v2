@@ -49,6 +49,7 @@ import {
   getChatSystemPrompt,
   getReviewChatSystemPrompt,
   getResearchChatSystemPrompt,
+  getTaskChatSystemPrompt,
   getSlackChatSystemPrompt,
   getPrCommentValidatorSystemPrompt,
   getFindingGrounderSystemPrompt,
@@ -93,6 +94,7 @@ const SYSTEM_PROMPTS: Record<string, () => string> = {
   "chat.md": getChatSystemPrompt,
   "review-chat.md": getReviewChatSystemPrompt,
   "research-chat.md": getResearchChatSystemPrompt,
+  "task-chat.md": getTaskChatSystemPrompt,
   "slack-chat.md": getSlackChatSystemPrompt,
 };
 

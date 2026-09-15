@@ -32,6 +32,37 @@ export function sanitizeSlug(input: string, maxLength = 50): string {
   return slug || "workspace";
 }
 
+/**
+ * Cap on a name derived from the note. It becomes the README's `# Task:`
+ * heading, the same 70 characters `init-readme` is held to.
+ */
+export const DERIVED_NAME_MAX_CHARS = 70;
+
+/**
+ * The name a quick create ends up with: what the caller typed, or the note's
+ * first line when they typed nothing.
+ *
+ * The note is the field that says what the change is, so requiring a name as
+ * well is asking for the same thing twice. Only the *derived* name is capped —
+ * a caller who typed a long name meant it, while a note's first line is prose
+ * that happens to be first.
+ *
+ * Returns `""` when neither was given; naming a workspace with nothing to go on
+ * is the caller's call to refuse, not this function's to invent.
+ */
+export function quickWorkspaceName(name: string, note: string): string {
+  const typed = name.trim();
+  if (typed) return typed;
+
+  const firstLine = note
+    .split("\n")
+    .map((line) => line.trim())
+    .find(Boolean);
+  if (!firstLine) return "";
+
+  return firstLine.replace(/\s+/g, " ").slice(0, DERIVED_NAME_MAX_CHARS);
+}
+
 /** The `YYYYMMDD` stamp both workspace directories and branches carry. */
 export function dateStamp(date: Date): string {
   return date.toISOString().slice(0, 10).replace(/-/g, "");

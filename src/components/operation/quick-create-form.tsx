@@ -8,7 +8,13 @@ import { Input, Textarea } from "@/components/shared/forms";
 import { Spinner } from "@/components/shared/feedback";
 import { useRepositories } from "@/hooks/use-repositories";
 import { postJson } from "@/lib/api";
-import { dateStamp, deriveBranchName, sanitizeSlug, workspaceDirName } from "@/lib/naming";
+import {
+  dateStamp,
+  deriveBranchName,
+  quickWorkspaceName,
+  sanitizeSlug,
+  workspaceDirName,
+} from "@/lib/naming";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 
 /** The default first, since it is also the dropdown's initial value. */
@@ -28,15 +34,14 @@ function parseExtraRepositories(raw: string): string[] {
 }
 
 /**
- * Where to go once the workspace exists. The note travels in the URL as a
- * draft for the chat's prompt box rather than as something to send: the chat
- * page applies it only to a session it starts, so a reload resumes that
- * session instead of typing the text a second time.
+ * Where to go once the workspace exists. The note travels in the URL as the
+ * chat's task: the chat page applies it only to a session it starts, so a
+ * reload resumes the running session rather than starting the work again.
  */
 function destination(workspace: string, openChat: boolean, note: string): string {
   const base = `/workspace/${encodeURIComponent(workspace)}`;
   if (!openChat) return base;
-  const query = note ? `?${new URLSearchParams({ seed: note })}` : "";
+  const query = note ? `?${new URLSearchParams({ task: note })}` : "";
   return `${base}/chat/interactive${query}`;
 }
 
@@ -59,23 +64,28 @@ export function QuickCreateForm() {
     [selected, extra],
   );
 
+  /** What the workspace ends up called: the typed name, or the note's first line. */
+  const effectiveName = useMemo(() => quickWorkspaceName(name, note), [name, note]);
+
   /**
    * The names the server will produce, from the same functions it uses. It
-   * renders only once a name is typed, which also keeps it out of the server
-   * render — `new Date()` on both sides would mismatch across midnight.
+   * renders only once there is a name to show, which also keeps it out of the
+   * server render — `new Date()` on both sides would mismatch across midnight.
    */
   const preview = useMemo(() => {
-    const trimmed = name.trim();
-    if (!trimmed) return null;
+    if (!effectiveName) return null;
     const stamp = dateStamp(new Date());
-    const workspace = workspaceDirName({ taskType, name: trimmed, dateStamp: stamp });
+    const workspace = workspaceDirName({ taskType, name: effectiveName, dateStamp: stamp });
     return {
       workspace,
       branch: deriveBranchName(workspace, "", stamp),
+      derived: !name.trim(),
+      title: effectiveName,
       // Asking for `workspace` is not the fallback firing.
-      collapsed: sanitizeSlug(trimmed) === "workspace" && !/workspace/i.test(trimmed),
+      collapsed:
+        sanitizeSlug(effectiveName) === "workspace" && !/workspace/i.test(effectiveName),
     };
-  }, [name, taskType]);
+  }, [effectiveName, name, taskType]);
 
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
@@ -95,6 +105,8 @@ export function QuickCreateForm() {
     setResult(null);
 
     const response = await postJson<QuickCreateResponse>("/api/workspaces", {
+      // Sent as typed — the server derives from the note with the same rule,
+      // so an empty name is not a second copy of the derivation.
       name: name.trim(),
       taskType,
       repositories: chosen,
@@ -117,23 +129,45 @@ export function QuickCreateForm() {
   return (
     <div className="w-full space-y-4">
       <div>
+        <label htmlFor="quick-note" className="mb-1 block text-xs font-medium">
+          What you want to do
+        </label>
+        <Textarea
+          id="quick-note"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. Fix the login crash on token expiry — the refresh path 500s instead of retrying."
+          rows={4}
+          autoFocus
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Kept verbatim in the README&apos;s Initial Request. With the chat below ticked it is
+          also handed to the session as its request, which starts on it straight away.
+        </p>
+      </div>
+
+      <div>
         <label htmlFor="quick-name" className="mb-1 block text-xs font-medium">
-          Name
+          Name (optional)
         </label>
         <Input
           id="quick-name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. login-crash"
+          placeholder="e.g. login-crash — leave blank to use the note's first line"
           className="w-full"
-          autoFocus
         />
         <p className="mt-1 text-xs text-muted-foreground">
           Becomes the README title verbatim. Its ASCII slug names the workspace directory and
-          every branch.
+          every branch. Leave it blank and the first line of the note below is used.
         </p>
         {preview && (
           <div className="mt-1 space-y-0.5 text-xs">
+            {preview.derived && (
+              <p className="text-muted-foreground">
+                Named from the note: <code className="font-mono">{preview.title}</code>
+              </p>
+            )}
             <p className="text-muted-foreground">
               Workspace <code className="font-mono">{preview.workspace}</code>
               {" · "}branch <code className="font-mono">{preview.branch}</code>
@@ -232,23 +266,6 @@ export function QuickCreateForm() {
         </div>
       </div>
 
-      <div>
-        <label htmlFor="quick-note" className="mb-1 block text-xs font-medium">
-          Note — what you want to do (optional)
-        </label>
-        <Textarea
-          id="quick-note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Describe the change. Goes into the README's Initial Request, and is typed into the chat's prompt for you."
-          rows={3}
-        />
-        <p className="mt-1 text-xs text-muted-foreground">
-          Kept verbatim in the README&apos;s Initial Request. With the chat below ticked it is
-          also typed into its prompt box, unsent — edit it and press Enter when you are ready.
-        </p>
-      </div>
-
       <label className="flex cursor-pointer items-start gap-2 text-sm">
         <input
           type="checkbox"
@@ -257,15 +274,15 @@ export function QuickCreateForm() {
           className="mt-1"
         />
         <span>
-          Open an interactive chat on the new workspace
+          Hand it to an interactive chat
           <span className="block text-xs text-muted-foreground">
-            Starts a Claude session in the workspace once the worktrees exist. Untick to land on
-            the workspace page with nothing running.
+            Opens a Claude session in the workspace once the worktrees exist and gives it the
+            text above to work on. Untick to land on the workspace page with nothing running.
           </span>
         </span>
       </label>
 
-      <Button onClick={create} disabled={!name.trim() || chosen.length === 0}>
+      <Button onClick={create} disabled={!effectiveName || chosen.length === 0}>
         Create workspace
       </Button>
 

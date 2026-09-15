@@ -48,6 +48,10 @@ function fillName(value: string) {
   fireEvent.change(screen.getByLabelText(/name/i), { target: { value } });
 }
 
+function fillNote(value: string) {
+  fireEvent.change(screen.getByLabelText(/what you want to do/i), { target: { value } });
+}
+
 beforeEach(() => {
   mockUseRepositories.mockReset();
   mockPostJson.mockReset().mockResolvedValue(ok());
@@ -100,7 +104,7 @@ describe("QuickCreateForm", () => {
     expect(screen.getByText(`bugfix/retry-${stamp}`)).toBeInTheDocument();
   });
 
-  it("needs both a name and a repository before it can create", () => {
+  it("needs something to name the workspace and a repository before it can create", () => {
     render(<QuickCreateForm />);
     const button = screen.getByRole("button", { name: /create workspace/i });
     expect(button).toBeDisabled();
@@ -112,12 +116,36 @@ describe("QuickCreateForm", () => {
     expect(button).toBeEnabled();
   });
 
+  it("takes the note alone, so the name does not have to be typed twice", () => {
+    render(<QuickCreateForm />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+    const button = screen.getByRole("button", { name: /create workspace/i });
+    expect(button).toBeDisabled();
+
+    fillNote("Fix the login crash\nthe refresh path 500s");
+
+    expect(button).toBeEnabled();
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    expect(screen.getByText(`feature-fix-the-login-crash-${stamp}`)).toBeInTheDocument();
+    expect(screen.getByText("Fix the login crash")).toBeInTheDocument();
+  });
+
+  it("lets a typed name override the note for the preview", () => {
+    render(<QuickCreateForm />);
+    fillNote("Fix the login crash");
+    fillName("token refresh");
+
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    expect(screen.getByText(`feature-token-refresh-${stamp}`)).toBeInTheDocument();
+    expect(screen.queryByText(/named from the note/i)).not.toBeInTheDocument();
+  });
+
   it("posts the ticked repositories with the name, type and note", async () => {
     render(<QuickCreateForm />);
     fillName("login crash");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
     fireEvent.change(screen.getByLabelText(/task type/i), { target: { value: "bugfix" } });
-    fireEvent.change(screen.getByLabelText(/note/i), { target: { value: "crash on submit" } });
+    fillNote("crash on submit");
     fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
     await waitFor(() => expect(mockPostJson).toHaveBeenCalled());
@@ -144,23 +172,21 @@ describe("QuickCreateForm", () => {
     ]);
   });
 
-  it("opens a chat on the new workspace with the note typed in, ready to send", async () => {
+  it("opens a chat on the new workspace and hands it the note as its task", async () => {
     render(<QuickCreateForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-    fireEvent.change(screen.getByLabelText(/note/i), {
-      target: { value: "fix the login crash\nthe refresh path 500s" },
-    });
+    fillNote("fix the login crash\nthe refresh path 500s");
     fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith(
-        "/workspace/bugfix-login-crash-20260911/chat/interactive?seed=fix+the+login+crash%0Athe+refresh+path+500s",
+        "/workspace/bugfix-login-crash-20260911/chat/interactive?task=fix+the+login+crash%0Athe+refresh+path+500s",
       ),
     );
   });
 
-  it("opens the chat with nothing typed in when no note was written", async () => {
+  it("opens the chat with no task when only a name was given", async () => {
     render(<QuickCreateForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
@@ -182,7 +208,7 @@ describe("QuickCreateForm", () => {
     expect(openChat).toBeChecked();
     fireEvent.click(openChat);
 
-    fireEvent.change(screen.getByLabelText(/note/i), { target: { value: "for the README only" } });
+    fillNote("for the README only");
     fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
     await waitFor(() =>

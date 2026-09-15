@@ -1,10 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { ClaudeModel } from "@/types/claude";
-import { CHAT_BUSY_IDLE_MS } from "@/lib/chat-server/constants";
-import { SEED_INPUT_MAX_WAIT_MS, bracketedPaste } from "@/lib/chat-server/seed-input";
 
 const mockSpawnClaudeTerminal = vi.fn();
 const mockGetConfig = vi.fn();
@@ -37,6 +35,7 @@ vi.mock("@/lib/templates", () => ({
   buildInitPrompt: () => "init-prompt-body",
   buildReviewChatPrompt: () => "review-prompt-body",
   buildResearchChatPrompt: () => "research-prompt-body",
+  buildTaskChatPrompt: (_id: string, _path: string, task: string) => `task-prompt-body:${task}`,
 }));
 
 vi.mock("@/lib/workspace/prompts", () => ({
@@ -212,53 +211,50 @@ describe("handleStart", () => {
     expect(opts.args).toContain("custom");
   });
 
-  describe("seedInput", () => {
-    /** The PTY of the one session these tests start. */
-    const spawnedTerminal = () => mockSpawnClaudeTerminal.mock.results[0].value.terminal;
-
-    async function startWithSeed(seedInput?: string) {
+  describe("task", () => {
+    it("opens the session on the task, under the prompt that has it start working", async () => {
       const { handleStart } = await import("@/lib/chat-server/handlers");
       const ws = makeWs();
-      await handleStart(ws, { type: "start", workspaceId: WITH_README, ...(seedInput && { seedInput }) });
-      return ws;
-    }
 
-    beforeEach(() => {
-      vi.useFakeTimers();
+      await handleStart(ws, {
+        type: "start",
+        workspaceId: WITH_README,
+        task: "fix the login crash",
+      });
+
+      const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+      expect(opts.args).toContain("task-prompt-body:fix the login crash");
+      const [, agentName] = mockEnsureSessionSystemPrompt.mock.calls[0];
+      expect(agentName).toBe("task-chat");
     });
 
-    afterEach(() => {
-      vi.useRealTimers();
+    it("falls back to the plain chat when the task is only whitespace", async () => {
+      const { handleStart } = await import("@/lib/chat-server/handlers");
+      const ws = makeWs();
+
+      await handleStart(ws, { type: "start", workspaceId: WITH_README, task: "  \n " });
+
+      const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+      expect(opts.args).toContain("init-prompt-body");
+      const [, agentName] = mockEnsureSessionSystemPrompt.mock.calls[0];
+      expect(agentName).toBe("chat");
     });
 
-    it("types the caller's text into the prompt box once the session goes quiet", async () => {
-      await startWithSeed("fix the login crash");
+    it("lets a caller-supplied prompt win, keeping the plain chat system prompt", async () => {
+      const { handleStart } = await import("@/lib/chat-server/handlers");
+      const ws = makeWs();
 
-      expect(spawnedTerminal().write).not.toHaveBeenCalled();
+      await handleStart(ws, {
+        type: "start",
+        workspaceId: WITH_README,
+        initialPrompt: "custom",
+        task: "ignored",
+      });
 
-      vi.advanceTimersByTime(CHAT_BUSY_IDLE_MS);
-
-      expect(spawnedTerminal().write).toHaveBeenCalledTimes(1);
-      expect(spawnedTerminal().write).toHaveBeenCalledWith(
-        bracketedPaste("fix the login crash"),
-      );
-    });
-
-    it("leaves the box alone when the caller seeded nothing", async () => {
-      await startWithSeed();
-
-      vi.advanceTimersByTime(SEED_INPUT_MAX_WAIT_MS);
-
-      expect(spawnedTerminal().write).not.toHaveBeenCalled();
-    });
-
-    it("does not type into a session whose process has already exited", async () => {
-      await startWithSeed("too late");
-
-      exitSpawnedProcess(0);
-      await vi.advanceTimersByTimeAsync(SEED_INPUT_MAX_WAIT_MS);
-
-      expect(spawnedTerminal().write).not.toHaveBeenCalled();
+      const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+      expect(opts.args).toContain("custom");
+      const [, agentName] = mockEnsureSessionSystemPrompt.mock.calls[0];
+      expect(agentName).toBe("chat");
     });
   });
 });

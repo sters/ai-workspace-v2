@@ -1,4 +1,5 @@
 import z from "zod";
+import { quickWorkspaceName } from "./naming";
 
 /** Interaction level enum — shared between client and server. */
 export const interactionLevelEnum = z.enum(["low", "mid", "high"]);
@@ -29,15 +30,25 @@ export const workspaceSchema = z.object({
  * directory and every branch, and the rest of the pipeline reads those four
  * values (see `INIT_ANALYSIS_SCHEMA`).
  */
-export const quickCreateWorkspaceSchema = z.object({
-  name: z.string().trim().min(1, "name is required"),
-  taskType: z.enum(["feature", "bugfix", "research", "review"]).default("feature"),
-  repositories: z
-    .array(z.string().trim().min(1))
-    .min(1, "select at least one repository")
-    .transform((repos) => [...new Set(repos)]),
-  note: z.string().optional(),
-});
+/**
+ * The name is optional because the note already says what the change is:
+ * `quickWorkspaceName` derives one from its first line. One of the two has to
+ * be there, since a workspace with neither has nothing to be called.
+ */
+export const quickCreateWorkspaceSchema = z
+  .object({
+    name: z.string().trim().default(""),
+    taskType: z.enum(["feature", "bugfix", "research", "review"]).default("feature"),
+    repositories: z
+      .array(z.string().trim().min(1))
+      .min(1, "select at least one repository")
+      .transform((repos) => [...new Set(repos)]),
+    note: z.string().optional(),
+  })
+  .refine((input) => quickWorkspaceName(input.name, input.note ?? "") !== "", {
+    message: "name or note is required",
+    path: ["name"],
+  });
 
 export const executeSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),

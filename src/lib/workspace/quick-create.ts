@@ -22,6 +22,7 @@
 
 import path from "node:path";
 import { existsSync } from "node:fs";
+import { quickWorkspaceName } from "@/lib/naming";
 import { denormalizeRepoPath } from "@/lib/parsers/readme";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 import type { SelectableRepository } from "@/types/workspace";
@@ -71,8 +72,11 @@ export function listSelectableRepositories(): SelectableRepository[] {
 }
 
 export interface QuickCreateInput {
-  /** Free text; becomes the README title, and its slug the directory name. */
-  name: string;
+  /**
+   * Free text; becomes the README title, and its slug the directory name.
+   * Optional — the note's first line is used when it is empty.
+   */
+  name?: string;
   /** Prefixes the workspace directory and every branch (`bugfix/…`). */
   taskType: string;
   /** Repository paths, `github.com/org/repo` or `github.com/org/repo:alias`. */
@@ -166,8 +170,11 @@ export async function createQuickWorkspace(
   input: QuickCreateInput,
   deps: QuickCreateDeps,
 ): Promise<QuickCreateResult> {
-  const name = input.name.trim();
-  const description = input.note?.trim() || name;
+  const note = input.note?.trim() ?? "";
+  // The note is the field that says what the change is, so a caller who wrote
+  // one does not have to name the workspace as well.
+  const name = quickWorkspaceName(input.name ?? "", note);
+  const description = note || name;
 
   const { workspaceName, workspacePath } = await setupWorkspace(
     input.taskType,

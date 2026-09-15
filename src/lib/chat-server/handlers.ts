@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { spawnClaudeTerminal } from "../claude/cli";
 import { clampPtySize, resizeTerminal, DEFAULT_PTY_COLS, DEFAULT_PTY_ROWS } from "../pty";
 import type { DataListener } from "@/types/pty";
-import { buildInitPrompt, buildReviewChatPrompt, buildResearchChatPrompt } from "@/lib/templates";
+import { buildInitPrompt, buildReviewChatPrompt, buildResearchChatPrompt, buildTaskChatPrompt } from "@/lib/templates";
 import { ensureSessionSystemPrompt, cleanupSessionSystemPrompt } from "@/lib/workspace/prompts";
 import type { ChatSession, ClientMessage, ServerMessage, WsData } from "@/types/chat-server";
 import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
@@ -14,9 +14,45 @@ export function send(ws: { send(data: string): void }, msg: ServerMessage) {
 import { trimBuffer } from "./buffer";
 import { getStore, nextSessionId, persistSessionCreated, persistSessionExited, persistSessionDeleted } from "./store";
 import { runGc } from "./gc";
-import { scheduleSeedInput } from "./seed-input";
 
 type Ws = { send(data: string): void; data: WsData };
+
+type StartMsg = Extract<ClientMessage, { type: "start" }>;
+
+/**
+ * Which chat this is: the opening prompt and the system prompt that bounds it,
+ * in precedence order. A caller-supplied `initialPrompt` replaces the built
+ * one but keeps the plain chat's system prompt, since it is the same kind of
+ * session with a different opening line.
+ */
+function buildChatOpening(
+  msg: StartMsg,
+  workspacePath: string,
+): { prompt: string; agentName: string } {
+  if (msg.initialPrompt) {
+    return { prompt: msg.initialPrompt, agentName: "chat" };
+  }
+  if (msg.reviewTimestamp) {
+    return {
+      prompt: buildReviewChatPrompt(msg.workspaceId, workspacePath, msg.reviewTimestamp),
+      agentName: "review-chat",
+    };
+  }
+  if (msg.researchChat) {
+    return {
+      prompt: buildResearchChatPrompt(msg.workspaceId, workspacePath),
+      agentName: "research-chat",
+    };
+  }
+  const task = msg.task?.trim();
+  if (task) {
+    return {
+      prompt: buildTaskChatPrompt(msg.workspaceId, workspacePath, task),
+      agentName: "task-chat",
+    };
+  }
+  return { prompt: buildInitPrompt(msg.workspaceId, workspacePath), agentName: "chat" };
+}
 
 export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" }>): Promise<void> {
   const store = getStore();
@@ -55,16 +91,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
 
   const listeners = new Set<DataListener>();
 
-  const isReviewChat = !msg.initialPrompt && !!msg.reviewTimestamp;
-  const isResearchChat = !msg.initialPrompt && !msg.reviewTimestamp && !!msg.researchChat;
-  const initPrompt = msg.initialPrompt
-    || (msg.reviewTimestamp
-      ? buildReviewChatPrompt(msg.workspaceId, workspacePath, msg.reviewTimestamp)
-      : msg.researchChat
-        ? buildResearchChatPrompt(msg.workspaceId, workspacePath)
-        : buildInitPrompt(msg.workspaceId, workspacePath));
-
-  const agentName = isReviewChat ? "review-chat" : isResearchChat ? "research-chat" : "chat";
+  const { prompt: initPrompt, agentName } = buildChatOpening(msg, workspacePath);
   const systemPromptFile = ensureSessionSystemPrompt(
     workspacePath,
     agentName,
@@ -126,17 +153,6 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
   };
   listeners.add(outputListener);
 
-  // Text the caller already wrote goes into the prompt box, unsent — they
-  // wrote it in a form, so pressing Enter is still theirs to do.
-  const disposeSeed = msg.seedInput
-    ? scheduleSeedInput({
-        text: msg.seedInput,
-        listeners,
-        write: (data) => proc.terminal.write(data),
-        isExited: () => session.exited,
-      })
-    : null;
-
   // Track process exit and clean up per-session system prompt file
   proc.exited.then((code) => {
     session.exited = true;
@@ -146,7 +162,6 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     if (session.activeWs) {
       send(session.activeWs, { type: "exited", code });
     }
-    disposeSeed?.();
     cleanupSessionSystemPrompt(systemPromptFile);
   });
 
