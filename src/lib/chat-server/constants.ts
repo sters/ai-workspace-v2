@@ -18,3 +18,21 @@ export const GC_INTERVAL_MS = 60 * 1000;
  * `esc to interrupt` stays in it from every earlier turn's redraw.
  */
 export const CHAT_BUSY_IDLE_MS = 3000;
+/**
+ * How often the busy→waiting transition is looked for.
+ *
+ * Adds up to one interval to `CHAT_BUSY_IDLE_MS` before a session that stopped
+ * working is notified about. One timer scans every session, the same shape as
+ * the GC timer above.
+ */
+export const CHAT_WAITING_POLL_MS = 1000;
+/**
+ * How long a session must have been working for its return to the prompt to be
+ * worth a push notification.
+ *
+ * Measured as the gap between the last input and the last output, which is what
+ * tells a finished turn apart from the PTY echoing a burst of typing — see
+ * `takeSessionsTurnedWaiting`. A turn shorter than this finished while the user
+ * was still looking at the Enter they pressed.
+ */
+export const CHAT_NOTIFY_MIN_WORK_MS = 10_000;

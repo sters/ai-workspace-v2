@@ -9,6 +9,7 @@ const store = globalThis as unknown as {
   __chatSessions?: Map<string, ChatSession>;
   __chatCounter?: number;
   __chatGcTimer?: ReturnType<typeof setInterval>;
+  __chatWaitingTimer?: ReturnType<typeof setInterval>;
 };
 
 if (!store.__chatSessions) {

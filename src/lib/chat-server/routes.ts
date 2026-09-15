@@ -1,5 +1,5 @@
 import type { ChatSessionInfo } from "@/types/chat";
-import { CHAT_BUSY_IDLE_MS } from "./constants";
+import { isSessionBusy } from "./activity";
 import { getStore, persistSessionDeleted } from "./store";
 
 export function handleHealthCheck(): Response {
@@ -41,7 +41,7 @@ export function handleSessionsList(): Response {
         id: session.id,
         workspaceId: session.workspaceId,
         startedAt: session.startedAt,
-        busy: now - session.lastOutputAt < CHAT_BUSY_IDLE_MS,
+        busy: isSessionBusy(session, now),
       });
     }
   }

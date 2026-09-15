@@ -136,6 +136,8 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     exitedAt: null,
     startedAt,
     lastOutputAt: startedAt,
+    lastInputAt: startedAt,
+    waitingDecidedForOutputAt: null,
     cols: size?.cols ?? DEFAULT_PTY_COLS,
     rows: size?.rows ?? DEFAULT_PTY_ROWS,
   };
@@ -260,6 +262,7 @@ export function handleInput(ws: Ws, msg: Extract<ClientMessage, { type: "input" 
     });
     return;
   }
+  session.lastInputAt = Date.now();
   session.proc.terminal.write(msg.data);
 }
 
