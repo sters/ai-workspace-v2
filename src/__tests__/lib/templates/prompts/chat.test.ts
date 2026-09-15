@@ -6,6 +6,8 @@ import {
   buildReviewChatPrompt,
   getResearchChatSystemPrompt,
   buildResearchChatPrompt,
+  getTaskChatSystemPrompt,
+  buildTaskChatPrompt,
 } from "@/lib/templates/prompts/chat";
 
 describe("getChatSystemPrompt", () => {
@@ -39,10 +41,44 @@ describe("getChatSystemPrompt", () => {
   });
 });
 
+describe("getTaskChatSystemPrompt", () => {
+  const systemPrompt = getTaskChatSystemPrompt();
+
+  it("has the session start the work instead of acknowledging and waiting", () => {
+    // The whole difference from the plain chat prompt: a task was handed over,
+    // so the restraint the others need is the wrong behavior here.
+    expect(systemPrompt).toMatch(/first turn/i);
+    expect(systemPrompt).not.toContain('"Ready."');
+    expect(systemPrompt).toMatch(/without asking (for permission|whether)/i);
+  });
+
+  it("still opens with the bare cd and the README read", () => {
+    expect(systemPrompt).toMatch(/one Bash call/i);
+    expect(systemPrompt).toContain("cd");
+    expect(systemPrompt).toMatch(/`&&`/);
+    expect(systemPrompt).toContain("README.md");
+  });
+
+  it("names what still needs the user: a decision it cannot ground", () => {
+    expect(systemPrompt).toMatch(/ask/i);
+    expect(systemPrompt).toMatch(/assumption/i);
+  });
+
+  it("keeps publishing out of scope, since the workspace has operations for it", () => {
+    expect(systemPrompt).toMatch(/git push/);
+    expect(systemPrompt).toMatch(/pull request|`gh pr create`/i);
+  });
+
+  it("has it verify with the repository's own checks", () => {
+    expect(systemPrompt).toMatch(/lint|test|build/i);
+  });
+});
+
 describe.each([
   ["chat", getChatSystemPrompt()],
   ["review chat", getReviewChatSystemPrompt()],
   ["research chat", getResearchChatSystemPrompt()],
+  ["task chat", getTaskChatSystemPrompt()],
 ])("%s system prompt", (_name, systemPrompt) => {
   it("leaves the TODO files and remaining artifacts to be read on demand", () => {
     // Anything pre-loaded is a snapshot: an operation can rewrite the TODO files
@@ -124,10 +160,41 @@ describe("buildResearchChatPrompt", () => {
   });
 });
 
+describe("buildTaskChatPrompt", () => {
+  const task = "fix the login crash — the token refresh path 500s";
+  const prompt = buildTaskChatPrompt(workspaceId, workspacePath, task);
+
+  it("hands the task over verbatim, as the user wrote it", () => {
+    expect(prompt).toContain(task);
+  });
+
+  it("opens with the same cd and README pointers as every other variant", () => {
+    expect(prompt).toContain(`cd ${workspacePath}`);
+    expect(prompt).toContain(`${workspacePath}/README.md`);
+  });
+
+  it("asks it to get on with the work rather than to confirm the plan first", () => {
+    expect(prompt).toMatch(/自走|work through it|on your own/i);
+  });
+
+  it("never tells it to acknowledge and wait, which is the other variants' shape", () => {
+    // The shared first-turn block is the last word on "what do I do here", so
+    // an instruction to wait in it outranks the system prompt's "start on it".
+    expect(prompt).not.toMatch(/wait for the user/i);
+    expect(prompt).not.toMatch(/brief acknowledgement/i);
+  });
+
+  it("keeps a multi-line task intact", () => {
+    const multi = buildTaskChatPrompt(workspaceId, workspacePath, "line one\nline two");
+    expect(multi).toContain("line one\nline two");
+  });
+});
+
 describe.each([
   ["init", () => buildInitPrompt(workspaceId, workspacePath)],
   ["review", () => buildReviewChatPrompt(workspaceId, workspacePath, "20260214-235920")],
   ["research", () => buildResearchChatPrompt(workspaceId, workspacePath)],
+  ["task", () => buildTaskChatPrompt(workspaceId, workspacePath, "fix the login crash")],
 ])("%s prompt carries no pre-read file content", (_name, build) => {
   it("stays a short set of pointers rather than an embedded corpus", () => {
     // The README body and a TODO progress table used to be inlined here, which

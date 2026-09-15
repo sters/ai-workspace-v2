@@ -170,6 +170,30 @@ describe("createQuickWorkspace", () => {
     expect(readme).toContain("fix the crash");
   });
 
+  it("names the workspace from the note when no name was typed", async () => {
+    const dir = stageWorkspace();
+    mockSetupWorkspace.mockResolvedValue({ workspaceName: WS_NAME, workspacePath: dir });
+
+    await createQuickWorkspace(
+      {
+        taskType: "bugfix",
+        repositories: [],
+        note: "Fix the login crash\nthe refresh path 500s instead of retrying",
+      },
+      { setupRepository: vi.fn() },
+    );
+
+    // The slug comes from the first line; the note stays the request in full.
+    const [, description, , preGeneratedSlug] = mockSetupWorkspace.mock.calls[0];
+    expect(preGeneratedSlug).toBe("Fix the login crash");
+    expect(description).toBe(
+      "Fix the login crash\nthe refresh path 500s instead of retrying",
+    );
+
+    const readme = fs.readFileSync(path.join(dir, "README.md"), "utf-8");
+    expect(readme.split("\n")[0]).toBe("# Task: Fix the login crash");
+  });
+
   it("reports a repository that failed and still sets up the others", async () => {
     const dir = stageWorkspace();
     mockSetupWorkspace.mockResolvedValue({ workspaceName: WS_NAME, workspacePath: dir });

@@ -7,22 +7,22 @@ import { clientMessageSchema } from "@/lib/runtime-schemas";
  * declared here.
  */
 describe("clientMessageSchema", () => {
-  it("accepts a start frame carrying a prompt-box seed", () => {
+  it("accepts a start frame carrying a task for the session", () => {
     const parsed = clientMessageSchema.safeParse({
       type: "start",
       workspaceId: "feature-login-crash-20260915",
       cols: 120,
       rows: 40,
-      seedInput: "fix the login crash\nthe refresh path 500s",
+      task: "fix the login crash\nthe refresh path 500s",
     });
 
     expect(parsed.success).toBe(true);
     expect(parsed.success && parsed.data).toMatchObject({
-      seedInput: "fix the login crash\nthe refresh path 500s",
+      task: "fix the login crash\nthe refresh path 500s",
     });
   });
 
-  it("accepts a start frame with no seed", () => {
+  it("accepts a start frame with no task", () => {
     const parsed = clientMessageSchema.safeParse({
       type: "start",
       workspaceId: "feature-login-crash-20260915",

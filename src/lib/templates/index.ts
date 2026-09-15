@@ -54,6 +54,8 @@ export {
   buildReviewChatPrompt,
   getResearchChatSystemPrompt,
   buildResearchChatPrompt,
+  getTaskChatSystemPrompt,
+  buildTaskChatPrompt,
   getCreateTodoPlannerSystemPrompt,
   buildCreateTodoFromReviewPrompt,
   getSearchSystemPrompt,

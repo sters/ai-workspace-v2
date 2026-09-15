@@ -8,6 +8,11 @@
  * dumped the whole README into the browser terminal as the visible first
  * message. The chat server refuses to start a session whose workspace has no
  * README, so the read below always has a target.
+ *
+ * Three of the four variants end that first turn in a wait, because nothing
+ * has been asked yet. The task variant is the exception and the reason the
+ * distinction is worth naming: its request arrived *with* the session, so
+ * waiting would mean asking the user to say again what they already wrote.
  */
 
 const WORKSPACE_LAYOUT =
@@ -80,10 +85,63 @@ ${ON_DEMAND_READING}`;
 }
 
 /**
+ * System prompt for a chat session that was handed a task up front.
+ *
+ * Every other variant's first turn ends in a wait, because nothing has been
+ * asked yet and a session that starts investigating on its own initiative is
+ * reading files the user may not care about. Here the request arrived *with*
+ * the session — quick create's note — so the same restraint would make the
+ * user retype what they already wrote into the form. The bounds that remain
+ * are the ones a waiting turn was incidentally providing: publishing is not
+ * this session's to do, and an unguessable decision still comes back to the
+ * user rather than being resolved by a guess.
+ */
+export function getTaskChatSystemPrompt(): string {
+  return `${WORKSPACE_LAYOUT}
+
+The user's request is in the first message. Your first turn is:
+
+1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
+2. One Read call: the workspace \`README.md\`, at the path in the user prompt. It says which repositories have worktrees here and where they are.
+3. Then start on the request, without asking for permission to begin.
+
+Work it through: find the code involved, make the change in the worktrees the README declares, and verify it with the repository's own checks (its lint / test / build commands, as the repository defines them — a repository with a \`## Repository Constraints\` section in the README has them listed there). Report what you did when you are done.
+
+Ask the user when a decision is genuinely theirs — an ambiguity in the request where the choices lead to materially different work, or a change that reaches further than they asked for. For anything you can settle from the code, settle it and say which assumption you took. A question you could have answered by reading the repository is a turn the user has to sit through.
+
+Two things are out of scope. **Publishing**: no \`git push\`, no \`gh pr create\`, no merging — the WebUI has operations for that, and the user is sitting in front of this session. Committing in the worktree is fine. **The workspace contract**: leave \`README.md\` and the \`TODO-*.md\` files alone unless the user asks; the pipeline's phases treat them as authoritative and write them themselves.
+
+${ON_DEMAND_READING}`;
+}
+
+/**
  * Build the initial prompt sent to Claude when starting an interactive chat session.
  */
 export function buildInitPrompt(workspaceId: string, workspacePath: string): string {
   return firstTurnSection(workspacePath);
+}
+
+/**
+ * Build the initial prompt for a chat session that already has its task: the
+ * note the caller wrote when creating the workspace.
+ *
+ * The task goes in verbatim and last. The positional argument is the visible
+ * first message in the browser terminal, so this reads as the user saying what
+ * they want — which is what it is.
+ */
+export function buildTaskChatPrompt(
+  workspaceId: string,
+  workspacePath: string,
+  task: string,
+): string {
+  return [
+    firstTurnSection(workspacePath, [], "start on the request below"),
+    "### What I want to do",
+    "",
+    task,
+    "",
+    "Work through it on your own — make the change in the repositories the README declares, and verify it with their own checks. Ask me only if something genuinely needs my decision.",
+  ].join("\n");
 }
 
 /**
@@ -123,8 +181,20 @@ export function buildResearchChatPrompt(
  * (permissions + managed hooks) is auto-loaded; we then instruct Claude to cd
  * into the feature workspace, mirroring how pipeline prompts (`executor.ts` etc.)
  * handle the same constraint.
+ *
+ * `afterReads` is what this block says to do once the reads are done, and it is
+ * a parameter rather than fixed text because this block is the **last word** on
+ * "what do I do here" in the prompt the model receives. Stating the waiting
+ * variants' shape here unconditionally put "then wait for the user" at the end
+ * of the task variant's prompt, against a system prompt telling it to start —
+ * the same way a shared fragment loses to the prompt around it in
+ * `REPO_SEARCH_EFFICIENCY`.
  */
-function firstTurnSection(workspacePath: string, extraReads: string[] = []): string {
+function firstTurnSection(
+  workspacePath: string,
+  extraReads: string[] = [],
+  afterReads = "follow the first-turn shape in the system prompt (brief acknowledgement, then wait for the user)",
+): string {
   const reads = [`${workspacePath}/README.md`, ...extraReads];
   return [
     "### Working Directory",
@@ -137,9 +207,9 @@ function firstTurnSection(workspacePath: string, extraReads: string[] = []): str
     `cd ${workspacePath}`,
     "```",
     "",
-    `Then read ${reads.map((f) => `\`${f}\``).join(" and ")}, and follow the first-turn shape in the system prompt (brief acknowledgement, then wait for the user).`,
+    `Then read ${reads.map((f) => `\`${f}\``).join(" and ")}, and ${afterReads}.`,
     "",
-    `The TODO files (\`${workspacePath}/TODO-*.md\`) and the other artifacts (\`${workspacePath}/artifacts/\`) are there for later questions — leave them until one calls for them.`,
+    `The TODO files (\`${workspacePath}/TODO-*.md\`) and the other artifacts (\`${workspacePath}/artifacts/\`) are there if something calls for them — leave them until it does.`,
     "",
   ].join("\n");
 }

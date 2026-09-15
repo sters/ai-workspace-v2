@@ -31,7 +31,7 @@ export { getUpdaterSystemPrompt, buildUpdaterPrompt } from "./updater";
 export { getReadmeUpdaterSystemPrompt, buildReadmeUpdaterPrompt } from "./readme-updater";
 export { getCollectorSystemPrompt, buildCollectorPrompt } from "./collector";
 export { getInitReadmeSystemPrompt, buildInitAnalyzeAndReadmePrompt, INIT_ANALYSIS_SCHEMA } from "./init-readme";
-export { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildReviewChatPrompt, getResearchChatSystemPrompt, buildResearchChatPrompt } from "./chat";
+export { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildReviewChatPrompt, getResearchChatSystemPrompt, buildResearchChatPrompt, getTaskChatSystemPrompt, buildTaskChatPrompt } from "./chat";
 export { getCreateTodoPlannerSystemPrompt, buildCreateTodoFromReviewPrompt } from "./create-todo-planner";
 export { getSearchSystemPrompt, buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "./search";
 export { buildSlackChatPrompt, getSlackChatSystemPrompt } from "./slack-chat";

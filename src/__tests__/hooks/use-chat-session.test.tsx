@@ -70,9 +70,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("useChatSession seedInput", () => {
-  it("starts a session on mount and carries the seed to the server", async () => {
-    renderHook(() => useChatSession("ws", { seedInput: "fix the login crash" }));
+describe("useChatSession task", () => {
+  it("starts a session on mount and carries the task to the server", async () => {
+    renderHook(() => useChatSession("ws", { task: "fix the login crash" }));
 
     await waitFor(() => expect(sockets).toHaveLength(1));
     await waitFor(() => expect(sockets[0].sent).toHaveLength(1));
@@ -80,36 +80,36 @@ describe("useChatSession seedInput", () => {
     expect(sockets[0].firstFrame()).toMatchObject({
       type: "start",
       workspaceId: "ws",
-      seedInput: "fix the login crash",
+      task: "fix the login crash",
     });
   });
 
-  it("resumes a saved session instead, and does not type into a box already in use", async () => {
+  it("resumes a saved session instead of starting the work over", async () => {
     localStorage.setItem("aiw-chat:ws", JSON.stringify({ sessionId: "chat-1" }));
 
-    renderHook(() => useChatSession("ws", { seedInput: "fix the login crash" }));
+    renderHook(() => useChatSession("ws", { task: "fix the login crash" }));
 
     await waitFor(() => expect(sockets).toHaveLength(1));
     await waitFor(() => expect(sockets[0].sent).toHaveLength(1));
 
     expect(sockets[0].firstFrame()).toMatchObject({ type: "resume", sessionId: "chat-1" });
-    expect(startFrames().some((f) => "seedInput" in f)).toBe(false);
+    expect(startFrames().some((f) => "task" in f)).toBe(false);
   });
 
-  it("stays idle with neither a seed nor a saved session", async () => {
+  it("stays idle with neither a task nor a saved session", async () => {
     renderHook(() => useChatSession("ws"));
 
     await new Promise<void>((r) => setTimeout(r, 20));
     expect(sockets).toHaveLength(0);
   });
 
-  it("omits the field entirely when nothing was seeded", async () => {
+  it("omits the field entirely when no task was given", async () => {
     localStorage.clear();
     renderHook(() => useChatSession("ws", { initialPrompt: "custom" }));
 
     await waitFor(() => expect(sockets).toHaveLength(1));
     await waitFor(() => expect(sockets[0].sent).toHaveLength(1));
 
-    expect("seedInput" in sockets[0].firstFrame()).toBe(false);
+    expect("task" in sockets[0].firstFrame()).toBe(false);
   });
 });

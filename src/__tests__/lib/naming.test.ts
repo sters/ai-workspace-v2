@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { dateStamp, deriveBranchName, workspaceDirName } from "@/lib/naming";
+import {
+  DERIVED_NAME_MAX_CHARS,
+  dateStamp,
+  deriveBranchName,
+  quickWorkspaceName,
+  workspaceDirName,
+} from "@/lib/naming";
 
 describe("dateStamp", () => {
   it("is the YYYYMMDD form the directory and branch names carry", () => {
@@ -34,6 +40,39 @@ describe("workspaceDirName", () => {
     expect(
       workspaceDirName({ taskType: "feature", name: "PROJ-1", ticketId: "PROJ-1", dateStamp: "20260911" }),
     ).toBe("feature-PROJ-1-workspace-20260911");
+  });
+});
+
+describe("quickWorkspaceName", () => {
+  it("uses the typed name whenever there is one", () => {
+    expect(quickWorkspaceName("login crash", "a long note about the refresh path")).toBe(
+      "login crash",
+    );
+  });
+
+  it("falls back to the note's first line, so the name can be left blank", () => {
+    expect(quickWorkspaceName("", "fix the login crash\nthe refresh path 500s")).toBe(
+      "fix the login crash",
+    );
+  });
+
+  it("skips blank leading lines and collapses whitespace", () => {
+    expect(quickWorkspaceName("", "\n\n  fix   the  crash  \nmore")).toBe("fix the crash");
+  });
+
+  it("caps the derived name, since it becomes the README heading", () => {
+    const derived = quickWorkspaceName("", "x".repeat(DERIVED_NAME_MAX_CHARS + 50));
+    expect(derived).toHaveLength(DERIVED_NAME_MAX_CHARS);
+  });
+
+  it("does not cap a name the caller typed themselves", () => {
+    const typed = "y".repeat(DERIVED_NAME_MAX_CHARS + 50);
+    expect(quickWorkspaceName(typed, "")).toBe(typed);
+  });
+
+  it("reports nothing to name when both are empty, rather than inventing one", () => {
+    expect(quickWorkspaceName("", "")).toBe("");
+    expect(quickWorkspaceName("  ", "  \n ")).toBe("");
   });
 });
 

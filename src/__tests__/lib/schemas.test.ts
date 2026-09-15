@@ -9,6 +9,7 @@ import {
   operationKillSchema,
   operationAnswerSchema,
   mcpAuthSchema,
+  quickCreateWorkspaceSchema,
 } from "@/lib/schemas";
 
 describe("initSchema", () => {
@@ -197,5 +198,42 @@ describe("mcpAuthSchema", () => {
 
   it("rejects empty serverName", () => {
     expect(mcpAuthSchema.safeParse({ serverName: "" }).success).toBe(false);
+  });
+});
+
+describe("quickCreateWorkspaceSchema", () => {
+  const REPOS = ["github.com/acme/web"];
+
+  it("accepts a note with no name, since the name is derived from it", () => {
+    const result = quickCreateWorkspaceSchema.safeParse({
+      repositories: REPOS,
+      note: "fix the login crash",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.name).toBe("");
+    expect(result.success && result.data.taskType).toBe("feature");
+  });
+
+  it("accepts a name with no note", () => {
+    expect(
+      quickCreateWorkspaceSchema.safeParse({ name: "login crash", repositories: REPOS }).success,
+    ).toBe(true);
+  });
+
+  it("rejects a request with nothing to name the workspace after", () => {
+    const result = quickCreateWorkspaceSchema.safeParse({
+      repositories: REPOS,
+      note: "   \n  ",
+    });
+
+    expect(result.success).toBe(false);
+    expect(!result.success && result.error.issues[0].message).toMatch(/name or note/);
+  });
+
+  it("still requires a repository", () => {
+    expect(
+      quickCreateWorkspaceSchema.safeParse({ name: "login crash", repositories: [] }).success,
+    ).toBe(false);
   });
 });
