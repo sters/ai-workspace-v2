@@ -1,8 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { ClaudeModel } from "@/types/claude";
+import { CHAT_BUSY_IDLE_MS } from "@/lib/chat-server/constants";
+import { SEED_INPUT_MAX_WAIT_MS, bracketedPaste } from "@/lib/chat-server/seed-input";
 
 const mockSpawnClaudeTerminal = vi.fn();
 const mockGetConfig = vi.fn();
@@ -208,6 +210,56 @@ describe("handleStart", () => {
     expect(mockSpawnClaudeTerminal).toHaveBeenCalledTimes(1);
     const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
     expect(opts.args).toContain("custom");
+  });
+
+  describe("seedInput", () => {
+    /** The PTY of the one session these tests start. */
+    const spawnedTerminal = () => mockSpawnClaudeTerminal.mock.results[0].value.terminal;
+
+    async function startWithSeed(seedInput?: string) {
+      const { handleStart } = await import("@/lib/chat-server/handlers");
+      const ws = makeWs();
+      await handleStart(ws, { type: "start", workspaceId: WITH_README, ...(seedInput && { seedInput }) });
+      return ws;
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("types the caller's text into the prompt box once the session goes quiet", async () => {
+      await startWithSeed("fix the login crash");
+
+      expect(spawnedTerminal().write).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(CHAT_BUSY_IDLE_MS);
+
+      expect(spawnedTerminal().write).toHaveBeenCalledTimes(1);
+      expect(spawnedTerminal().write).toHaveBeenCalledWith(
+        bracketedPaste("fix the login crash"),
+      );
+    });
+
+    it("leaves the box alone when the caller seeded nothing", async () => {
+      await startWithSeed();
+
+      vi.advanceTimersByTime(SEED_INPUT_MAX_WAIT_MS);
+
+      expect(spawnedTerminal().write).not.toHaveBeenCalled();
+    });
+
+    it("does not type into a session whose process has already exited", async () => {
+      await startWithSeed("too late");
+
+      exitSpawnedProcess(0);
+      await vi.advanceTimersByTimeAsync(SEED_INPUT_MAX_WAIT_MS);
+
+      expect(spawnedTerminal().write).not.toHaveBeenCalled();
+    });
   });
 });
 

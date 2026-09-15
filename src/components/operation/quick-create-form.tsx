@@ -27,6 +27,19 @@ function parseExtraRepositories(raw: string): string[] {
   return raw.split(/[\s,]+/).filter(Boolean);
 }
 
+/**
+ * Where to go once the workspace exists. The note travels in the URL as a
+ * draft for the chat's prompt box rather than as something to send: the chat
+ * page applies it only to a session it starts, so a reload resumes that
+ * session instead of typing the text a second time.
+ */
+function destination(workspace: string, openChat: boolean, note: string): string {
+  const base = `/workspace/${encodeURIComponent(workspace)}`;
+  if (!openChat) return base;
+  const query = note ? `?${new URLSearchParams({ seed: note })}` : "";
+  return `${base}/chat/interactive${query}`;
+}
+
 export function QuickCreateForm() {
   const router = useRouter();
   const { repositories, isLoading, error: listError } = useRepositories();
@@ -37,6 +50,7 @@ export function QuickCreateForm() {
   const [extra, setExtra] = useState("");
   const [filter, setFilter] = useState("");
   const [note, setNote] = useState("");
+  const [openChat, setOpenChat] = useState(true);
   const [result, setResult] = useState<QuickCreateResponse | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -96,7 +110,7 @@ export function QuickCreateForm() {
     // A clean run has nothing left to read here. Anything that failed is the
     // one thing worth staying for, so that case reports instead of navigating.
     if (response.data.problems.length === 0) {
-      router.push(`/workspace/${encodeURIComponent(response.data.workspace)}`);
+      router.push(destination(response.data.workspace, openChat, note.trim()));
     }
   };
 
@@ -220,16 +234,36 @@ export function QuickCreateForm() {
 
       <div>
         <label htmlFor="quick-note" className="mb-1 block text-xs font-medium">
-          Note (optional)
+          Note — what you want to do (optional)
         </label>
         <Textarea
           id="quick-note"
           value={note}
           onChange={(e) => setNote(e.target.value)}
-          placeholder="Goes into the README's Initial Request. Nothing reads it until you ask."
+          placeholder="Describe the change. Goes into the README's Initial Request, and is typed into the chat's prompt for you."
           rows={3}
         />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Kept verbatim in the README&apos;s Initial Request. With the chat below ticked it is
+          also typed into its prompt box, unsent — edit it and press Enter when you are ready.
+        </p>
       </div>
+
+      <label className="flex cursor-pointer items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={openChat}
+          onChange={(e) => setOpenChat(e.target.checked)}
+          className="mt-1"
+        />
+        <span>
+          Open an interactive chat on the new workspace
+          <span className="block text-xs text-muted-foreground">
+            Starts a Claude session in the workspace once the worktrees exist. Untick to land on
+            the workspace page with nothing running.
+          </span>
+        </span>
+      </label>
 
       <Button onClick={create} disabled={!name.trim() || chosen.length === 0}>
         Create workspace

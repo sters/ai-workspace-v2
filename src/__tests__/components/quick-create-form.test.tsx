@@ -144,10 +144,45 @@ describe("QuickCreateForm", () => {
     ]);
   });
 
-  it("opens the new workspace when every worktree was created", async () => {
+  it("opens a chat on the new workspace with the note typed in, ready to send", async () => {
     render(<QuickCreateForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+    fireEvent.change(screen.getByLabelText(/note/i), {
+      target: { value: "fix the login crash\nthe refresh path 500s" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        "/workspace/bugfix-login-crash-20260911/chat/interactive?seed=fix+the+login+crash%0Athe+refresh+path+500s",
+      ),
+    );
+  });
+
+  it("opens the chat with nothing typed in when no note was written", async () => {
+    render(<QuickCreateForm />);
+    fillName("n");
+    fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+
+    await waitFor(() =>
+      expect(mockPush).toHaveBeenCalledWith(
+        "/workspace/bugfix-login-crash-20260911/chat/interactive",
+      ),
+    );
+  });
+
+  it("opens the workspace itself once the chat is unticked", async () => {
+    render(<QuickCreateForm />);
+    fillName("n");
+    fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+
+    const openChat = screen.getByRole("checkbox", { name: /interactive chat/i });
+    expect(openChat).toBeChecked();
+    fireEvent.click(openChat);
+
+    fireEvent.change(screen.getByLabelText(/note/i), { target: { value: "for the README only" } });
     fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
     await waitFor(() =>

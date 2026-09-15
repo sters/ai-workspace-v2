@@ -50,7 +50,12 @@ function clearChatSession(workspaceId: string): void {
 
 export function useChatSession(
   workspaceId: string,
-  options?: { initialPrompt?: string; reviewTimestamp?: string; researchChat?: boolean },
+  options?: {
+    initialPrompt?: string;
+    reviewTimestamp?: string;
+    researchChat?: boolean;
+    seedInput?: string;
+  },
 ) {
   // Forward every layout change to the PTY, so the Claude TUI on the other end
   // draws for the viewport the browser actually has. Without this the child
@@ -78,6 +83,8 @@ export function useChatSession(
   reviewTimestampRef.current = options?.reviewTimestamp;
   const researchChatRef = useRef(options?.researchChat);
   researchChatRef.current = options?.researchChat;
+  const seedInputRef = useRef(options?.seedInput);
+  seedInputRef.current = options?.seedInput;
 
   // Refs for websocket (survive re-renders)
   const onDataDisposableRef = useRef<{ dispose: () => void } | null>(null);
@@ -287,7 +294,8 @@ export function useChatSession(
       const prompt = initialPromptRef.current;
       const review = reviewTimestampRef.current;
       const research = researchChatRef.current;
-      ws.send(JSON.stringify({ type: "start", workspaceId, cols: term.cols, rows: term.rows, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }) }));
+      const seed = seedInputRef.current;
+      ws.send(JSON.stringify({ type: "start", workspaceId, cols: term.cols, rows: term.rows, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }), ...(seed && { seedInput: seed }) }));
     };
 
     ws.onmessage = (event) => {
@@ -373,7 +381,12 @@ export function useChatSession(
     } else {
       const savedSessionId = loadChatSession(workspaceId);
       if (savedSessionId) {
+        // A seed does not displace a live session: its prompt box may already
+        // hold what the user was typing, and the seed is only ever applied to
+        // a session this hook starts.
         resumeSession(savedSessionId);
+      } else if (seedInputRef.current) {
+        startSession();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -14,6 +14,7 @@ export function send(ws: { send(data: string): void }, msg: ServerMessage) {
 import { trimBuffer } from "./buffer";
 import { getStore, nextSessionId, persistSessionCreated, persistSessionExited, persistSessionDeleted } from "./store";
 import { runGc } from "./gc";
+import { scheduleSeedInput } from "./seed-input";
 
 type Ws = { send(data: string): void; data: WsData };
 
@@ -125,6 +126,17 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
   };
   listeners.add(outputListener);
 
+  // Text the caller already wrote goes into the prompt box, unsent — they
+  // wrote it in a form, so pressing Enter is still theirs to do.
+  const disposeSeed = msg.seedInput
+    ? scheduleSeedInput({
+        text: msg.seedInput,
+        listeners,
+        write: (data) => proc.terminal.write(data),
+        isExited: () => session.exited,
+      })
+    : null;
+
   // Track process exit and clean up per-session system prompt file
   proc.exited.then((code) => {
     session.exited = true;
@@ -134,6 +146,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     if (session.activeWs) {
       send(session.activeWs, { type: "exited", code });
     }
+    disposeSeed?.();
     cleanupSessionSystemPrompt(systemPromptFile);
   });
 
