@@ -89,6 +89,20 @@ export function sendCompletionNotification(
   });
 }
 
+/**
+ * A chat session has stopped working and is back at its prompt — the sidebar's
+ * blue→muted flip. Tagged per session so a later turn of the same session
+ * replaces this one rather than stacking.
+ */
+export function sendChatWaitingNotification(sessionId: string, workspace: string): void {
+  broadcastNotification({
+    title: "ai-workspace: Chat waiting",
+    body: `Chat in "${workspace}" is waiting for your input`,
+    tag: `chat-waiting-${sessionId}`,
+    url: buildAbsoluteUrl(`/workspace/${encodeURIComponent(workspace)}/chat/interactive`),
+  });
+}
+
 export function sendAskNotification(operationId: string, workspace?: string): void {
   const path = workspace
     ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`

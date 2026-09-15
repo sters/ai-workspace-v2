@@ -20,6 +20,13 @@ export interface ChatSession {
    * drawn its first frame yet reads as working rather than as idle.
    */
   lastOutputAt: number;
+  /**
+   * When the browser last sent keystrokes. Seeded with `startedAt`, so the
+   * opening turn — which nobody typed — reads as work rather than as echo.
+   */
+  lastInputAt: number;
+  /** See `ChatActivityState` in `lib/chat-server/activity.ts`. */
+  waitingDecidedForOutputAt: number | null;
   /** Size the PTY currently has, so a no-op resize can be skipped. */
   cols: number;
   rows: number;

@@ -10,9 +10,10 @@
 import { clientMessageSchema } from "../runtime-schemas";
 import type { ClientMessage, WsData } from "@/types/chat-server";
 import { send } from "./handlers";
-import { GC_INTERVAL_MS } from "./constants";
+import { GC_INTERVAL_MS, CHAT_WAITING_POLL_MS } from "./constants";
 import { getStore } from "./store";
 import { runGc } from "./gc";
+import { notifyWaitingSessions } from "./waiting-notifier";
 import { handleStart, handleResume, handleInput, handleResize, handleKill, handleClose } from "./handlers";
 import { handleHealthCheck, handleSessionKill, handleSessionsList } from "./routes";
 
@@ -29,6 +30,16 @@ export function startChatServer(port: number) {
     clearInterval(store.__chatGcTimer);
   }
   store.__chatGcTimer = setInterval(runGc, GC_INTERVAL_MS);
+
+  // Watch for sessions that stop working, so the sidebar's blue→muted flip also
+  // reaches the user as a push notification.
+  if (store.__chatWaitingTimer) {
+    clearInterval(store.__chatWaitingTimer);
+  }
+  store.__chatWaitingTimer = setInterval(
+    () => notifyWaitingSessions(),
+    CHAT_WAITING_POLL_MS,
+  );
 
   const server = Bun.serve<WsData>({
     port,
