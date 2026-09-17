@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/shared/buttons";
 import { Input, Textarea } from "@/components/shared/forms";
@@ -34,19 +33,16 @@ function parseExtraRepositories(raw: string): string[] {
 }
 
 /**
- * Where to go once the workspace exists. The note travels in the URL as the
+ * The chat the note can be handed to. The note travels in the URL as the
  * chat's task: the chat page applies it only to a session it starts, so a
  * reload resumes the running session rather than starting the work again.
  */
-function destination(workspace: string, openChat: boolean, note: string): string {
-  const base = `/workspace/${encodeURIComponent(workspace)}`;
-  if (!openChat) return base;
-  const query = note ? `?${new URLSearchParams({ task: note })}` : "";
-  return `${base}/chat/interactive${query}`;
+function chatHref(workspace: string, task: string): string {
+  const query = task ? `?${new URLSearchParams({ task })}` : "";
+  return `/workspace/${encodeURIComponent(workspace)}/chat/interactive${query}`;
 }
 
 export function QuickCreateForm() {
-  const router = useRouter();
   const { repositories, isLoading, error: listError } = useRepositories();
 
   const [name, setName] = useState("");
@@ -55,17 +51,22 @@ export function QuickCreateForm() {
   const [extra, setExtra] = useState("");
   const [filter, setFilter] = useState("");
   const [note, setNote] = useState("");
-  const [openChat, setOpenChat] = useState(true);
-  const [result, setResult] = useState<QuickCreateResponse | null>(null);
+  /**
+   * The created workspace, with the note as it read when it was sent: the
+   * textarea stays editable afterwards, and the chat link must carry the
+   * request the README was written from.
+   */
+  const [created, setCreated] = useState<{ response: QuickCreateResponse; task: string } | null>(
+    null,
+  );
   const [failure, setFailure] = useState<string | null>(null);
   /**
    * `sent` is terminal, and it is what stops a second workspace being created.
-   * The in-flight click is already swallowed by `Button`, but the success path
-   * navigates with `router.push`, which leaves this form mounted and clickable
-   * until the new route renders — and a POST landing in that window creates a
-   * whole second workspace (`setupWorkspace` gives the collision a `-2`), not a
-   * retry. Only a request the server *refused* returns to `idle`, since that is
-   * the one answer that says nothing was created.
+   * The in-flight click is already swallowed by `Button`, but nothing navigates
+   * away on success, so the button stays in front of the user — and a second
+   * POST creates a whole second workspace (`setupWorkspace` gives the collision
+   * a `-2`), not a retry. Only a request the server *refused* returns to
+   * `idle`, since that is the one answer that says nothing was created.
    */
   const [status, setStatus] = useState<"idle" | "creating" | "sent">("idle");
 
@@ -112,7 +113,7 @@ export function QuickCreateForm() {
 
   const create = async () => {
     setFailure(null);
-    setResult(null);
+    setCreated(null);
     setStatus("creating");
 
     let response;
@@ -143,12 +144,7 @@ export function QuickCreateForm() {
     }
 
     setStatus("sent");
-    setResult(response.data);
-    // A clean run has nothing left to read here. Anything that failed is the
-    // one thing worth staying for, so that case reports instead of navigating.
-    if (response.data.problems.length === 0) {
-      router.push(destination(response.data.workspace, openChat, note.trim()));
-    }
+    setCreated({ response: response.data, task: note.trim() });
   };
 
   return (
@@ -166,8 +162,9 @@ export function QuickCreateForm() {
           autoFocus
         />
         <p className="mt-1 text-xs text-muted-foreground">
-          Kept verbatim in the README&apos;s Initial Request. With the chat below ticked it is
-          also handed to the session as its request, which starts on it straight away.
+          Kept verbatim in the README&apos;s Initial Request. Open the chat from the link this
+          leaves behind and it is handed to the session as its request, which starts on it
+          straight away.
         </p>
       </div>
 
@@ -291,22 +288,6 @@ export function QuickCreateForm() {
         </div>
       </div>
 
-      <label className="flex cursor-pointer items-start gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={openChat}
-          onChange={(e) => setOpenChat(e.target.checked)}
-          className="mt-1"
-        />
-        <span>
-          Hand it to an interactive chat
-          <span className="block text-xs text-muted-foreground">
-            Opens a Claude session in the workspace once the worktrees exist and gives it the
-            text above to work on. Untick to land on the workspace page with nothing running.
-          </span>
-        </span>
-      </label>
-
       <Button
         onClick={create}
         disabled={!effectiveName || chosen.length === 0 || status !== "idle"}
@@ -330,30 +311,45 @@ export function QuickCreateForm() {
         </div>
       )}
 
-      {result && result.problems.length > 0 && (
-        <div
-          role="alert"
-          className="space-y-2 rounded-md bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-        >
+      {created && (
+        <div className="space-y-2 rounded-md border p-3 text-sm">
           <p>
-            Workspace{" "}
+            Workspace <code className="font-mono">{created.response.workspace}</code> is ready,
+            and is in the sidebar. Nothing is running in it yet.
+          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Link
-              href={`/workspace/${encodeURIComponent(result.workspace)}`}
+              href={chatHref(created.response.workspace, created.task)}
               className="font-medium underline"
             >
-              {result.workspace}
-            </Link>{" "}
-            was created, but {result.problems.length} repositor
-            {result.problems.length === 1 ? "y" : "ies"} could not be set up. Only the worktrees
-            that exist are declared in its README.
-          </p>
-          <ul className="space-y-1">
-            {result.problems.map((problem) => (
-              <li key={problem.repository} className="font-mono text-xs">
-                {problem.repository}: {problem.error}
-              </li>
-            ))}
-          </ul>
+              Start a chat on it
+            </Link>
+            <Link
+              href={`/workspace/${encodeURIComponent(created.response.workspace)}`}
+              className="underline"
+            >
+              Open the workspace
+            </Link>
+          </div>
+          {created.response.problems.length > 0 && (
+            <div
+              role="alert"
+              className="space-y-2 rounded-md bg-amber-50 p-2 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+            >
+              <p>
+                {created.response.problems.length} repositor
+                {created.response.problems.length === 1 ? "y" : "ies"} could not be set up. Only
+                the worktrees that exist are declared in its README.
+              </p>
+              <ul className="space-y-1">
+                {created.response.problems.map((problem) => (
+                  <li key={problem.repository} className="font-mono text-xs">
+                    {problem.repository}: {problem.error}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>
