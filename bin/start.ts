@@ -201,8 +201,17 @@ const nextServer = Bun.spawn(["bun", "--bun", "run", "bin/next-server.ts", ...ne
   env: sharedEnv,
 });
 
-// Start WebSocket chat server
-const chatServer = Bun.spawn(["bun", "--bun", "run", "bin/chat-server.ts"], {
+// Start WebSocket chat server, hot when this process is: a reload keeps the
+// PTYs and the browser's WebSocket, where a restart kills every live chat
+// session. The session store is on globalThis and Bun.serve rebinds the port
+// in place, so nothing here has to be torn down for a reload to land.
+//
+// What a reload does not reach is the per-session PTY output listener: that
+// closure is registered when the session starts and keeps running the code it
+// was created with, so a change on the output path applies to sessions started
+// after it rather than to the ones already open.
+const hotFlag = isHot ? ["--hot"] : [];
+const chatServer = Bun.spawn(["bun", "--bun", ...hotFlag, "run", "bin/chat-server.ts"], {
   cwd: packageDir,
   stdio: ["inherit", "inherit", "inherit"],
   env: sharedEnv,
@@ -219,7 +228,7 @@ if (appConfig.slack.enabled && !slackEnabled) {
   );
 }
 const slackServer = slackEnabled
-  ? Bun.spawn(["bun", "--bun", "run", "bin/slack-server.ts"], {
+  ? Bun.spawn(["bun", "--bun", ...hotFlag, "run", "bin/slack-server.ts"], {
       cwd: packageDir,
       stdio: ["inherit", "inherit", "inherit"],
       env: sharedEnv,
