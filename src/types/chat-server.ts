@@ -1,4 +1,5 @@
 import type { DataListener, TerminalSubprocess } from "@/types/pty";
+import type { TurnProgress } from "@/lib/chat-server/activity";
 
 // ---------------------------------------------------------------------------
 // Session
@@ -25,6 +26,8 @@ export interface ChatSession {
    * opening turn — which nobody typed — reads as work rather than as echo.
    */
   lastInputAt: number;
+  /** Whether Claude has a turn open, per the TUI's progress marker. */
+  progress: TurnProgress;
   /** See `ChatActivityState` in `lib/chat-server/activity.ts`. */
   waitingDecidedForOutputAt: number | null;
   /** Size the PTY currently has, so a no-op resize can be skipped. */

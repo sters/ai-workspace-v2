@@ -299,18 +299,25 @@ describe("handleResize", () => {
 
 describe("PTY activity clock", () => {
   /** The one session in the store, typed to the fields these tests read. */
-  function onlySession(): { lastOutputAt: number; startedAt: number } {
+  function onlySession(): {
+    lastOutputAt: number;
+    startedAt: number;
+    progress: { inFlight: boolean | null };
+  } {
     const sessions = (globalThis as unknown as {
-      __chatSessions: Map<string, { lastOutputAt: number; startedAt: number }>;
+      __chatSessions: Map<
+        string,
+        { lastOutputAt: number; startedAt: number; progress: { inFlight: boolean | null } }
+      >;
     }).__chatSessions;
     return [...sessions.values()][0];
   }
 
   /** Push a chunk through every listener the spawn was handed. */
-  function emitPtyOutput() {
+  function emitPtyOutput(text = "frame") {
     const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
     for (const listener of opts.listeners) {
-      listener("frame", new Uint8Array([0x61]));
+      listener(text, new TextEncoder().encode(text));
     }
   }
 
@@ -329,6 +336,22 @@ describe("PTY activity clock", () => {
     emitPtyOutput();
 
     expect(session.lastOutputAt).toBeGreaterThan(session.startedAt - 60_000);
+  });
+
+  it("follows the TUI's turn markers through the output stream", async () => {
+    await startSession();
+    const session = onlySession();
+    expect(session.progress.inFlight).toBe(null);
+
+    emitPtyOutput("\x1b]9;4;3;\x07⠐ Thinking…");
+    expect(session.progress.inFlight).toBe(true);
+
+    emitPtyOutput("⏺ Done.\x1b]9;4;0;\x07");
+    expect(session.progress.inFlight).toBe(false);
+
+    // Keystroke echo after the turn ended must not put it back in flight.
+    emitPtyOutput("h");
+    expect(session.progress.inFlight).toBe(false);
   });
 });
 

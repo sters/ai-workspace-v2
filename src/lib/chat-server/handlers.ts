@@ -11,6 +11,7 @@ import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
 export function send(ws: { send(data: string): void }, msg: ServerMessage) {
   ws.send(JSON.stringify(msg));
 }
+import { readTurnProgress, UNKNOWN_TURN_PROGRESS } from "./activity";
 import { trimBuffer } from "./buffer";
 import { getStore, nextSessionId, persistSessionCreated, persistSessionExited, persistSessionDeleted } from "./store";
 import { runGc } from "./gc";
@@ -137,6 +138,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     startedAt,
     lastOutputAt: startedAt,
     lastInputAt: startedAt,
+    progress: UNKNOWN_TURN_PROGRESS,
     waitingDecidedForOutputAt: null,
     cols: size?.cols ?? DEFAULT_PTY_COLS,
     rows: size?.rows ?? DEFAULT_PTY_ROWS,
@@ -147,6 +149,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
   // Forward PTY output to buffer (raw bytes) + active WebSocket (decoded text)
   const outputListener: DataListener = (data, rawData) => {
     session.lastOutputAt = Date.now();
+    session.progress = readTurnProgress(data, session.progress);
     session.outputBuffer.push(rawData);
     session.outputBuffer = trimBuffer(session.outputBuffer);
     if (session.activeWs) {
