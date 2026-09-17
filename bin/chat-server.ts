@@ -1,6 +1,11 @@
 /**
  * Entry point to start the chat WebSocket server.
  * Usage: bun run bin/chat-server.ts
+ *
+ * Runs under `bun --hot` when started by `bin/start.ts --hot`, so this file is
+ * re-evaluated in place while the PTY sessions on globalThis keep running.
+ * Anything registered on the *process* therefore has to be registered once —
+ * `startChatServer` guards its timers the same way.
  */
 
 import { startChatServer } from "../src/lib/chat-server";
@@ -16,5 +21,10 @@ function shutdown(signal: string): void {
   console.log(`[chat-server] received ${signal}, stopping…`);
   process.exit(0);
 }
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+const hotState = globalThis as typeof globalThis & { __aiwChatSignalsBound?: boolean };
+if (!hotState.__aiwChatSignalsBound) {
+  hotState.__aiwChatSignalsBound = true;
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+}
