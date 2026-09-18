@@ -13,7 +13,7 @@ import type { OperationType, OperationContext } from "@/types/operation";
  * Shared component for running Claude operations.
  *
  * Handles:
- * - Operation state lifecycle (via useOperation + localStorage persistence)
+ * - Operation state lifecycle (via useOperation, with optional localStorage persistence)
  * - Status badge, Cancel button (running), Clear button (done)
  * - OperationLog rendering
  *
@@ -26,7 +26,8 @@ export function ClaudeOperation({
   onRunningChange,
   initialOperationId,
 }: {
-  storageKey: string;
+  /** Persists the active operation, so returning to the page reconnects to it. Omit to remember nothing. */
+  storageKey?: string;
   children: (ctx: OperationContext) => ReactNode;
   vertical?: boolean;
   /** Called when the running state changes. Useful for coordinating multiple independent operations. */

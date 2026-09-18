@@ -1,27 +1,13 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { ClaudeOperation } from "@/components/operation/claude-operation";
 import { Button } from "@/components/shared/buttons/button";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import type { InteractionLevel } from "@/types/prompts";
-
-const FROM_PR_STORAGE_KEY = "init-from-pr";
-
-/** Navigate to the workspace operations page once the workspace name is known. */
-function AutoNavigate({ workspace, reset }: { workspace: string; reset: () => void }) {
-  const router = useRouter();
-  const navigated = useRef(false);
-  useEffect(() => {
-    if (navigated.current) return;
-    navigated.current = true;
-    reset();
-    router.push(`/workspace/${encodeURIComponent(workspace)}/operations`);
-  }, [router, workspace, reset]);
-  return null;
-}
 
 function FromPrPageContent() {
   const searchParams = useSearchParams();
@@ -37,8 +23,10 @@ function FromPrPageContent() {
         description="Paste a GitHub PR URL. Claude verifies the PR, identifies (and clones, if needed) the repository, names a workspace from the PR description, and checks out the PR branch as a worktree."
       />
 
-      <ClaudeOperation storageKey={FROM_PR_STORAGE_KEY}>
-        {({ start, reset, isRunning, workspace, status }) => {
+      {/* No storageKey: the run stays on this page and is followed from the
+          sidebar afterwards, so there is nothing to remember here. */}
+      <ClaudeOperation>
+        {({ start, isRunning, workspace, status }) => {
           const started = isRunning || status === "completed" || status === "failed";
           const trimmed = prUrl.trim();
           return (
@@ -118,7 +106,17 @@ function FromPrPageContent() {
                 )}
               </div>
 
-              {workspace && <AutoNavigate workspace={workspace} reset={reset} />}
+              {workspace && (
+                <p className="text-sm">
+                  Working in{" "}
+                  <Link
+                    href={`/workspace/${encodeURIComponent(workspace)}/operations`}
+                    className="font-mono underline"
+                  >
+                    {workspace}
+                  </Link>
+                </p>
+              )}
             </>
           );
         }}

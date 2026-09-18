@@ -370,6 +370,7 @@ Prompt wording follows Anthropic's Claude Opus 5 / Sonnet 5 prompting guides: pr
 
 - `src/hooks/` — SWR hooks with auto-refresh, operation lifecycle with localStorage persistence, SSE streaming
 - `src/components/` — `dashboard/`, `workspace/`, `operation/`, `shared/`
+- **A started operation is followed from the sidebar, not by moving the user.** `ClaudeOperation`'s `storageKey` is **optional**, and the three pages that kick a workspace into existence — `/new`, `/new/from-pr`, `/suggestions` — deliberately pass none. Each used to jump to `/workspace/<name>/operations` the moment the run emitted `__setWorkspace:`, which is mid-run and unannounced: the form the user was still reading vanished. The localStorage entry existed to serve that jump — it kept the in-flight init alive across a reload so the pending navigation survived, and `/suggestions` used the same key to hand its run to `/new` and have the log reappear there. With the jump gone, the memory has nothing to carry: the run streams into the page that started it, a link to the named workspace renders beside it, and the sidebar's running-operation indicator is what finds it later. Coming back to a form now finds a form. The pages that keep a `storageKey` (`utilities/*`, `suggestions/discover|aggregate|prune`) are the ones whose whole purpose is that one operation, where reconnecting to it *is* the page.
 
 ## Development Rules
 
