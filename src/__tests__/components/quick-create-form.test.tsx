@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockUseRepositories = vi.fn();
 const mockPostJson = vi.fn();
+const mockPush = vi.fn();
 
 vi.mock("@/hooks/use-repositories", () => ({
   useRepositories: () => mockUseRepositories(),
@@ -10,6 +11,10 @@ vi.mock("@/hooks/use-repositories", () => ({
 
 vi.mock("@/lib/api", () => ({
   postJson: (...a: unknown[]) => mockPostJson(...a),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
 }));
 
 import { QuickCreateForm } from "@/components/operation/quick-create-form";
@@ -50,6 +55,7 @@ function fillNote(value: string) {
 beforeEach(() => {
   mockUseRepositories.mockReset();
   mockPostJson.mockReset().mockResolvedValue(ok());
+  mockPush.mockReset();
   setRepositories([WEB, API]);
 });
 
@@ -166,7 +172,7 @@ describe("QuickCreateForm", () => {
     ]);
   });
 
-  it("offers a chat link carrying the note as its task, and stays on the form", async () => {
+  it("opens a chat on the new workspace and hands it the note as its task", async () => {
     render(<QuickCreateForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
@@ -174,58 +180,41 @@ describe("QuickCreateForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
     await waitFor(() =>
-      expect(screen.getByRole("link", { name: /start a chat/i })).toHaveAttribute(
-        "href",
+      expect(mockPush).toHaveBeenCalledWith(
         "/workspace/bugfix-login-crash-20260911/chat/interactive?task=fix+the+login+crash%0Athe+refresh+path+500s",
       ),
     );
-    expect(screen.getByRole("link", { name: /open the workspace/i })).toHaveAttribute(
-      "href",
-      "/workspace/bugfix-login-crash-20260911",
-    );
-    expect(screen.getByLabelText(/what you want to do/i)).toBeInTheDocument();
   });
 
-  it("offers a chat link with no task when only a name was given", async () => {
+  it("opens the chat with no task when only a name was given", async () => {
     render(<QuickCreateForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
     fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
     await waitFor(() =>
-      expect(screen.getByRole("link", { name: /start a chat/i })).toHaveAttribute(
-        "href",
+      expect(mockPush).toHaveBeenCalledWith(
         "/workspace/bugfix-login-crash-20260911/chat/interactive",
       ),
     );
   });
 
-  it("keeps the task the note held when it was created, not as edited afterwards", async () => {
-    render(<QuickCreateForm />);
-    fillName("n");
-    fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-    fillNote("fix the login crash");
-    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
-
-    await waitFor(() => expect(screen.getByRole("link", { name: /start a chat/i })).toBeInTheDocument());
-    fillNote("something else entirely");
-
-    expect(screen.getByRole("link", { name: /start a chat/i })).toHaveAttribute(
-      "href",
-      "/workspace/bugfix-login-crash-20260911/chat/interactive?task=fix+the+login+crash",
-    );
-  });
-
-  it("reports a repository that failed alongside the links", async () => {
+  it("stays put and reports a repository that failed, with the chat still one click away", async () => {
     mockPostJson.mockResolvedValue(
       ok({ problems: [{ repository: "github.com/acme/api", error: "fatal: no such remote" }] }),
     );
     render(<QuickCreateForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+    fillNote("fix the login crash");
     fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
     await waitFor(() => expect(screen.getByText(/no such remote/)).toBeInTheDocument());
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: /start a chat/i })).toHaveAttribute(
+      "href",
+      "/workspace/bugfix-login-crash-20260911/chat/interactive?task=fix+the+login+crash",
+    );
     expect(screen.getByRole("link", { name: /open the workspace/i })).toHaveAttribute(
       "href",
       "/workspace/bugfix-login-crash-20260911",
@@ -240,7 +229,7 @@ describe("QuickCreateForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
     await waitFor(() => expect(screen.getByText(/name is required/)).toBeInTheDocument());
-    expect(screen.queryByRole("link", { name: /start a chat/i })).not.toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   describe("a second click never creates a second workspace", () => {
@@ -262,16 +251,16 @@ describe("QuickCreateForm", () => {
       expect(button).toBeDisabled();
 
       settle(ok());
-      await waitFor(() => expect(screen.getByRole("link", { name: /start a chat/i })).toBeInTheDocument());
+      await waitFor(() => expect(mockPush).toHaveBeenCalled());
     });
 
-    it("stays disabled once a workspace has been created", async () => {
+    it("stays disabled while the router navigates to the created workspace", async () => {
       const button = ready();
       fireEvent.click(button);
-      await waitFor(() => expect(screen.getByRole("link", { name: /start a chat/i })).toBeInTheDocument());
+      await waitFor(() => expect(mockPush).toHaveBeenCalled());
 
-      // Nothing navigates away, so the form stays in front of the user — and a
-      // second POST is a second workspace, not a retry.
+      // The form is still mounted until the new route renders, so the click
+      // lands here — and a second POST is a second workspace, not a retry.
       expect(button).toBeDisabled();
       fireEvent.click(button);
       expect(mockPostJson).toHaveBeenCalledTimes(1);
