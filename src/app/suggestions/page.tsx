@@ -6,7 +6,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useOperation } from "@/hooks/use-operation";
 import { useSuggestions } from "@/hooks/use-suggestions";
 import { postJson } from "@/lib/api";
-import { INIT_STORAGE_KEY, InitSplitButton } from "@/components/operation/init-operation";
+import { InitSplitButton } from "@/components/operation/init-operation";
 import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import { CollapsibleSection } from "@/components/shared/containers/collapsible-section";
 import { X, Search, Trash2, Layers } from "lucide-react";
@@ -32,11 +32,14 @@ function formatRelativeTime(dateStr: string): string {
 export default function SuggestionsPage() {
   useDocumentTitle("Suggestions");
   const { suggestions, isLoading, refresh } = useSuggestions();
-  const { start } = useOperation(INIT_STORAGE_KEY);
+  // No storageKey: starting a suggestion leaves the page where it is, so there
+  // is no handover to another page to carry the operation across.
+  const { start } = useOperation();
   const { start: startAggregate } = useOperation(AGGREGATE_STORAGE_KEY);
   const router = useRouter();
   const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
   const [starting, setStarting] = useState(false);
+  const [startNote, setStartNote] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [query, setQuery] = useState("");
   const handleAggregate = useCallback(() => {
     startAggregate("aggregate-suggestions", {}).then(() =>
@@ -51,12 +54,19 @@ export default function SuggestionsPage() {
 
   function handleStart(suggestionId: string, type: OperationType, body: Record<string, string>) {
     setStarting(true);
+    setStartNote(null);
     Promise.all([
       start(type, body),
       postJson("/api/suggestions/dismiss", { id: suggestionId }),
     ])
-      .then(() => router.push("/new"))
-      .catch(() => setStarting(false));
+      .then(([op]) => {
+        // The card it came from is dismissed by now, so this line is the only
+        // sign the run exists until the sidebar picks it up.
+        setStartNote({ kind: "ok", text: `Started ${op.type}.` });
+        refresh();
+      })
+      .catch((err: unknown) => setStartNote({ kind: "error", text: String(err) }))
+      .finally(() => setStarting(false));
   }
 
   const lowerQuery = query.toLowerCase();
@@ -104,6 +114,29 @@ export default function SuggestionsPage() {
             Prune
           </Link>
         </div>
+
+        {startNote && (
+          <p
+            className={
+              startNote.kind === "ok"
+                ? "text-sm text-muted-foreground"
+                : "text-sm text-red-600 dark:text-red-400"
+            }
+            role={startNote.kind === "error" ? "alert" : undefined}
+          >
+            {startNote.text}
+            {startNote.kind === "ok" && (
+              <>
+                {" "}
+                Follow it from the sidebar, or on{" "}
+                <Link href="/utilities/running" className="underline">
+                  Running Operations
+                </Link>
+                .
+              </>
+            )}
+          </p>
+        )}
 
         {/* Search */}
         <div className="relative">
