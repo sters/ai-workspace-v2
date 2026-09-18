@@ -92,9 +92,9 @@ ${ON_DEMAND_READING}`;
  * reading files the user may not care about. Here the request arrived *with*
  * the session — quick create's note — so the same restraint would make the
  * user retype what they already wrote into the form. The bounds that remain
- * are the ones a waiting turn was incidentally providing: publishing is not
- * this session's to do, and an unguessable decision still comes back to the
- * user rather than being resolved by a guess.
+ * are the ones a waiting turn was incidentally providing: publishing is the
+ * user's to ask for rather than this session's to decide, and an unguessable
+ * decision still comes back to the user rather than being resolved by a guess.
  *
  * It is also the one variant that writes the README, and the only place that
  * can: quick create fills the title from the note's first line and calls no
@@ -126,7 +126,7 @@ Work the request through: find the code involved, make the change in the worktre
 
 Ask the user when a decision is genuinely theirs — an ambiguity in the request where the choices lead to materially different work, or a change that reaches further than they asked for. For anything you can settle from the code, settle it and say which assumption you took. A question you could have answered by reading the repository is a turn the user has to sit through.
 
-**Publishing is out of scope**: no \`git push\`, no \`gh pr create\`, no merging — the WebUI has operations for that, and the user is sitting in front of this session. Committing in the worktree is fine.
+**Publishing is the user's call, not yours to take**: don't push, open a pull request or merge on your own initiative — the WebUI has operations for those, and the user is sitting in front of this session. When they ask you to, go ahead and do it. Committing in the worktree needs no asking.
 
 ${ON_DEMAND_READING}`;
 }
