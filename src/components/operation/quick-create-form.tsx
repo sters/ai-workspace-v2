@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/shared/buttons";
 import { Input, Textarea } from "@/components/shared/forms";
+import { RepositoryPicker } from "@/components/shared/forms/repository-picker";
 import { Spinner } from "@/components/shared/feedback";
-import { useRepositories } from "@/hooks/use-repositories";
 import { postJson } from "@/lib/api";
 import {
   dateStamp,
@@ -45,13 +45,11 @@ function chatHref(workspace: string, task: string): string {
 
 export function QuickCreateForm() {
   const router = useRouter();
-  const { repositories, isLoading, error: listError } = useRepositories();
 
   const [name, setName] = useState("");
   const [taskType, setTaskType] = useState<(typeof TASK_TYPES)[number]>("feature");
   const [selected, setSelected] = useState<string[]>([]);
   const [extra, setExtra] = useState("");
-  const [filter, setFilter] = useState("");
   const [note, setNote] = useState("");
   /**
    * A workspace whose repositories did not all set up, with the note as it read
@@ -101,13 +99,6 @@ export function QuickCreateForm() {
         sanitizeSlug(effectiveName) === "workspace" && !/workspace/i.test(effectiveName),
     };
   }, [effectiveName, name, taskType]);
-
-  const visible = useMemo(() => {
-    const needle = filter.trim().toLowerCase();
-    return needle
-      ? repositories.filter((repo) => repo.repoPath.toLowerCase().includes(needle))
-      : repositories;
-  }, [repositories, filter]);
 
   const toggle = (repoPath: string) => {
     setSelected((prev) =>
@@ -235,51 +226,11 @@ export function QuickCreateForm() {
       </div>
 
       <div>
-        <div className="mb-1 flex items-center justify-between gap-2">
-          <span className="text-xs font-medium">Repositories</span>
-          {repositories.length > 8 && (
-            <Input
-              aria-label="Filter repositories"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              placeholder="filter"
-              className="w-40 py-0.5 text-xs"
-            />
-          )}
-        </div>
-
-        {isLoading && <Spinner />}
-        {listError && (
-          <p className="text-xs text-red-600 dark:text-red-400">
-            Failed to list repositories: {String(listError)}
-          </p>
-        )}
-        {!isLoading && repositories.length === 0 && (
-          <p className="text-xs text-muted-foreground">
-            No repository has been cloned yet. Type a path below and it will be cloned.
-          </p>
-        )}
-
-        <div className="max-h-72 space-y-0.5 overflow-y-auto rounded-md border p-2">
-          {visible.map((repo) => (
-            <label
-              key={repo.repoPath}
-              className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-accent"
-            >
-              <input
-                type="checkbox"
-                checked={selected.includes(repo.repoPath)}
-                onChange={() => toggle(repo.repoPath)}
-              />
-              <span className="truncate">{repo.repoPath}</span>
-              {repo.baseBranch && (
-                <span className="ml-auto shrink-0 font-mono text-xs text-muted-foreground">
-                  {repo.baseBranch}
-                </span>
-              )}
-            </label>
-          ))}
-        </div>
+        <RepositoryPicker
+          selected={selected}
+          onToggle={toggle}
+          emptyHint="No repository has been cloned yet. Type a path below and it will be cloned."
+        />
 
         <div className="mt-2">
           <label htmlFor="quick-extra" className="mb-1 block text-xs font-medium">

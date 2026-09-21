@@ -4,6 +4,7 @@
  * The analysis result is returned as structured JSON output via --json-schema.
  */
 
+import { SELECTED_REPOS_HEADING } from "@/lib/task-description";
 import type { InitAnalyzeAndReadmeInput } from "@/types/prompts";
 
 /**
@@ -60,7 +61,7 @@ Analyze the task description provided in the user prompt. Your final text respon
   - **"research"**: the goal is **only** to gather information or understand something, with no intent to change code. Pure investigation with no fix/implementation planned. Only use this when the task explicitly asks for research/analysis/documentation without code changes.
 - **slug**: concise English directory name for the workspace. Do NOT include the ticket ID in the slug.
 - **ticketId**: extract Jira IDs (XX-123), GitHub issue refs (#123 or org/repo#123), Linear IDs, etc. Empty string if none.
-- **repositories**: extract repository paths like "github.com/org/repo". Include the host. Empty array if none mentioned.
+- **repositories**: extract repository paths like "github.com/org/repo". Include the host. Empty array if none mentioned. A \`${SELECTED_REPOS_HEADING}\` section is the user's own pick from a list of cloned repositories: include every path it lists, even one the prose never mentions. Repositories named elsewhere in the description still count — the section adds to what you find, it does not bound it.
 
 ### 2. Edit the README template
 
