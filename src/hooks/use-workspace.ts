@@ -3,6 +3,7 @@
 import { useCallback } from "react";
 import useSWR from "swr";
 import type { WorkspaceSummary, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
+import type { ArtifactFileContent, ArtifactListing } from "@/types/artifact";
 import type { WorkspacePullRequestsResult } from "@/types/pull-request";
 import type { ReviewFindingsResult } from "@/types/review-findings";
 import type { ReviewFreshnessResult } from "@/types/review-freshness";
@@ -187,6 +188,38 @@ export function useResearchReport(name: string) {
     isLoading,
     error,
   };
+}
+
+export function useArtifacts(name: string) {
+  const { data, error, isLoading, mutate } = useSWR<ArtifactListing>(
+    name ? `/api/workspaces/${encodeURIComponent(name)}/artifacts` : null,
+    fetcher,
+    { refreshInterval: SWR_REFRESH_INTERVAL }
+  );
+
+  return {
+    entries: data?.entries ?? [],
+    truncated: data?.truncated ?? false,
+    isLoading,
+    error,
+    refresh: mutate,
+  };
+}
+
+/**
+ * One artifact's content. A running operation rewrites these files, so this
+ * follows the same refresh interval as the listing rather than reading once.
+ */
+export function useArtifactFile(name: string, filePath: string | null) {
+  const { data, error, isLoading } = useSWR<ArtifactFileContent>(
+    name && filePath
+      ? `/api/workspaces/${encodeURIComponent(name)}/artifacts/file?path=${encodeURIComponent(filePath)}`
+      : null,
+    fetcher,
+    { refreshInterval: SWR_REFRESH_INTERVAL }
+  );
+
+  return { file: data, isLoading, error };
 }
 
 export function useReviewDetail(name: string, timestamp: string | null) {

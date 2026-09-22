@@ -19,6 +19,7 @@ const BASE_TABS = [
   { label: "Reviews", segment: "review", href: "review" },
   { label: "Pull Requests", segment: "pull-requests", href: "pull-requests" },
   { label: "Research", segment: "research", href: "research", taskType: "research" },
+  { label: "Artifacts", segment: "artifacts", href: "artifacts" },
   { label: "History", segment: "history", href: "history" },
   { label: "Operations", segment: "operations", href: "operations" },
   { label: "Chat", segment: "chat", href: "chat/interactive" },
