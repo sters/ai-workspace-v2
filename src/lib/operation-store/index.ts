@@ -7,6 +7,7 @@ export { readOperationLog } from "./reader";
 // Listing
 export { listStoredOperations, listAllOperationLogsWithAge, listRecentFinishedOperations } from "./listing";
 export { listRecentNewOriginatedOperations } from "./new-history";
+export { isUsageLimitMessage, listUsageLimitStops } from "./usage-limit";
 
 // Writing
 export { writeOperationLog } from "./writer";

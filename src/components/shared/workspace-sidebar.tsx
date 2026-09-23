@@ -9,13 +9,15 @@ import {
   Loader2,
   MessageCircleQuestion,
   Terminal,
+  TriangleAlert,
   type LucideIcon,
 } from "lucide-react";
-import type { OperationListItem } from "@/types/operation";
+import type { OperationListItem, UsageLimitStop } from "@/types/operation";
 import type { WorkspaceListItem } from "@/types/workspace";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useChatSessions, type ChatActivity } from "@/hooks/use-chat-sessions";
+import { useUsageLimitStops } from "@/hooks/use-usage-limit-stops";
 import { cn } from "@/lib/utils";
 
 /**
@@ -79,6 +81,7 @@ function WorkspaceRow({
   operationId,
   isAsking,
   chatActivity,
+  usageLimitStop,
   archived,
 }: {
   workspace: WorkspaceListItem;
@@ -88,6 +91,8 @@ function WorkspaceRow({
   operationId?: string;
   isAsking?: boolean;
   chatActivity?: ChatActivity;
+  /** Set when the latest operation here died on a Claude usage limit. */
+  usageLimitStop?: UsageLimitStop;
   archived?: boolean;
 }) {
   const { name, title, overallProgress, totalCompleted, totalItems } =
@@ -133,6 +138,18 @@ function WorkspaceRow({
             label="Operation running"
             icon={Loader2}
             className="animate-spin text-primary"
+          />
+        ) : usageLimitStop ? (
+          // Same slot as the running indicators, so a run that started since
+          // the stop was read wins: the two polls are independent, and the
+          // newer fact is the one on the row.
+          <Indicator
+            href={`${base}/operations?operationId=${encodeURIComponent(usageLimitStop.operationId)}`}
+            // The CLI's own wording, which carries the reset time — the one
+            // thing needed to decide between waiting and restarting.
+            label={`Stopped: ${usageLimitStop.message}`}
+            icon={TriangleAlert}
+            className="text-red-500"
           />
         ) : null}
         {chatActivity && (
@@ -195,6 +212,7 @@ export function WorkspaceSidebar() {
     });
   const { runningWorkspaces, operations } = useRunningOperations();
   const { chatActivity } = useChatSessions();
+  const { usageLimitStops } = useUsageLimitStops();
 
   // The operation a row's indicator opens, preferring one that is waiting for
   // an answer: with several running, that is the one the user is being asked
@@ -224,6 +242,7 @@ export function WorkspaceSidebar() {
       operationId={linkedOperations.get(ws.name)?.id}
       isAsking={linkedOperations.get(ws.name)?.hasPendingAsk}
       chatActivity={chatActivity.get(ws.name)}
+      usageLimitStop={usageLimitStops.get(ws.name)}
       archived={archived}
     />
   );

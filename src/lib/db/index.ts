@@ -16,6 +16,7 @@ export {
   deleteOperationsForWorkspace,
   listRecentCompletedOperations,
   listRecentFinishedOperations,
+  listLatestOperationPerWorkspace,
   listRecentOperationsByTypes,
   _resetStatements,
 } from "./operations";

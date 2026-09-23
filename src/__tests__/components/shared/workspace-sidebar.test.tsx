@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { WorkspaceListItem } from "@/types/workspace";
+import type { UsageLimitStop } from "@/types/operation";
 
 vi.mock("next/link", () => ({
   default: ({
@@ -57,6 +58,13 @@ vi.mock("@/hooks/use-chat-sessions", () => ({
   useChatSessions: () => mockUseChatSessions(),
 }));
 
+const mockUseUsageLimitStops = vi.fn<
+  () => { usageLimitStops: Map<string, UsageLimitStop> }
+>();
+vi.mock("@/hooks/use-usage-limit-stops", () => ({
+  useUsageLimitStops: () => mockUseUsageLimitStops(),
+}));
+
 // Import after mocks
 import { WorkspaceSidebar } from "@/components/shared/workspace-sidebar";
 
@@ -102,7 +110,23 @@ describe("WorkspaceSidebar", () => {
       operations: [],
     });
     mockUseChatSessions.mockReturnValue({ chatActivity: new Map() });
+    mockUseUsageLimitStops.mockReturnValue({ usageLimitStops: new Map() });
   });
+
+  function mockUsageLimitStop(workspace: string, operationId = "op-limited") {
+    mockUseUsageLimitStops.mockReturnValue({
+      usageLimitStops: new Map<string, UsageLimitStop>([
+        [
+          workspace,
+          {
+            workspace,
+            operationId,
+            message: "You've hit your session limit · resets 9:40pm (Asia/Tokyo)",
+          },
+        ],
+      ]),
+    });
+  }
 
   it("lists each workspace as a link to its page", () => {
     mockWorkspaces([
@@ -312,6 +336,40 @@ describe("WorkspaceSidebar", () => {
     render(<WorkspaceSidebar />);
 
     expect(screen.queryByLabelText(/^Chat /)).not.toBeInTheDocument();
+  });
+
+  it("flags a workspace whose run was stopped by a usage limit", () => {
+    mockUsageLimitStop("ws-limited", "op-77");
+    mockWorkspaces([
+      makeWorkspace("ws-fine", "Fine one"),
+      makeWorkspace("ws-limited", "Stopped one"),
+    ]);
+    render(<WorkspaceSidebar />);
+
+    // The CLI's own wording carries the reset time, which is the one thing the
+    // user needs before deciding to wait or restart.
+    const indicator = screen.getByLabelText(
+      "Stopped: You've hit your session limit · resets 9:40pm (Asia/Tokyo)",
+    );
+    expect(indicator).toHaveAttribute(
+      "href",
+      "/workspace/ws-limited/operations?operationId=op-77",
+    );
+  });
+
+  it("says nothing about a limit once the workspace is running again", () => {
+    // The stop describes the latest operation, so a running one supersedes it —
+    // and the two reads poll independently, so the row can hold both for a tick.
+    mockUsageLimitStop("ws");
+    mockUseRunningOperations.mockReturnValue({
+      runningWorkspaces: new Set(["ws"]),
+      operations: [{ id: "op-new", workspace: "ws" }],
+    });
+    mockWorkspaces([makeWorkspace("ws", "Restarted")]);
+    render(<WorkspaceSidebar />);
+
+    expect(screen.getByLabelText("Operation running")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Stopped: /)).not.toBeInTheDocument();
   });
 
   it("reveals older workspaces on demand", async () => {
