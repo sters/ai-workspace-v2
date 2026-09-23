@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getReviewDetail } from "@/lib/workspace/reader";
+import { getReviewFileList } from "@/lib/workspace/reader";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,7 @@ export async function GET(
     if (timestamp.includes('..') || timestamp.includes('/') || timestamp.includes('\\')) {
       return NextResponse.json({ error: "Invalid timestamp" }, { status: 400 });
     }
-    const detail = await getReviewDetail(name, timestamp);
+    const detail = await getReviewFileList(name, timestamp);
     if (!detail) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
