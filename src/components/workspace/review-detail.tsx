@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
-import { useReviewDetail, useWorkspace } from "@/hooks/use-workspace";
+import { useArtifactFile, useReviewDetail, useWorkspace } from "@/hooks/use-workspace";
 import { Button } from "../shared/buttons/button";
 import { Card } from "../shared/containers/card";
 import { cardVariants } from "../shared/containers/card";
@@ -14,7 +14,10 @@ import { StatusText } from "../shared/feedback/status-text";
 import { ReviewFindingsList } from "./review-findings-list";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
+import { ARTIFACT_MAX_BYTES } from "@/lib/constants";
+import { formatBytes } from "@/lib/utils";
 import type { InteractionLevel } from "@/types/prompts";
+import type { ReviewFileRef } from "@/types/workspace";
 
 export function ReviewDetail({
   workspaceName,
@@ -99,17 +102,97 @@ export function ReviewDetail({
       {files && files.length > 0 && (
         <div className="space-y-4">
           {files.map((f) => (
-            <details key={f.name} className={cardVariants("flush")}>
-              <summary className="cursor-pointer px-4 py-2 font-medium hover:bg-accent">
-                {f.name}
-              </summary>
-              <div className="border-t px-4 py-3">
-                <MarkdownRenderer content={f.content} />
-              </div>
-            </details>
+            <ReviewReportSection
+              key={f.name}
+              workspaceName={workspaceName}
+              timestamp={timestamp}
+              file={f}
+            />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * One per-repo report, read when it is opened rather than with the session.
+ *
+ * A cycle writes a `REVIEW-*`, `VERIFY-*` and `CONSTRAINTS-*` per repository, so
+ * a session's reports run to hundreds of kilobytes — all of it fetched, parsed
+ * and rendered as markdown to show a row of collapsed headings. The body reads
+ * through the artifacts file route, which is the same reader the Artifacts tab
+ * uses and bounds the read.
+ *
+ * `open` is React's, and the summary's own toggle is prevented: the body is
+ * mounted only while open, and that is what makes the read lazy.
+ */
+function ReviewReportSection({
+  workspaceName,
+  timestamp,
+  file,
+}: {
+  workspaceName: string;
+  timestamp: string;
+  file: ReviewFileRef;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <details open={isOpen} className={cardVariants("flush")}>
+      <summary
+        onClick={(e) => {
+          e.preventDefault();
+          setIsOpen((v) => !v);
+        }}
+        className="flex cursor-pointer items-baseline justify-between gap-3 px-4 py-2 font-medium hover:bg-accent"
+      >
+        <span className="min-w-0 break-all">{file.name}</span>
+        <span className="shrink-0 text-xs font-normal text-muted-foreground">
+          {formatBytes(file.size)}
+        </span>
+      </summary>
+      {isOpen && (
+        <div className="border-t px-4 py-3">
+          <ReviewReportBody
+            workspaceName={workspaceName}
+            relPath={`reviews/${timestamp}/${file.name}`}
+          />
+        </div>
+      )}
+    </details>
+  );
+}
+
+function ReviewReportBody({
+  workspaceName,
+  relPath,
+}: {
+  workspaceName: string;
+  relPath: string;
+}) {
+  const { file, isLoading, error } = useArtifactFile(workspaceName, relPath);
+
+  if (error || (!file && !isLoading)) {
+    return (
+      <StatusText>
+        This report could not be read. A running review may have rewritten it.
+      </StatusText>
+    );
+  }
+  if (!file) return <StatusText>Loading...</StatusText>;
+  if (file.kind === "binary") {
+    return <StatusText>{formatBytes(file.size)} — not a text file.</StatusText>;
+  }
+
+  return (
+    <>
+      {file.truncated && (
+        <p className="mb-2 text-xs text-muted-foreground">
+          Showing the first {formatBytes(ARTIFACT_MAX_BYTES)} of {formatBytes(file.size)}.
+        </p>
+      )}
+      <MarkdownRenderer content={file.content} />
+    </>
   );
 }

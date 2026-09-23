@@ -11,6 +11,7 @@ import type {
   WorkspaceListItem,
   TodoFile,
   ReviewSession,
+  ReviewFileRef,
   HistoryEntry,
 } from "@/types/workspace";
 import type { QuickSearchResult } from "@/types/search";
@@ -309,28 +310,61 @@ export async function getReviewSessions(name: string): Promise<ReviewSession[]> 
   return listReviewSessions(wsPath);
 }
 
+function reviewDirPath(name: string, timestamp: string): string {
+  return path.join(getWorkspaceDir(), name, "artifacts", "reviews", timestamp);
+}
+
+async function readReviewSummary(reviewDir: string): Promise<string> {
+  const summaryFile = Bun.file(path.join(reviewDir, "SUMMARY.md"));
+  return (await summaryFile.exists()) ? await summaryFile.text() : "";
+}
+
+function reviewReportNames(reviewDir: string): string[] {
+  const glob = new Bun.Glob("*.md");
+  return [...glob.scanSync({ cwd: reviewDir })]
+    .filter((f) => f !== "SUMMARY.md")
+    .sort();
+}
+
+/**
+ * A review session's summary plus the names of its per-repo reports.
+ *
+ * The reports are named, not read: a cycle writes one `REVIEW-*`, `VERIFY-*`
+ * and `CONSTRAINTS-*` per repository, so a multi-repo session's contents run to
+ * hundreds of kilobytes that the tab renders collapsed. The UI reads a report
+ * through the artifacts file route when it is opened.
+ */
+export async function getReviewFileList(
+  name: string,
+  timestamp: string
+): Promise<{ summary: string; files: ReviewFileRef[] } | null> {
+  const reviewDir = reviewDirPath(name, timestamp);
+  if (!existsSync(reviewDir)) return null;
+
+  const summary = await readReviewSummary(reviewDir);
+  const files: ReviewFileRef[] = [];
+  for (const f of reviewReportNames(reviewDir)) {
+    try {
+      files.push({ name: f, size: statSync(path.join(reviewDir, f)).size });
+    } catch {
+      // Gone between the scan and the stat: a running review rewrites this directory.
+    }
+  }
+
+  return { summary, files };
+}
+
+/** The same session with every report's content, for the phases that embed them in a prompt. */
 export async function getReviewDetail(
   name: string,
   timestamp: string
 ): Promise<{ summary: string; files: { name: string; content: string }[] } | null> {
-  const reviewDir = path.join(
-    getWorkspaceDir(),
-    name,
-    "artifacts",
-    "reviews",
-    timestamp
-  );
+  const reviewDir = reviewDirPath(name, timestamp);
   if (!existsSync(reviewDir)) return null;
 
-  const summaryFile = Bun.file(path.join(reviewDir, "SUMMARY.md"));
-  const summary = (await summaryFile.exists())
-    ? await summaryFile.text()
-    : "";
-
-  const glob = new Bun.Glob("*.md");
-  const mdFiles = [...glob.scanSync({ cwd: reviewDir })].filter((f) => f !== "SUMMARY.md");
+  const summary = await readReviewSummary(reviewDir);
   const files: { name: string; content: string }[] = [];
-  for (const f of mdFiles) {
+  for (const f of reviewReportNames(reviewDir)) {
     const content = await Bun.file(path.join(reviewDir, f)).text();
     files.push({ name: f, content });
   }

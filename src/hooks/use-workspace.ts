@@ -2,7 +2,13 @@
 
 import { useCallback } from "react";
 import useSWR from "swr";
-import type { WorkspaceSummary, TodoFile, ReviewSession, HistoryEntry } from "@/types/workspace";
+import type {
+  WorkspaceSummary,
+  TodoFile,
+  ReviewSession,
+  ReviewFileRef,
+  HistoryEntry,
+} from "@/types/workspace";
 import type { ArtifactFileContent, ArtifactListing } from "@/types/artifact";
 import type { WorkspacePullRequestsResult } from "@/types/pull-request";
 import type { ReviewFindingsResult } from "@/types/review-findings";
@@ -222,8 +228,12 @@ export function useArtifactFile(name: string, filePath: string | null) {
   return { file: data, isLoading, error };
 }
 
+/**
+ * A review session's summary and the names of its per-repo reports. The reports
+ * themselves are read one at a time through `useArtifactFile`, when opened.
+ */
 export function useReviewDetail(name: string, timestamp: string | null) {
-  const { data, error, isLoading } = useSWR<{ summary: string; files: { name: string; content: string }[] }>(
+  const { data, error, isLoading } = useSWR<{ summary: string; files: ReviewFileRef[] }>(
     name && timestamp
       ? `/api/workspaces/${encodeURIComponent(name)}/reviews/${timestamp}`
       : null,

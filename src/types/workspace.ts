@@ -54,6 +54,12 @@ export interface ReviewSession {
   suggestions: number;
 }
 
+/** One of a review session's per-repo reports, named and sized but not read. */
+export interface ReviewFileRef {
+  name: string;
+  size: number;
+}
+
 export interface WorkspaceSummary {
   name: string;
   path: string;
