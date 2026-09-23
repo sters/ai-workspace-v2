@@ -173,6 +173,12 @@ export const operationListItemSchema = z.object({
     content: z.string(),
     cost: z.string().optional(),
     duration: z.string().optional(),
+    results: z.array(z.object({
+      label: z.string().optional(),
+      content: z.string(),
+      cost: z.string().optional(),
+      duration: z.string().optional(),
+    })).optional(),
   }).optional(),
   hasPendingAsk: z.boolean().optional(),
 }).passthrough();

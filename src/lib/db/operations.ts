@@ -1,5 +1,5 @@
 import type { Database, Statement } from "bun:sqlite";
-import type { Operation, OperationListItem } from "@/types/operation";
+import type { Operation, OperationListItem, OperationResultSummary } from "@/types/operation";
 import type { OperationLogAgeInfo } from "@/lib/operation-store/types";
 import { getDb, _onDbReset } from "./connection";
 
@@ -239,7 +239,7 @@ export function updateOperationMeta(
   meta: {
     children?: Operation["children"];
     phases?: Operation["phases"];
-    resultSummary?: { content: string; cost?: string; duration?: string };
+    resultSummary?: OperationResultSummary;
   },
 ): void {
   const db = getDb();

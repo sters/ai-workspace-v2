@@ -1,5 +1,5 @@
 import type { Operation, OperationEvent } from "@/types/operation";
-import { extractLastResult } from "../parsers/stream";
+import { extractResultSummary } from "../parsers/stream";
 import {
   updateOperationStatus,
   updateOperationMeta,
@@ -25,7 +25,7 @@ export function writeOperationLog(
     operation.completedAt,
   );
 
-  const resultSummary = extractLastResult(events);
+  const resultSummary = extractResultSummary(events);
   if (resultSummary || operation.children || operation.phases) {
     updateOperationMeta(operation.id, {
       children: operation.children,

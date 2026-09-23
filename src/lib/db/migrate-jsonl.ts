@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { storedHeaderSchema, storedEventSchema } from "../runtime-schemas";
-import { extractLastResult } from "../parsers/stream";
+import { extractResultSummary } from "../parsers/stream";
 import { getDb } from "./connection";
 import { OPERATIONS_DIR } from "../operation-store/constants";
 import type { Operation, OperationEvent } from "@/types/operation";
@@ -101,7 +101,7 @@ export function migrateJsonlToSqlite(): { migrated: number; errors: number } {
         }
 
         const { operation, events } = log;
-        const resultSummary = extractLastResult(events);
+        const resultSummary = extractResultSummary(events);
 
         // Insert in a transaction per operation
         db.transaction(() => {
