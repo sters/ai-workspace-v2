@@ -1,13 +1,33 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { OperationCard } from "@/components/workspace/operation-card";
-import type { OperationListItem, OperationResultSummary } from "@/types/operation";
+import type {
+  OperationEvent,
+  OperationListItem,
+  OperationResultSummary,
+} from "@/types/operation";
 
+let sseEvents: OperationEvent[] = [];
 vi.mock("@/hooks/use-sse", () => ({
-  useSSE: () => ({ events: [], connected: false }),
+  useSSE: () => ({ events: sseEvents, connected: false }),
 }));
 
-function renderCard(resultSummary: OperationResultSummary) {
+function resultEvent(content: string, childLabel: string): OperationEvent {
+  return {
+    type: "output",
+    operationId: "op-1",
+    timestamp: "2026-09-23T00:00:00.000Z",
+    data: JSON.stringify({ type: "result", subtype: "success", result: content }),
+    childLabel,
+    phaseIndex: 3,
+  };
+}
+
+function renderCard(
+  resultSummary: OperationResultSummary,
+  events: OperationEvent[] = [],
+) {
+  sseEvents = events;
   const operation: OperationListItem = {
     id: "op-1",
     type: "create-pr",
@@ -42,8 +62,19 @@ describe("OperationCard results", () => {
     expect(screen.getByText("repo-b")).toBeInTheDocument();
   });
 
-  // Operations recorded before per-child results existed carry only `content`.
-  it("falls back to the headline result when there is no per-child list", () => {
+  // An operation recorded before per-child results existed stored only the
+  // headline; the loaded stream still has every child's.
+  it("prefers the event stream over a headline-only summary", () => {
+    renderCard({ content: "opened PR for repo-b" }, [
+      resultEvent("opened PR for repo-a", "repo-a"),
+      resultEvent("opened PR for repo-b", "repo-b"),
+    ]);
+
+    expect(screen.getByText("opened PR for repo-a")).toBeInTheDocument();
+    expect(screen.getByText("opened PR for repo-b")).toBeInTheDocument();
+  });
+
+  it("falls back to the summary when no events are loaded", () => {
     renderCard({ content: "collected the reviews" });
 
     expect(screen.getByText("collected the reviews")).toBeInTheDocument();

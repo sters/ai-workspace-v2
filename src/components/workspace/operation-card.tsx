@@ -11,6 +11,7 @@ import { Spinner } from "@/components/shared/feedback/spinner";
 import { ResultBox } from "@/components/shared/feedback/result-box";
 import { useSSE } from "@/hooks/use-sse";
 import { parsePhaseUpdatesFromEvents } from "@/lib/parse-phase-updates";
+import { extractResultSummary } from "@/lib/parsers/stream";
 import type { OperationCardProps } from "@/types/components";
 import type { OperationResult } from "@/types/operation";
 
@@ -100,15 +101,18 @@ export function OperationCard({
   }), [operation, liveStatus, livePhases, liveHasPendingAsk]);
   const effectiveIsRunning = liveStatus === "running" && (connected || isRunning);
 
-  // Use resultSummary from the operation list item (no SSE needed for results).
-  // A phase that fanned out over the repositories has one result per repository;
-  // `content` alone is whichever of them finished last.
+  // A phase that fanned out over the repositories has one result per repository,
+  // and `resultSummary.content` alone is whichever of them finished last. The
+  // stream is what carries all of them, so it wins whenever it is loaded — the
+  // list item is a collapsed card's only source, and for an operation recorded
+  // before per-child results existed it holds just the last one.
   const results = useMemo<OperationResult[]>(() => {
-    const summary = operation.resultSummary;
+    const summary = (events.length > 0 ? extractResultSummary(events) : undefined)
+      ?? operation.resultSummary;
     if (!summary) return [];
     const { content, cost, duration } = summary;
     return summary.results ?? [{ content, cost, duration }];
-  }, [operation.resultSummary]);
+  }, [events, operation.resultSummary]);
 
   return (
     <Card variant="flush">
