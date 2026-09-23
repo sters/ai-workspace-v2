@@ -21,6 +21,7 @@ import { PushToggle } from "./push-toggle";
 const UTILITY_ITEMS = [
   { label: "Workspace Prune", href: "/utilities/workspace-prune" },
   { label: "Operation Log Prune", href: "/utilities/operation-prune" },
+  { label: "Repository Prune", href: "/utilities/repository-prune" },
   { label: "MCP Servers", href: "/utilities/mcp-servers" },
   { label: "Claude Version", href: "/utilities/claude-version" },
   { label: "Claude Usage", href: "/utilities/claude-usage" },
