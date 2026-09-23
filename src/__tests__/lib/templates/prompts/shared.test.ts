@@ -1,5 +1,6 @@
 import {
   NO_CD_RULES,
+  NO_WORKSPACE_REFERENCES,
   RECURRING_FINDINGS_POLICY,
   REPO_SEARCH_EFFICIENCY,
   REVIEW_COVERAGE_POLICY,
@@ -9,6 +10,7 @@ import {
   WRITTEN_DELIVERABLE_LENGTH,
   worktreeCdRules,
 } from "@/lib/templates/prompts/shared";
+import { getFindingGrounderSystemPrompt } from "@/lib/templates/prompts/finding-grounder";
 import { getExecutorSystemPrompt } from "@/lib/templates/prompts/executor";
 import { getPlannerSystemPrompt, getResearchPlannerSystemPrompt } from "@/lib/templates/prompts/planner";
 import { getReviewerSystemPrompt } from "@/lib/templates/prompts/reviewer";
@@ -346,6 +348,44 @@ describe("SEVERITY_CALIBRATION", () => {
   ])("%s carries the severity calibration alongside coverage", (_name, prompt) => {
     expect(prompt).toContain(SEVERITY_CALIBRATION);
     expect(prompt).toContain(REVIEW_COVERAGE_POLICY);
+  });
+});
+
+describe("NO_WORKSPACE_REFERENCES", () => {
+  // The measured failure: a PR body that ended "the approach taken and the
+  // alternatives rejected are recorded in the workspace's
+  // artifacts/CC-2607-parallel-query-design.md". The reviewer has no workspace.
+  it("names the workspace files a reader outside it cannot open", () => {
+    expect(NO_WORKSPACE_REFERENCES).toMatch(/artifacts\//);
+    expect(NO_WORKSPACE_REFERENCES).toMatch(/TODO-\*\.md/);
+    expect(NO_WORKSPACE_REFERENCES).toMatch(/README/);
+  });
+
+  // A pointer is not the compromise between including the content and omitting
+  // it: either the substance is worth a sentence here, or it is not wanted.
+  it("requires the substance inline rather than a pointer to it", () => {
+    expect(NO_WORKSPACE_REFERENCES).toMatch(/state the substance/i);
+    expect(NO_WORKSPACE_REFERENCES).toMatch(/leave it out/i);
+  });
+
+  // The process that produced the change (cycles, phases, TODO items, findings)
+  // is the other half of the same leak — it is how the work happened here, not a
+  // fact about the change.
+  it("keeps the pipeline's own machinery out of reader-facing text", () => {
+    expect(NO_WORKSPACE_REFERENCES).toMatch(/cycle/i);
+    expect(NO_WORKSPACE_REFERENCES).toMatch(/acceptance criteria/i);
+  });
+
+  it("says what a reader can be pointed at instead", () => {
+    expect(NO_WORKSPACE_REFERENCES).toMatch(/ticket URL/i);
+  });
+
+  it.each([
+    ["prCreator", getPRCreatorSystemPrompt()],
+    ["findingGrounder", getFindingGrounderSystemPrompt()],
+    ["executor", getExecutorSystemPrompt()],
+  ])("%s writes for a reader who has only the repository", (_name, prompt) => {
+    expect(prompt).toContain(NO_WORKSPACE_REFERENCES);
   });
 });
 

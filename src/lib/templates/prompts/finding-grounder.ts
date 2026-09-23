@@ -22,7 +22,7 @@
  * asked for.
  */
 
-import { REPO_SEARCH_EFFICIENCY, worktreeCdRules } from "./shared";
+import { NO_WORKSPACE_REFERENCES, REPO_SEARCH_EFFICIENCY, worktreeCdRules } from "./shared";
 import type { FindingGrounderInput } from "@/types/prompts";
 
 export function getFindingGrounderSystemPrompt(): string {
@@ -68,6 +68,8 @@ Only when \`holds\` is \`yes\` **and** \`scope\` is \`pr\`. Otherwise leave it e
 4. Where a repository's convention is genuinely absent, a plain, specific, unhedged sentence is the safe default.
 
 Write the comment body only. A location reference and a bookkeeping marker are appended mechanically; a \`\`\`suggestion block is attached from the finding's own suggestion field when it has one, so do not write one yourself.
+
+${NO_WORKSPACE_REFERENCES}
 
 ### The Bar
 

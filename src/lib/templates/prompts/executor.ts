@@ -6,6 +6,7 @@
 import type { ExecutorInput, BatchedExecutorInput } from "@/types/prompts";
 import {
   NO_TICKET_IDS_IN_CODE,
+  NO_WORKSPACE_REFERENCES,
   SCOPE_DISCIPLINE,
   SUBAGENT_DELEGATION_POLICY,
   TOOLCHAIN_RESOLUTION,
@@ -124,6 +125,8 @@ To commit changes to the workspace (TODO file updates), \`cd\` to the workspace 
 - Merge branches, perform git merge, PR merge, or any branch merging operations (unless explicitly instructed)
 
 ${NO_TICKET_IDS_IN_CODE}
+
+${NO_WORKSPACE_REFERENCES}
 
 ### Repository Constraints Enforcement
 

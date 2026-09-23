@@ -245,6 +245,34 @@ export const TOOLCHAIN_RESOLUTION = `### Toolchain & Environment Resolution
 5. If, after genuinely attempting steps 1–4 (corepack, mise/asdf, documented bootstrap), the toolchain still cannot be provisioned (e.g. it needs network access you don't have, or a credentialed private registry), mark the affected item \`[!]\` (blocked) with a Note stating exactly which tool/version/manager is missing and what you tried. Do NOT silently switch to a different manager, and do NOT treat it as "unsolvable" without recording the attempts.`;
 
 /**
+ * Audience rule for every agent whose output leaves the workspace — a commit
+ * message, a PR title or body, a review-thread reply, a comment on someone
+ * else's pull request, or a file written into the repository.
+ *
+ * The workspace is the pipeline's own scratch space, and its contents are the
+ * agents' richest context, so pointing at them is the shortest way to look
+ * thorough. But the reader on the other side has a clone of one repository and
+ * nothing else: a PR body ending "the approach taken and the alternatives
+ * rejected are recorded in the workspace's artifacts/<ticket>-design.md" hands
+ * them a reference they cannot resolve and cannot even tell is unresolvable.
+ *
+ * Stated as an outlet rather than a prohibition, for the reason CLAUDE.md's
+ * prompt conventions give: "do not mention the workspace" leaves the agent
+ * holding a rationale it believes the reader needs, and the pointer is what that
+ * belief produces. So the rule routes it — say the thing in one sentence, or
+ * decide it was not worth one.
+ */
+export const NO_WORKSPACE_REFERENCES = `### The Workspace Is Invisible Outside It
+
+Everything you write that lands in the repository or on its pull request — a commit message, the PR title and body, a review-thread reply, a comment, a code comment or a document — is read by people who have **only this repository**. They cannot see this workspace: not its \`README.md\`, not its \`TODO-*.md\` files, not \`artifacts/\` or the design notes, review reports and summaries inside it, not the operation log, and not any path on this machine.
+
+So never point them at one. "The alternatives considered are recorded in \`artifacts/parallel-query-design.md\`", "see the workspace README for the acceptance criteria", "as planned in \`TODO-<repo>.md\`" — each of those gives the reader nothing, and reads as a reference they are failing to find.
+
+When something in those files matters to the reader, **state the substance itself** in the text you are writing, in a sentence or two. When it does not matter enough to be worth those sentences, leave it out. A pointer is not the middle option between the two.
+
+The same goes for the machinery that produced the change. Cycles, phases, TODO items, batches, review findings, acceptance criteria, verification reports, agents and operations are how the work happened here; they are not facts about the change, and naming them describes a process the reader has no stake in. Describe the change as a change, and reference only what a reader of this repository can open: its own files and directories, its commits, its pull requests and issues, and any ticket URL you were given.`;
+
+/**
  * Ticket-tracker hygiene, for every agent that edits files in a repository.
  */
 export const NO_TICKET_IDS_IN_CODE = `### No Ticket IDs in Code
