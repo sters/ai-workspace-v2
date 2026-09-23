@@ -4,6 +4,7 @@ import {
   buildPRCreatorPrompt,
 } from "@/lib/templates/prompts/pr-creator";
 import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
+import { NO_WORKSPACE_REFERENCES } from "@/lib/templates/prompts/shared";
 import type { PRCreatorInput } from "@/types/prompts";
 
 const baseInput: PRCreatorInput = {
@@ -116,6 +117,27 @@ describe("getPRCreatorSystemPrompt", () => {
   // a section with nothing to say still costs a line rather than a paragraph.
   it("allows a one-line answer for a template section with nothing substantive", () => {
     expect(prompt).toMatch(/nothing substantive gets one line/);
+  });
+
+  // Observed on a real PR: "the approach taken and the alternatives rejected are
+  // recorded in the workspace's artifacts/<ticket>-design.md". The reviewer has
+  // the repository and nothing else, so that sentence is a dead end for them.
+  it("keeps every reference to the workspace out of the reader-facing text", () => {
+    expect(prompt).toContain(NO_WORKSPACE_REFERENCES);
+  });
+
+  // The body is written under the description bar, so the rule has to be next to
+  // it rather than somewhere above the git mechanics.
+  it("states it alongside the description bar", () => {
+    expect(prompt.indexOf("### PR Description: An Overview, Not a Walkthrough")).toBeLessThan(
+      prompt.indexOf(NO_WORKSPACE_REFERENCES),
+    );
+  });
+
+  // The workspace is on --add-dir for reading context; the note that says so is
+  // the one place that could be read as licence to cite what it found there.
+  it("does not offer the workspace as something to cite", () => {
+    expect(prompt).toMatch(/for your own understanding/i);
   });
 });
 

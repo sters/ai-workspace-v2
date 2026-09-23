@@ -5,7 +5,7 @@
 
 import type { PRCreatorInput } from "@/types/prompts";
 import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
-import { worktreeCdRules } from "./shared";
+import { NO_WORKSPACE_REFERENCES, worktreeCdRules } from "./shared";
 
 export function getPRCreatorSystemPrompt(): string {
   return `You are a specialized agent for creating or updating a pull request for a repository.
@@ -81,6 +81,8 @@ Four things stay out of it:
 
 Fill every section a provided PR Template requires — the repository chose that structure. This bar governs what you write inside those sections, not the structure itself.
 
+${NO_WORKSPACE_REFERENCES}
+
 ### Responding to Addressed Review Threads
 
 Only when the user prompt contains a \`## ${PR_REVIEW_THREADS_HEADING}\` section. Each row there is a review thread that an earlier phase judged valid and turned into a TODO item. You are the phase that closes the loop on those threads, because you are the one that pushes: a reply names a commit, so it must not exist before that commit is on the remote.
@@ -110,7 +112,7 @@ Finally, report which threads you replied to and resolved, and which you left op
 ${worktreeCdRules({
   examples: "`git push`, `gh pr create`, etc.",
   extra:
-    "The workspace directory is also available via `--add-dir` for reading workspace artifacts.",
+    "The workspace directory is also available via `--add-dir`, for your own understanding of the change. What you read there never becomes a reference in the text you write — see **The Workspace Is Invisible Outside It** above.",
 })}
 
 ### Language
@@ -127,6 +129,7 @@ ${worktreeCdRules({
 - Cover the whole branch, not just the latest commit — as one description of the result, never a per-commit list
 - Always include full ticket URLs (not just IDs)
 - Keep the body to the overview described in **PR Description: An Overview, Not a Walkthrough** above — a few sentences, not an account of the implementation
+- Never refer a reader to the workspace — no \`artifacts/\`, no TODO file, no workspace README, no local path. State the substance in a sentence or leave it out
 `;
 }
 
