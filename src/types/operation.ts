@@ -77,6 +77,21 @@ export interface OperationListItem {
   hasPendingAsk?: boolean;
 }
 
+/**
+ * A workspace whose latest operation stopped because the account's Claude
+ * allowance ran out — the run is unfinished and no retry will get past it until
+ * the allowance resets.
+ */
+export interface UsageLimitStop {
+  workspace: string;
+  /** The operation that died, so the UI can link straight to its log. */
+  operationId: string;
+  /** The CLI's own wording, e.g. "You've hit your session limit · resets 9:40pm (Asia/Tokyo)". */
+  message: string;
+  /** When it gave up. */
+  at?: string;
+}
+
 export interface OperationEvent {
   type: "output" | "error" | "complete" | "status" | "terminal";
   operationId: string;

@@ -20,6 +20,7 @@ let _deleteByWorkspace: Statement | null = null;
 let _listWithAge: Statement | null = null;
 let _listRecentCompleted: Statement | null = null;
 let _listRecentFinished: Statement | null = null;
+let _listLatestPerWorkspace: Statement | null = null;
 
 function stmts(db: Database) {
   if (!_insert) {
@@ -84,6 +85,19 @@ function stmts(db: Database) {
       "SELECT * FROM operations WHERE status IN ('completed', 'failed') ORDER BY completed_at DESC LIMIT ?",
     );
   }
+  if (!_listLatestPerWorkspace) {
+    // `rowid DESC` breaks a tie on started_at by insertion order: two
+    // operations can share a millisecond, and the later row is the later start.
+    _listLatestPerWorkspace = db.prepare(`
+      SELECT * FROM operations WHERE rowid IN (
+        SELECT rowid FROM (
+          SELECT rowid, ROW_NUMBER() OVER (
+            PARTITION BY workspace ORDER BY started_at DESC, rowid DESC
+          ) AS rn FROM operations
+        ) WHERE rn = 1
+      )
+    `);
+  }
   return {
     insert: _insert,
     updateStatus: _updateStatus,
@@ -98,6 +112,7 @@ function stmts(db: Database) {
     listWithAge: _listWithAge,
     listRecentCompleted: _listRecentCompleted,
     listRecentFinished: _listRecentFinished,
+    listLatestPerWorkspace: _listLatestPerWorkspace,
   };
 }
 
@@ -116,6 +131,7 @@ export function _resetStatements(): void {
   _listWithAge = null;
   _listRecentCompleted = null;
   _listRecentFinished = null;
+  _listLatestPerWorkspace = null;
 }
 
 _onDbReset(_resetStatements);
@@ -304,6 +320,17 @@ export function listRecentFinishedOperations(limit: number = 50): OperationListI
   const db = getDb();
   const s = stmts(db);
   const rows = s.listRecentFinished.all(limit) as OperationRow[];
+  return rows.map(rowToListItem);
+}
+
+/**
+ * The newest operation of every workspace, running ones included — one row
+ * each, which is what a caller asking "what happened here last?" needs.
+ */
+export function listLatestOperationPerWorkspace(): OperationListItem[] {
+  const db = getDb();
+  const s = stmts(db);
+  const rows = s.listLatestPerWorkspace.all() as OperationRow[];
   return rows.map(rowToListItem);
 }
 

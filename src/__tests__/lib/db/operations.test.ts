@@ -4,15 +4,22 @@ import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import {
   insertOperation,
   updateOperationStatus,
+  updateOperationMeta,
+  listLatestOperationPerWorkspace,
   listRecentFinishedOperations,
 } from "@/lib/db";
 import type { Operation } from "@/types/operation";
 
-function makeOp(id: string, status: Operation["status"], startedAt: string): Operation {
+function makeOp(
+  id: string,
+  status: Operation["status"],
+  startedAt: string,
+  workspace = "ws-1",
+): Operation {
   return {
     id,
     type: "execute",
-    workspace: "ws-1",
+    workspace,
     status,
     startedAt,
   };
@@ -67,5 +74,55 @@ describe("db/operations: listRecentFinishedOperations", () => {
   it("returns an empty array when no finished operations exist", () => {
     insertOperation(makeOp("op-running", "running", "2026-01-01T00:00:00Z"));
     expect(listRecentFinishedOperations(10)).toEqual([]);
+  });
+});
+
+describe("db/operations: listLatestOperationPerWorkspace", () => {
+  beforeEach(() => {
+    _resetDb();
+    _setDbPath(":memory:");
+    getDb();
+  });
+
+  it("keeps only the newest operation of each workspace", () => {
+    insertOperation(makeOp("a-old", "running", "2026-01-01T00:00:00Z", "ws-a"));
+    updateOperationStatus("a-old", "failed", "2026-01-01T00:01:00Z");
+    insertOperation(makeOp("a-new", "running", "2026-01-02T00:00:00Z", "ws-a"));
+    updateOperationStatus("a-new", "completed", "2026-01-02T00:01:00Z");
+    insertOperation(makeOp("b-only", "running", "2026-01-01T12:00:00Z", "ws-b"));
+    updateOperationStatus("b-only", "failed", "2026-01-01T12:01:00Z");
+
+    const latest = listLatestOperationPerWorkspace();
+    expect(new Map(latest.map((o) => [o.workspace, o.id]))).toEqual(
+      new Map([
+        ["ws-a", "a-new"],
+        ["ws-b", "b-only"],
+      ]),
+    );
+  });
+
+  it("counts a running operation as the newest one", () => {
+    insertOperation(makeOp("done", "running", "2026-01-01T00:00:00Z", "ws"));
+    updateOperationStatus("done", "failed", "2026-01-01T00:01:00Z");
+    insertOperation(makeOp("live", "running", "2026-01-01T00:02:00Z", "ws"));
+
+    expect(listLatestOperationPerWorkspace().map((o) => o.id)).toEqual(["live"]);
+  });
+
+  it("breaks a tie on start time by insertion order", () => {
+    insertOperation(makeOp("first", "running", "2026-01-01T00:00:00Z", "ws"));
+    updateOperationStatus("first", "completed", "2026-01-01T00:01:00Z");
+    insertOperation(makeOp("second", "running", "2026-01-01T00:00:00Z", "ws"));
+    updateOperationStatus("second", "failed", "2026-01-01T00:01:00Z");
+
+    expect(listLatestOperationPerWorkspace().map((o) => o.id)).toEqual(["second"]);
+  });
+
+  it("carries the result summary through", () => {
+    insertOperation(makeOp("op", "running", "2026-01-01T00:00:00Z", "ws"));
+    updateOperationStatus("op", "failed", "2026-01-01T00:01:00Z");
+    updateOperationMeta("op", { resultSummary: { content: "boom" } });
+
+    expect(listLatestOperationPerWorkspace()[0]?.resultSummary?.content).toBe("boom");
   });
 });
