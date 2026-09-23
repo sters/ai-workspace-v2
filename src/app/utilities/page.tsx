@@ -16,6 +16,12 @@ const tools = [
       "Delete operation logs older than the specified number of days.",
   },
   {
+    href: "/utilities/repository-prune",
+    name: "Repository Prune",
+    description:
+      "Delete cloned repositories no workspace has a worktree of, oldest reference first.",
+  },
+  {
     href: "/utilities/mcp-servers",
     name: "MCP Servers",
     description:
