@@ -1,7 +1,7 @@
 // Parse stream-json messages from `claude -p --output-format stream-json` (or SDK) into displayable log entries.
 
 import type { LogEntry } from "@/types/claude";
-import type { OperationEvent } from "@/types/operation";
+import type { OperationEvent, OperationResult, OperationResultSummary } from "@/types/operation";
 import { askQuestionItemSchema, permissionDenialItemSchema } from "../runtime-schemas";
 
 /**
@@ -315,23 +315,58 @@ export function parseStreamEvent(raw: string): LogEntry[] {
   return entries;
 }
 
+/** Events carry no `phaseIndex` outside a pipeline phase. */
+const NO_PHASE = -1;
+
 /**
- * Extract the last result (content, cost, duration) from a list of OperationEvents.
- * Scans events in reverse to find the last "result" entry efficiently.
+ * Extract the operation's results from its event stream.
+ *
+ * The scope is the last phase that produced a result, one result per child of
+ * it: a phase that fans out over the workspace's repositories writes one result
+ * per repository, and the last of them describes only its own. Earlier phases
+ * are left out — their results describe work the final phase built on.
+ *
+ * Scans in reverse and stops at the first result of an earlier phase, so the
+ * cost is bounded by the final phase rather than by the whole run.
  */
-export function extractLastResult(
+export function extractResultSummary(
   events: OperationEvent[],
-): { content: string; cost?: string; duration?: string } | undefined {
-  for (let i = events.length - 1; i >= 0; i--) {
+): OperationResultSummary | undefined {
+  // Reverse order, so the first result found is the run's last.
+  const found: OperationResult[] = [];
+  const seenLabels = new Set<string>();
+  let phase: number | undefined;
+
+  outer: for (let i = events.length - 1; i >= 0; i--) {
     const event = events[i];
     if (event.type !== "output") continue;
     const entries = parseStreamEvent(event.data);
     for (let j = entries.length - 1; j >= 0; j--) {
       const entry = entries[j];
-      if (entry.kind === "result") {
-        return { content: entry.content, cost: entry.cost, duration: entry.duration };
+      if (entry.kind !== "result") continue;
+      const eventPhase = event.phaseIndex ?? NO_PHASE;
+      if (phase === undefined) phase = eventPhase;
+      else if (eventPhase !== phase) break outer;
+      // A retried child emits a result per attempt; the newest one stands.
+      if (event.childLabel) {
+        if (seenLabels.has(event.childLabel)) continue;
+        seenLabels.add(event.childLabel);
       }
+      found.push({
+        ...(event.childLabel && { label: event.childLabel }),
+        content: entry.content,
+        ...(entry.cost && { cost: entry.cost }),
+        ...(entry.duration && { duration: entry.duration }),
+      });
     }
   }
-  return undefined;
+
+  const last = found[0];
+  if (!last) return undefined;
+  return {
+    content: last.content,
+    ...(last.cost && { cost: last.cost }),
+    ...(last.duration && { duration: last.duration }),
+    ...(found.length > 1 && { results: found.reverse() }),
+  };
 }

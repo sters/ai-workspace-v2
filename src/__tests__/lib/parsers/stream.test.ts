@@ -4,7 +4,9 @@ import {
   buildPermissionString,
   isPermissionDenialMessage,
   enrichPermissionDenials,
+  extractResultSummary,
 } from "@/lib/parsers/stream";
+import type { OperationEvent } from "@/types/operation";
 
 describe("parseStreamEvent", () => {
   it("returns raw entry for unparseable JSON", () => {
@@ -758,5 +760,89 @@ describe("enrichPermissionDenials", () => {
     expect(entries[2].kind).toBe("permission_denial");
     expect(entries[3].kind).toBe("tool_call");
     expect(entries[4].kind).toBe("tool_result"); // normal result, not replaced
+  });
+});
+
+describe("extractResultSummary", () => {
+  function resultEvent(
+    content: string,
+    extra: { childLabel?: string; phaseIndex?: number } = {},
+  ): OperationEvent {
+    return {
+      type: "output",
+      operationId: "op",
+      timestamp: "2026-09-23T00:00:00.000Z",
+      data: JSON.stringify({
+        type: "result",
+        subtype: "success",
+        result: content,
+        total_cost_usd: 0.5,
+        duration_ms: 1000,
+      }),
+      ...extra,
+    };
+  }
+
+  it("returns every child of the final phase, in stream order", () => {
+    const summary = extractResultSummary([
+      resultEvent("repo-a: opened PR #1", { childLabel: "repo-a", phaseIndex: 1 }),
+      resultEvent("repo-b: opened PR #2", { childLabel: "repo-b", phaseIndex: 1 }),
+    ]);
+    expect(summary?.results).toEqual([
+      { label: "repo-a", content: "repo-a: opened PR #1", cost: "$0.5000", duration: "1.0s" },
+      { label: "repo-b", content: "repo-b: opened PR #2", cost: "$0.5000", duration: "1.0s" },
+    ]);
+  });
+
+  it("keeps the last result as the headline content", () => {
+    const summary = extractResultSummary([
+      resultEvent("repo-a", { childLabel: "repo-a", phaseIndex: 1 }),
+      resultEvent("repo-b", { childLabel: "repo-b", phaseIndex: 1 }),
+    ]);
+    expect(summary?.content).toBe("repo-b");
+  });
+
+  it("ignores results from earlier phases", () => {
+    const summary = extractResultSummary([
+      resultEvent("planned", { childLabel: "plan", phaseIndex: 0 }),
+      resultEvent("reviewed", { childLabel: "review", phaseIndex: 1 }),
+    ]);
+    expect(summary?.results).toBeUndefined();
+    expect(summary?.content).toBe("reviewed");
+  });
+
+  it("omits the per-child list for a single-child phase", () => {
+    const summary = extractResultSummary([
+      resultEvent("collected", { childLabel: "collect", phaseIndex: 2 }),
+    ]);
+    expect(summary).toEqual({ content: "collected", cost: "$0.5000", duration: "1.0s" });
+  });
+
+  it("keeps only the newest result of a child that ran twice", () => {
+    const summary = extractResultSummary([
+      resultEvent("repo-a first try", { childLabel: "repo-a", phaseIndex: 1 }),
+      resultEvent("repo-b", { childLabel: "repo-b", phaseIndex: 1 }),
+      resultEvent("repo-a retry", { childLabel: "repo-a", phaseIndex: 1 }),
+    ]);
+    expect(summary?.results?.map((r) => r.content)).toEqual(["repo-b", "repo-a retry"]);
+  });
+
+  it("skips non-output events between results", () => {
+    const summary = extractResultSummary([
+      resultEvent("repo-a", { childLabel: "repo-a", phaseIndex: 1 }),
+      {
+        type: "status",
+        operationId: "op",
+        timestamp: "2026-09-23T00:00:00.000Z",
+        data: "__phaseUpdate:{}",
+        phaseIndex: 1,
+      },
+      resultEvent("repo-b", { childLabel: "repo-b", phaseIndex: 1 }),
+    ]);
+    expect(summary?.results).toHaveLength(2);
+  });
+
+  it("returns undefined when nothing produced a result", () => {
+    expect(extractResultSummary([])).toBeUndefined();
   });
 });

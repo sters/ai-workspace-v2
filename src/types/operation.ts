@@ -44,6 +44,28 @@ export interface OperationPhaseInfo {
   retryAttempt?: number;
 }
 
+/** One child's final message, as the agent wrote it. */
+export interface OperationResult {
+  /** The child that produced it — a repository name for a per-repo fan-out. */
+  label?: string;
+  content: string;
+  cost?: string;
+  duration?: string;
+}
+
+export interface OperationResultSummary {
+  /** The last result of the run. */
+  content: string;
+  cost?: string;
+  duration?: string;
+  /**
+   * Every result of the phase that produced it, present only when that phase
+   * had more than one child. A per-repo fan-out writes one result per
+   * repository and `content` alone is whichever finished last.
+   */
+  results?: OperationResult[];
+}
+
 export interface Operation {
   id: string;
   type: OperationType;
@@ -71,8 +93,8 @@ export interface OperationListItem {
   currentPhase?: Pick<OperationPhaseInfo, "index" | "label" | "status" | "timeoutMs" | "startedAt">;
   /** User-provided inputs (present when created locally via POST, absent from list API). */
   inputs?: Record<string, string>;
-  /** Last result text from the operation (populated for completed/failed operations). */
-  resultSummary?: { content: string; cost?: string; duration?: string };
+  /** Result text from the operation (populated for completed/failed operations). */
+  resultSummary?: OperationResultSummary;
   /** True when the operation is waiting for user input (AskUserQuestion). */
   hasPendingAsk?: boolean;
 }

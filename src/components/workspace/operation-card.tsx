@@ -12,6 +12,7 @@ import { ResultBox } from "@/components/shared/feedback/result-box";
 import { useSSE } from "@/hooks/use-sse";
 import { parsePhaseUpdatesFromEvents } from "@/lib/parse-phase-updates";
 import type { OperationCardProps } from "@/types/components";
+import type { OperationResult } from "@/types/operation";
 
 export function OperationCard({
   operation,
@@ -99,8 +100,15 @@ export function OperationCard({
   }), [operation, liveStatus, livePhases, liveHasPendingAsk]);
   const effectiveIsRunning = liveStatus === "running" && (connected || isRunning);
 
-  // Use resultSummary from the operation list item (no SSE needed for results)
-  const resultSummary = operation.resultSummary;
+  // Use resultSummary from the operation list item (no SSE needed for results).
+  // A phase that fanned out over the repositories has one result per repository;
+  // `content` alone is whichever of them finished last.
+  const results = useMemo<OperationResult[]>(() => {
+    const summary = operation.resultSummary;
+    if (!summary) return [];
+    const { content, cost, duration } = summary;
+    return summary.results ?? [{ content, cost, duration }];
+  }, [operation.resultSummary]);
 
   return (
     <Card variant="flush">
@@ -181,13 +189,20 @@ export function OperationCard({
       )}
 
       {/* Result summary (always visible when done, even when collapsed) */}
-      {!effectiveIsRunning && resultSummary && (
-        <div className="border-t p-3">
-          <ResultBox
-            content={resultSummary.content}
-            cost={resultSummary.cost}
-            duration={resultSummary.duration}
-          />
+      {!effectiveIsRunning && results.length > 0 && (
+        <div className="space-y-2 border-t p-3">
+          {results.map((result, i) => (
+            <div key={result.label ?? i}>
+              {results.length > 1 && result.label && (
+                <div className="mb-1 text-xs text-muted-foreground">{result.label}</div>
+              )}
+              <ResultBox
+                content={result.content}
+                cost={result.cost}
+                duration={result.duration}
+              />
+            </div>
+          ))}
         </div>
       )}
 
