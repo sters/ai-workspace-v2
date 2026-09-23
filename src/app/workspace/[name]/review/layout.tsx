@@ -1,12 +1,11 @@
 "use client";
 
 import { use } from "react";
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useReviews } from "@/hooks/use-workspace";
-import { cn, formatReviewTimestamp } from "@/lib/utils";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { ReviewFreshnessBanner } from "@/components/workspace/review-freshness-banner";
+import { ReviewSessionList } from "@/components/workspace/review-session-list";
 
 export default function ReviewLayout({
   params,
@@ -31,34 +30,17 @@ export default function ReviewLayout({
       {/* Above the session list, because it is about the workspace's newest
           review rather than the session being read. */}
       <ReviewFreshnessBanner workspaceName={decodedName} />
-      <div className="flex flex-wrap items-center gap-2">
-        {reviews.map((r) => {
-          const isActive = activeTimestamp === r.timestamp;
-          return (
-            <Link
-              key={r.timestamp}
-              href={`${basePath}/${r.timestamp}`}
-              className={cn(
-                "rounded-lg border px-3 py-2 text-sm transition-colors",
-                isActive
-                  ? "border-primary bg-primary/10 text-foreground"
-                  : "hover:bg-accent"
-              )}
-            >
-              <div className="font-medium">{formatReviewTimestamp(r.timestamp)}</div>
-              <div className="mt-1 flex gap-2 text-xs text-muted-foreground">
-                <span>{r.repos} repos</span>
-                {r.critical > 0 && (
-                  <span className="text-red-500">{r.critical} critical</span>
-                )}
-                <span>{r.warnings} warn</span>
-                <span>{r.suggestions} suggest</span>
-              </div>
-            </Link>
-          );
-        })}
+      {/* The session column is sized by its own text (`max-content`), not to a
+          fixed width: every row is a fixed-length timestamp plus short counts,
+          so a guessed width is either padding or a truncated label. */}
+      <div className="grid gap-4 md:grid-cols-[max-content_1fr]">
+        <ReviewSessionList
+          reviews={reviews}
+          basePath={basePath}
+          activeTimestamp={activeTimestamp}
+        />
+        <div className="min-w-0">{children}</div>
       </div>
-      {children}
     </div>
   );
 }
