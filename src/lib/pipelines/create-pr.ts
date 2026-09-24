@@ -9,28 +9,17 @@ import {
   checkExistingPR,
   readPRTemplate,
 } from "@/lib/workspace";
+import {
+  getSoleCommitSubject,
+  resolvePrTitle,
+  resolveTaskTitle,
+} from "@/lib/workspace/pr-title";
 import { getWorkspaceDir } from "@/lib/config";
 import { buildPRCreatorPrompt } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
-
-/**
- * The README's `# Task:` heading, when it is a real title. Handing the same
- * string to every repo's child is what stops sibling PRs of one task carrying
- * unrelated titles — the children run in parallel and each sees only its own
- * diff, so nothing else can align them.
- *
- * Placeholders are rejected rather than mandated: a README that `init-readme`
- * never rewrote (hand-edited, or `init --only`) still carries the template's
- * `TBD`, and `parseReadmeMeta` reports a missing heading as `Untitled`.
- */
-function resolveSharedTitle(title: string): string | null {
-  const trimmed = title.trim().replace(/^Task:\s*/i, "").trim();
-  if (!trimmed || /^(TBD|Untitled)$/i.test(trimmed)) return null;
-  return trimmed;
-}
 
 export async function buildCreatePrPipeline(input: {
   workspace: string;
@@ -48,7 +37,7 @@ export async function buildCreatePrPipeline(input: {
     : allRepos;
 
   const wsPath = path.join(getWorkspaceDir(), workspace);
-  const sharedTitle = resolveSharedTitle(meta.title);
+  const taskTitle = resolveTaskTitle(meta.title);
 
   const children = await Promise.all(repos.map(async (repo) => {
     // Detect base branch from README metadata or repo itself
@@ -60,6 +49,16 @@ export async function buildCreatePrPipeline(input: {
     const changes = getRepoChanges(workspace, repo.repoPath, baseBranch);
     const existingPR = checkExistingPR(repo.worktreePath);
     const prTemplate = readPRTemplate(repo.worktreePath);
+
+    // Per-repo, and only reached without a task title: a sole commit's subject
+    // describes that repo's whole change, but it cannot align the siblings.
+    const title = resolvePrTitle({
+      taskTitle,
+      ticketId: meta.ticketId,
+      soleCommitSubject: taskTitle
+        ? null
+        : getSoleCommitSubject(repo.worktreePath, baseBranch),
+    });
 
     // Review threads an earlier PR-review triage turned into TODO items. This is
     // the phase that pushes, so it is the first point at which a reply can name a
@@ -85,7 +84,7 @@ export async function buildCreatePrPipeline(input: {
         : undefined,
       // Only a new PR gets the mandated title: the update path retitles only when
       // scope shifted, and the existing title may be the user's own wording.
-      ...(!existingPR.exists && sharedTitle && { sharedTitle }),
+      ...(!existingPR.exists && title && { sharedTitle: title }),
       ...(prReviewThreads && { prReviewThreads, todoFilePath }),
     });
 
