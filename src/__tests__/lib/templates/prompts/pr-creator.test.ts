@@ -79,6 +79,18 @@ describe("getPRCreatorSystemPrompt", () => {
     expect(prompt).toMatch(/add a ticket/i);
   });
 
+  // The allowance for a repository's own prefix convention stays — a PR-title
+  // lint is a real thing to survive — but it used to name `feat: ` and say the
+  // evidence was "its PR template or recent PR titles". A pointer to evidence is
+  // a procedure: the agent goes and reads them on some runs and not on others,
+  // and the one concrete token in the whole title instruction is the one it
+  // copies. Neither belongs here while the prefix is left to judgment at all.
+  it("gives the agent nothing to look up about a title prefix", () => {
+    expect(prompt).toMatch(/prefix your repository/i);
+    expect(prompt).not.toMatch(/recent PR titles/i);
+    expect(prompt).not.toMatch(/`feat: `/);
+  });
+
   // A repo-name suffix would break the byte-identity that makes the titles
   // recognizable as one task, and the PR list already names the repository.
   it("forbids appending the repository name to the mandated title", () => {
