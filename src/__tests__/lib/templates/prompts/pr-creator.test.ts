@@ -72,6 +72,13 @@ describe("getPRCreatorSystemPrompt", () => {
     expect(prompt).toContain("verbatim");
   });
 
+  // The ticket is bracketed on where the README is read, so it is already in the
+  // mandated string — an agent adding its own would double it, and adding one
+  // only on the runs that noticed the ticket is the drift this removes.
+  it("forbids adding a ticket reference to the mandated title", () => {
+    expect(prompt).toMatch(/add a ticket/i);
+  });
+
   // A repo-name suffix would break the byte-identity that makes the titles
   // recognizable as one task, and the PR list already names the repository.
   it("forbids appending the repository name to the mandated title", () => {

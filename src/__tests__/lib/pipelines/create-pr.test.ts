@@ -29,6 +29,13 @@ vi.mock("@/lib/templates", () => ({
   buildPRCreatorPrompt: vi.fn(() => "pr-prompt"),
 }));
 
+// The derivation itself is real (see pr-title.test.ts); only the git read is
+// replaced, since these cases are about which candidate reaches the prompt.
+vi.mock("@/lib/workspace/pr-title", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace/pr-title")>()),
+  getSoleCommitSubject: vi.fn(() => null),
+}));
+
 vi.mock("@/lib/workspace/prompts", () => ({
   ensureSystemPrompt: vi.fn(() => "/mock/prompts/pr-creator.md"),
 }));
@@ -47,6 +54,7 @@ afterAll(() => {
 
 import { buildCreatePrPipeline } from "@/lib/pipelines/create-pr";
 import { listWorkspaceRepos, checkExistingPR } from "@/lib/workspace";
+import { getSoleCommitSubject } from "@/lib/workspace/pr-title";
 import { parseReadmeMeta } from "@/lib/parsers/readme";
 import { buildPRCreatorPrompt } from "@/lib/templates";
 
@@ -54,9 +62,10 @@ const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
 const mockCheckExistingPR = vi.mocked(checkExistingPR);
 const mockParseReadmeMeta = vi.mocked(parseReadmeMeta);
 const mockBuildPrompt = vi.mocked(buildPRCreatorPrompt);
+const mockSoleCommit = vi.mocked(getSoleCommitSubject);
 
-const meta = (title: string) =>
-  ({ title, repositories: [] }) as ReturnType<typeof parseReadmeMeta>;
+const meta = (title: string, ticketId = "") =>
+  ({ title, ticketId, repositories: [] }) as ReturnType<typeof parseReadmeMeta>;
 
 const TODO_WITH_THREADS = `# TODO: my-repo
 
@@ -162,6 +171,39 @@ describe("buildCreatePrPipeline", () => {
       expect(mockBuildPrompt.mock.calls[0][0].sharedTitle).toBeUndefined();
     },
   );
+
+  // The ticket is in the README and the same for every repo, so bracketing it on
+  // here is what stops it being a per-run decision inside each child.
+  it("brackets the workspace ticket onto the mandated title", async () => {
+    mockParseReadmeMeta.mockReturnValue(meta("Add pagination to user search API", "ABC-123"));
+
+    await buildCreatePrPipeline({ workspace: "ws", draft: true });
+
+    expect(mockBuildPrompt.mock.calls[0][0].sharedTitle).toBe(
+      "[ABC-123] Add pagination to user search API",
+    );
+  });
+
+  // With no task title to align the repos, a branch holding one commit already
+  // has a description of its whole change — composing a second one is where the
+  // wording drifted between runs.
+  it("uses the branch's sole commit subject when the heading is a placeholder", async () => {
+    mockParseReadmeMeta.mockReturnValue(meta("TBD", "ABC-123"));
+    mockSoleCommit.mockReturnValueOnce("Tweak the search query");
+
+    await buildCreatePrPipeline({ workspace: "ws", draft: true });
+
+    expect(mockSoleCommit).toHaveBeenCalledWith("/repos/my-repo/worktrees/ws", "main");
+    expect(mockBuildPrompt.mock.calls[0][0].sharedTitle).toBe("[ABC-123] Tweak the search query");
+  });
+
+  // The commit read is a git call per repo, and a resolved task title outranks
+  // whatever it would return.
+  it("does not read the commits when the task title already decides the title", async () => {
+    await buildCreatePrPipeline({ workspace: "ws", draft: true });
+
+    expect(mockSoleCommit).not.toHaveBeenCalled();
+  });
 
   // An existing PR's title is the user's to keep; the update path only retitles
   // when scope shifted, so it must not receive a mandated title at all.
