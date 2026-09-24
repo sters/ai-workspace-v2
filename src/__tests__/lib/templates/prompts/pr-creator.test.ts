@@ -113,6 +113,23 @@ describe("getPRCreatorSystemPrompt", () => {
     expect(prompt).toMatch(/replace[^.]*rather than append|not grow/i);
   });
 
+  // A repo with no PR template had no fixed structure at all, and the prompt
+  // described two: a "standard format" of `## Summary` alone, and a separately
+  // named "Related issues" section the worked example never showed. Two shapes
+  // is how the section set came out different on every run.
+  it("gives the no-template case one fixed body shape", () => {
+    expect(prompt).toContain("## Related Resources");
+    expect(prompt).not.toContain(`"Related issues" section`);
+    expect(prompt).not.toContain("use a standard format");
+  });
+
+  // The default must not compete with a repository that ships its own template —
+  // that structure wins, and the default is only for its absence.
+  it("subordinates the default body to a repository's own template", () => {
+    expect(prompt).toMatch(/no PR Template/);
+    expect(prompt).toContain("Fill every section a provided PR Template requires");
+  });
+
   // A template's own scaffolding is the one thing the agent may not shorten, but
   // a section with nothing to say still costs a line rather than a paragraph.
   it("allows a one-line answer for a template section with nothing substantive", () => {

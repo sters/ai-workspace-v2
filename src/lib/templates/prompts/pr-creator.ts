@@ -35,9 +35,9 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
    - Title: if the user prompt has a \`## PR Title\` section, **use that string verbatim** as the title. It is the workspace's task title, and every repository of this task is given the same one, so a reviewer looking at several PRs sees one task rather than several. Do not rephrase it, shorten it, or retune it to your repository's diff, and do not append the repository name — the PR list already says which repository it is. The one allowed addition is a prefix your repository's convention requires (e.g. \`feat: \`, visible in its PR template or recent PR titles); the descriptive part after it stays verbatim.
    - Only when no \`## PR Title\` section is given: compose one yourself, concise and under 70 characters
    - If a PR Template is provided in the user prompt, fill in each section of the template with the relevant change information. Do NOT search for a template file.
-   - If no PR Template is provided, use a standard format: a short \`## Summary\` of the change as a whole, at the altitude described in **PR Description: An Overview, Not a Walkthrough** below
+   - If no PR Template is provided, use the default body given in **PR Description: An Overview, Not a Walkthrough** below — \`## Summary\` plus \`## Related Resources\`, and nothing else
    - Do NOT include a list of changed files unless the PR Template explicitly requires it — reviewers can see the diff directly
-   - Include ticket URLs in "Related issues" section
+   - Include full ticket / issue URLs: in the section a provided template gives them, or in the default body's \`## Related Resources\`
 
 3. **Push and Create**:
    - Push the branch to remote: \`git push -u origin <branch>\`
@@ -60,7 +60,7 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 
 What the body owes a reviewer is the **rough shape of the whole change in a few sentences** — what it is, and why it was done — so that they know what they are looking at before they open the diff. The diff itself is the detailed account, and it is right there: anything a reviewer would answer by reading the diff belongs to the diff, not to the body.
 
-So write it at that altitude, and stop:
+So write it at that altitude, and stop. With no PR Template provided, this filled example is the whole body:
 
 \`\`\`markdown
 ## Summary
@@ -68,7 +68,13 @@ So write it at that altitude, and stop:
 Adds cursor-based pagination to the user search endpoint, replacing the offset
 query that timed out on large tenants. Callers now pass an opaque cursor; the
 old \`page\` parameter stays accepted for one release.
+
+## Related Resources
+
+- https://example.atlassian.net/browse/ABC-123
 \`\`\`
+
+Those two sections are the default body's entire structure: a \`## Summary\` at that altitude, and \`## Related Resources\` listing in full every ticket or issue URL you were given — the section dropped entirely when there are none. Add no further sections to it. A repository that wants more structure ships a PR Template, and then its structure is the one to fill.
 
 That is the target size — a few sentences, generally **under 10 lines** for the descriptive part (a template's own headings and ticket links do not count against it). Add a bullet or two beyond it only for something a reviewer would otherwise be surprised by: a deliberate trade-off, a deferred piece of work, a migration or rollout step they have to know about.
 
@@ -125,6 +131,7 @@ ${worktreeCdRules({
 - For new PRs: use draft mode unless Draft is explicitly false
 - For existing PRs: never change the draft/ready state — leave it as the user set it
 - Follow repository's PR template exactly if one exists
+- With no PR Template, the body is \`## Summary\` + \`## Related Resources\` and nothing else
 - A given \`## PR Title\` is the title; only compose one (concise, under 70 characters) when none is given
 - Cover the whole branch, not just the latest commit — as one description of the result, never a per-commit list
 - Always include full ticket URLs (not just IDs)
