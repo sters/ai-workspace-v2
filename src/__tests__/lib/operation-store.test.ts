@@ -9,6 +9,7 @@ import {
 } from "@/lib/operation-store";
 import type { Operation, OperationEvent } from "@/types/operation";
 import { getDb, _resetDb, _setDbPath, insertOperation, appendEvents } from "@/lib/db";
+import { extractResultSummary } from "@/lib/parsers/stream";
 
 // Deterministic UUIDs for test use
 const ID1 = "00000000-0000-4000-8000-000000000001";
@@ -46,7 +47,7 @@ function writeViaDb(op: Operation, events: OperationEvent[]) {
     appendEvents(events);
   }
   // writeOperationLog updates status/meta (simulating markComplete)
-  writeOperationLog(op, events);
+  writeOperationLog(op, extractResultSummary(events));
 }
 
 describe("operation-store", () => {
@@ -247,7 +248,7 @@ describe("operation-store", () => {
     it("rejects path traversal in operation ID", () => {
       const op = makeOperation("../../../etc/passwd" as string);
       // writeViaDb validates, so use writeOperationLog directly
-      writeOperationLog(op, []);
+      writeOperationLog(op);
       expect(readOperationLog("../../../etc/passwd" as string)).toBeNull();
     });
 

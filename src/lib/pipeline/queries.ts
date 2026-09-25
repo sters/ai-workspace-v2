@@ -2,7 +2,6 @@ import type { Operation, OperationEvent, OperationListItem } from "@/types/opera
 import type { ManagedOperation } from "./types";
 import { operations } from "./store";
 import { gcCompletedOperations } from "./gc";
-import { extractResultSummary } from "@/lib/parsers/stream";
 
 export function getOperations(): Operation[] {
   gcCompletedOperations();
@@ -12,9 +11,9 @@ export function getOperations(): Operation[] {
 function toSummary(managed: ManagedOperation): OperationListItem {
   const op = managed.operation;
   const currentPhase = op.phases?.find((p) => p.status === "running");
-  const resultSummary = op.status !== "running" && managed.events.length > 0
-    ? extractResultSummary(managed.events)
-    : undefined;
+  // Computed by `markComplete`; extracting it here would read an events array
+  // it has already cleared.
+  const resultSummary = managed.resultSummary;
   return {
     id: op.id,
     type: op.type,

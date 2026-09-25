@@ -2,6 +2,7 @@ import type { OperationEvent } from "@/types/operation";
 import type { ManagedOperation } from "./types";
 import { sendAskNotification, sendCompletionNotification } from "@/lib/web-push";
 import { bufferEvent, stopAutoFlush } from "@/lib/db";
+import { extractResultSummary } from "@/lib/parsers/stream";
 
 export function emitEvent(managed: ManagedOperation, event: OperationEvent) {
   managed.events.push(event);
@@ -70,16 +71,21 @@ export function markComplete(managed: ManagedOperation, success: boolean) {
   // Stop auto-flush and do final flush of buffered events
   stopAutoFlush(managed.operation.id);
 
-  // Persist operation metadata (status, completedAt, resultSummary) to SQLite.
-  // Events are already flushed above, so writeOperationLog only updates the operation row.
-  const eventsSnapshot = managed.events.slice();
+  // The listing renders a completed operation's result without the card being
+  // expanded, and this managed entry is what it reads until GC drops it. The
+  // events it comes from are cleared below, so it is extracted here — and the
+  // row is written from this same value, so memory and disk cannot disagree.
+  managed.resultSummary = extractResultSummary(managed.events);
   const operationSnapshot = { ...managed.operation };
-  // Clear events synchronously after taking snapshot to avoid data loss window.
-  // Late-connecting SSE clients will query events from SQLite via getOperationEvents.
+  const summarySnapshot = managed.resultSummary;
+  // Clear events synchronously to avoid a data loss window. Late-connecting
+  // SSE clients will query events from SQLite via getOperationEvents.
   managed.events.length = 0;
+  // Persist operation metadata (status, completedAt, resultSummary) to SQLite.
+  // Events are already flushed above, so this only updates the operation row.
   import("../operation-store")
     .then(({ writeOperationLog }) => {
-      writeOperationLog(operationSnapshot, eventsSnapshot);
+      writeOperationLog(operationSnapshot, summarySnapshot);
     })
     .catch((err) => console.warn("[pipeline-manager] Failed to persist operation log:", err));
 
