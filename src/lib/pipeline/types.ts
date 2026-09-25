@@ -1,5 +1,5 @@
 import type { ClaudeProcess } from "@/types/claude";
-import type { OperationEvent, Operation } from "@/types/operation";
+import type { OperationEvent, Operation, OperationResultSummary } from "@/types/operation";
 
 export interface ChildProcessEntry {
   process: ClaudeProcess;
@@ -22,6 +22,11 @@ export interface ManagedOperation {
   abortController: AbortController;
   /** Timestamp (ms) when the operation completed. Used for GC. */
   completedAt?: number;
+  /**
+   * The operation's results, computed when it completed. `events` is cleared at
+   * that point, so this is the only in-memory source for the listing.
+   */
+  resultSummary?: OperationResultSummary;
 }
 
 export interface WireChildResult {
