@@ -4,7 +4,7 @@ import {
   getOperationEvents,
   subscribeToOperation,
 } from "@/lib/pipeline-manager";
-import { readOperationLog } from "@/lib/operation-store";
+import { readOperationLog, backfillResultSummary } from "@/lib/operation-store";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +41,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "operation not found" }, { status: 404 });
     }
 
-    // Completed on disk → return JSON
+    // Completed on disk → return JSON. Expanding the card is also the moment
+    // an operation that never got a result recorded can have one derived, so
+    // the listing shows it next time without being expanded.
+    backfillResultSummary(operationId, stored.events);
     console.log(`[events][${operationId}] serving from disk (JSON), ${stored.events.length} events`);
     return NextResponse.json(stored.events);
   }
@@ -49,6 +52,7 @@ export async function GET(request: Request) {
   // ---------- Completed in memory → return JSON ----------
   if (operation.status !== "running") {
     const events = resolveCompletedEvents(operationId) ?? [];
+    backfillResultSummary(operationId, events);
     console.log(`[events][${operationId}] completed (JSON), ${events.length} events`);
     return NextResponse.json(events);
   }

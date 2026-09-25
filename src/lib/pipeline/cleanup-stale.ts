@@ -1,4 +1,5 @@
 import { listRunningOperations, updateOperationStatus } from "@/lib/db";
+import { backfillResultSummary } from "@/lib/operation-store";
 
 // ---------------------------------------------------------------------------
 // Stale operation cleanup on startup
@@ -33,5 +34,10 @@ export function failStaleOperations(): void {
       console.log(`[cleanup] Marking interrupted ${op.type}/${op.id} as failed`);
       updateOperationStatus(op.id, "failed", now);
     }
+
+    // The run never reached `markComplete`, so nothing recorded its result —
+    // but its events were flushed as they arrived. Settled first: the fill
+    // refuses a row that is still running.
+    backfillResultSummary(op.id);
   }
 }

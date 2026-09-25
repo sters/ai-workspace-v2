@@ -11,6 +11,7 @@ export { isUsageLimitMessage, listUsageLimitStops } from "./usage-limit";
 
 // Writing
 export { writeOperationLog } from "./writer";
+export { backfillResultSummary } from "./backfill";
 
 // Deletion
 export { deleteStoredOperationsForWorkspace, deleteStoredOperation } from "./deletion";
