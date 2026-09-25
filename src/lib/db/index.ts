@@ -8,6 +8,7 @@ export {
   updateOperationStatus,
   updateOperationWorkspace,
   updateOperationMeta,
+  fillMissingOperationResultSummary,
   getOperation,
   listOperations,
   listRunningOperations,

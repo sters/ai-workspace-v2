@@ -8,6 +8,8 @@ import {
   updateOperationMeta,
   updateOperationWorkspace,
   listRunningOperations,
+  listRecentFinishedOperations,
+  appendEvents,
   getOperation as dbGetOperation,
 } from "@/lib/db";
 import type { Operation, OperationPhaseInfo } from "@/types/operation";
@@ -89,6 +91,26 @@ describe("pipeline/cleanup-stale", () => {
 
       const op = dbGetOperation(OP_ID_1);
       expect(op?.status).toBe("completed");
+    });
+
+    it("records the result its events already carry", async () => {
+      // The run's own completion never wrote one, but its events were flushed
+      // as they arrived — so the card has something to show without expanding.
+      insertOperation(makeOp(OP_ID_1, { status: "running" }));
+      appendEvents([
+        {
+          type: "output",
+          operationId: OP_ID_1,
+          data: JSON.stringify({ type: "result", subtype: "success", result: "Cycle 1 done" }),
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      const { failStaleOperations } = await import("@/lib/pipeline/cleanup-stale");
+      failStaleOperations();
+
+      const settled = listRecentFinishedOperations(10).find((o) => o.id === OP_ID_1);
+      expect(settled?.resultSummary?.content).toBe("Cycle 1 done");
     });
 
     it("does nothing when no running operations exist", async () => {

@@ -11,6 +11,7 @@ let _insert: Statement | null = null;
 let _updateStatus: Statement | null = null;
 let _updateWorkspace: Statement | null = null;
 let _updateMeta: Statement | null = null;
+let _fillMissingSummary: Statement | null = null;
 let _getById: Statement | null = null;
 let _list: Statement | null = null;
 let _listByWorkspace: Statement | null = null;
@@ -46,6 +47,17 @@ function stmts(db: Database) {
         phases_json = COALESCE($phases_json, phases_json),
         result_summary = COALESCE($result_summary, result_summary)
       WHERE id = $id
+    `);
+  }
+  if (!_fillMissingSummary) {
+    // Only a settled operation with no result of its own: a summary written at
+    // completion is the authoritative one, and a running operation's result is
+    // still being decided by the phase that is producing it.
+    _fillMissingSummary = db.prepare(`
+      UPDATE operations SET result_summary = $result_summary
+      WHERE id = $id
+        AND result_summary IS NULL
+        AND status IN ('completed', 'failed')
     `);
   }
   if (!_getById) {
@@ -103,6 +115,7 @@ function stmts(db: Database) {
     updateStatus: _updateStatus,
     updateWorkspace: _updateWorkspace,
     updateMeta: _updateMeta,
+    fillMissingSummary: _fillMissingSummary,
     getById: _getById,
     list: _list,
     listByWorkspace: _listByWorkspace,
@@ -122,6 +135,7 @@ export function _resetStatements(): void {
   _updateStatus = null;
   _updateWorkspace = null;
   _updateMeta = null;
+  _fillMissingSummary = null;
   _getById = null;
   _list = null;
   _listByWorkspace = null;
@@ -250,6 +264,27 @@ export function updateOperationMeta(
     $phases_json: meta.phases ? JSON.stringify(meta.phases) : null,
     $result_summary: meta.resultSummary ? JSON.stringify(meta.resultSummary) : null,
   });
+}
+
+/**
+ * Write a result summary for a settled operation that has none, leaving an
+ * existing one alone. Returns whether it landed.
+ *
+ * The guard is in SQL rather than in the caller because the caller derives the
+ * summary from the event stream, which is also what the operation's own
+ * completion does — the row is the one place that can decide which wins.
+ */
+export function fillMissingOperationResultSummary(
+  id: string,
+  resultSummary: OperationResultSummary,
+): boolean {
+  const db = getDb();
+  const s = stmts(db);
+  const result = s.fillMissingSummary.run({
+    $id: id,
+    $result_summary: JSON.stringify(resultSummary),
+  });
+  return result.changes > 0;
 }
 
 export function getOperation(id: string): Operation | null {
