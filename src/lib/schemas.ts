@@ -1,4 +1,5 @@
 import z from "zod";
+import { parsePrUrl } from "./github-pr-url";
 import { quickWorkspaceName } from "./naming";
 
 /** Interaction level enum — shared between client and server. */
@@ -8,15 +9,6 @@ export const initSchema = z.object({
   description: z.string().min(1, "description is required"),
   interactionLevel: interactionLevelEnum.optional(),
   bestOfN: z.coerce.number().min(0).max(5).optional(),
-});
-
-export const initFromPrSchema = z.object({
-  prUrl: z.string().min(1, "prUrl is required"),
-  interactionLevel: interactionLevelEnum.optional(),
-  /** Free-text instruction for TODO planning. When non-empty, TODO phases are appended. */
-  todoInstruction: z.string().optional(),
-  /** Append a review pass after the worktree is created. */
-  withReview: z.coerce.boolean().optional(),
 });
 
 export const workspaceSchema = z.object({
@@ -33,7 +25,8 @@ export const workspaceSchema = z.object({
 /**
  * The name is optional because the note already says what the change is:
  * `quickWorkspaceName` derives one from its first line. One of the two has to
- * be there, since a workspace with neither has nothing to be called.
+ * be there, since a workspace with neither has nothing to be called — unless
+ * a repository entry is a PR URL, whose title the server reads and names it by.
  */
 export const quickCreateWorkspaceSchema = z
   .object({
@@ -45,10 +38,12 @@ export const quickCreateWorkspaceSchema = z
       .transform((repos) => [...new Set(repos)]),
     note: z.string().optional(),
   })
-  .refine((input) => quickWorkspaceName(input.name, input.note ?? "") !== "", {
-    message: "name or note is required",
-    path: ["name"],
-  });
+  .refine(
+    (input) =>
+      quickWorkspaceName(input.name, input.note ?? "") !== "" ||
+      input.repositories.some((repo) => parsePrUrl(repo) !== null),
+    { message: "name or note is required", path: ["name"] },
+  );
 
 export const executeSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),

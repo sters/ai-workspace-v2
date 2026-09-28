@@ -159,7 +159,6 @@ describe("AppSidebar", () => {
     await user.tab();
     await user.tab();
     await user.tab();
-    await user.tab();
     expect(screen.getByRole("link", { name: "Utilities" })).toHaveFocus();
     expect(screen.queryByText("Quick (no AI)")).not.toBeInTheDocument();
     expect(screen.getByText("Claude Usage")).toBeInTheDocument();

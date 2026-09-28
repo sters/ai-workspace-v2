@@ -4,6 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { SetupRepositoryResult } from "@/types/pipeline";
+import type { PrBranchInfo, PrUrlInfo } from "@/lib/workspace/pr-url";
 
 const mockSetupWorkspace = vi.fn();
 const mockCommitWorkspaceSnapshot = vi.fn();
@@ -31,6 +32,21 @@ function repoResult(repoPath: string, baseBranch = "main"): SetupRepositoryResul
     worktreePath: `/ws/${WS_NAME}/${repoPath}`,
     baseBranch,
     branchName: "bugfix/login-crash-20260911",
+  };
+}
+
+const WEB_PR = "https://github.com/acme/web/pull/42";
+
+function pr(overrides: Partial<PrBranchInfo> = {}): PrBranchInfo {
+  return {
+    headBranch: "feature/widget",
+    baseBranch: "develop",
+    repoPath: "github.com/acme/web",
+    prUrl: WEB_PR,
+    isFork: false,
+    title: "Add the widget",
+    body: "It renders on the settings page.",
+    ...overrides,
   };
 }
 
@@ -267,5 +283,150 @@ describe("createQuickWorkspace", () => {
     );
 
     expect(result.log).toEqual(["[github.com/acme/web] Base branch: main"]);
+  });
+
+  describe("a PR URL among the repositories", () => {
+    function stage() {
+      const dir = stageWorkspace();
+      mockSetupWorkspace.mockResolvedValue({ workspaceName: WS_NAME, workspacePath: dir });
+      return dir;
+    }
+
+    it("checks out the PR's own branch, off the PR's base", async () => {
+      stage();
+      const setupRepository = vi.fn((_ws: string, repo: string) => repoResult(repo, "develop"));
+
+      const result = await createQuickWorkspace(
+        { name: "n", taskType: "review", repositories: [`${WEB_PR}/files`] },
+        { setupRepository, resolvePullRequest: () => pr() },
+      );
+
+      expect(setupRepository).toHaveBeenCalledWith(
+        WS_NAME,
+        "github.com/acme/web",
+        "develop",
+        expect.any(Function),
+        "feature/widget",
+      );
+      expect(result.pullRequests).toEqual([
+        { url: WEB_PR, repoPath: "github.com/acme/web", headBranch: "feature/widget" },
+      ]);
+    });
+
+    it("names the workspace from the PR title and records the PR as the request", async () => {
+      const dir = stage();
+
+      await createQuickWorkspace(
+        { taskType: "review", repositories: [WEB_PR] },
+        {
+          setupRepository: vi.fn((_ws: string, repo: string) => repoResult(repo)),
+          resolvePullRequest: () => pr(),
+        },
+      );
+
+      const [, description, , preGeneratedSlug] = mockSetupWorkspace.mock.calls[0];
+      expect(preGeneratedSlug).toBe("Add the widget");
+      expect(description).toContain(WEB_PR);
+      expect(description).toContain("It renders on the settings page.");
+      const readme = fs.readFileSync(path.join(dir, "README.md"), "utf-8");
+      expect(readme.split("\n")[0]).toBe("# Task: Add the widget");
+    });
+
+    it("keeps the note ahead of the PR in the request, and its name over the title", async () => {
+      stage();
+
+      await createQuickWorkspace(
+        { taskType: "feature", repositories: [WEB_PR], note: "Address the review comments" },
+        {
+          setupRepository: vi.fn((_ws: string, repo: string) => repoResult(repo)),
+          resolvePullRequest: () => pr(),
+        },
+      );
+
+      const [, description, , preGeneratedSlug] = mockSetupWorkspace.mock.calls[0];
+      expect(preGeneratedSlug).toBe("Address the review comments");
+      expect(description.indexOf("Address the review comments")).toBe(0);
+      expect(description).toContain(WEB_PR);
+    });
+
+    it("lets the PR supersede a plain entry for the same repository", async () => {
+      stage();
+      const setupRepository = vi.fn((_ws: string, repo: string) => repoResult(repo));
+
+      await createQuickWorkspace(
+        {
+          name: "n",
+          taskType: "review",
+          repositories: ["github.com/acme/web", WEB_PR, "github.com/acme/web:second"],
+        },
+        { setupRepository, resolvePullRequest: () => pr() },
+      );
+
+      // An aliased entry is a separate worktree directory, so it stays.
+      expect(setupRepository.mock.calls.map((c) => [c[1], c[4]])).toEqual([
+        ["github.com/acme/web", "feature/widget"],
+        ["github.com/acme/web:second", undefined],
+      ]);
+    });
+
+    it("refuses a second PR of the same repository rather than replacing the first worktree", async () => {
+      stage();
+      const setupRepository = vi.fn((_ws: string, repo: string) => repoResult(repo));
+      const other = "https://github.com/acme/web/pull/43";
+
+      const result = await createQuickWorkspace(
+        { name: "n", taskType: "review", repositories: [WEB_PR, other] },
+        {
+          setupRepository,
+          resolvePullRequest: (info: PrUrlInfo) =>
+            pr({ prUrl: info.url, headBranch: `branch-${info.prNumber}` }),
+        },
+      );
+
+      expect(setupRepository).toHaveBeenCalledTimes(1);
+      expect(result.problems).toEqual([
+        { repository: other, error: expect.stringMatching(/already/i) },
+      ]);
+    });
+
+    it("reports a fork PR and one gh could not read, and sets up the rest", async () => {
+      stage();
+      const setupRepository = vi.fn((_ws: string, repo: string) => repoResult(repo));
+      const fork = "https://github.com/acme/api/pull/7";
+      const unreadable = "https://github.com/acme/infra/pull/8";
+
+      const result = await createQuickWorkspace(
+        { name: "n", taskType: "review", repositories: [fork, unreadable, "github.com/acme/tools"] },
+        {
+          setupRepository,
+          resolvePullRequest: (info: PrUrlInfo) => {
+            if (info.url === unreadable) throw new Error("gh: not found");
+            return pr({ prUrl: info.url, repoPath: info.repoPath, isFork: true });
+          },
+        },
+      );
+
+      expect(setupRepository.mock.calls.map((c) => c[1])).toEqual(["github.com/acme/tools"]);
+      expect(result.pullRequests).toEqual([]);
+      expect(result.problems).toEqual([
+        { repository: fork, error: expect.stringMatching(/fork/i) },
+        { repository: unreadable, error: expect.stringContaining("gh: not found") },
+      ]);
+    });
+
+    it("creates nothing when the only thing to name it by was a PR that could not be read", async () => {
+      await expect(
+        createQuickWorkspace(
+          { taskType: "review", repositories: [WEB_PR] },
+          {
+            setupRepository: vi.fn(),
+            resolvePullRequest: () => {
+              throw new Error("gh: not found");
+            },
+          },
+        ),
+      ).rejects.toThrow(/gh: not found/);
+      expect(mockSetupWorkspace).not.toHaveBeenCalled();
+    });
   });
 });

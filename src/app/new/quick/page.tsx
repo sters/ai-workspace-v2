@@ -6,7 +6,7 @@ export default function QuickWorkspacePage() {
     <div>
       <PageHeader
         title="New Workspace (Quick)"
-        description="Say what you want to do, pick the repositories, and get worktrees. Creating it plans nothing: no README analysis, no TODO planning, no constraint discovery — just the workspace, a template README declaring what you picked, and a branch per repository. It then opens an interactive chat and hands it your description to work on."
+        description="Say what you want to do, pick the repositories, and get worktrees. Creating it plans nothing: no README analysis, no TODO planning, no constraint discovery — just the workspace, a template README declaring what you picked, and a branch per repository. A PR URL checks out that PR's branch instead. It then opens an interactive chat and hands it your description to work on — or, for a review of a PR, starts the review."
       />
 
       <QuickCreateForm />
