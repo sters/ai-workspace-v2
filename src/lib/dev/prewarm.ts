@@ -1,22 +1,25 @@
 /**
- * Compile the App Router's page routes before the human clicks one.
+ * Compile the App Router's routes before the human reaches one.
  *
  * `next dev` compiles a route on its first request, so on a freshly started
- * dev server the first visit to every page is paid by whoever visits it.
- * Measured on this app with an empty `.next` (Next 16.2, Turbopack): ~0.2-0.7s
- * of server work per page route, ~10s for all 33 of them, against ~30ms once
- * compiled. Sweeping them in the background right after boot moves that cost
- * off the click.
+ * dev server the first visit to every page is paid by whoever visits it, and
+ * so is the first call to every route handler that page fetches. Measured on
+ * this app with an empty `.next` (Next 16.2, Turbopack): ~0.2-0.7s per page
+ * route, and ~0.4-0.6s per `/api/workspaces/[name]/*` handler even after the
+ * pages were compiled, against ~15-30ms once compiled. A page is not usable
+ * until the handlers it fetches answer, so both are swept, in the background
+ * right after boot, which moves that cost off the click.
  *
- * Only page routes are swept. API routes compile in ~0.1s on first hit, and a
- * GET is not free of consequence for all of them (`gh` calls, spawns), so they
- * are left to the request that actually wants them.
+ * Route handlers are requested with OPTIONS, which Next answers itself from
+ * the module's exports without running any handler — the compile happens, the
+ * `gh` calls and spawns behind a GET do not. That holds only for a route that
+ * does not export its own OPTIONS, so such a route is not swept.
  *
  * Every dependency this touches is injected because the sweep runs from
  * `bin/next-server.ts`, which is outside the test suite's reach.
  */
 
-import { readdirSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { Semaphore } from "@/lib/semaphore";
 
@@ -30,6 +33,31 @@ const DEFAULT_CONCURRENCY = 4;
  * segments left in place for `resolvePrewarmPaths` to fill.
  */
 export function discoverPageRoutes(appDir: string): string[] {
+  return discoverRoutes(appDir, /^page\.(tsx|ts|jsx|js)$/);
+}
+
+const EXPORTS_OPTIONS = /export\s+(async\s+)?(function|const|let|var)\s+OPTIONS\b/;
+
+/**
+ * Route handlers under an App Router directory, in the same shape as
+ * `discoverPageRoutes`, minus any that export their own OPTIONS handler — the
+ * sweep's OPTIONS request would run it.
+ */
+export function discoverRouteHandlers(appDir: string): string[] {
+  return discoverRoutes(appDir, /^route\.(ts|js)$/, (file) => {
+    try {
+      return !EXPORTS_OPTIONS.test(readFileSync(file, "utf8"));
+    } catch {
+      return false;
+    }
+  });
+}
+
+function discoverRoutes(
+  appDir: string,
+  routeFile: RegExp,
+  accept: (file: string) => boolean = () => true,
+): string[] {
   const routes: string[] = [];
 
   function walk(dir: string, segments: string[]) {
@@ -40,7 +68,8 @@ export function discoverPageRoutes(appDir: string): string[] {
       return; // no such directory, or unreadable — nothing to warm
     }
 
-    if (entries.some((e) => e.isFile() && /^page\.(tsx|ts|jsx|js)$/.test(e.name))) {
+    const file = entries.find((e) => e.isFile() && routeFile.test(e.name));
+    if (file && accept(join(dir, file.name))) {
       routes.push(`/${segments.join("/")}`);
     }
 
@@ -93,7 +122,9 @@ export function resolvePrewarmPaths(
 }
 
 export interface PrewarmOptions {
-  fetch: (url: string) => Promise<unknown>;
+  fetch: (url: string, init: { method: string }) => Promise<unknown>;
+  /** OPTIONS for route handlers; see the module comment. */
+  method?: "GET" | "OPTIONS";
   concurrency?: number;
   signal?: AbortSignal;
 }
@@ -112,7 +143,7 @@ export interface PrewarmResult {
 export async function prewarmRoutes(
   baseUrl: string,
   paths: string[],
-  { fetch, concurrency = DEFAULT_CONCURRENCY, signal }: PrewarmOptions,
+  { fetch, method = "GET", concurrency = DEFAULT_CONCURRENCY, signal }: PrewarmOptions,
 ): Promise<PrewarmResult> {
   const semaphore = new Semaphore(concurrency);
   let ok = 0;
@@ -123,7 +154,7 @@ export async function prewarmRoutes(
       semaphore.run(async () => {
         if (signal?.aborted) return;
         try {
-          await fetch(`${baseUrl}${path}`);
+          await fetch(`${baseUrl}${path}`, { method });
           ok++;
         } catch {
           failed++;
