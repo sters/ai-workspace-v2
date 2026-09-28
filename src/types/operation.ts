@@ -1,5 +1,7 @@
 export type OperationType =
   | "init"
+  // No longer started — a PR URL is a quick-create repository entry now — but
+  // operations recorded under it are still listed.
   | "init-from-pr"
   | "execute"
   | "review"

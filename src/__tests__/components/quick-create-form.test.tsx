@@ -37,6 +37,7 @@ function ok(overrides: Record<string, unknown> = {}) {
       workspace: "bugfix-login-crash-20260911",
       workspacePath: "/ws/bugfix-login-crash-20260911",
       repositories: [{ repoPath: WEB.repoPath, repoName: "web", branchName: "bugfix/login-crash", baseBranch: "main", worktreePath: "/ws/x" }],
+      pullRequests: [],
       problems: [],
       log: [],
       ...overrides,
@@ -50,6 +51,23 @@ function fillName(value: string) {
 
 function fillNote(value: string) {
   fireEvent.change(screen.getByLabelText(/what you want to do/i), { target: { value } });
+}
+
+const PR_URL = "https://github.com/acme/web/pull/42";
+
+function addRepository(value: string) {
+  fireEvent.change(screen.getByLabelText(/add repository/i), { target: { value } });
+}
+
+function chooseType(value: string) {
+  fireEvent.change(screen.getByLabelText(/task type/i), { target: { value } });
+}
+
+/** A create whose PR entry became a worktree. */
+function okWithPr() {
+  return ok({
+    pullRequests: [{ url: PR_URL, repoPath: WEB.repoPath, headBranch: "feature/widget" }],
+  });
 }
 
 beforeEach(() => {
@@ -302,6 +320,91 @@ describe("QuickCreateForm", () => {
       expect(button).toBeEnabled();
       fireEvent.click(button);
       await waitFor(() => expect(mockPostJson).toHaveBeenCalledTimes(2));
+    });
+  });
+
+  describe("a PR URL as a repository", () => {
+    it("needs no name or note, since the workspace is named from the PR's title", () => {
+      render(<QuickCreateForm />);
+      const button = screen.getByRole("button", { name: /create workspace/i });
+      expect(button).toBeDisabled();
+
+      addRepository(PR_URL);
+
+      expect(button).toBeEnabled();
+      expect(screen.getByText(/named from the pr's title/i)).toBeInTheDocument();
+    });
+
+    it("starts a review of the PR instead of a chat when the type is review", async () => {
+      mockPostJson.mockImplementation(async (url: string) =>
+        url === "/api/operations/review" ? { ok: true, data: { id: "op-1" } } : okWithPr(),
+      );
+      render(<QuickCreateForm />);
+      addRepository(PR_URL);
+      chooseType("review");
+      fireEvent.click(screen.getByRole("button", { name: /create workspace and review/i }));
+
+      await waitFor(() =>
+        expect(mockPush).toHaveBeenCalledWith(
+          "/workspace/bugfix-login-crash-20260911/operations?operationId=op-1",
+        ),
+      );
+      expect(mockPostJson).toHaveBeenCalledWith("/api/operations/review", {
+        workspace: "bugfix-login-crash-20260911",
+      });
+    });
+
+    it("opens the chat when no PR became a worktree, whatever the type says", async () => {
+      render(<QuickCreateForm />);
+      fillName("n");
+      fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+      chooseType("review");
+      fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+
+      await waitFor(() =>
+        expect(mockPush).toHaveBeenCalledWith(
+          "/workspace/bugfix-login-crash-20260911/chat/interactive",
+        ),
+      );
+      expect(mockPostJson).toHaveBeenCalledTimes(1);
+    });
+
+    it("opens the chat for a PR of any other type, which is continuing work on it", async () => {
+      mockPostJson.mockResolvedValue(okWithPr());
+      render(<QuickCreateForm />);
+      addRepository(PR_URL);
+      fillNote("address the review comments");
+      fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+
+      await waitFor(() =>
+        expect(mockPush).toHaveBeenCalledWith(
+          "/workspace/bugfix-login-crash-20260911/chat/interactive?task=address+the+review+comments",
+        ),
+      );
+      expect(mockPostJson).toHaveBeenCalledTimes(1);
+    });
+
+    it("reports a review that could not start, without offering a second create", async () => {
+      mockPostJson.mockImplementation(async (url: string) =>
+        url === "/api/operations/review"
+          ? { ok: false, error: "Too many concurrent operations" }
+          : okWithPr(),
+      );
+      render(<QuickCreateForm />);
+      addRepository(PR_URL);
+      chooseType("review");
+      const button = screen.getByRole("button", { name: /create workspace and review/i });
+      fireEvent.click(button);
+
+      await waitFor(() =>
+        expect(screen.getByText(/too many concurrent operations/i)).toBeInTheDocument(),
+      );
+      expect(mockPush).not.toHaveBeenCalled();
+      expect(screen.getByRole("link", { name: /open the workspace/i })).toHaveAttribute(
+        "href",
+        "/workspace/bugfix-login-crash-20260911",
+      );
+      expect(button).toBeDisabled();
     });
   });
 });

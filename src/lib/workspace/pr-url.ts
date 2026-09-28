@@ -4,14 +4,10 @@
  */
 
 import { exec } from "@/lib/workspace/helpers";
+import type { PrUrlInfo } from "@/lib/github-pr-url";
 
-export interface PrUrlInfo {
-  url: string;
-  owner: string;
-  repo: string;
-  repoPath: string; // github.com/owner/repo
-  prNumber: number;
-}
+export { extractPrUrls, parsePrUrl } from "@/lib/github-pr-url";
+export type { PrUrlInfo } from "@/lib/github-pr-url";
 
 export interface PrBranchInfo {
   headBranch: string;
@@ -19,33 +15,8 @@ export interface PrBranchInfo {
   repoPath: string;
   prUrl: string;
   isFork: boolean;
-}
-
-const PR_URL_RE = /https:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/g;
-
-/**
- * Extract GitHub PR URLs from text.
- * Returns deduplicated list of parsed PR URL info.
- */
-export function extractPrUrls(text: string): PrUrlInfo[] {
-  const seen = new Set<string>();
-  const results: PrUrlInfo[] = [];
-
-  for (const match of text.matchAll(PR_URL_RE)) {
-    const url = match[0];
-    if (seen.has(url)) continue;
-    seen.add(url);
-
-    results.push({
-      url,
-      owner: match[1],
-      repo: match[2],
-      repoPath: `github.com/${match[1]}/${match[2]}`,
-      prNumber: parseInt(match[3], 10),
-    });
-  }
-
-  return results;
+  title: string;
+  body: string;
 }
 
 /**
@@ -54,12 +25,14 @@ export function extractPrUrls(text: string): PrUrlInfo[] {
  */
 export function resolvePrBranch(prUrl: PrUrlInfo): PrBranchInfo {
   const output = exec(
-    `gh pr view "${prUrl.url}" --json headRefName,baseRefName,headRepositoryOwner`,
+    `gh pr view "${prUrl.url}" --json headRefName,baseRefName,headRepositoryOwner,title,body`,
   );
   const data = JSON.parse(output) as {
     headRefName: string;
     baseRefName: string;
     headRepositoryOwner: { login: string };
+    title?: string;
+    body?: string;
   };
 
   return {
@@ -68,5 +41,7 @@ export function resolvePrBranch(prUrl: PrUrlInfo): PrBranchInfo {
     repoPath: prUrl.repoPath,
     prUrl: prUrl.url,
     isFork: data.headRepositoryOwner.login !== prUrl.owner,
+    title: data.title ?? "",
+    body: data.body ?? "",
   };
 }

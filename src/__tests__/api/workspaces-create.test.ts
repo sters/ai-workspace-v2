@@ -8,6 +8,7 @@ const mockListSelectableRepositories = vi.fn();
 vi.mock("@/lib/workspace/quick-create", () => ({
   createQuickWorkspace: (...a: unknown[]) => mockCreateQuickWorkspace(...a),
   listSelectableRepositories: () => mockListSelectableRepositories(),
+  QuickCreateRefusal: class QuickCreateRefusal extends Error {},
 }));
 
 vi.mock("@/lib/pipelines/actions/setup-repository", () => ({
@@ -102,6 +103,14 @@ describe("POST /api/workspaces", () => {
     const response = await post({ name: "n", repositories: ["github.com/acme/web"] });
     expect(response.status).toBe(500);
     await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining("disk full") });
+  });
+
+  it("reports a refusal as 400, since nothing was created", async () => {
+    const { QuickCreateRefusal } = await import("@/lib/workspace/quick-create");
+    mockCreateQuickWorkspace.mockRejectedValue(new QuickCreateRefusal("Nothing to name it by"));
+    const response = await post({ repositories: ["https://github.com/acme/web/pull/42"] });
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: "Nothing to name it by" });
   });
 });
 

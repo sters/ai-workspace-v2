@@ -54,7 +54,6 @@ const NAV_SECTIONS: NavSection[] = [
     match: ["/suggestions"],
     children: [
       { label: "Quick (no AI)", href: "/new/quick" },
-      { label: "From PR", href: "/new/from-pr" },
       { label: "Suggestions", href: "/suggestions" },
     ],
   },

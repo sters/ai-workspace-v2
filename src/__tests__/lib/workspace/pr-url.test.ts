@@ -93,6 +93,8 @@ describe("resolvePrBranch", () => {
         headRefName: "feature/new-widget",
         baseRefName: "main",
         headRepositoryOwner: { login: "sters" },
+        title: "Add the widget",
+        body: "It renders.",
       }),
     );
 
@@ -103,6 +105,8 @@ describe("resolvePrBranch", () => {
       repoPath: "github.com/sters/ai-workspace-v2",
       prUrl: "https://github.com/sters/ai-workspace-v2/pull/42",
       isFork: false,
+      title: "Add the widget",
+      body: "It renders.",
     });
   });
 

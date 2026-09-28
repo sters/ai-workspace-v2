@@ -8,6 +8,7 @@ import { Input, Textarea } from "@/components/shared/forms";
 import { RepositoryPicker } from "@/components/shared/forms/repository-picker";
 import { Spinner } from "@/components/shared/feedback";
 import { postJson } from "@/lib/api";
+import { parsePrUrl } from "@/lib/github-pr-url";
 import {
   dateStamp,
   deriveBranchName,
@@ -24,11 +25,12 @@ interface QuickCreateResponse {
   workspace: string;
   workspacePath: string;
   repositories: SetupRepositoryResult[];
+  pullRequests: { url: string; repoPath: string; headBranch: string }[];
   problems: { repository: string; error: string }[];
   log: string[];
 }
 
-/** Repository paths as typed: whitespace- or comma-separated. */
+/** Repository paths or PR URLs as typed: whitespace- or comma-separated. */
 function parseExtraRepositories(raw: string): string[] {
   return raw.split(/[\s,]+/).filter(Boolean);
 }
@@ -43,6 +45,10 @@ function chatHref(workspace: string, task: string): string {
   return `/workspace/${encodeURIComponent(workspace)}/chat/interactive${query}`;
 }
 
+function operationHref(workspace: string, operationId: string): string {
+  return `/workspace/${encodeURIComponent(workspace)}/operations?${new URLSearchParams({ operationId })}`;
+}
+
 export function QuickCreateForm() {
   const router = useRouter();
 
@@ -52,14 +58,18 @@ export function QuickCreateForm() {
   const [extra, setExtra] = useState("");
   const [note, setNote] = useState("");
   /**
-   * A workspace whose repositories did not all set up, with the note as it read
-   * when it was sent: the textarea stays editable afterwards, and the chat link
-   * must carry the request the README was written from. A clean create never
-   * renders this — it is already on its way to the chat.
+   * A workspace whose repositories did not all set up, or whose review did not
+   * start, with the note as it read when it was sent: the textarea stays
+   * editable afterwards, and the chat link must carry the request the README
+   * was written from. A clean create never renders this — it is already on its
+   * way to the chat or the review.
    */
-  const [created, setCreated] = useState<{ response: QuickCreateResponse; task: string } | null>(
-    null,
-  );
+  const [created, setCreated] = useState<{
+    response: QuickCreateResponse;
+    task: string;
+    /** Set when the workspace exists but its review did not start. */
+    reviewError?: string;
+  } | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   /**
    * `sent` is terminal, and it is what stops a second workspace being created.
@@ -79,6 +89,14 @@ export function QuickCreateForm() {
 
   /** What the workspace ends up called: the typed name, or the note's first line. */
   const effectiveName = useMemo(() => quickWorkspaceName(name, note), [name, note]);
+  const hasPr = useMemo(() => chosen.some((repo) => parsePrUrl(repo) !== null), [chosen]);
+  /** The PR's title is read server-side, so it names the workspace when nothing here does. */
+  const namedFromPr = !effectiveName && hasPr;
+  /**
+   * What the form promises; the server's `pullRequests` decides, since a PR
+   * that could not be read leaves nothing to review.
+   */
+  const reviewsOnCreate = taskType === "review" && hasPr;
 
   /**
    * The names the server will produce, from the same functions it uses. It
@@ -140,14 +158,30 @@ export function QuickCreateForm() {
 
     setStatus("sent");
     const task = note.trim();
-    // The chat is the point of this path, so it starts on its own. A repository
-    // that failed is the one thing worth reading first, so that case reports
-    // instead of navigating.
-    if (response.data.problems.length === 0) {
-      router.push(chatHref(response.data.workspace, task));
+    // A repository that failed is the one thing worth reading first, so that
+    // case reports instead of navigating.
+    if (response.data.problems.length > 0) {
+      setCreated({ response: response.data, task });
       return;
     }
-    setCreated({ response: response.data, task });
+
+    // A review workspace whose PR is checked out has something to review, and
+    // a review operation — not a chat — is what posts findings onto the PR.
+    // Without a PR the worktree is a fresh branch with an empty diff.
+    if (taskType === "review" && response.data.pullRequests.length > 0) {
+      const review = await postJson<{ id: string }>("/api/operations/review", {
+        workspace: response.data.workspace,
+      }).catch((err: unknown) => ({ ok: false as const, error: String(err) }));
+      if (review.ok) {
+        router.push(operationHref(response.data.workspace, review.data.id));
+      } else {
+        setCreated({ response: response.data, task, reviewError: review.error });
+      }
+      return;
+    }
+
+    // Otherwise the chat is the point of this path, so it starts on its own.
+    router.push(chatHref(response.data.workspace, task));
   };
 
   return (
@@ -166,7 +200,8 @@ export function QuickCreateForm() {
         />
         <p className="mt-1 text-xs text-muted-foreground">
           Kept verbatim in the README&apos;s Initial Request, and handed to the chat this opens as
-          its request, which starts on it straight away.
+          its request, which starts on it straight away. Optional when a PR URL is among the
+          repositories: its title and description are recorded instead.
         </p>
       </div>
 
@@ -185,6 +220,11 @@ export function QuickCreateForm() {
           Becomes the README title verbatim. Its ASCII slug names the workspace directory and
           every branch. Leave it blank and the first line of the note below is used.
         </p>
+        {namedFromPr && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Named from the PR&apos;s title, which is read when the workspace is created.
+          </p>
+        )}
         {preview && (
           <div className="mt-1 space-y-0.5 text-xs">
             {preview.derived && (
@@ -196,6 +236,11 @@ export function QuickCreateForm() {
               Workspace <code className="font-mono">{preview.workspace}</code>
               {" · "}branch <code className="font-mono">{preview.branch}</code>
             </p>
+            {hasPr && (
+              <p className="text-muted-foreground">
+                A PR&apos;s worktree checks out the PR&apos;s own branch instead.
+              </p>
+            )}
             {preview.collapsed && (
               <p className="text-amber-700 dark:text-amber-400">
                 The name has nothing that survives slugging, so the directory and branch fall
@@ -223,6 +268,13 @@ export function QuickCreateForm() {
             </option>
           ))}
         </select>
+        {taskType === "review" && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {hasPr
+              ? "Starts a review of the PR once the workspace exists, instead of a chat."
+              : "Add a PR URL below to have it reviewed on creation; without one this opens a chat."}
+          </p>
+        )}
       </div>
 
       <div>
@@ -240,25 +292,27 @@ export function QuickCreateForm() {
             id="quick-extra"
             value={extra}
             onChange={(e) => setExtra(e.target.value)}
-            placeholder="github.com/org/repo — separate several with spaces"
+            placeholder="github.com/org/repo or https://github.com/org/repo/pull/123 — separate several with spaces"
             className="w-full"
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            Not cloned yet, or the same repository twice with a <code>:alias</code> suffix for a
-            second worktree.
+            Not cloned yet, the same repository twice with a <code>:alias</code> suffix for a
+            second worktree, or a PR URL to check out that PR&apos;s branch.
           </p>
         </div>
       </div>
 
       <Button
         onClick={create}
-        disabled={!effectiveName || chosen.length === 0 || status !== "idle"}
+        disabled={(!effectiveName && !hasPr) || chosen.length === 0 || status !== "idle"}
       >
         {status === "creating" ? (
           <>
             <Spinner />
             Creating workspace…
           </>
+        ) : reviewsOnCreate ? (
+          "Create workspace and review"
         ) : (
           "Create workspace"
         )}
@@ -278,19 +332,28 @@ export function QuickCreateForm() {
           role="alert"
           className="space-y-2 rounded-md bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
         >
-          <p>
-            Workspace <code className="font-mono">{created.response.workspace}</code> was created,
-            but {created.response.problems.length} repositor
-            {created.response.problems.length === 1 ? "y" : "ies"} could not be set up. Only the
-            worktrees that exist are declared in its README.
-          </p>
-          <ul className="space-y-1">
-            {created.response.problems.map((problem) => (
-              <li key={problem.repository} className="font-mono text-xs">
-                {problem.repository}: {problem.error}
-              </li>
-            ))}
-          </ul>
+          {created.reviewError ? (
+            <p>
+              Workspace <code className="font-mono">{created.response.workspace}</code> was created,
+              but its review could not start: {created.reviewError}
+            </p>
+          ) : (
+            <>
+              <p>
+                Workspace <code className="font-mono">{created.response.workspace}</code> was
+                created, but {created.response.problems.length} repositor
+                {created.response.problems.length === 1 ? "y" : "ies"} could not be set up. Only
+                the worktrees that exist are declared in its README.
+              </p>
+              <ul className="space-y-1">
+                {created.response.problems.map((problem) => (
+                  <li key={problem.repository} className="font-mono text-xs">
+                    {problem.repository}: {problem.error}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Link
               href={chatHref(created.response.workspace, created.task)}
