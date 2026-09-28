@@ -13,7 +13,7 @@ bunx github:sters/ai-workspace-v2 [/path/to/ai-workspace]  # Run via bunx
 bun install                                                  # Install dependencies
 bun run dev:hot                                              # Development with hot reload
 bun run build && bun run start                               # Production build + start
-bun run lint                    # Runs both tsc --noEmit AND eslint src/
+bun run lint                    # next typegen, then tsc --noEmit (tsconfig.typecheck.json) AND eslint src/
 bun run test                    # Run all tests
 bun run test:watch              # Run tests in watch mode
 bun --bun vitest run src/__tests__/lib/parsers/todo.test.ts  # Single test file (--bun is required for bun:sqlite)
@@ -450,6 +450,7 @@ Neither knob is what makes a run eat the machine. That is an unbounded loop call
 
 ## Gotchas
 
+- **`bun run lint` does not read the dev server's route types** — `tsconfig.json` includes `.next/dev/types`, which `next dev` owns and does not regenerate when a route is *deleted*, so a removed page kept failing `tsc` until the server restarted. Lint therefore runs `next typegen` (fresh `.next/types` from `src/app`, ~1s, no `BUILD_ID`) and type-checks through `tsconfig.typecheck.json`, which includes those and excludes `.next/dev`. The exclusion cannot go in `tsconfig.json` itself: `next dev` writes the include back on startup.
 - **Config is cached on first access** — `getConfig()` stores on globalThis. Changes to `config.yml` require `_resetConfig()` to take effect. Tests must call reset functions in order: `_resetDb()` → `_resetConfig()` → `_resetWorkspaceRoot()`.
 - **Event buffering is async** — Events aren't persisted immediately (500ms flush interval). Don't query events from the DB immediately after emitting them. SSE streaming replays from the in-memory buffer so clients see events before flush.
 - **Workspace root must be set before config/DB** — The entire config directory and DB path depend on workspace root being known first. `bin/start.ts` calls `setWorkspaceRoot()` before `getConfig()`.

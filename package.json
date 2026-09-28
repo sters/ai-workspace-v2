@@ -10,7 +10,7 @@
     "dev:hot": "bun --bun bin/start.ts --hot",
     "build": "bun --bun next build",
     "start": "bun --bun bin/start.ts",
-    "lint": "bun --bun tsc --noEmit && bun --bun eslint src/",
+    "lint": "bun --bun next typegen && bun --bun tsc --noEmit -p tsconfig.typecheck.json && bun --bun eslint src/",
     "test": "bun --bun vitest run",
     "test:watch": "bun --bun vitest",
     "next-server": "bun run bin/next-server.ts",
