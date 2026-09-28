@@ -1,0 +1,9 @@
+{
+  // `bun run lint`'s config. It checks the route types `next typegen` has just
+  // generated from `src/app`, and not `.next/dev/types`, which the running dev
+  // server owns and does not regenerate when a route is deleted. `tsconfig.json`
+  // cannot drop that include itself: `next dev` adds it back on startup.
+  "extends": "./tsconfig.json",
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "src/__tests__", "src/test-setup.ts", ".next/dev"]
+}
