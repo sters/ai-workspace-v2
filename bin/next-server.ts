@@ -13,6 +13,7 @@ import { describeChildExit, reraiseSignal, signalExitCode } from "../src/lib/pro
 import {
   PREWARM_PARAM_VALUE,
   discoverPageRoutes,
+  discoverRouteHandlers,
   prewarmRoutes,
   resolvePrewarmPaths,
   waitForServer,
@@ -71,14 +72,16 @@ process.on("SIGINT", () => stop("SIGINT"));
 process.on("SIGTERM", () => stop("SIGTERM"));
 
 /**
- * `next dev` compiles a page on its first request, so without this the human
- * pays that compile on every page they open first. Sweep them all in the
- * background instead — by the time the first click lands, most are already
- * built, and an already-compiled page answers in ~30ms.
+ * `next dev` compiles a route on its first request, so without this the human
+ * pays that compile on every page they open first, and again for every route
+ * handler that page fetches. Sweep them all in the background instead — pages
+ * first, since they are what a click reaches — so by the time the first click
+ * lands most are already built.
  */
-async function prewarmPages() {
+async function prewarm() {
   const baseUrl = `http://127.0.0.1:${port}`;
-  const request = (url: string) => fetch(url, { signal: prewarmAbort.signal });
+  const request = (url: string, init?: { method: string }) =>
+    fetch(url, { ...init, signal: prewarmAbort.signal });
 
   // The root page is the first thing compiled either way, so the readiness
   // probe is also the first item of the sweep.
@@ -89,28 +92,44 @@ async function prewarmPages() {
   });
   if (!ready) return;
 
-  const routes = discoverPageRoutes(resolve(projectDir, "src", "app"));
-  const paths = resolvePrewarmPaths(routes, {
+  const appDir = resolve(projectDir, "src", "app");
+  const params = {
     name: PREWARM_PARAM_VALUE,
     timestamp: PREWARM_PARAM_VALUE,
-  });
-  if (paths.length === 0) return;
+    hash: PREWARM_PARAM_VALUE,
+  };
+  const sweeps = [
+    {
+      kind: "page routes",
+      method: "GET",
+      paths: resolvePrewarmPaths(discoverPageRoutes(appDir), params),
+    },
+    {
+      kind: "route handlers",
+      method: "OPTIONS",
+      paths: resolvePrewarmPaths(discoverRouteHandlers(appDir), params),
+    },
+  ] as const;
 
-  const startedAt = Date.now();
-  const { ok, failed } = await prewarmRoutes(baseUrl, paths, {
-    fetch: request,
-    signal: prewarmAbort.signal,
-  });
-  if (prewarmAbort.signal.aborted) return;
-  const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-  console.log(
-    `[next-server] pre-compiled ${ok}/${paths.length} page routes in ${elapsed}s` +
-      (failed > 0 ? ` (${failed} failed)` : ""),
-  );
+  for (const { kind, method, paths } of sweeps) {
+    if (paths.length === 0) continue;
+    const startedAt = Date.now();
+    const { ok, failed } = await prewarmRoutes(baseUrl, paths, {
+      fetch: request,
+      method,
+      signal: prewarmAbort.signal,
+    });
+    if (prewarmAbort.signal.aborted) return;
+    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+    console.log(
+      `[next-server] pre-compiled ${ok}/${paths.length} ${kind} in ${elapsed}s` +
+        (failed > 0 ? ` (${failed} failed)` : ""),
+    );
+  }
 }
 
 if (isHot) {
-  void prewarmPages();
+  void prewarm();
   void child.exited.then(() => prewarmAbort.abort());
 }
 await child.exited;

@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import {
   discoverPageRoutes,
+  discoverRouteHandlers,
   prewarmRoutes,
   resolvePrewarmPaths,
   waitForServer,
@@ -67,6 +68,46 @@ describe("discoverPageRoutes", () => {
   });
 });
 
+describe("discoverRouteHandlers", () => {
+  let appDir: string;
+
+  function seed(routeDir: string, file: string, body: string) {
+    const dir = path.join(appDir, routeDir);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, file), body);
+  }
+
+  beforeEach(() => {
+    appDir = fs.mkdtempSync(path.join("/tmp", "aiw-prewarm-app-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(appDir, { recursive: true, force: true });
+  });
+
+  it("maps route files to their URL paths and leaves page files alone", () => {
+    seed("api/workspaces/[name]/todos", "route.ts", "export async function GET() {}\n");
+    seed("api/operations/(group)/review", "route.ts", "export async function POST() {}\n");
+    seed("workspace/[name]", "page.tsx", "export default function P() {}\n");
+
+    expect(discoverRouteHandlers(appDir)).toEqual([
+      "/api/operations/review",
+      "/api/workspaces/[name]/todos",
+    ]);
+  });
+
+  // The sweep requests handlers with OPTIONS because Next answers it itself
+  // without running any handler. A route that exports its own OPTIONS would
+  // have that handler run by the sweep, so it is left for a real request.
+  it("skips a route that exports its own OPTIONS handler", () => {
+    seed("api/cors", "route.ts", "export async function OPTIONS() {}\nexport async function GET() {}\n");
+    seed("api/cors-const", "route.ts", "export const OPTIONS = handler;\n");
+    seed("api/plain", "route.ts", "export async function GET() { return options(); }\n");
+
+    expect(discoverRouteHandlers(appDir)).toEqual(["/api/plain"]);
+  });
+});
+
 describe("resolvePrewarmPaths", () => {
   it("fills a known dynamic segment", () => {
     expect(
@@ -107,6 +148,18 @@ describe("prewarmRoutes", () => {
 
   // A prewarm is a background nicety; one route that throws (or 500s on a page
   // whose own code is broken) must not cost the rest of the sweep.
+  it("sends the requested method, GET by default", async () => {
+    const methods: string[] = [];
+    const fetch = async (_url: string, init: { method: string }) => {
+      methods.push(init.method);
+      return { ok: true };
+    };
+    await prewarmRoutes("http://x", ["/a"], { fetch });
+    await prewarmRoutes("http://x", ["/api/a"], { fetch, method: "OPTIONS" });
+
+    expect(methods).toEqual(["GET", "OPTIONS"]);
+  });
+
   it("keeps going past a route that throws", async () => {
     const result = await prewarmRoutes("http://127.0.0.1:3741", ["/a", "/b", "/c"], {
       fetch: async (url) => {
