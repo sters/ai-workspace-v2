@@ -6,7 +6,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useOperation } from "@/hooks/use-operation";
 import { useSuggestions } from "@/hooks/use-suggestions";
 import { postJson } from "@/lib/api";
-import { InitSplitButton } from "@/components/operation/init-operation";
+import { InitSplitButton } from "@/components/operation/init-split-button";
 import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import { CollapsibleSection } from "@/components/shared/containers/collapsible-section";
 import { X, Search, Trash2, Layers } from "lucide-react";

@@ -15,7 +15,7 @@ export function InteractionLevelSelector({
 }: {
   value: InteractionLevel;
   onChange: (level: InteractionLevel) => void;
-  disabled: boolean;
+  disabled?: boolean;
 }) {
   return (
     <div className="flex gap-0.5">
