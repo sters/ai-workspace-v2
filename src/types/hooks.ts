@@ -7,6 +7,11 @@ export interface UseTerminalOptions {
    * told its viewport changed.
    */
   onResize?: (cols: number, rows: number) => void;
+  /**
+   * Move keyboard focus into the terminal whenever the window regains focus,
+   * unless a text field elsewhere on the page holds it.
+   */
+  focusOnWindowFocus?: boolean;
 }
 
 export interface UseTerminalReturn {

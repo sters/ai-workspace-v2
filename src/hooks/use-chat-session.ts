@@ -71,6 +71,7 @@ export function useChatSession(
   const { containerRef, termRef, init, dispose } = useTerminal({
     webLinks: true,
     onResize: handleTerminalResize,
+    focusOnWindowFocus: true,
   });
   const [state, setState] = useState<SessionState>("idle");
   const [exitCode, setExitCode] = useState<number | null>(null);

@@ -1,5 +1,5 @@
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // Mock xterm.js modules before importing the hook
 const mockWrite = vi.fn();
@@ -7,6 +7,7 @@ const mockOpen = vi.fn();
 const mockDispose = vi.fn();
 const mockLoadAddon = vi.fn();
 const mockFit = vi.fn();
+const mockFocus = vi.fn();
 
 vi.mock("@xterm/xterm", () => {
   return {
@@ -16,6 +17,7 @@ vi.mock("@xterm/xterm", () => {
         open: mockOpen,
         dispose: mockDispose,
         loadAddon: mockLoadAddon,
+        focus: mockFocus,
         cols: 97,
         rows: 31,
       };
@@ -268,5 +270,81 @@ describe("useTerminal", () => {
     const opts = vi.mocked(Terminal).mock.calls[0][0];
     // For readonly, cursor color matches background to hide it
     expect(opts?.theme?.cursor).toBe(opts?.theme?.background);
+  });
+  describe("focusOnWindowFocus", () => {
+    async function initWith(options: Parameters<typeof useTerminal>[0]) {
+      const hook = renderHook(() => useTerminal(options));
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      Object.defineProperty(hook.result.current.containerRef, "current", {
+        value: container,
+        writable: true,
+      });
+      await act(async () => {
+        await hook.result.current.init();
+      });
+      return { ...hook, container };
+    }
+
+    afterEach(() => {
+      document.body.innerHTML = "";
+    });
+
+    it("focuses the terminal when the window regains focus", async () => {
+      await initWith({ focusOnWindowFocus: true });
+
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+      });
+
+      expect(mockFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves focus alone when not asked to", async () => {
+      await initWith({});
+
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+      });
+
+      expect(mockFocus).not.toHaveBeenCalled();
+    });
+
+    it("does not take focus from a text field outside the terminal", async () => {
+      await initWith({ focusOnWindowFocus: true });
+      const input = document.createElement("input");
+      document.body.appendChild(input);
+      input.focus();
+
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+      });
+
+      expect(mockFocus).not.toHaveBeenCalled();
+    });
+
+    it("takes focus back from a button", async () => {
+      await initWith({ focusOnWindowFocus: true });
+      const button = document.createElement("button");
+      document.body.appendChild(button);
+      button.focus();
+
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+      });
+
+      expect(mockFocus).toHaveBeenCalledTimes(1);
+    });
+
+    it("stops listening once unmounted", async () => {
+      const { unmount } = await initWith({ focusOnWindowFocus: true });
+      unmount();
+
+      act(() => {
+        window.dispatchEvent(new Event("focus"));
+      });
+
+      expect(mockFocus).not.toHaveBeenCalled();
+    });
   });
 });

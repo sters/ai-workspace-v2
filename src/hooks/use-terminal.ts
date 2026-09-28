@@ -150,10 +150,37 @@ export function useTerminal(options?: UseTerminalOptions): UseTerminalReturn {
     };
   }, [fit]);
 
+  // Returning to the window otherwise leaves focus wherever it last was, so
+  // typing into the terminal needs a click on it first. A text field elsewhere
+  // on the page keeps focus: the user was typing there, not here.
+  const focusOnWindowFocus = options?.focusOnWindowFocus ?? false;
+  useEffect(() => {
+    if (!focusOnWindowFocus) return;
+    const handleFocus = () => {
+      const term = termRef.current;
+      if (!term) return;
+      const active = document.activeElement;
+      if (isTextEntry(active) && !containerRef.current?.contains(active)) return;
+      term.focus();
+    };
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, [focusOnWindowFocus]);
+
   // Auto-dispose on unmount
   useEffect(() => {
     return () => dispose();
   }, [dispose]);
 
   return { containerRef, termRef, init, dispose };
+}
+
+function isTextEntry(el: Element | null): boolean {
+  if (!el) return false;
+  if (el instanceof HTMLElement && el.isContentEditable) return true;
+  if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return true;
+  if (el instanceof HTMLInputElement) {
+    return !["button", "checkbox", "radio", "submit", "reset", "range", "color", "file", "image"].includes(el.type);
+  }
+  return false;
 }
