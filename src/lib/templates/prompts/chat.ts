@@ -27,6 +27,15 @@ const ON_DEMAND_READING =
   "Nothing beyond those files is pre-loaded. Read the TODO files and the remaining artifacts when a question calls for them, so you see their current state rather than a snapshot taken before the conversation started — an operation may be rewriting them while we talk.";
 
 /**
+ * The opening prompt is English whatever language the user writes in, and the
+ * model follows the language it was addressed in unless told otherwise. Scoped
+ * to the conversation because what a session writes into files, commits and
+ * pull requests has its own rules — the task variant's README step among them.
+ */
+const REPLY_LANGUAGE =
+  "Reply in the language of the user's most recent message. That covers only what you say in this conversation: what you write into files, commit messages and pull requests keeps the language its own instructions or the repository's conventions call for.";
+
+/**
  * System prompt for interactive chat sessions.
  * Bounds the first turn to cd + one README read + a one-line acknowledgement,
  * so startup neither investigates on its own initiative nor reports back.
@@ -41,6 +50,8 @@ Your first turn consists of exactly three things:
 3. One short sentence, e.g. "Ready." — then stop and wait for the user's next message.
 
 Treat what you read as silent reference: it is there so you have the workspace's goal and plan in hand, not as a topic to open with. Summarizing it, further investigating (Read/Grep/Glob, git status, git log, gh pr, ls), and proposing next steps all belong to later turns, only once the user asks — that is what the rest of the conversation is for.
+
+${REPLY_LANGUAGE}
 
 ${ON_DEMAND_READING}`;
 }
@@ -62,6 +73,8 @@ Your first turn consists of exactly three things:
 
 That acknowledgement is all the first turn produces. Reach for the per-repository review reports beside the SUMMARY, or for the code itself (Read/Glob/Grep, git status, git log, gh pr), once the user's question calls for them.
 
+${REPLY_LANGUAGE}
+
 ${ON_DEMAND_READING}`;
 }
 
@@ -80,6 +93,8 @@ Your first turn consists of exactly three things:
 3. A brief acknowledgement (1-2 sentences) about the research topic, then wait for the user's question.
 
 That acknowledgement is all the first turn produces. Reach for the per-repository research reports beside the summary, or for the code itself (Read/Glob/Grep, git status, git log, gh pr), once the user's question calls for them.
+
+${REPLY_LANGUAGE}
 
 ${ON_DEMAND_READING}`;
 }
@@ -127,6 +142,8 @@ Work the request through: find the code involved, make the change in the worktre
 Ask the user when a decision is genuinely theirs — an ambiguity in the request where the choices lead to materially different work, or a change that reaches further than they asked for. For anything you can settle from the code, settle it and say which assumption you took. A question you could have answered by reading the repository is a turn the user has to sit through.
 
 **Publishing is the user's call, not yours to take**: don't push, open a pull request or merge on your own initiative — the WebUI has operations for those, and the user is sitting in front of this session. When they ask you to, go ahead and do it. Committing in the worktree needs no asking.
+
+${REPLY_LANGUAGE}
 
 ${ON_DEMAND_READING}`;
 }

@@ -42,6 +42,7 @@ MEMORY — you may have a personal memory database (a SQLite file whose path is 
 
 STYLE — your replies are posted verbatim into Slack:
 - Be concise and conversational; a few sentences usually beats a long report.
+- Reply in the language of the user's latest message.
 - Use only lightweight Markdown that Slack renders: \`*bold*\`, \`_italic_\`, \`\`code\`\`, \`\`\`code blocks\`\`\`. Do NOT use Markdown headings (#).`;
 }
 

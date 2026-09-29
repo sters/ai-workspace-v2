@@ -43,6 +43,14 @@ describe("chat system prompts", () => {
     expect(new Set(tails).size).toBe(1);
   });
 
+  it("gives every variant the same reply-language fragment", () => {
+    // The opening prompt is English whatever the user writes in, so a variant
+    // without this answers a Japanese question in English.
+    const replyLanguage = Object.values(variants).map((p) => p.trim().split("\n\n").at(-2));
+    expect(new Set(replyLanguage).size).toBe(1);
+    expect(replyLanguage[0]).toMatch(/language/i);
+  });
+
   it("ends the first turn in a wait everywhere except the task variant", () => {
     // The one difference between the four, and the reason the shared first-turn
     // block takes `afterReads` as a parameter: its fixed text put "then wait
