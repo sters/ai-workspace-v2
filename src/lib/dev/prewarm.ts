@@ -10,6 +10,12 @@
  * until the handlers it fetches answer, so both are swept, in the background
  * right after boot, which moves that cost off the click.
  *
+ * Fetching a page's HTML is enough for its client side too: Turbopack builds
+ * the page's whole client module graph on that request, `import()`-ed chunks
+ * included (xterm's, which loads only once a terminal opens), so UI rendered
+ * only after a click needs no sweep of its own and the JS chunks need not be
+ * fetched. Monaco is outside this entirely — it loads from a CDN at runtime.
+ *
  * Route handlers are requested with OPTIONS, which Next answers itself from
  * the module's exports without running any handler — the compile happens, the
  * `gh` calls and spawns behind a GET do not. That holds only for a route that
