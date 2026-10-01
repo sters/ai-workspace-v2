@@ -171,7 +171,7 @@ bun install
 bun run dev:hot
 
 # Production build + start
-bun run build && bun run start
+bun run start:build    # = bun run build && bun run start
 
 # Lint (runs tsc --noEmit + eslint)
 bun run lint
