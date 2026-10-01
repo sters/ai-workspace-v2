@@ -42,11 +42,17 @@ vi.mock("@/hooks/use-start-and-navigate", () => ({
   useStartAndNavigate: () => mockStartAndNavigate,
 }));
 
+const mockPush = vi.fn();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: mockPush }),
+}));
+
 vi.mock("@/hooks/use-workspace", () => ({
   usePullRequests: () => mockUsePullRequests(),
 }));
 
 import { PullRequestsView } from "@/components/workspace/pull-requests-view";
+import { peekChatHandoff } from "@/lib/chat-handoff";
 
 function pr(overrides: Partial<WorkspacePullRequest> = {}): WorkspacePullRequest {
   return {
@@ -136,6 +142,8 @@ const mockFetch = vi.fn();
 beforeEach(() => {
   mockStartAndNavigate.mockReset();
   mockRefresh.mockReset();
+  mockPush.mockReset();
+  sessionStorage.clear();
   workspaceRunning = false;
   mockFetch.mockReset();
   mockFetch.mockResolvedValue({
@@ -220,6 +228,38 @@ describe("PullRequestsView", () => {
     setData({ validations: { PRRT_open: validation } });
     render(<PullRequestsView workspaceName="feat" />);
     expect(screen.getByText("Wrap the body in try/finally.")).toBeInTheDocument();
+  });
+
+  it("opens a chat whose opening message is the selected comment, starting no operation", () => {
+    setData({ validations: { PRRT_open: validation } });
+    render(<PullRequestsView workspaceName="feat" />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
+
+    expect(mockPush).toHaveBeenCalledWith("/workspace/feat/chat/interactive");
+    expect(mockStartAndNavigate).not.toHaveBeenCalled();
+    const draft = peekChatHandoff("feat")?.discussion ?? "";
+    expect(draft).toContain("github.com/acme/widgets/src/cache.ts, line 88");
+    expect(draft).toContain("This early return skips the unlock.");
+    expect(draft).toContain("The lock is not released on the error path.");
+  });
+
+  it("puts a selected failing check in the chat draft too", () => {
+    setData({
+      pullRequests: [
+        pr({
+          threads: [],
+          checks: checksOf([{ name: "lint", state: "failure", url: "https://ci/lint" }]),
+        }),
+      ],
+    });
+    render(<PullRequestsView workspaceName="feat" />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /lint/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Chat" }));
+
+    const draft = peekChatHandoff("feat")?.discussion ?? "";
+    expect(draft).toContain("Failing check `lint`");
+    expect(draft).toContain("https://ci/lint");
   });
 
   it("blocks both actions while another operation holds the worktrees", () => {

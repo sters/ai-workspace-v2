@@ -10,6 +10,7 @@ import type {
   HistoryEntry,
 } from "@/types/workspace";
 import type { ArtifactFileContent, ArtifactListing } from "@/types/artifact";
+import type { FileDiff, WorkspaceChanges } from "@/types/changes";
 import type { WorkspacePullRequestsResult } from "@/types/pull-request";
 import type { ReviewFindingsResult } from "@/types/review-findings";
 import type { ReviewFreshnessResult } from "@/types/review-freshness";
@@ -226,6 +227,40 @@ export function useArtifactFile(name: string, filePath: string | null) {
   );
 
   return { file: data, isLoading, error };
+}
+
+/** Each worktree's changed files against its base branch. */
+export function useWorkspaceChanges(name: string) {
+  const { data, error, isLoading, mutate } = useSWR<WorkspaceChanges>(
+    name ? `/api/workspaces/${encodeURIComponent(name)}/changes` : null,
+    fetcher,
+    { refreshInterval: SWR_REFRESH_INTERVAL },
+  );
+
+  return { repos: data?.repos ?? [], isLoading, error, refresh: mutate };
+}
+
+/**
+ * One changed file's diff. Not on an interval or on focus: a revalidation
+ * replaces the editor's content, which drops the selection the user may be in
+ * the middle of making. `version` is what re-reads it instead — the file's line
+ * counts from the listing, which move when the file does.
+ */
+export function useWorkspaceChangeDiff(
+  name: string,
+  repoPath: string | null,
+  filePath: string | null,
+  version: string,
+) {
+  const { data, error, isLoading, mutate } = useSWR<FileDiff>(
+    name && repoPath && filePath
+      ? `/api/workspaces/${encodeURIComponent(name)}/changes/diff?repo=${encodeURIComponent(repoPath)}&path=${encodeURIComponent(filePath)}&v=${encodeURIComponent(version)}`
+      : null,
+    fetcher,
+    { revalidateOnFocus: false, revalidateOnReconnect: false },
+  );
+
+  return { diff: data, isLoading, error, refresh: mutate };
 }
 
 /**

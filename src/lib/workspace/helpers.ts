@@ -95,6 +95,34 @@ export function remoteBranchExists(repoAbsPath: string, branch: string): boolean
   }
 }
 
+const COMMON_BASE_BRANCHES = ["main", "master", "develop", "development"];
+
+/**
+ * The base branch as the refs already on disk report it, with no network call.
+ *
+ * This answers a *display* question: the repository picker and the Changes tab
+ * run it once per repository on every page load. `detectBaseBranch` answers
+ * the question `git worktree add` is about to be held to — it may run `remote
+ * set-head --auto`, which talks to the remote, and it throws when it cannot
+ * decide. Creation still goes through that one; an empty string here only
+ * means the caller has nothing to show.
+ */
+export function localBaseBranch(repoAbsPath: string): string {
+  try {
+    const ref = exec(`git -C "${repoAbsPath}" symbolic-ref refs/remotes/origin/HEAD`);
+    const branch = ref.replace(/^refs\/remotes\/origin\//, "");
+    if (branch) return branch;
+  } catch { /* fall through to the common names */ }
+
+  for (const branch of COMMON_BASE_BRANCHES) {
+    try {
+      exec(`git -C "${repoAbsPath}" show-ref --verify --quiet refs/remotes/origin/${branch}`);
+      return branch;
+    } catch { /* try the next one */ }
+  }
+  return "";
+}
+
 export function detectBaseBranch(repoAbsPath: string): string {
   // 1. symbolic-ref
   try {

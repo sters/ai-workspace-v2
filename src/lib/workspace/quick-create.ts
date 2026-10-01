@@ -39,37 +39,9 @@ import { parsePrUrl, type PrUrlInfo } from "@/lib/github-pr-url";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 import type { SelectableRepository } from "@/types/workspace";
 import { commitWorkspaceSnapshot, listAllRepositories } from "./git";
-import { exec, repoDir } from "./helpers";
+import { localBaseBranch, repoDir } from "./helpers";
 import { setupWorkspace } from "./setup";
 import type { PrBranchInfo } from "./pr-url";
-
-const COMMON_BASE_BRANCHES = ["main", "master", "develop", "development"];
-
-/**
- * The base branch as the refs already on disk report it, with no network call.
- *
- * This answers a *display* question for a picker that runs it once per
- * repository on every page load, where `detectBaseBranch` answers the question
- * `git worktree add` is about to be held to — it may run `remote set-head
- * --auto`, which talks to the remote, and it throws when it cannot decide.
- * Creation still goes through that one; an empty string here only means the
- * row has nothing to show.
- */
-function localBaseBranch(repoAbsPath: string): string {
-  try {
-    const ref = exec(`git -C "${repoAbsPath}" symbolic-ref refs/remotes/origin/HEAD`);
-    const branch = ref.replace(/^refs\/remotes\/origin\//, "");
-    if (branch) return branch;
-  } catch { /* fall through to the common names */ }
-
-  for (const branch of COMMON_BASE_BRANCHES) {
-    try {
-      exec(`git -C "${repoAbsPath}" show-ref --verify --quiet refs/remotes/origin/${branch}`);
-      return branch;
-    } catch { /* try the next one */ }
-  }
-  return "";
-}
 
 /**
  * The already-cloned repositories, for the picker. A repository absent from

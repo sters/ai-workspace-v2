@@ -116,6 +116,7 @@ const wsStartSchema = z.object({
   reviewTimestamp: z.string().optional(),
   researchChat: z.boolean().optional(),
   task: z.string().optional(),
+  discussion: z.string().optional(),
   cols: z.number().optional(),
   rows: z.number().optional(),
 });

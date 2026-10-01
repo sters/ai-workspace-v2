@@ -22,6 +22,18 @@ describe("clientMessageSchema", () => {
     });
   });
 
+  it("accepts a start frame carrying a discussion topic", () => {
+    const parsed = clientMessageSchema.safeParse({
+      type: "start",
+      workspaceId: "feature-login-crash-20260915",
+      discussion: "1. Review comment at src/cache.ts, line 88",
+    });
+
+    expect(parsed.success && parsed.data).toMatchObject({
+      discussion: "1. Review comment at src/cache.ts, line 88",
+    });
+  });
+
   it("accepts a start frame with no task", () => {
     const parsed = clientMessageSchema.safeParse({
       type: "start",

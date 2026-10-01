@@ -9,8 +9,8 @@
  * message. The chat server refuses to start a session whose workspace has no
  * README, so the read below always has a target.
  *
- * Three of the four variants end that first turn in a wait, because nothing
- * has been asked yet. The task variant is the exception and the reason the
+ * Every variant but one ends that first turn in a wait, because nothing has
+ * been asked yet. The task variant is the exception and the reason the
  * distinction is worth naming: its request arrived *with* the session, so
  * waiting would mean asking the user to say again what they already wrote.
  */
@@ -149,6 +149,35 @@ ${ON_DEMAND_READING}`;
 }
 
 /**
+ * System prompt for a chat session opened on a topic — the Pull Requests tab's
+ * Chat button, with the selected review comments and failing checks.
+ *
+ * Between the waiting variants and the task one: the topic arrived with the
+ * session, so an acknowledgement that ignores it makes the user restate it, but
+ * nothing has been asked of it yet, so acting on it decides for them. The first
+ * turn therefore reads what the topic points at and says how each item stands,
+ * then waits. Replying on the pull request is ruled out until asked because it
+ * is published under the user's name.
+ */
+export function getDiscussionChatSystemPrompt(): string {
+  return `${WORKSPACE_LAYOUT}
+
+The first message names what the user wants to talk about — review comments or failing checks on this workspace's pull requests. Your first turn is:
+
+1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
+2. Read calls, issued together: the workspace \`README.md\`, and the code each item points at (the file around the referenced line, in the worktree the path names).
+3. A short reply: for each item, a sentence or two on what it is asking for and how the code currently stands against it. Then wait for the user.
+
+For example, for one comment: "1. The reviewer says the early return at cache.ts:88 skips \`unlock()\` — it does, the lock stays held on that path. What would you like to look at?"
+
+What happens next is the user's to decide. Making a change, replying on or resolving a review thread, and reading a check's full log all wait until the user asks for them; a reply on the pull request is published under the user's name.
+
+${REPLY_LANGUAGE}
+
+${ON_DEMAND_READING}`;
+}
+
+/**
  * Build the initial prompt sent to Claude when starting an interactive chat session.
  */
 export function buildInitPrompt(workspaceId: string, workspacePath: string): string {
@@ -179,6 +208,28 @@ export function buildTaskChatPrompt(
     task,
     "",
     "Work through it on your own — make the change in the repositories the README declares, and verify it with their own checks. Ask me only if something genuinely needs my decision.",
+  ].join("\n");
+}
+
+/**
+ * Build the initial prompt for a chat session opened on a topic. The topic goes
+ * in verbatim and last, so the visible first message reads as the user saying
+ * what they want to talk about, links and all.
+ */
+export function buildDiscussionChatPrompt(
+  workspaceId: string,
+  workspacePath: string,
+  topic: string,
+): string {
+  return [
+    firstTurnSection(
+      workspacePath,
+      [],
+      "read the code the items below point at, say briefly how each one stands, then wait for the user",
+    ),
+    "### What I want to talk about",
+    "",
+    topic,
   ].join("\n");
 }
 

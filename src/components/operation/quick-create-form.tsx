@@ -8,6 +8,7 @@ import { Input, Textarea } from "@/components/shared/forms";
 import { RepositoryPicker } from "@/components/shared/forms/repository-picker";
 import { Spinner } from "@/components/shared/feedback";
 import { postJson } from "@/lib/api";
+import { chatPagePath, stashChatHandoff } from "@/lib/chat-handoff";
 import { parsePrUrl } from "@/lib/github-pr-url";
 import {
   dateStamp,
@@ -36,13 +37,14 @@ function parseExtraRepositories(raw: string): string[] {
 }
 
 /**
- * Where a created workspace hands over. The note travels in the URL as the
- * chat's task: the chat page applies it only to a session it starts, so a
- * reload resumes the running session rather than starting the work again.
+ * Hand the note to the chat as its task. It travels as a chat handoff rather
+ * than in the URL, so its length is not capped by a query string, and the chat
+ * page clears it once a session has it — a reload then resumes that session
+ * rather than starting the work again.
  */
-function chatHref(workspace: string, task: string): string {
-  const query = task ? `?${new URLSearchParams({ task })}` : "";
-  return `/workspace/${encodeURIComponent(workspace)}/chat/interactive${query}`;
+function handOverToChat(workspace: string, task: string): string {
+  if (task) stashChatHandoff(workspace, { task });
+  return chatPagePath(workspace);
 }
 
 function operationHref(workspace: string, operationId: string): string {
@@ -181,7 +183,7 @@ export function QuickCreateForm() {
     }
 
     // Otherwise the chat is the point of this path, so it starts on its own.
-    router.push(chatHref(response.data.workspace, task));
+    router.push(handOverToChat(response.data.workspace, task));
   };
 
   return (
@@ -356,7 +358,8 @@ export function QuickCreateForm() {
           )}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Link
-              href={chatHref(created.response.workspace, created.task)}
+              href={chatPagePath(created.response.workspace)}
+              onClick={() => handOverToChat(created.response.workspace, created.task)}
               className="font-medium underline"
             >
               Start a chat on it anyway
