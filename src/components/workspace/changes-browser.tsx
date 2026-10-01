@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { useChatSelections } from "@/hooks/use-chat-selections";
+import { useViewportFillHeight } from "@/hooks/use-viewport-fill-height";
 import { useWorkspaceChangeDiff, useWorkspaceChanges } from "@/hooks/use-workspace";
 import { Button } from "../shared/buttons/button";
 import { Callout } from "../shared/containers/callout";
@@ -371,6 +372,11 @@ function ChangeViewer({
     file.path,
     `${file.status}:${file.additions}:${file.deletions}`,
   );
+  // The page's bottom padding (`p-6` on <main>) plus the card's two borders.
+  const { attach: attachFill, height: fillHeight } = useViewportFillHeight({
+    bottomGap: 26,
+    minHeight: 320,
+  });
 
   const header = (
     <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -426,11 +432,16 @@ function ChangeViewer({
           Showing the first {formatBytes(CHANGES_DIFF_MAX_BYTES)} of this diff.
         </Callout>
       )}
+      {hasHunks && (
+        <p className="text-xs text-muted-foreground">
+          Select lines in the diff to add them to the chat.
+        </p>
+      )}
       {hasHunks ? (
-        <Card variant="flush" className="overflow-hidden">
+        <Card variant="flush" className="overflow-hidden" ref={attachFill}>
           <UnifiedDiffViewer
             content={diff.diff}
-            maxHeight="calc(100vh - 10rem)"
+            height={fillHeight ?? "calc(100vh - 10rem)"}
             onSelectLines={onAddSelection}
           />
         </Card>
@@ -440,11 +451,6 @@ function ChangeViewer({
             ? "This is a binary file, so there is no line diff to show."
             : "No line changes — only the file's mode or name changed."}
         </StatusText>
-      )}
-      {hasHunks && (
-        <p className="text-xs text-muted-foreground">
-          Select lines in the diff to add them to the chat.
-        </p>
       )}
     </div>
   );

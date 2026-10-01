@@ -63,12 +63,15 @@ const ACTION_WIDTH_PX = 150;
 export function UnifiedDiffViewer({
   content,
   maxHeight = 480,
+  height: fixedHeight,
   onSelectLines,
   selectionActionLabel = "Add to chat",
 }: {
   content: string;
   /** Pixels, or any CSS length (`calc(100vh - 16rem)`) for a viewport-relative cap. */
   maxHeight?: number | string;
+  /** Overrides the content-fitted height, for a viewer that fills a space whatever the diff's length. */
+  height?: number | string;
   onSelectLines?: (range: LineRangeDescription) => void;
   selectionActionLabel?: string;
 }) {
@@ -76,9 +79,10 @@ export function UnifiedDiffViewer({
   const lines = useMemo(() => mapHunkLines(body), [body]);
   const contentHeight = Math.max(80, lines.length * LINE_HEIGHT_PX);
   const height =
-    typeof maxHeight === "number"
+    fixedHeight ??
+    (typeof maxHeight === "number"
       ? Math.min(maxHeight, contentHeight)
-      : `min(${contentHeight}px, ${maxHeight})`;
+      : `min(${contentHeight}px, ${maxHeight})`);
 
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
