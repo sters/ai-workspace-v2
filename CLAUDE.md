@@ -12,7 +12,7 @@ Web UI dashboard for a multi-repository workspace manager for Claude Code. Brows
 bunx github:sters/ai-workspace-v2 [/path/to/ai-workspace]  # Run via bunx
 bun install                                                  # Install dependencies
 bun run dev:hot                                              # Development with hot reload
-bun run build && bun run start                               # Production build + start
+bun run start:build                                          # Production build + start (bun run build && bun run start)
 bun run lint                    # next typegen, then tsc --noEmit (tsconfig.typecheck.json) AND eslint src/
 bun run test                    # Run all tests
 bun run test:watch              # Run tests in watch mode
