@@ -18,6 +18,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { QuickCreateForm } from "@/components/operation/quick-create-form";
+import { peekChatHandoff } from "@/lib/chat-handoff";
 
 function setRepositories(repos: { repoPath: string; repoName: string; baseBranch: string }[]) {
   mockUseRepositories.mockReturnValue({
@@ -74,6 +75,7 @@ beforeEach(() => {
   mockUseRepositories.mockReset();
   mockPostJson.mockReset().mockResolvedValue(ok());
   mockPush.mockReset();
+  sessionStorage.clear();
   setRepositories([WEB, API]);
 });
 
@@ -198,10 +200,13 @@ describe("QuickCreateForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
     await waitFor(() =>
-      expect(mockPush).toHaveBeenCalledWith(
-        "/workspace/bugfix-login-crash-20260911/chat/interactive?task=fix+the+login+crash%0Athe+refresh+path+500s",
-      ),
+      expect(mockPush).toHaveBeenCalledWith("/workspace/bugfix-login-crash-20260911/chat/interactive"),
     );
+    // The note travels out of the URL, whole, so its length is not capped by
+    // a query string and a reload does not re-send it.
+    expect(peekChatHandoff("bugfix-login-crash-20260911")).toEqual({
+      task: "fix the login crash\nthe refresh path 500s",
+    });
   });
 
   it("opens the chat with no task when only a name was given", async () => {
@@ -215,6 +220,7 @@ describe("QuickCreateForm", () => {
         "/workspace/bugfix-login-crash-20260911/chat/interactive",
       ),
     );
+    expect(peekChatHandoff("bugfix-login-crash-20260911")).toBeNull();
   });
 
   it("stays put and reports a repository that failed, with the chat still one click away", async () => {
@@ -229,10 +235,12 @@ describe("QuickCreateForm", () => {
 
     await waitFor(() => expect(screen.getByText(/no such remote/)).toBeInTheDocument());
     expect(mockPush).not.toHaveBeenCalled();
-    expect(screen.getByRole("link", { name: /start a chat/i })).toHaveAttribute(
-      "href",
-      "/workspace/bugfix-login-crash-20260911/chat/interactive?task=fix+the+login+crash",
-    );
+    const chatLink = screen.getByRole("link", { name: /start a chat/i });
+    expect(chatLink).toHaveAttribute("href", "/workspace/bugfix-login-crash-20260911/chat/interactive");
+    // Edited after sending: the link still carries the request as it was sent.
+    fillNote("something else");
+    fireEvent.click(chatLink);
+    expect(peekChatHandoff("bugfix-login-crash-20260911")).toEqual({ task: "fix the login crash" });
     expect(screen.getByRole("link", { name: /open the workspace/i })).toHaveAttribute(
       "href",
       "/workspace/bugfix-login-crash-20260911",
@@ -377,10 +385,11 @@ describe("QuickCreateForm", () => {
       fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
 
       await waitFor(() =>
-        expect(mockPush).toHaveBeenCalledWith(
-          "/workspace/bugfix-login-crash-20260911/chat/interactive?task=address+the+review+comments",
-        ),
+        expect(mockPush).toHaveBeenCalledWith("/workspace/bugfix-login-crash-20260911/chat/interactive"),
       );
+      expect(peekChatHandoff("bugfix-login-crash-20260911")).toEqual({
+        task: "address the review comments",
+      });
       expect(mockPostJson).toHaveBeenCalledTimes(1);
     });
 

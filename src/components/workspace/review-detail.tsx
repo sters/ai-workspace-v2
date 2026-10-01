@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
+import { chatPagePath, stashChatHandoff } from "@/lib/chat-handoff";
 import { useArtifactFile, useReviewDetail, useWorkspace } from "@/hooks/use-workspace";
 import { Button } from "../shared/buttons/button";
 import { Card } from "../shared/containers/card";
@@ -89,7 +90,8 @@ export function ReviewDetail({
         <div>
           <div className="mb-2 flex items-center justify-end">
             <Link
-              href={`/workspace/${encodeURIComponent(workspaceName)}/chat/interactive?reviewTimestamp=${timestamp}`}
+              href={chatPagePath(workspaceName)}
+              onClick={() => stashChatHandoff(workspaceName, { reviewTimestamp: timestamp })}
               className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent"
             >
               <MessageSquare className="h-4 w-4" />

@@ -61,6 +61,12 @@ interface StartMessage {
    * instead of acknowledging and waiting.
    */
   task?: string;
+  /**
+   * What the user wants to talk about — the Pull Requests tab's selection. It
+   * becomes the opening message, and its system prompt has the session read
+   * what the topic points at and say how it stands before waiting.
+   */
+  discussion?: string;
   /** Size of the browser terminal, so the PTY is born at the right size. */
   cols?: number;
   rows?: number;

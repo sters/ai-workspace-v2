@@ -4,85 +4,9 @@ import { useState, useCallback, useEffect } from "react";
 import type { HistoryEntry } from "@/types/workspace";
 import { useHistory } from "@/hooks/use-workspace";
 import { Button } from "@/components/shared/buttons/button";
-import { MonacoEditorLazy } from "@/components/shared/content/monaco-editor-lazy";
+import { UnifiedDiffViewer } from "@/components/shared/content/unified-diff-viewer";
 import { StatusText } from "@/components/shared/feedback/status-text";
-import type { BeforeMount } from "@monaco-editor/react";
-
-const DIFF_THEME = "unified-diff-theme";
-const DIFF_LANG = "unified-diff";
-let themeRegistered = false;
-
-const handleBeforeMount: BeforeMount = (monaco) => {
-  if (!monaco.languages.getLanguages().some((l: { id: string }) => l.id === DIFF_LANG)) {
-    monaco.languages.register({ id: DIFF_LANG });
-    monaco.languages.setMonarchTokensProvider(DIFF_LANG, {
-      tokenizer: {
-        root: [
-          [/^diff .*$/, "diff-meta"],
-          [/^index .*$/, "diff-meta"],
-          [/^---.*$/, "diff-meta"],
-          [/^\+\+\+.*$/, "diff-meta"],
-          [/^@@.*@@.*$/, "diff-hunk"],
-          [/^\+.*$/, "diff-added"],
-          [/^-.*$/, "diff-removed"],
-        ],
-      },
-    });
-  }
-
-  if (!themeRegistered) {
-    themeRegistered = true;
-    monaco.editor.defineTheme(DIFF_THEME, {
-      base: "vs-dark",
-      inherit: true,
-      rules: [
-        { token: "diff-added", foreground: "4EC969" },
-        { token: "diff-removed", foreground: "F85149" },
-        { token: "diff-hunk", foreground: "79C0FF" },
-        { token: "diff-meta", foreground: "8B949E", fontStyle: "bold" },
-      ],
-      colors: {},
-    });
-  }
-};
-
-interface FileDiffEntry {
-  filename: string;
-  content: string;
-  additions: number;
-  deletions: number;
-}
-
-function parseDiffByFile(rawDiff: string): FileDiffEntry[] {
-  const chunks = rawDiff.split(/^(?=diff --git )/m);
-  const files: FileDiffEntry[] = [];
-
-  for (const chunk of chunks) {
-    const trimmed = chunk.trim();
-    if (!trimmed) continue;
-
-    // Extract filename from "diff --git a/path b/path" or "+++ b/path"
-    let filename = "unknown";
-    const plusMatch = trimmed.match(/^\+\+\+ b\/(.+)$/m);
-    if (plusMatch) {
-      filename = plusMatch[1];
-    } else {
-      const headerMatch = trimmed.match(/^diff --git a\/(.+?) b\//);
-      if (headerMatch) filename = headerMatch[1];
-    }
-
-    let additions = 0;
-    let deletions = 0;
-    for (const line of trimmed.split("\n")) {
-      if (line.startsWith("+") && !line.startsWith("+++")) additions++;
-      else if (line.startsWith("-") && !line.startsWith("---")) deletions++;
-    }
-
-    files.push({ filename, content: trimmed, additions, deletions });
-  }
-
-  return files;
-}
+import { parseDiffByFile, type FileDiffEntry } from "@/lib/unified-diff";
 
 function CommitDiff({
   workspaceName,
@@ -195,36 +119,10 @@ function FileDiffList({ files }: { files: FileDiffEntry[] }) {
               <span className="shrink-0 text-green-500">+{file.additions}</span>
               <span className="shrink-0 text-red-500">-{file.deletions}</span>
             </button>
-            {expanded && <FileDiffViewer content={file.content} />}
+            {expanded && <UnifiedDiffViewer content={file.content} />}
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function FileDiffViewer({ content }: { content: string }) {
-  // Strip the header lines (diff --git, index, ---, +++) and show only hunks
-  const lines = content.split("\n");
-  const hunkStart = lines.findIndex((l) => l.startsWith("@@"));
-  const hunkContent = hunkStart >= 0 ? lines.slice(hunkStart).join("\n") : content;
-  const lineCount = hunkContent.split("\n").length;
-  const height = Math.min(480, Math.max(80, lineCount * 18));
-
-  return (
-    <div className="border-t border-border" style={{ height }}>
-      <MonacoEditorLazy
-        language={DIFF_LANG}
-        value={hunkContent}
-        theme={DIFF_THEME}
-        beforeMount={handleBeforeMount}
-        options={{
-          readOnly: true,
-          lineNumbers: "on",
-          renderLineHighlight: "none",
-          folding: false,
-        }}
-      />
     </div>
   );
 }

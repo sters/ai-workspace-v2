@@ -10,6 +10,12 @@ export const SWR_REFRESH_INTERVAL = 20_000;
  */
 export const ARTIFACT_MAX_BYTES = 512 * 1024;
 
+/**
+ * Most of one file's diff the Changes tab reads. A lockfile or generated file
+ * diff runs to megabytes and nobody reads it line by line in a browser.
+ */
+export const CHANGES_DIFF_MAX_BYTES = 512 * 1024;
+
 /** Operation types that can be auto-started via URL query params. */
 const _VALID_AUTO_ACTIONS = new Set<OperationType>([
   "execute",

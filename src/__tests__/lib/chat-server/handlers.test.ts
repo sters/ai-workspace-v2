@@ -36,6 +36,8 @@ vi.mock("@/lib/templates", () => ({
   buildReviewChatPrompt: () => "review-prompt-body",
   buildResearchChatPrompt: () => "research-prompt-body",
   buildTaskChatPrompt: (_id: string, _path: string, task: string) => `task-prompt-body:${task}`,
+  buildDiscussionChatPrompt: (_id: string, _path: string, topic: string) =>
+    `discussion-prompt-body:${topic}`,
 }));
 
 vi.mock("@/lib/workspace/prompts", () => ({
@@ -256,6 +258,30 @@ describe("handleStart", () => {
       const [, agentName] = mockEnsureSessionSystemPrompt.mock.calls[0];
       expect(agentName).toBe("chat");
     });
+  });
+});
+
+describe("handleStart discussion", () => {
+  it("opens the session on the topic, under the discussion prompt", async () => {
+    const { handleStart } = await import("@/lib/chat-server/handlers");
+    const ws = makeWs();
+
+    await handleStart(ws, { type: "start", workspaceId: WITH_README, discussion: "this comment" });
+
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    expect(opts.args).toContain("discussion-prompt-body:this comment");
+    const [, agentName] = mockEnsureSessionSystemPrompt.mock.calls[0];
+    expect(agentName).toBe("discussion-chat");
+  });
+
+  it("falls back to the plain chat when the topic is only whitespace", async () => {
+    const { handleStart } = await import("@/lib/chat-server/handlers");
+    const ws = makeWs();
+
+    await handleStart(ws, { type: "start", workspaceId: WITH_README, discussion: " \n" });
+
+    const [, agentName] = mockEnsureSessionSystemPrompt.mock.calls[0];
+    expect(agentName).toBe("chat");
   });
 });
 

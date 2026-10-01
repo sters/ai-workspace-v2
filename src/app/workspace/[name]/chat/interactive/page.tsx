@@ -1,9 +1,9 @@
 "use client";
 
-import { use } from "react";
-import { useSearchParams } from "next/navigation";
+import { use, useCallback, useState } from "react";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { ChatTerminal } from "@/components/workspace/chat-terminal";
+import { clearChatHandoff, peekChatHandoff } from "@/lib/chat-handoff";
 
 export default function ChatInteractivePage({
   params,
@@ -13,17 +13,25 @@ export default function ChatInteractivePage({
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
   useDocumentTitle(`Interactive Chat - ${decodedName}`);
-  const searchParams = useSearchParams();
-  const reviewTimestamp = searchParams.get("reviewTimestamp") ?? undefined;
-  const researchChat = searchParams.get("researchChat") === "1" || undefined;
-  // What the session should get on with — quick create hands its note over
-  // this way. Only ever applied to a session this mount starts, so reloading
-  // the URL resumes the running one rather than starting the work again.
-  const task = searchParams.get("task") ?? undefined;
+  // What the page that navigated here asked for — a task, a draft, a chat
+  // variant. Read without consuming, and cleared only once a session has it,
+  // so a reload before then still applies it and a reload after resumes.
+  const [handoff] = useState(() =>
+    typeof window === "undefined" ? null : peekChatHandoff(decodedName),
+  );
+  const onHandoffDelivered = useCallback(() => clearChatHandoff(decodedName), [decodedName]);
 
   return (
     <div className="h-[calc(100vh-24rem)]">
-      <ChatTerminal workspaceId={decodedName} reviewTimestamp={reviewTimestamp} researchChat={researchChat} task={task} />
+      <ChatTerminal
+        workspaceId={decodedName}
+        reviewTimestamp={handoff?.reviewTimestamp}
+        researchChat={handoff?.researchChat}
+        task={handoff?.task}
+        discussion={handoff?.discussion}
+        draft={handoff?.draft}
+        onHandoffDelivered={handoff ? onHandoffDelivered : undefined}
+      />
     </div>
   );
 }

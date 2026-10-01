@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { spawnClaudeTerminal } from "../claude/cli";
 import { clampPtySize, resizeTerminal, DEFAULT_PTY_COLS, DEFAULT_PTY_ROWS } from "../pty";
 import type { DataListener } from "@/types/pty";
-import { buildInitPrompt, buildReviewChatPrompt, buildResearchChatPrompt, buildTaskChatPrompt } from "@/lib/templates";
+import { buildInitPrompt, buildReviewChatPrompt, buildResearchChatPrompt, buildTaskChatPrompt, buildDiscussionChatPrompt } from "@/lib/templates";
 import { ensureSessionSystemPrompt, cleanupSessionSystemPrompt } from "@/lib/workspace/prompts";
 import type { ChatSession, ClientMessage, ServerMessage, WsData } from "@/types/chat-server";
 import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
@@ -43,6 +43,13 @@ function buildChatOpening(
     return {
       prompt: buildResearchChatPrompt(msg.workspaceId, workspacePath),
       agentName: "research-chat",
+    };
+  }
+  const discussion = msg.discussion?.trim();
+  if (discussion) {
+    return {
+      prompt: buildDiscussionChatPrompt(msg.workspaceId, workspacePath, discussion),
+      agentName: "discussion-chat",
     };
   }
   const task = msg.task?.trim();

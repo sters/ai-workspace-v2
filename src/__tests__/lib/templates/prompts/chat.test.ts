@@ -8,6 +8,8 @@ import {
   buildResearchChatPrompt,
   getTaskChatSystemPrompt,
   buildTaskChatPrompt,
+  getDiscussionChatSystemPrompt,
+  buildDiscussionChatPrompt,
 } from "@/lib/templates/prompts/chat";
 import { DERIVED_NAME_MAX_CHARS } from "@/lib/naming";
 
@@ -33,6 +35,7 @@ describe("chat system prompts", () => {
     "research-chat": getResearchChatSystemPrompt(),
     "review-chat": getReviewChatSystemPrompt(),
     "task-chat": getTaskChatSystemPrompt(),
+    "discussion-chat": getDiscussionChatSystemPrompt(),
   };
 
   it("closes every variant with the same on-demand-reading fragment", () => {
@@ -59,7 +62,7 @@ describe("chat system prompts", () => {
     const waiting = Object.entries(variants)
       .filter(([, prompt]) => /wait for the user/i.test(prompt))
       .map(([name]) => name);
-    expect(waiting).toEqual(["chat", "research-chat", "review-chat"]);
+    expect(waiting).toEqual(["chat", "research-chat", "review-chat", "discussion-chat"]);
   });
 
   it("keeps the plain chat's negative guidance to a minimum", () => {
@@ -106,11 +109,19 @@ describe("built opening prompts", () => {
     expect(buildTaskChatPrompt(workspaceId, workspacePath, task)).toContain(task);
   });
 
+  it("hands the discussion topic over verbatim, links included", () => {
+    const topic = "1. Review comment at github.com/acme/widgets/src/cache.ts, line 88\nhttps://github.com/acme/widgets/pull/42#discussion_r1";
+    const prompt = buildDiscussionChatPrompt(workspaceId, workspacePath, topic);
+    expect(prompt).toContain(topic);
+    expect(prompt).toContain(`${workspacePath}/README.md`);
+  });
+
   it.each([
     ["init", () => buildInitPrompt(workspaceId, workspacePath)],
     ["review", () => buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp)],
     ["research", () => buildResearchChatPrompt(workspaceId, workspacePath)],
     ["task", () => buildTaskChatPrompt(workspaceId, workspacePath, "fix the login crash")],
+    ["discussion", () => buildDiscussionChatPrompt(workspaceId, workspacePath, "this comment")],
   ])("keeps the %s prompt a set of pointers rather than an embedded corpus", (_name, build) => {
     // The README body and a computed TODO progress table used to be inlined
     // here, which both dumped the README into the browser terminal and pinned a

@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ExternalLink, MessageSquare, RefreshCw } from "lucide-react";
 import { usePullRequests } from "@/hooks/use-workspace";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
@@ -17,6 +18,8 @@ import {
   type TriageCiFailure,
   type TriageThread,
 } from "@/lib/templates/prompts/triage-pr-comments";
+import { chatPagePath, stashChatHandoff } from "@/lib/chat-handoff";
+import { buildPrChatTopic } from "@/lib/pr-chat-topic";
 import type {
   PrCheck,
   PrCheckFailureLog,
@@ -112,6 +115,7 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
     usePullRequests(workspaceName);
   const { isWorkspaceRunning } = useRunningOperations();
   const startAndNavigate = useStartAndNavigate(workspaceName);
+  const router = useRouter();
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedCheckKeys, setSelectedCheckKeys] = useState<Set<string>>(new Set());
@@ -239,6 +243,28 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
       interactionLevel: "low",
       ...(scopedRepo && { repo: scopedRepo }),
     });
+  };
+
+  const handleChat = () => {
+    const threads = [...selectedIds]
+      .map((id) => threadsById.get(id))
+      .filter((entry): entry is { pr: WorkspacePullRequest; thread: PrReviewThread } => entry != null)
+      .map(({ pr, thread }) => ({
+        repoPath: pr.repoPath,
+        prUrl: pr.url,
+        path: thread.path,
+        line: thread.line,
+        comments: thread.comments,
+        validation: validations[thread.id],
+      }));
+    const checks = [...selectedCheckKeys]
+      .map((key) => failuresByKey.get(key))
+      .filter((entry): entry is { pr: WorkspacePullRequest; check: PrCheck } => entry != null)
+      .map(({ pr, check }) => ({ repoPath: pr.repoPath, prUrl: pr.url, name: check.name, url: check.url }));
+    if (threads.length === 0 && checks.length === 0) return;
+
+    stashChatHandoff(workspaceName, { discussion: buildPrChatTopic({ threads, checks }) });
+    router.push(chatPagePath(workspaceName));
   };
 
   if (isLoading) return <StatusText>Loading pull requests…</StatusText>;
@@ -391,6 +417,16 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
               Clear
             </Button>
             <div className="ml-auto flex items-center gap-2">
+              {/* Not gated on a running operation: the chat it opens reads the
+                  code and waits, changing nothing until asked. */}
+              <Button
+                variant="outline"
+                onClick={handleChat}
+                title="Start a chat about the selection, to talk it through before deciding"
+              >
+                <MessageSquare className="h-4 w-4" />
+                Chat
+              </Button>
               <Button
                 variant="secondary"
                 disabled={isRunning || selectedIds.size === 0}
