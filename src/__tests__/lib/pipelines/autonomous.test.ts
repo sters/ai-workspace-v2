@@ -81,7 +81,7 @@ vi.mock("@/lib/workspace/known-findings", async (importOriginal) => {
   };
 });
 
-import { buildAutonomousPipeline } from "@/lib/pipelines/autonomous";
+import { buildAutonomousPipeline, resolveUnfinishedRepositories } from "@/lib/pipelines/autonomous";
 import { FINAL_CYCLE_STOP_PREFIX } from "@/lib/templates/prompts/autonomous-gate";
 import { executePhaseBudgetMs, ROUTINE_BATCH_COUNT } from "@/lib/pipeline/constants";
 import { getOperationConfig } from "@/lib/config";
@@ -204,7 +204,7 @@ describe("buildAutonomousPipeline", () => {
       const ctx = createMockCtx();
       await updatePhase.fn(ctx);
 
-      expect(mockStripCompletedTodos).toHaveBeenCalledWith("test-ws", undefined);
+      expect(mockStripCompletedTodos).toHaveBeenCalledWith("test-ws", { repository: undefined });
       expect(mockBuildUpdateTodo).toHaveBeenCalled();
     });
 
@@ -683,7 +683,10 @@ describe("buildAutonomousPipeline", () => {
       const updateCtx = createMockCtx();
       await updatePhase.fn(updateCtx);
 
-      expect(mockStripCompletedTodos).toHaveBeenCalledWith("test-ws", "my-repo");
+      expect(mockStripCompletedTodos).toHaveBeenCalledWith("test-ws", {
+        repository: "my-repo",
+        repositories: undefined,
+      });
       expect(mockBuildUpdateTodo).toHaveBeenCalled();
     });
 
@@ -1447,5 +1450,230 @@ describe("buildAutonomousPipeline — every loop goes through the plan", () => {
       fixableIssues: [],
     });
     expect(appended.map((p) => p.kind === "function" && p.label)).toEqual(UNIFORM_ROUND);
+  });
+});
+
+describe("resolveUnfinishedRepositories", () => {
+  const repoNames = ["api", "web", "worker"];
+  const noTodos: { repoName: string; pending: number; inProgress: number }[] = [];
+  const loop = (unfinishedRepositories: string[] | null) => ({
+    shouldLoop: true,
+    giveUp: false,
+    unfinishedRepositories,
+  });
+
+  it("leaves nothing open when the run is done, whatever the list says", () => {
+    expect(resolveUnfinishedRepositories({
+      gate: { shouldLoop: false, giveUp: false, unfinishedRepositories: ["web"] },
+      repoNames, open: repoNames, todos: noTodos,
+    })).toEqual([]);
+  });
+
+  it("keeps the named repositories, in workspace order", () => {
+    expect(resolveUnfinishedRepositories({
+      gate: loop(["worker", "api"]), repoNames, open: repoNames, todos: noTodos,
+    })).toEqual(["api", "worker"]);
+  });
+
+  // Closing a repository wrongly ships its PR unfinished; keeping one open
+  // wrongly costs a cycle of review. A list the gate did not give, or gave with
+  // names it made up, therefore closes nothing.
+  it.each([
+    ["no list", null],
+    ["an empty list", []],
+    ["only unknown names", ["frontend"]],
+  ])("keeps everything still open when the gate gives %s", (_case, named) => {
+    expect(resolveUnfinishedRepositories({
+      gate: loop(named), repoNames, open: ["web", "worker"], todos: noTodos,
+    })).toEqual(["web", "worker"]);
+  });
+
+  it("does the same for a give-up verdict", () => {
+    expect(resolveUnfinishedRepositories({
+      gate: { shouldLoop: false, giveUp: true, unfinishedRepositories: null },
+      repoNames, open: repoNames, todos: noTodos,
+    })).toEqual(repoNames);
+  });
+
+  it("keeps a repository with actionable TODO items open even when the gate closed it", () => {
+    expect(resolveUnfinishedRepositories({
+      gate: loop(["web"]),
+      repoNames,
+      open: repoNames,
+      todos: [
+        { repoName: "api", pending: 0, inProgress: 1 },
+        { repoName: "worker", pending: 0, inProgress: 0 },
+      ],
+    })).toEqual(["api", "web"]);
+  });
+});
+
+describe("buildAutonomousPipeline — repositories finish independently", () => {
+  const api = { repoPath: "github.com/sters/api", repoName: "api", worktreePath: "/w/api" };
+  const web = { repoPath: "github.com/sters/web", repoName: "web", worktreePath: "/w/web" };
+
+  function findPhase(phases: PipelinePhase[], label: string) {
+    const p = phases.find((x) => x.kind === "function" && x.label === label);
+    if (!p || p.kind !== "function") throw new Error(`no phase ${label}`);
+    return p;
+  }
+
+  function gateCtx(verdict: Record<string, unknown>) {
+    const appended: PipelinePhase[] = [];
+    const prompts: string[] = [];
+    const ctx = createMockCtx({
+      runChild: vi.fn(async (label, prompt, opts) => {
+        if (opts?.onResultText && label === "Autonomous Gate") {
+          prompts.push(prompt);
+          opts.onResultText(JSON.stringify({ giveUp: false, reason: "r", dismissedFindings: [], ...verdict }));
+        }
+        return true;
+      }),
+      appendPhases: vi.fn((p: PipelinePhase[]) => { appended.push(...p); }),
+    });
+    return { ctx, appended, prompts };
+  }
+
+  function session(timestamp: string) {
+    return { timestamp, critical: 0, major: 1, minor: 0, total: 1 };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetOperation.mockReturnValue({
+      id: "test-op",
+      workspace: "test-ws",
+    } as ReturnType<typeof mockGetOperation>);
+    mockListWorkspaceRepos.mockReturnValue([api, web]);
+    mockGetTodos.mockResolvedValue([]);
+    mockGetReviewSessions.mockResolvedValue([session("s1")]);
+    mockGetReviewDetail.mockImplementation(async (_ws, ts) => ({
+      summary: `summary ${ts}`,
+      files: [
+        { name: "REVIEW-github.com_sters_api.md", content: `api review from ${ts}` },
+        { name: "REVIEW-github.com_sters_web.md", content: `web review from ${ts}` },
+        { name: "REVIEW-cross-repository.md", content: `boundary review from ${ts}` },
+      ],
+    }));
+  });
+
+  /** Cycle 1's gate finds api finished and web not; returns what it appended. */
+  async function finishApiInCycle1(maxLoops = 3) {
+    const phases = buildAutonomousPipeline({ startWith: "execute", workspace: "test-ws", maxLoops });
+    const gate = gateCtx({
+      shouldLoop: true,
+      fixableIssues: ["handle the empty list in web/src/list.tsx"],
+      unfinishedRepositories: ["web"],
+    });
+    await findPhase(phases, "Cycle 1: Gate").fn(gate.ctx);
+    return gate;
+  }
+
+  it("plans, executes and reviews only the unfinished repository next cycle", async () => {
+    const { appended } = await finishApiInCycle1();
+
+    for (const label of ["Cycle 1: Update TODO", "Cycle 2: Execute", "Cycle 2: Review"]) {
+      await findPhase(appended, label).fn(createMockCtx());
+    }
+
+    expect(mockStripCompletedTodos).toHaveBeenCalledWith("test-ws", { repository: undefined, repositories: ["web"] });
+    expect(mockBuildUpdateTodo).toHaveBeenCalledWith(expect.objectContaining({ repositories: ["web"] }));
+    expect(mockBuildExecute).toHaveBeenCalledWith(expect.objectContaining({ repositories: ["web"] }));
+    expect(mockBuildReview).toHaveBeenCalledWith(expect.objectContaining({ repositories: ["web"] }));
+  });
+
+  it("works on every repository when the gate's list names none of them", async () => {
+    const phases = buildAutonomousPipeline({ startWith: "execute", workspace: "test-ws" });
+    const gate = gateCtx({ shouldLoop: true, fixableIssues: ["x"], unfinishedRepositories: ["frontend"] });
+    await findPhase(phases, "Cycle 1: Gate").fn(gate.ctx);
+
+    await findPhase(gate.appended, "Cycle 2: Execute").fn(createMockCtx());
+
+    expect(mockBuildExecute).toHaveBeenCalledWith(expect.objectContaining({ repositories: undefined }));
+  });
+
+  // The latest review no longer covers the finished repository, so without
+  // these the gate would judge the contract with that side's evidence missing.
+  it("hands the next gate the finished repository's reports from the cycle it finished in", async () => {
+    const { appended } = await finishApiInCycle1();
+    mockGetReviewSessions.mockResolvedValue([session("s2"), session("s1")]);
+
+    const next = gateCtx({ shouldLoop: false, fixableIssues: [], unfinishedRepositories: [] });
+    await findPhase(appended, "Cycle 2: Gate").fn(next.ctx);
+
+    const prompt = next.prompts[0];
+    expect(prompt).toMatch(/`api` — finished in cycle 1/);
+    expect(prompt).toContain("api review from s1");
+    // Only api's own reports carry over; the rest of s1 was superseded by s2.
+    expect(prompt).not.toContain("web review from s1");
+    expect(prompt).not.toContain("boundary review from s1");
+  });
+
+  it("creates every repository's PR when the run finishes", async () => {
+    const { appended } = await finishApiInCycle1();
+    const next = gateCtx({ shouldLoop: false, fixableIssues: [], unfinishedRepositories: [] });
+    await findPhase(appended, "Cycle 2: Gate").fn(next.ctx);
+
+    await findPhase(next.appended, "Create PR").fn(createMockCtx());
+
+    expect(mockBuildCreatePr).toHaveBeenCalledWith(expect.objectContaining({ repositories: undefined }));
+  });
+
+  it("still creates the finished repository's PR when the last cycle stops", async () => {
+    const phases = buildAutonomousPipeline({ startWith: "execute", workspace: "test-ws", maxLoops: 1 });
+    const gate = gateCtx({
+      shouldLoop: true,
+      fixableIssues: ["handle the empty list in web/src/list.tsx"],
+      unfinishedRepositories: ["web"],
+    });
+    await findPhase(phases, "Cycle 1: Gate").fn(gate.ctx);
+
+    const stop = vi.mocked(gate.ctx.emitResult).mock.calls
+      .map((c) => c[0])
+      .find((m) => m.startsWith(FINAL_CYCLE_STOP_PREFIX));
+    expect(stop).toMatch(/only for the finished repository \(api\); none for web/);
+
+    await findPhase(gate.appended, "Create PR").fn(createMockCtx());
+    expect(mockBuildCreatePr).toHaveBeenCalledWith(expect.objectContaining({ repositories: ["api"] }));
+  });
+
+  it("creates no PR when the last cycle stops with every repository unfinished", async () => {
+    const phases = buildAutonomousPipeline({ startWith: "execute", workspace: "test-ws", maxLoops: 1 });
+    const gate = gateCtx({
+      shouldLoop: true,
+      fixableIssues: ["align the response type on both sides"],
+      unfinishedRepositories: ["api", "web"],
+    });
+    await findPhase(phases, "Cycle 1: Gate").fn(gate.ctx);
+
+    expect(gate.appended).toEqual([]);
+  });
+
+  it("creates the finished repository's PR when the gate gives up on the other", async () => {
+    const phases = buildAutonomousPipeline({ startWith: "execute", workspace: "test-ws" });
+    const gate = gateCtx({
+      shouldLoop: false,
+      giveUp: true,
+      fixableIssues: [],
+      unfinishedRepositories: ["web"],
+    });
+    await findPhase(phases, "Cycle 1: Gate").fn(gate.ctx);
+
+    await findPhase(gate.appended, "Create PR").fn(createMockCtx());
+    expect(mockBuildCreatePr).toHaveBeenCalledWith(expect.objectContaining({ repositories: ["api"] }));
+  });
+
+  it("reopens a finished repository when a later gate gives it new work", async () => {
+    const { appended } = await finishApiInCycle1();
+    mockGetReviewSessions.mockResolvedValue([session("s2"), session("s1")]);
+    const next = gateCtx({
+      shouldLoop: true,
+      fixableIssues: ["the boundary moved: update api's handler to match"],
+      unfinishedRepositories: ["api", "web"],
+    });
+    await findPhase(appended, "Cycle 2: Gate").fn(next.ctx);
+
+    await findPhase(next.appended, "Cycle 3: Execute").fn(createMockCtx());
+    expect(mockBuildExecute).toHaveBeenLastCalledWith(expect.objectContaining({ repositories: undefined }));
   });
 });

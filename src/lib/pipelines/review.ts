@@ -25,6 +25,8 @@ import {
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { readKnownFindings } from "@/lib/workspace/known-findings";
 import { findingsFilePath } from "@/lib/workspace/review-findings";
+import { repoReportStem } from "@/lib/workspace/review-report-names";
+import { selectRepos } from "@/lib/workspace/select-repos";
 import { collectPostedAsks } from "@/lib/workspace/posted-findings";
 import { buildRefreshWorktreesPhase } from "./actions/refresh-worktrees";
 import { runSubPhases } from "./actions/run-sub-phases";
@@ -44,6 +46,13 @@ import { getTimeoutDefaults } from "@/lib/pipeline-manager";
 export interface ReviewPipelineInput {
   workspace: string;
   repository?: string;
+  /**
+   * Reviews only these worktrees on their own — an autonomous cycle's
+   * unfinished set. The cross-repository reviewer still reads every worktree
+   * `repository` selects, since a finished repository remains the other side of
+   * each boundary an unfinished one can move.
+   */
+  repositories?: readonly string[];
   /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
   repos?: WorkspaceRepo[];
   /**
@@ -114,9 +123,9 @@ export async function buildReviewPipeline(
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
   const allRepos = input.repos ?? listWorkspaceRepos(workspace);
-  const repos = repository
-    ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
-    : allRepos;
+  const boundaryRepos = selectRepos(allRepos, { repository });
+  const repos = selectRepos(boundaryRepos, { repositories: input.repositories });
+  const reviewedNames = new Set(repos.map((r) => r.repoName));
   const wsPath = path.join(getWorkspaceDir(), workspace);
 
   // Write report templates (idempotent — ensures templates exist for older workspaces)
@@ -158,7 +167,7 @@ export async function buildReviewPipeline(
   const previousBaseline = await readPreviousReviewBaseline(wsPath, reviewTimestamp);
   const currentHeads: Record<string, string> = {};
 
-  for (const repo of repos) {
+  for (const repo of boundaryRepos) {
     const metaRepo = meta.repositories.find(
       (r) => r.path === repo.repoPath || r.alias === repo.repoName,
     );
@@ -190,10 +199,15 @@ export async function buildReviewPipeline(
       reviewScope,
     });
 
-    const orgName = repo.repoPath.split("/").slice(0, -1).join("_") || "local";
-    const reviewFileName = `REVIEW-${orgName}_${repo.repoName}.md`;
-    const verifyFileName = `VERIFY-TODO-${orgName}_${repo.repoName}.md`;
-    const constraintFileName = `CONSTRAINTS-${orgName}_${repo.repoName}.md`;
+    // A repository an autonomous cycle finished stops here. Its head is in the
+    // baseline and its side of each boundary is in `crossRepoInputs`, so the next
+    // review still scopes it as unchanged, but nothing reviews it on its own.
+    if (!reviewedNames.has(repo.repoName)) continue;
+
+    const stem = repoReportStem(repo.repoPath, repo.repoName);
+    const reviewFileName = `REVIEW-${stem}.md`;
+    const verifyFileName = `VERIFY-TODO-${stem}.md`;
+    const constraintFileName = `CONSTRAINTS-${stem}.md`;
 
     // Code reviewer. Runs on every review, including a round that only applies
     // the previous gate's asks: the fix diff is changed code and gets the same
@@ -233,7 +247,7 @@ export async function buildReviewPipeline(
       : postedAsks.get(repo.repoName) ?? [];
 
     if (repoFixes.length > 0) {
-      const fixVerifyFileName = `VERIFY-FIXES-${orgName}_${repo.repoName}.md`;
+      const fixVerifyFileName = `VERIFY-FIXES-${stem}.md`;
       reviewChildren.push({
         label: `verify-fixes-${repo.repoName}`,
         stepType: STEP_TYPES.VERIFY_FIXES,
@@ -283,7 +297,7 @@ export async function buildReviewPipeline(
     }
 
     // README verifier
-    const readmeVerifyFileName = `VERIFY-README-${orgName}_${repo.repoName}.md`;
+    const readmeVerifyFileName = `VERIFY-README-${stem}.md`;
     reviewChildren.push({
       label: `verify-readme-${repo.repoName}`,
       stepType: STEP_TYPES.VERIFY_README,
@@ -324,7 +338,7 @@ export async function buildReviewPipeline(
   // behind a FIFO semaphore, and this is the longest-running child of the set
   // (it reads across all worktrees). Appending it would put the critical path
   // last in the queue whenever the fan-out exceeds the concurrency limit.
-  if (!repository && repos.length > 1) {
+  if (!repository && boundaryRepos.length > 1) {
     reviewChildren.unshift({
       label: "review-cross-repository",
       stepType: STEP_TYPES.CODE_REVIEW,
@@ -336,7 +350,7 @@ export async function buildReviewPipeline(
         repos: crossRepoInputs,
         knownFindings,
       }),
-      addDirs: [reviewDir, ...repos.map((r) => r.worktreePath)],
+      addDirs: [reviewDir, ...boundaryRepos.map((r) => r.worktreePath)],
       appendSystemPromptFile: ensureSystemPrompt(wsPath, "cross-repository-reviewer"),
     });
   }
@@ -367,8 +381,7 @@ export async function buildReviewPipeline(
             (c) => c.repoName === repo.repoName,
           );
           const baseBranch = repoBaseBranches.get(repo.repoName) ?? "main";
-          const orgName = repo.repoPath.split("/").slice(0, -1).join("_") || "local";
-          const constraintFileName = `CONSTRAINTS-${orgName}_${repo.repoName}.md`;
+          const constraintFileName = `CONSTRAINTS-${repoReportStem(repo.repoPath, repo.repoName)}.md`;
 
           // Still write a report: an absent file is indistinguishable from a
           // clean run downstream, and no other phase runs these commands now.

@@ -7,6 +7,12 @@ import {
 import { KNOWN_FINDING_KINDS } from "@/lib/workspace/known-findings";
 
 describe("AUTONOMOUS_GATE_SCHEMA", () => {
+  // A verdict without the list falls back to "every repository unfinished",
+  // so leaving it optional would quietly turn per-repository completion off.
+  it("requires unfinishedRepositories", () => {
+    expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("unfinishedRepositories");
+  });
+
   it("requires dismissedFindings so a dismissal is never silent", () => {
     expect(AUTONOMOUS_GATE_SCHEMA.required).toContain("dismissedFindings");
     const dismissed = AUTONOMOUS_GATE_SCHEMA.properties.dismissedFindings as {
@@ -45,7 +51,7 @@ describe("buildAutonomousGatePrompt", () => {
       maxLoops: 3,
     });
     expect(prompt).toContain("FINAL cycle");
-    expect(prompt).toMatch(/without creating a PR/i);
+    expect(prompt).toMatch(/no PR is created for any repository in `unfinishedRepositories`/);
     expect(prompt).toMatch(/`shouldLoop: true`/);
     expect(prompt).not.toMatch(/MUST set `shouldLoop: false`/);
   });
@@ -259,11 +265,48 @@ describe("buildAutonomousGatePrompt", () => {
     });
   });
 
+  describe("repositories", () => {
+    it("lists the repositories and carries a finished one's reports from its cycle", () => {
+      const prompt = buildAutonomousGatePrompt({
+        ...baseInput,
+        loopIteration: 2,
+        repositories: [
+          { repoName: "repo-a" },
+          {
+            repoName: "repo-b",
+            finished: {
+              cycle: 1,
+              files: [{ name: "VERIFY-README-owner_repo-b.md", content: "criterion 2: SATISFIED" }],
+            },
+          },
+        ],
+      });
+      expect(prompt).toContain("## Repositories");
+      expect(prompt).toContain("`repo-a`");
+      expect(prompt).toMatch(/`repo-b` — finished in cycle 1/);
+      expect(prompt).toContain("## Reports of Finished Repositories");
+      expect(prompt).toContain("criterion 2: SATISFIED");
+    });
+
+    it("adds neither section when no repositories are given", () => {
+      const prompt = buildAutonomousGatePrompt(baseInput);
+      expect(prompt).not.toContain("## Repositories");
+      expect(prompt).not.toContain("## Reports of Finished Repositories");
+    });
+
+    it("tells the gate that leaving a repository out is what creates its PR", () => {
+      const systemPrompt = getAutonomousGateSystemPrompt();
+      expect(systemPrompt).toContain("### Per-Repository Completion");
+      // The cross-boundary case is the one a per-repo reading gets wrong.
+      expect(systemPrompt).toMatch(/needs a matching change on the other, list both/);
+    });
+  });
+
   describe("completion bar", () => {
     it("makes a PR conditional on the work actually being finished", () => {
       const systemPrompt = getAutonomousGateSystemPrompt();
       expect(systemPrompt).toContain("### Completion Bar");
-      expect(systemPrompt).toMatch(/the only thing that triggers PR creation/);
+      expect(systemPrompt).toMatch(/what creates every repository's PR/);
       // All four conditions, contiguously numbered — a dropped one is a PR
       // opened over unfinished work.
       const bar = systemPrompt.slice(systemPrompt.indexOf("### Completion Bar"));
@@ -285,7 +328,7 @@ describe("buildAutonomousGatePrompt", () => {
     it("explains that shouldLoop stops the run when no cycle is left", () => {
       const systemPrompt = getAutonomousGateSystemPrompt();
       expect(systemPrompt).toContain("### The Final Cycle");
-      expect(systemPrompt).toMatch(/stops the run \*\*without creating a PR\*\*/);
+      expect(systemPrompt).toMatch(/\*\*No PR is created for a repository in `unfinishedRepositories`\*\*/);
       // Both failure directions matter: a soft "done" ships leftovers, and
       // invented remaining work throws away a finished branch.
       expect(systemPrompt).toMatch(/do not soften/i);

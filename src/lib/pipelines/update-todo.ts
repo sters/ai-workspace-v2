@@ -2,6 +2,7 @@ import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { getCleanEnv } from "@/lib/env";
 import { listWorkspaceRepos } from "@/lib/workspace";
+import { selectRepos } from "@/lib/workspace/select-repos";
 import { normalizeTodoCheckboxes } from "@/lib/parsers/todo";
 import { buildUpdaterPrompt } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
@@ -14,12 +15,14 @@ export async function buildUpdateTodoPipeline(input: {
   workspace: string;
   instruction: string;
   repo?: string;
+  /** Narrows `repo`'s selection further to these worktrees — an autonomous cycle's unfinished set. */
+  repositories?: readonly string[];
   bestOfN?: number;
   bestOfNConfirm?: boolean;
   interactionLevel?: InteractionLevel;
   interject?: boolean;
 }): Promise<PipelinePhase[]> {
-  const { workspace, instruction, repo, bestOfN, bestOfNConfirm, interactionLevel, interject } = input;
+  const { workspace, instruction, repo, repositories, bestOfN, bestOfNConfirm, interactionLevel, interject } = input;
   const workspacePath = path.join(getWorkspaceDir(), workspace);
 
   const readmeFile = Bun.file(path.join(workspacePath, "README.md"));
@@ -27,10 +30,7 @@ export async function buildUpdateTodoPipeline(input: {
     ? await readmeFile.text()
     : "";
 
-  const allRepos = listWorkspaceRepos(workspace);
-  const repos = repo
-    ? allRepos.filter((r) => r.repoName === repo)
-    : allRepos;
+  const repos = selectRepos(listWorkspaceRepos(workspace), { repository: repo, repositories });
 
   // Read TODO content once (shared across all candidates)
   const todoContents = await Promise.all(repos.map(async (r) => {

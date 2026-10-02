@@ -23,6 +23,7 @@ import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { awaitToolchainPrewarm } from "@/lib/workspace/toolchain-prewarm";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { executePhaseBudgetMs } from "@/lib/pipeline/constants";
+import { selectRepos } from "@/lib/workspace/select-repos";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { WorkspaceRepo } from "@/types/workspace";
@@ -31,6 +32,8 @@ export async function buildExecutePipeline(input: {
   workspace: string;
   batchSize?: number;
   repository?: string;
+  /** Narrows `repository`'s selection further to these worktrees — an autonomous cycle's unfinished set. */
+  repositories?: readonly string[];
   /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
   repos?: WorkspaceRepo[];
 }): Promise<PipelinePhase[]> {
@@ -39,9 +42,7 @@ export async function buildExecutePipeline(input: {
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
   const allRepos = input.repos ?? listWorkspaceRepos(workspace);
-  const repos = repository
-    ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
-    : allRepos;
+  const repos = selectRepos(allRepos, { repository, repositories: input.repositories });
   const wsPath = path.join(getWorkspaceDir(), workspace);
 
   if (meta.taskType === "review") {

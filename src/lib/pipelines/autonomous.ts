@@ -26,10 +26,13 @@ import {
   readKnownFindings,
 } from "@/lib/workspace/known-findings";
 import type { KnownFinding } from "@/lib/workspace/known-findings";
+import { isRepoReportFile } from "@/lib/workspace/review-report-names";
+import { selectRepos } from "@/lib/workspace/select-repos";
 import path from "node:path";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { GroupChild, PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
-import type { InteractionLevel } from "@/types/prompts";
+import type { AutonomousGateInput, InteractionLevel } from "@/types/prompts";
+import type { TodoFile, WorkspaceRepo } from "@/types/workspace";
 
 const DEFAULT_MAX_LOOPS = 10;
 
@@ -75,8 +78,12 @@ interface AutonomousGateResult {
   giveUp: boolean;
   reason: string;
   fixableIssues: string[];
+  /** Repositories the gate named as still holding work; null when it returned no list. */
+  unfinishedRepositories: string[] | null;
   /** Findings the gate deliberately did not act on, for the known-findings ledger. */
   dismissedFindings: KnownFinding[];
+  /** The review session the verdict was read from. */
+  reviewTimestamp?: string;
 }
 
 function settled(reason: string): AutonomousGateResult {
@@ -85,8 +92,39 @@ function settled(reason: string): AutonomousGateResult {
     giveUp: false,
     reason,
     fixableIssues: [],
+    unfinishedRepositories: [],
     dismissedFindings: [],
   };
+}
+
+/**
+ * The repositories a gate verdict leaves open, in workspace order.
+ *
+ * Falls back to everything still open when the gate named nothing usable,
+ * because a repository wrongly closed gets a PR with its work unfinished, while
+ * one wrongly kept open costs only a cycle of review. A repository with
+ * actionable TODO items stays open whatever the gate said: the executor would
+ * otherwise never reach them, and its PR would carry them.
+ */
+export function resolveUnfinishedRepositories(input: {
+  gate: Pick<AutonomousGateResult, "shouldLoop" | "giveUp" | "unfinishedRepositories">;
+  repoNames: string[];
+  open: string[];
+  todos: Pick<TodoFile, "repoName" | "pending" | "inProgress">[];
+}): string[] {
+  const { gate, repoNames, open, todos } = input;
+  if (!gate.shouldLoop && !gate.giveUp) return [];
+  const named = (gate.unfinishedRepositories ?? []).filter((n) => repoNames.includes(n));
+  const result = new Set(named.length > 0 ? named : open);
+  for (const t of todos) {
+    if (t.pending + t.inProgress > 0 && repoNames.includes(t.repoName)) result.add(t.repoName);
+  }
+  return repoNames.filter((n) => result.has(n));
+}
+
+function parseRepositoryNames(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter((n): n is string => typeof n === "string" && n.trim() !== "").map((n) => n.trim());
 }
 
 function parseDismissedFindings(raw: unknown): KnownFinding[] {
@@ -109,6 +147,7 @@ async function runAutonomousGate(
   loopIteration: number,
   maxLoops: number,
   previousGateResults?: { cycle: number; reason: string; fixableIssues: string[] }[],
+  repositories?: AutonomousGateInput["repositories"],
 ): Promise<AutonomousGateResult> {
   // The final cycle is evaluated like any other. It used to short-circuit here
   // without calling the model, which threw away the cycle's whole review — the
@@ -162,6 +201,7 @@ async function runAutonomousGate(
     maxLoops,
     previousGateResults,
     knownFindings: await readKnownFindings(wsPath),
+    repositories,
   });
 
   // Run AI gate
@@ -191,11 +231,45 @@ async function runAutonomousGate(
       fixableIssues: Array.isArray(parsed.fixableIssues)
         ? parsed.fixableIssues.filter((i): i is string => typeof i === "string")
         : [],
+      unfinishedRepositories: parseRepositoryNames(parsed.unfinishedRepositories),
       dismissedFindings: parseDismissedFindings(parsed.dismissedFindings),
+      reviewTimestamp: latest.timestamp,
     };
   } catch {
     return settled("Failed to parse gate response");
   }
+}
+
+/**
+ * What the gate is told about each repository: its name, and for one an earlier
+ * gate found finished, that cycle's reports — the latest review covers only the
+ * repositories still open, so they are the newest evidence there is.
+ */
+async function describeRepositories(
+  workspace: string,
+  repos: WorkspaceRepo[],
+  finished: ReadonlyMap<string, { cycle: number; reviewTimestamp?: string }>,
+): Promise<NonNullable<AutonomousGateInput["repositories"]>> {
+  const details = new Map<string, Awaited<ReturnType<typeof getReviewDetail>>>();
+  const described: NonNullable<AutonomousGateInput["repositories"]> = [];
+  for (const r of repos) {
+    const f = finished.get(r.repoName);
+    if (!f) {
+      described.push({ repoName: r.repoName });
+      continue;
+    }
+    let files: { name: string; content: string }[] = [];
+    if (f.reviewTimestamp) {
+      if (!details.has(f.reviewTimestamp)) {
+        details.set(f.reviewTimestamp, await getReviewDetail(workspace, f.reviewTimestamp));
+      }
+      files = (details.get(f.reviewTimestamp)?.files ?? []).filter((file) =>
+        isRepoReportFile(file.name, r.repoPath, r.repoName),
+      );
+    }
+    described.push({ repoName: r.repoName, finished: { cycle: f.cycle, files } });
+  }
+  return described;
 }
 
 export function buildAutonomousPipeline(input: {
@@ -221,6 +295,13 @@ export function buildAutonomousPipeline(input: {
   const phases: PipelinePhase[] = [];
   const skip = { skipAskUserQuestion: true } as const;
   const gateHistory: { cycle: number; reason: string; fixableIssues: string[] }[] = [];
+  // The repositories later cycles still plan, execute and review, by worktree
+  // directory; undefined means every one `repo` selects. Only a gate narrows it,
+  // so a resumed run, which has no verdict yet, starts over at every repository.
+  let unfinished: string[] | undefined;
+  // Repositories a gate found finished, with the review that last read them —
+  // no later review does, so the gate is handed that one's reports instead.
+  const finished = new Map<string, { cycle: number; reviewTimestamp?: string }>();
   // For a fresh `init` run, gate the first cycle behind a README clarity check
   // instead of queueing it upfront: the check appends the cycle only when the
   // drafted README is a clear enough "done" contract to implement autonomously.
@@ -384,7 +465,7 @@ export function buildAutonomousPipeline(input: {
       timeoutMs: CYCLE_BUDGETS_MS.updateTodo,
       fn: async (ctx) => {
         const ws = workspace!;
-        const stripped = await stripCompletedTodosFromWorkspace(ws, repo);
+        const stripped = await stripCompletedTodosFromWorkspace(ws, { repository: repo });
         if (stripped.length > 0) {
           ctx.emitStatus(`Removed completed TODO items from: ${stripped.join(", ")}`);
         }
@@ -416,7 +497,11 @@ export function buildAutonomousPipeline(input: {
           return false;
         }
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Executing workspace: ${ws}`);
-        const execPhases = await buildExecutePipeline({ workspace: ws, repository: repo });
+        const execPhases = await buildExecutePipeline({
+          workspace: ws,
+          repository: repo,
+          repositories: unfinished,
+        });
         return runSubPhases(ctx, execPhases, skip);
       },
     };
@@ -442,6 +527,7 @@ export function buildAutonomousPipeline(input: {
         const reviewPhases = await buildReviewPipeline({
           workspace: ws,
           repository: repo,
+          repositories: unfinished,
           requestedFixes: previousAsks && previousAsks.length > 0 ? previousAsks : undefined,
         });
         return runSubPhases(ctx, reviewPhases, skip);
@@ -462,7 +548,16 @@ export function buildAutonomousPipeline(input: {
           return false;
         }
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Evaluating review results`);
-        const gateResult = await runAutonomousGate(ctx, ws, loopNumber, maxLoops, gateHistory);
+        const repos = selectRepos(listWorkspaceRepos(ws), { repository: repo });
+        const repoNames = repos.map((r) => r.repoName);
+        const gateResult = await runAutonomousGate(
+          ctx,
+          ws,
+          loopNumber,
+          maxLoops,
+          gateHistory,
+          await describeRepositories(ws, repos, finished),
+        );
         gateHistory.push({ cycle: loopNumber, reason: gateResult.reason, fixableIssues: gateResult.fixableIssues });
 
         // Record what the gate declined to act on. Without this the next cycle's
@@ -480,6 +575,24 @@ export function buildAutonomousPipeline(input: {
           }
         }
 
+        const open = resolveUnfinishedRepositories({
+          gate: gateResult,
+          repoNames,
+          open: unfinished ?? repoNames,
+          todos: await getTodos(ws),
+        });
+        const done = repoNames.filter((n) => !open.includes(n));
+        for (const name of repoNames) {
+          if (open.includes(name)) {
+            finished.delete(name);
+          } else if (!finished.has(name)) {
+            finished.set(name, { cycle: loopNumber, reviewTimestamp: gateResult.reviewTimestamp });
+          }
+        }
+        // Some repositories finished while others still hold work. A stop then
+        // still creates the finished ones' PRs, and a loop leaves them out.
+        const partial = open.length > 0 && done.length > 0;
+
         const isFinalCycle = loopNumber >= maxLoops;
         const decisionLabel = gateResult.giveUp
           ? "Give up"
@@ -492,10 +605,16 @@ export function buildAutonomousPipeline(input: {
           `**Gate decision (cycle ${loopNumber}/${maxLoops})**: ${decisionLabel} — ${gateResult.reason}` +
             (gateResult.fixableIssues.length > 0
               ? `\n- ${gateResult.fixableIssues.join("\n- ")}`
+              : "") +
+            (partial
+              ? `\n\nStill unfinished: ${open.join(", ")}. Finished: ${done.join(", ")}.`
               : ""),
         );
 
         if (gateResult.giveUp) {
+          if (partial) {
+            ctx.appendPhases([buildCreatePrPhase(done)]);
+          }
           return true;
         }
 
@@ -509,12 +628,19 @@ export function buildAutonomousPipeline(input: {
             gateResult.fixableIssues.length > 0
               ? `\n\nRemaining work:\n- ${gateResult.fixableIssues.join("\n- ")}`
               : "";
+          const prNote = partial
+            ? `PRs are created only for the finished repositor${done.length === 1 ? "y" : "ies"} ` +
+              `(${done.join(", ")}); none for ${open.join(", ")}.`
+            : "No PR was created.";
           ctx.emitResult(
             `${FINAL_CYCLE_STOP_PREFIX} (cycle ${loopNumber}/${maxLoops})\n\n` +
-              `No PR was created.${gateResult.reason ? ` ${gateResult.reason}` : ""}${remaining}\n\n` +
+              `${prNote}${gateResult.reason ? ` ${gateResult.reason}` : ""}${remaining}\n\n` +
               "The branch and its TODO files are left as they are. Continue with an **update-todo** " +
               "operation followed by another autonomous run, or finish the remaining items by hand.",
           );
+          if (partial) {
+            ctx.appendPhases([buildCreatePrPhase(done)]);
+          }
           return true;
         }
 
@@ -522,6 +648,10 @@ export function buildAutonomousPipeline(input: {
           ctx.appendPhases([buildCreatePrPhase()]);
           return true;
         }
+
+        // A repository the gate found finished drops out of every later phase,
+        // which read this at run time, like `gateHistory`.
+        unfinished = done.length > 0 ? open : undefined;
 
         // Every round has the same shape, whatever the gate is asking for: the
         // asks become TODO items, an executor works from the plan, and the diff
@@ -558,7 +688,10 @@ export function buildAutonomousPipeline(input: {
           return false;
         }
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Updating TODOs for next iteration`);
-        const stripped = await stripCompletedTodosFromWorkspace(ws, repo);
+        const stripped = await stripCompletedTodosFromWorkspace(ws, {
+          repository: repo,
+          repositories: unfinished,
+        });
         if (stripped.length > 0) {
           ctx.emitStatus(`Removed completed TODO items from: ${stripped.join(", ")}`);
         }
@@ -570,6 +703,7 @@ export function buildAutonomousPipeline(input: {
           workspace: ws,
           instruction: updateInstruction,
           repo,
+          repositories: unfinished,
           interactionLevel,
         });
         return runSubPhases(ctx, updatePhases, skip);
@@ -671,8 +805,9 @@ export function buildAutonomousPipeline(input: {
     };
   }
 
-  // Helper to build the Create PR phase
-  function buildCreatePrPhase(): PipelinePhase {
+  // Helper to build the Create PR phase. `repositories` narrows it to the ones a
+  // stopped run finished; omitted, every repository gets its PR.
+  function buildCreatePrPhase(repositories?: string[]): PipelinePhase {
     return {
       kind: "function",
       label: "Create PR",
@@ -684,6 +819,7 @@ export function buildAutonomousPipeline(input: {
           workspace: ws,
           draft: draft !== false,
           repository: repo,
+          repositories,
         });
         return runSubPhases(ctx, prPhases, skip);
       },

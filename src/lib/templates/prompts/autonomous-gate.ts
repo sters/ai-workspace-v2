@@ -9,7 +9,8 @@ import { knownFindingsSection } from "./shared";
 
 /**
  * Prefix of the `emitResult` the gate phase writes when the last cycle ends with
- * work still outstanding. The run stops there — no PR — and the Slack notifier
+ * work still outstanding. The run stops there — PRs only for the repositories
+ * the gate found finished — and the Slack notifier
  * locates this message by prefix so it can relay the reason instead of the
  * misleading "no PRs were created" completion message.
  */
@@ -22,11 +23,11 @@ export const AUTONOMOUS_GATE_SCHEMA = {
     shouldLoop: {
       type: "boolean",
       description:
-        "Whether work still remains. Before the final cycle this starts another Execute cycle; on the final cycle it stops the run without creating a PR and hands fixableIssues to the human.",
+        "Whether work still remains. Before the final cycle this starts another Execute cycle; on the final cycle it stops the run, creates PRs only for the repositories left out of unfinishedRepositories, and hands fixableIssues to the human.",
     },
     giveUp: {
       type: "boolean",
-      description: "Set to true when the problem cannot be solved and the operation should stop without creating a PR.",
+      description: "Set to true when the problem cannot be solved and the operation should stop. Only repositories left out of unfinishedRepositories get PRs.",
     },
     reason: {
       type: "string",
@@ -36,6 +37,12 @@ export const AUTONOMOUS_GATE_SCHEMA = {
       type: "array",
       items: { type: "string" },
       description: "List of fixable issues to address in the next iteration (empty if shouldLoop is false).",
+    },
+    unfinishedRepositories: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "Repositories that still hold work, by the names in the Repositories section. Empty when the whole run is done. A repository left out is finished: later cycles stop working on it and its PR is created even if the run stops.",
     },
     dismissedFindings: {
       type: "array",
@@ -63,7 +70,7 @@ export const AUTONOMOUS_GATE_SCHEMA = {
       },
     },
   },
-  required: ["shouldLoop", "giveUp", "reason", "fixableIssues", "dismissedFindings"],
+  required: ["shouldLoop", "giveUp", "reason", "fixableIssues", "unfinishedRepositories", "dismissedFindings"],
   additionalProperties: false,
 };
 
@@ -129,7 +136,7 @@ An ask you can only state as a direction rather than a change is still worth lis
 
 ### Completion Bar (what creates the PR)
 
-\`shouldLoop: false, giveUp: false\` is a statement that the branch is **review-ready**, and it is the only thing that triggers PR creation. That is the run's deliverable: whoever opens the PR should find the work finished, not a list of what is left. Before setting it, confirm all four:
+\`shouldLoop: false, giveUp: false\` is a statement that the branch is **review-ready**, and it is what creates every repository's PR. That is the run's deliverable: whoever opens the PR should find the work finished, not a list of what is left. Before setting it, confirm all four:
 
 1. No unresolved Critical / Must-Fix / Should-Fix finding in the latest review.
 2. Every actionable \`(auto)\` acceptance criterion is satisfied — \`infeasible\` ledger entries excepted.
@@ -140,12 +147,28 @@ On item 4, a \`[!]\` **blocked** item does not hold the PR: it is waiting on a h
 
 If any of the four fails, the work is not done: \`shouldLoop: true\`, with every remaining item in \`fixableIssues\`.
 
+### Per-Repository Completion (\`unfinishedRepositories\`)
+
+A workspace can span several repositories, and they need not finish together. Alongside the run-wide decision, list in \`unfinishedRepositories\` every repository that still holds work, using the names in the user prompt's **Repositories** section:
+
+- every repository an entry in \`fixableIssues\` lands in. When a fix on one side of a boundary needs a matching change on the other, list both;
+- every repository whose TODO file still holds an in-scope \`[ ]\` or \`[~]\` item;
+- every repository where part of an unmet actionable \`(auto)\` criterion still has to be built.
+
+A repository you leave out is **finished**: the Completion Bar holds for the part of the work that lands in it. Later cycles do not plan, execute or review it on its own (the cross-repository reviewer still reads it as the other side of each boundary), and if the run stops with other repositories unfinished, its PR is still created. So an ask that lands in a repository you did not list is never carried out, and a repository you list without cause spends a full cycle of review on finished code.
+
+A repository an earlier gate found finished has not been reviewed since; its reports from the cycle it finished in are in the prompt, and they still stand because nothing has changed it. It stays finished unless this cycle's review gives it new work, such as a boundary the other side moved. Then list it again.
+
+- \`shouldLoop: false, giveUp: false\` → an empty list.
+- \`shouldLoop: true\` → at least one repository.
+- \`giveUp: true\` → every repository whose work is not done, not only the one the blocker sits in. The ones you leave out still get their PRs.
+
 ### The Final Cycle
 
 \`shouldLoop\` states a fact — *work remains* — rather than requesting a cycle. What the pipeline does with that fact depends on where the run is:
 
 - **Before the last cycle**: \`shouldLoop: true\` starts another Execute → Review → Gate round.
-- **On the last cycle** (the user prompt says so explicitly): \`shouldLoop: true\` stops the run **without creating a PR** and hands \`fixableIssues\` to the human as the remaining work.
+- **On the last cycle** (the user prompt says so explicitly): \`shouldLoop: true\` stops the run and hands \`fixableIssues\` to the human as the remaining work. **No PR is created for a repository in \`unfinishedRepositories\`**; the finished ones still get theirs.
 
 So on the last cycle, **do not soften** the verdict to get a PR created — an unfinished branch reported as unfinished is a useful outcome, while an unfinished branch handed over as a review-ready PR is a false claim about the run's own deliverable. Equally, **do not invent** remaining work to avoid committing to "done": that throws away a finished branch. Judge it exactly as you would on any other cycle and report what you find.
 
@@ -225,8 +248,8 @@ When \`giveUp: true\`, also set \`shouldLoop: false\` and explain in \`reason\` 
 ### Decision Rules
 
 - **Loop only for work that is not review-ready**: a Critical / Must-Fix / Should-Fix finding, an unmet actionable \`(auto)\` criterion, a pending in-scope TODO item, or a requested fix that did not land. Everything else is recorded in \`dismissedFindings\` and the run moves on.
-- Set \`shouldLoop: false\` and \`giveUp: false\` when the **Completion Bar** is met — that, and only that, creates the PR.
-- Set \`shouldLoop: false\` and \`giveUp: true\` when stagnation is detected or the problem is fundamentally unsolvable — stop without creating a PR.
+- Set \`shouldLoop: false\` and \`giveUp: false\` when the **Completion Bar** is met — that creates every repository's PR.
+- Set \`shouldLoop: false\` and \`giveUp: true\` when stagnation is detected or the problem is fundamentally unsolvable — stop, with PRs only for the repositories left out of \`unfinishedRepositories\`.
 - Do not narrow the bar to finish sooner, and do not widen it to keep working. A wrong "done" hands over unfinished work as review-ready; a wrong "not done" spends a full cycle on polish.
 
 ### Language
@@ -274,8 +297,46 @@ ${input.previousGateResults
 **NOTE: this is the FINAL cycle (${input.loopIteration}/${input.maxLoops}). No further Execute cycle can run.**
 
 - Completion Bar met → \`shouldLoop: false, giveUp: false\`, and the PR is created.
-- Work remains → \`shouldLoop: true\` with **every** outstanding item in \`fixableIssues\`. This does not start another cycle: the run stops without creating a PR, and your list is what the human picks up. Report that honestly rather than reporting the work done to get a PR.
+- Work remains → \`shouldLoop: true\` with **every** outstanding item in \`fixableIssues\`. This does not start another cycle: the run stops, no PR is created for any repository in \`unfinishedRepositories\`, and your list is what the human picks up. Report that honestly rather than reporting the work done to get a PR.
 `
+      : "";
+
+  const repositoriesSection =
+    input.repositories && input.repositories.length > 0
+      ? `## Repositories
+
+${input.repositories
+  .map((r) =>
+    r.finished
+      ? `- \`${r.repoName}\` — finished in cycle ${r.finished.cycle}; not reviewed since`
+      : `- \`${r.repoName}\``,
+  )
+  .join("\n")}
+
+`
+      : "";
+
+  const finishedReports = (input.repositories ?? []).flatMap((r) =>
+    r.finished ? [{ repoName: r.repoName, ...r.finished }] : [],
+  );
+  const finishedReportsSection =
+    finishedReports.length > 0
+      ? `
+
+## Reports of Finished Repositories
+
+These repositories were last reviewed in the cycle they finished in, and nothing has changed them since.
+
+${finishedReports
+  .map(
+    (r) =>
+      `### ${r.repoName} (cycle ${r.cycle})\n\n${
+        r.files.length > 0
+          ? r.files.map((f) => `#### ${f.name}\n\n${f.content}`).join("\n\n")
+          : "(no reports found)"
+      }`,
+  )
+  .join("\n\n")}`
       : "";
 
   return `# Autonomous Gate: Evaluate Review Results
@@ -288,7 +349,7 @@ ${finalCycleNote}
 
 ${input.readmeContent}
 ${input.acceptanceCriteria ? `\n## Acceptance Criteria (parsed)\n\n${input.acceptanceCriteria}\n` : ""}${knownFindingsSection(input.knownFindings)}
-${previousGateSection}## Review Summary (SUMMARY.md)
+${previousGateSection}${repositoriesSection}## Review Summary (SUMMARY.md)
 
 ${input.reviewSummary}
 
@@ -298,6 +359,6 @@ ${reviewFilesSection}
 
 ## TODO Files
 
-${todoFilesSection}
+${todoFilesSection}${finishedReportsSection}
 `;
 }

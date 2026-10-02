@@ -286,6 +286,53 @@ describe("buildReviewPipeline — cross-repository review", () => {
     expect(labels).toContain("review-api");
     expect(labels).not.toContain("review-web");
   });
+
+  // An autonomous cycle narrows the review to the repositories it is still
+  // working on. The one it finished is no longer reviewed on its own, but it is
+  // still the other side of the boundary, so the cross-repo reviewer keeps it.
+  describe("when narrowed to the unfinished repositories", () => {
+    async function narrowedToWeb() {
+      mockListWorkspaceRepos.mockReturnValue(twoRepos());
+      mockFileMap.set("/ws/test-ws/TODO-api.md", "- [x] done");
+      mockFileMap.set("/ws/test-ws/TODO-web.md", "- [ ] pending");
+      const phases = await buildReviewPipeline({ workspace: "test-ws", repositories: ["web"] });
+      return { phases, labels: (phases[1] as PipelinePhaseGroup).children.map((c) => c.label) };
+    }
+
+    it("builds per-repo children only for the unfinished repository", async () => {
+      const { labels } = await narrowedToWeb();
+
+      expect(labels).toEqual(expect.arrayContaining(["review-web", "verify-todo-web", "verify-readme-web"]));
+      expect(labels.filter((l) => l.endsWith("-api"))).toEqual([]);
+    });
+
+    it("still reviews the boundary against both repositories", async () => {
+      const { labels } = await narrowedToWeb();
+
+      expect(labels[0]).toBe("review-cross-repository");
+      const input = mockBuildCrossRepoPrompt.mock.calls[0][0];
+      expect(input.repos.map((r) => r.repoName)).toEqual(["api", "web"]);
+    });
+
+    it("records the finished repository's head so the next review scopes it as unchanged", async () => {
+      await narrowedToWeb();
+
+      expect(mockWriteReviewBaseline).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.objectContaining({ api: "head0001", web: "head0001" }),
+      );
+    });
+
+    it("runs constraints only for the unfinished repository", async () => {
+      mockParseConstraints.mockReturnValue([]);
+      const { phases } = await narrowedToWeb();
+
+      await (phases[0] as PipelinePhaseFunction).fn(createMockCtx());
+
+      expect(mockBuildNoConstraintsReport.mock.calls.map((c) => c[0])).toEqual(["web"]);
+    });
+  });
 });
 
 function createMockCtx(): PhaseFunctionContext {

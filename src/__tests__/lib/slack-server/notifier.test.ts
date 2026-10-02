@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractCreatedPrs,
   buildCompletionMessage,
+  withCreatedPrs,
   extractClarityGateStop,
   extractIncompleteStop,
 } from "@/lib/slack-server/notifier";
@@ -244,6 +245,28 @@ describe("extractIncompleteStop", () => {
   it("tolerates non-JSON event data", () => {
     const msg = `${FINAL_CYCLE_STOP_PREFIX} real`;
     expect(extractIncompleteStop([ev("not-json"), resultEvent(msg, "Cycle 1: Gate")])).toBe(msg);
+  });
+});
+
+// A stop with work outstanding still creates the finished repositories' PRs,
+// and the stop message alone would leave them out of the thread.
+describe("withCreatedPrs", () => {
+  const pr = {
+    url: "https://github.com/sters/api/pull/7",
+    owner: "sters",
+    repo: "api",
+    repoPath: "github.com/sters/api",
+    prNumber: 7,
+  };
+
+  it("lists the PRs after the stop reason", () => {
+    const msg = withCreatedPrs(`${FINAL_CYCLE_STOP_PREFIX} web is unfinished`, [pr]);
+    expect(msg.startsWith(`${FINAL_CYCLE_STOP_PREFIX} web is unfinished`)).toBe(true);
+    expect(msg).toContain("https://github.com/sters/api/pull/7");
+  });
+
+  it("leaves the stop reason alone when nothing was created", () => {
+    expect(withCreatedPrs("stopped", [])).toBe("stopped");
   });
 });
 
