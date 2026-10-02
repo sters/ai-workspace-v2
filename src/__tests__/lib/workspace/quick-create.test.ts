@@ -19,8 +19,8 @@ vi.mock("@/lib/workspace/git", () => ({
   listAllRepositories: () => mockListAllRepositories(),
 }));
 
-import { createQuickWorkspace, fillQuickReadme } from "@/lib/workspace/quick-create";
-import { parseReadmeMeta } from "@/lib/parsers/readme";
+import { createQuickWorkspace, fillQuickReadme, type QuickCreateDeps } from "@/lib/workspace/quick-create";
+import { parseConstraints, parseReadmeMeta } from "@/lib/parsers/readme";
 import { buildReadmeContent } from "@/lib/templates";
 
 const WS_NAME = "bugfix-login-crash-20260911";
@@ -170,6 +170,27 @@ describe("createQuickWorkspace", () => {
     ]);
     expect(mockCommitWorkspaceSnapshot).toHaveBeenCalledTimes(1);
     expect(mockCommitWorkspaceSnapshot.mock.calls[0][0]).toBe(WS_NAME);
+  });
+
+  it("declares the cached constraints of the repositories that have them", async () => {
+    // Nothing on this path discovers constraints, so without the cache a
+    // review of this workspace runs no lint/test/build at all.
+    const dir = stageWorkspace();
+    mockSetupWorkspace.mockResolvedValue({ workspaceName: WS_NAME, workspacePath: dir });
+    const lint = [{ label: "Lint", command: "make lint" }];
+
+    await createQuickWorkspace(
+      { name: "n", taskType: "bugfix", repositories: ["github.com/acme/web", "github.com/acme/api"] },
+      {
+        setupRepository: vi.fn((_ws: string, repo: string) => repoResult(repo)),
+        cachedConstraints: vi.fn((worktreePath: string) =>
+          worktreePath.endsWith("/web") ? lint : null,
+        ),
+      } as unknown as QuickCreateDeps,
+    );
+
+    const readme = fs.readFileSync(path.join(dir, "README.md"), "utf-8");
+    expect(parseConstraints(readme)).toEqual([{ repoName: "web", constraints: lint }]);
   });
 
   it("titles the README with the typed name and keeps the note as the request", async () => {

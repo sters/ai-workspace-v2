@@ -96,6 +96,17 @@ export function parseAcceptanceCriteria(content: string): AcceptanceCriterion[] 
   return results;
 }
 
+/** The `- <Label>: \`<command>\`` lines of one repository's constraint block. */
+export function parseConstraintLines(block: string): RepoConstraint[] {
+  const constraintPattern = /^\s*-\s+([\w][\w\s]*?):\s*`([^`]+)`/gm;
+  const constraints: RepoConstraint[] = [];
+  let match;
+  while ((match = constraintPattern.exec(block)) !== null) {
+    constraints.push({ label: match[1].trim(), command: match[2] });
+  }
+  return constraints;
+}
+
 export function parseConstraints(content: string): RepoConstraints[] {
   // Find the start of the ## Repository Constraints section
   const startMatch = content.match(/^## Repository Constraints\s*$/m);
@@ -112,19 +123,12 @@ export function parseConstraints(content: string): RepoConstraints[] {
   const repoBlocks = section.split(/^### /m).slice(1); // skip text before first ###
 
   const results: RepoConstraints[] = [];
-  const constraintPattern = /^\s*-\s+([\w][\w\s]*?):\s*`([^`]+)`/gm;
 
   for (const block of repoBlocks) {
     const repoName = block.split("\n")[0].trim();
     if (!repoName) continue;
 
-    const constraints: RepoConstraint[] = [];
-    let match;
-    constraintPattern.lastIndex = 0;
-    while ((match = constraintPattern.exec(block)) !== null) {
-      constraints.push({ label: match[1].trim(), command: match[2] });
-    }
-
+    const constraints = parseConstraintLines(block);
     if (constraints.length > 0) {
       results.push({ repoName, constraints });
     }
