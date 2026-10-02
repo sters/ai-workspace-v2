@@ -11,7 +11,6 @@ export function ChatTerminal({
   researchChat,
   task,
   discussion,
-  draft,
   onHandoffDelivered,
 }: {
   workspaceId: string;
@@ -20,7 +19,6 @@ export function ChatTerminal({
   researchChat?: boolean;
   task?: string;
   discussion?: string;
-  draft?: string;
   onHandoffDelivered?: () => void;
 }) {
   const {
@@ -37,8 +35,7 @@ export function ChatTerminal({
     researchChat,
     task,
     discussion,
-    draft,
-    onHandoffDelivered,
+      onHandoffDelivered,
   });
 
   return (

@@ -1,6 +1,6 @@
 /**
  * Ranges of the Changes tab's diffs collected to talk about in the chat, and
- * the prompt-box text they become.
+ * the opening message they become.
  */
 
 export interface ChatSelection {
@@ -32,11 +32,8 @@ export function fenceFor(text: string): string {
   return "`".repeat(Math.max(3, longest + 1));
 }
 
-/**
- * The text pasted into the chat's prompt box. It ends on a blank line so the
- * question the user types after it starts on a line of its own.
- */
-export function buildSelectionDraft(selections: ChatSelection[]): string {
+/** The opening message of a discussion chat about these selections. */
+export function buildSelectionTopic(selections: ChatSelection[]): string {
   const parts = selections.map((selection, i) => {
     const fence = fenceFor(selection.text);
     return `${i + 1}. ${locateSelection(selection)}\n${fence}diff\n${selection.text}\n${fence}`;
@@ -45,8 +42,6 @@ export function buildSelectionDraft(selections: ChatSelection[]): string {
     "About these parts of this workspace's changes (each worktree diffed against its base branch; paths are relative to the workspace directory):",
     "",
     parts.join("\n\n"),
-    "",
-    "",
   ].join("\n");
 }
 

@@ -1,9 +1,8 @@
 /**
  * What a page hands to the chat page it navigates to: a task to start on, a
- * topic to open a discussion on, a draft to put in the prompt box, or which
- * chat variant to open.
+ * topic to open a discussion on, or which chat variant to open.
  *
- * It travels in `sessionStorage` rather than in the URL. A task or a draft is
+ * It travels in `sessionStorage` rather than in the URL. A task or a topic is
  * free text of any length, which a query string caps; and a URL that starts a
  * session re-starts it on every reload, which is the wrong answer once the
  * session exists. So the handoff stays readable until the chat page reports it
@@ -19,10 +18,8 @@
 export interface ChatHandoff {
   /** Start a task chat on this request (quick create). */
   task?: string;
-  /** Start a new session whose opening message is this topic (Pull Requests tab). */
+  /** Start a new session whose opening message is this topic (Pull Requests and Changes tabs). */
   discussion?: string;
-  /** Paste into the prompt box of whichever session opens, left unsent. */
-  draft?: string;
   /** Open a chat about this review session. */
   reviewTimestamp?: string;
   /** Open a chat about the research report. */
