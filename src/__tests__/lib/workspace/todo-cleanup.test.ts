@@ -83,11 +83,11 @@ describe("stripCompletedTodosFromWorkspace", () => {
     expect(mockBunWrite).not.toHaveBeenCalled();
   });
 
-  it("honours repoFilter to process a single repo", async () => {
+  it("honours the repository filter to process a single repo", async () => {
     mockFileExists.mockResolvedValue(true);
     mockFileText.mockResolvedValueOnce("- [x] Done\n- [ ] Pending");
 
-    const modified = await stripCompletedTodosFromWorkspace("test-ws", "repo-b");
+    const modified = await stripCompletedTodosFromWorkspace("test-ws", { repository: "repo-b" });
 
     // Only repo-b should be read — file mock is only called once
     expect(mockFileText).toHaveBeenCalledTimes(1);
@@ -96,5 +96,15 @@ describe("stripCompletedTodosFromWorkspace", () => {
       "/ws/test-ws/TODO-repo-b.md",
       "- [ ] Pending",
     );
+  });
+
+  it("narrows to the repositories an autonomous cycle still works on", async () => {
+    mockFileExists.mockResolvedValue(true);
+    mockFileText.mockResolvedValueOnce("- [x] Done\n- [ ] Pending");
+
+    const modified = await stripCompletedTodosFromWorkspace("test-ws", { repositories: ["repo-b"] });
+
+    expect(mockFileText).toHaveBeenCalledTimes(1);
+    expect(modified).toEqual(["TODO-repo-b.md"]);
   });
 });

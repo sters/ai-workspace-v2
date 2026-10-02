@@ -364,6 +364,15 @@ export interface AutonomousGateInput {
   previousGateResults?: { cycle: number; reason: string; fixableIssues: string[] }[];
   /** Raw `artifacts/known-findings.md` content, or "" / undefined when absent. */
   knownFindings?: string;
+  /**
+   * Every repository the run covers, by worktree directory name. A repository
+   * an earlier gate found finished carries the cycle it finished in and its
+   * reports from that cycle's review, since no later review re-read it.
+   */
+  repositories?: {
+    repoName: string;
+    finished?: { cycle: number; files: { name: string; content: string }[] };
+  }[];
 }
 
 export interface ReadmeClarityGateInput {

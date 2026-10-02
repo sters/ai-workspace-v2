@@ -67,7 +67,9 @@ export function startNotifier(opts: NotifierOptions): Notifier {
           await opts.client.chat.postMessage({
             channel: row.channel,
             thread_ts: row.threadTs,
-            text: clarityStop ?? incompleteStop ?? buildCompletionMessage(prs),
+            text: clarityStop ?? (incompleteStop !== null
+              ? withCreatedPrs(incompleteStop, prs)
+              : buildCompletionMessage(prs)),
           });
         }
         // status === "failed": silently drop per product decision
@@ -244,6 +246,15 @@ function toolResultText(content: unknown): string {
       ? (c as { text: string }).text
       : ""))
     .join("\n");
+}
+
+/**
+ * An incomplete stop still creates the PRs of the repositories that finished,
+ * so their URLs follow the stop reason rather than being dropped from it.
+ */
+export function withCreatedPrs(stopMessage: string, prs: PrUrlInfo[]): string {
+  if (prs.length === 0) return stopMessage;
+  return `${stopMessage}\n\nCreated PRs:\n${prs.map((p) => `• ${p.url}`).join("\n")}`;
 }
 
 /** Build the Slack message text for a completed autonomous run. */

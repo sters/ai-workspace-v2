@@ -7,9 +7,10 @@ import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { stripCompletedTodoItems } from "../parsers/todo";
 import { listWorkspaceRepos } from "./git";
+import { selectRepos } from "./select-repos";
 
 /**
- * For each repo in the workspace (optionally filtered by repo name), read its
+ * For each repo in the workspace (optionally narrowed by `filter`), read its
  * `TODO-{repo}.md` file, remove completed (`[x]`) items and their child lines,
  * and write the file back if the content changed.
  *
@@ -17,13 +18,10 @@ import { listWorkspaceRepos } from "./git";
  */
 export async function stripCompletedTodosFromWorkspace(
   workspace: string,
-  repoFilter?: string,
+  filter: { repository?: string; repositories?: readonly string[] } = {},
 ): Promise<string[]> {
   const workspacePath = path.join(getWorkspaceDir(), workspace);
-  const allRepos = listWorkspaceRepos(workspace);
-  const repos = repoFilter
-    ? allRepos.filter((r) => r.repoName === repoFilter)
-    : allRepos;
+  const repos = selectRepos(listWorkspaceRepos(workspace), filter);
 
   const modified: string[] = [];
   for (const r of repos) {
