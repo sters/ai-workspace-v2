@@ -83,7 +83,6 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
       workspace: workspaceName,
       startWith: "update-todo",
       instruction: buildChangeCommentsTodoInstruction(comments.items),
-      interactionLevel: "mid",
       ...(repoPaths.size === 1 && { repo: [...repoPaths][0] }),
     });
     if (started) comments.clear();

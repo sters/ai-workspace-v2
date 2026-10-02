@@ -1,18 +1,15 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";
 import { RepositoryActionButton } from "./repository-action-button";
 import { DropdownMenu, type DropdownItem } from "../shared/menus/dropdown-menu";
 import { showToast } from "../shared/feedback/toast";
-import { InteractionLevelSelector } from "../shared/forms/interaction-level-selector";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { useOpeners } from "@/hooks/use-openers";
 import { openWith } from "@/lib/api";
-import type { InteractionLevel } from "@/types/prompts";
 import {
   Play,
   ClipboardCheck,
@@ -45,7 +42,6 @@ export function OperationPanel({
   const { operations, isWorkspaceRunning, isWorkspaceTypeRunning } = useRunningOperations();
   const isRunning = isWorkspaceRunning(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
-  const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
   const { openers } = useOpeners();
 
   // Build "Open in..." menu structure: opener × (Root + each repository).
@@ -94,10 +90,8 @@ export function OperationPanel({
     }
   };
 
-  /** Build body with workspace path and current interaction level. */
   const body = (extra?: Record<string, string>) => ({
     workspace: workspacePath,
-    interactionLevel,
     ...extra,
   });
 
@@ -110,16 +104,6 @@ export function OperationPanel({
 
   return (
     <div className="space-y-3">
-      {/* Interaction Level selector */}
-      <div className="flex items-center gap-1">
-        <span className="text-xs text-muted-foreground mr-1">Interaction:</span>
-        <InteractionLevelSelector
-          value={interactionLevel}
-          onChange={setInteractionLevel}
-          disabled={false}
-        />
-      </div>
-
       <div className="flex flex-wrap items-center gap-2">
         <SplitButton
           label={<><Play className="h-3.5 w-3.5" /> Start autonomous</>}
