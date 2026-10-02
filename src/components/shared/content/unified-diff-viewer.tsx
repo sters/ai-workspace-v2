@@ -7,6 +7,7 @@ import { MessageSquarePlus } from "lucide-react";
 import { MonacoEditorLazy } from "./monaco-editor-lazy";
 import {
   describeLineRange,
+  diffGutterLabels,
   hunkBody,
   mapHunkLines,
   type LineRangeDescription,
@@ -54,7 +55,8 @@ const LINE_HEIGHT_PX = 18;
 const ACTION_WIDTH_PX = 150;
 
 /**
- * One file's diff, from its first hunk on, in a read-only editor.
+ * One file's diff, from its first hunk on, in a read-only editor, with the
+ * gutter showing each line's old and new file line numbers.
  *
  * With `onSelectLines`, selecting text shows a button beside the selection that
  * hands the selected lines — whole lines, numbered on each side of the file —
@@ -77,6 +79,17 @@ export function UnifiedDiffViewer({
 }) {
   const body = useMemo(() => hunkBody(content), [content]);
   const lines = useMemo(() => mapHunkLines(body), [body]);
+  // The editor would number its own lines from 1; the reader wants the file's.
+  const options = useMemo(() => {
+    const { labels, chars } = diffGutterLabels(lines);
+    return {
+      readOnly: true,
+      lineNumbers: (n: number) => labels[n - 1] ?? "",
+      lineNumbersMinChars: chars,
+      renderLineHighlight: "none" as const,
+      folding: false,
+    };
+  }, [lines]);
   const contentHeight = Math.max(80, lines.length * LINE_HEIGHT_PX);
   const height =
     fixedHeight ??
@@ -144,12 +157,7 @@ export function UnifiedDiffViewer({
         theme={DIFF_THEME}
         beforeMount={handleBeforeMount}
         onMount={handleMount}
-        options={{
-          readOnly: true,
-          lineNumbers: "on",
-          renderLineHighlight: "none",
-          folding: false,
-        }}
+        options={options}
       />
       {action && onSelectLines && (
         <button
