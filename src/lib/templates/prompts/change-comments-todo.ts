@@ -1,7 +1,7 @@
 /**
  * The instruction behind the Changes tab's **Make TODOs** button: the comments
- * the user left on lines of the workspace's diff, as the `instruction` of an
- * `update-todo` run.
+ * the user left on lines of the workspace's diff, as the `instruction` of the
+ * `update-todo` phase an `autonomous` run starts with.
  *
  * Like the Pull Requests tab's triage, the comments come from a human who has
  * already decided they want the work, so the instruction asks for them to be
