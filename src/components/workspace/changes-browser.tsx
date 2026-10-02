@@ -46,7 +46,7 @@ import type { ChangedFile, ChangedFileStatus, RepoChangeSet } from "@/types/chan
  * Lines selected in a diff can be commented on, the comment shown under them the
  * way a pull request review shows it. The comments are collected across files
  * and handed over together: as the opening message of a new chat session, or as
- * an `update-todo` run that plans what they ask for.
+ * an `autonomous` run that plans what they ask for and carries it out.
  *
  * The selected file lives in `?repo=&file=`, so a reload and a pasted link land
  * on it.
@@ -61,7 +61,7 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set());
   const comments = useChangeComments(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
-  const { isWorkspaceTypeRunning } = useRunningOperations();
+  const { isWorkspaceRunning } = useRunningOperations();
 
   const select = (repoPath: string, filePath: string) => {
     const query = new URLSearchParams({ repo: repoPath, file: filePath });
@@ -79,8 +79,9 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
   const makeTodos = async () => {
     // `repo` is a single value, so comments spanning worktrees run workspace-wide.
     const repoPaths = new Set(comments.items.map((c) => c.repoPath));
-    const started = await startAndNavigate("update-todo", {
+    const started = await startAndNavigate("autonomous", {
       workspace: workspaceName,
+      startWith: "update-todo",
       instruction: buildChangeCommentsTodoInstruction(comments.items),
       interactionLevel: "mid",
       ...(repoPaths.size === 1 && { repo: [...repoPaths][0] }),
@@ -109,7 +110,7 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
           onClear={comments.clear}
           onTalk={talkInChat}
           onMakeTodos={makeTodos}
-          todoRunning={isWorkspaceTypeRunning(workspaceName, "update-todo")}
+          workspaceBusy={isWorkspaceRunning(workspaceName)}
         />
       )}
 
@@ -179,7 +180,7 @@ function CommentsTray({
   onClear,
   onTalk,
   onMakeTodos,
-  todoRunning,
+  workspaceBusy,
 }: {
   items: ChangeComment[];
   onOpen: (comment: ChangeComment) => void;
@@ -187,7 +188,7 @@ function CommentsTray({
   onClear: () => void;
   onTalk: () => void;
   onMakeTodos: () => Promise<void>;
-  todoRunning: boolean;
+  workspaceBusy: boolean;
 }) {
   const uncommented = items.filter((c) => !c.comment.trim()).length;
   return (
@@ -203,8 +204,8 @@ function CommentsTray({
           <Button
             variant="secondary"
             onClick={onMakeTodos}
-            disabled={uncommented > 0 || todoRunning}
-            title={todoRunning ? "A TODO update is already running for this workspace." : undefined}
+            disabled={uncommented > 0 || workspaceBusy}
+            title={workspaceBusy ? "An operation is already running for this workspace." : undefined}
           >
             <ListTodo className="h-4 w-4" />
             Make TODOs
@@ -246,7 +247,7 @@ function CommentsTray({
       </ul>
       <p className="text-xs text-muted-foreground">
         Talk in chat opens a new session with these as its first message. Make TODOs plans what
-        they ask for into the TODO files.
+        they ask for into the TODO files and runs autonomous on them.
         {uncommented > 0 &&
           ` ${uncommented} ${uncommented === 1 ? "has" : "have"} no comment, which gives a TODO nothing to plan — add one or remove ${uncommented === 1 ? "it" : "them"} first.`}
       </p>

@@ -29,6 +29,7 @@ vi.mock("@/hooks/use-start-and-navigate", () => ({
 
 vi.mock("@/hooks/use-running-operations", () => ({
   useRunningOperations: () => ({
+    isWorkspaceRunning: () => runningTypes.length > 0,
     isWorkspaceTypeRunning: (_ws: string, type: string) => runningTypes.includes(type),
   }),
 }));
@@ -195,7 +196,7 @@ describe("ChangesBrowser", () => {
     expect(screen.queryByText(/\d comments?$/)).not.toBeInTheDocument();
   });
 
-  it("turns the comments into TODO items for the one repository they are in", async () => {
+  it("plans the comments and runs them through autonomous, in the one repository they are in", async () => {
     searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
     render(<ChangesBrowser workspaceName={ws} />);
     comment("Merge the two lines.");
@@ -204,7 +205,8 @@ describe("ChangesBrowser", () => {
 
     await vi.waitFor(() => expect(mockStart).toHaveBeenCalled());
     const [type, body] = mockStart.mock.calls[0];
-    expect(type).toBe("update-todo");
+    expect(type).toBe("autonomous");
+    expect(body.startWith).toBe("update-todo");
     expect(body.repo).toBe("github.com/acme/web");
     expect(body.instruction).toContain("`TODO-web.md`");
     expect(body.instruction).toContain("Merge the two lines.");
@@ -221,6 +223,15 @@ describe("ChangesBrowser", () => {
 
     await vi.waitFor(() => expect(mockStart).toHaveBeenCalled());
     expect(screen.getByText("1 comment")).toBeInTheDocument();
+  });
+
+  it("does not start a run over a workspace another operation is editing", () => {
+    runningTypes = ["review"];
+    searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
+    render(<ChangesBrowser workspaceName={ws} />);
+    comment("Merge the two lines.");
+
+    expect(screen.getByRole("button", { name: /make todos/i })).toBeDisabled();
   });
 
   it("asks for a comment on every selection before making TODOs of them", () => {
