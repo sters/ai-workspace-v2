@@ -6,7 +6,12 @@ const mockReplace = vi.fn();
 const mockPush = vi.fn();
 const mockUseChanges = vi.fn();
 const mockUseDiff = vi.fn();
+const mockStart = vi.fn();
+let runningTypes: string[] = [];
 let searchParams = new URLSearchParams();
+// The comments live in a module-level cache per workspace, so each test gets its own.
+let ws = "";
+let wsCount = 0;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
@@ -18,16 +23,40 @@ vi.mock("@/hooks/use-workspace", () => ({
   useWorkspaceChangeDiff: (...args: unknown[]) => mockUseDiff(...args),
 }));
 
+vi.mock("@/hooks/use-start-and-navigate", () => ({
+  useStartAndNavigate: () => mockStart,
+}));
+
+vi.mock("@/hooks/use-running-operations", () => ({
+  useRunningOperations: () => ({
+    isWorkspaceTypeRunning: (_ws: string, type: string) => runningTypes.includes(type),
+  }),
+}));
+
 // Monaco does not run in jsdom. The stand-in hands over a fixed selection when
-// clicked, which is what the real viewer does once the user selects lines.
+// clicked, which is what the real viewer does once the user selects lines, and
+// renders each zone with the lines it sits under.
 vi.mock("@/components/shared/content/unified-diff-viewer", () => ({
-  UnifiedDiffViewer: ({ onSelectLines }: { onSelectLines?: (r: unknown) => void }) => (
-    <button
-      type="button"
-      onClick={() => onSelectLines?.({ oldRange: [4, 4], newRange: [4, 5], text: "-a\n+b\n+c" })}
-    >
-      select lines
-    </button>
+  UnifiedDiffViewer: ({
+    onSelectLines,
+    zones,
+  }: {
+    onSelectLines?: (r: unknown) => void;
+    zones?: { key: string; fromLine: number; toLine: number; content: React.ReactNode }[];
+  }) => (
+    <div>
+      <button
+        type="button"
+        onClick={() => onSelectLines?.({ oldRange: [4, 4], newRange: [4, 5], text: "-a\n+b\n+c" })}
+      >
+        select lines
+      </button>
+      {zones?.map((z) => (
+        <section key={z.key} aria-label={`under lines ${z.fromLine}-${z.toLine}`}>
+          {z.content}
+        </section>
+      ))}
+    </div>
   ),
 }));
 
@@ -57,11 +86,15 @@ const API: RepoChangeSet = {
 beforeEach(() => {
   mockReplace.mockReset();
   mockPush.mockReset();
+  mockStart.mockReset();
+  mockStart.mockResolvedValue(true);
+  runningTypes = [];
+  ws = `ws-${++wsCount}`;
   sessionStorage.clear();
   searchParams = new URLSearchParams();
   mockUseChanges.mockReturnValue({ repos: [WEB, API], isLoading: false, error: undefined, refresh: vi.fn() });
   mockUseDiff.mockReturnValue({
-    diff: { diff: "@@ -1,1 +1,1 @@\n-a\n+b\n", truncated: false },
+    diff: { diff: "@@ -4,1 +4,2 @@\n-a\n+b\n+c\n", truncated: false },
     isLoading: false,
     error: undefined,
     refresh: vi.fn(),
@@ -100,35 +133,115 @@ describe("ChangesBrowser", () => {
     );
   });
 
-  it("collects selections and opens a chat whose first message is all of them", () => {
-    searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
-    render(<ChangesBrowser workspaceName="ws" />);
+  function comment(text: string) {
+    fireEvent.click(screen.getByRole("button", { name: "select lines" }));
+    const box = screen.getByPlaceholderText(/leave a comment/i);
+    fireEvent.change(box, { target: { value: text } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+  }
 
-    fireEvent.click(screen.getByRole("button", { name: "select lines" }));
-    fireEvent.click(screen.getByRole("button", { name: "select lines" }));
-    expect(screen.getByText("2 selections for the chat")).toBeInTheDocument();
+  it("shows a comment under the lines it was made on, and lets it be edited in place", () => {
+    searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
+    render(<ChangesBrowser workspaceName={ws} />);
+
+    comment("Why two lines?");
+
+    // Editor lines 2-4: the hunk header is line 1.
+    const zone = within(screen.getByRole("region", { name: "under lines 2-4" }));
+    expect(zone.getByText("Why two lines?")).toBeInTheDocument();
+    expect(screen.getByText("1 comment")).toBeInTheDocument();
+
+    fireEvent.click(zone.getByRole("button", { name: "Edit" }));
+    fireEvent.change(zone.getByDisplayValue("Why two lines?"), { target: { value: "Merge them." } });
+    fireEvent.click(zone.getByRole("button", { name: "Save" }));
+    expect(zone.getByText("Merge them.")).toBeInTheDocument();
+  });
+
+  it("does not place a comment on lines that changed since it was made", () => {
+    searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
+    const { rerender } = render(<ChangesBrowser workspaceName={ws} />);
+    comment("Why two lines?");
+
+    mockUseDiff.mockReturnValue({
+      diff: { diff: "@@ -4,1 +4,2 @@\n-a\n+b\n+changed\n", truncated: false },
+      isLoading: false,
+      error: undefined,
+      refresh: vi.fn(),
+    });
+    rerender(<ChangesBrowser workspaceName={ws} />);
+
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(screen.getByText(/no longer match/)).toBeInTheDocument();
+    // Still in the list, so it can still be handed over or removed.
+    expect(screen.getByText("1 comment")).toBeInTheDocument();
+  });
+
+  it("opens a chat whose first message is every comment with its lines", () => {
+    searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
+    render(<ChangesBrowser workspaceName={ws} />);
+
+    comment("Why two lines?");
+    comment("");
+    expect(screen.getByText("2 comments")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /talk in chat/i }));
 
-    expect(mockPush).toHaveBeenCalledWith("/workspace/ws/chat/interactive");
-    const handoff = peekChatHandoff("ws");
-    // The opening message of a new session, not text left in a prompt box.
-    const topic = handoff?.discussion ?? "";
+    expect(mockPush).toHaveBeenCalledWith(`/workspace/${ws}/chat/interactive`);
+    const topic = peekChatHandoff(ws)?.discussion ?? "";
     expect(topic).toContain("1. github.com/acme/web/src/app.ts, lines 4-5");
+    expect(topic).toContain("My comment: Why two lines?");
     expect(topic).toContain("2. github.com/acme/web/src/app.ts, lines 4-5");
-    // Handed over, so the tray starts empty next time.
-    expect(screen.queryByText(/selections? for the chat/)).not.toBeInTheDocument();
+    // Handed over, so the list starts empty next time.
+    expect(screen.queryByText(/\d comments?$/)).not.toBeInTheDocument();
   });
 
-  it("keeps collected selections across a remount", () => {
+  it("turns the comments into TODO items for the one repository they are in", async () => {
     searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
-    const first = render(<ChangesBrowser workspaceName="ws-keep" />);
-    fireEvent.click(screen.getByRole("button", { name: "select lines" }));
+    render(<ChangesBrowser workspaceName={ws} />);
+    comment("Merge the two lines.");
+
+    fireEvent.click(screen.getByRole("button", { name: /make todos/i }));
+
+    await vi.waitFor(() => expect(mockStart).toHaveBeenCalled());
+    const [type, body] = mockStart.mock.calls[0];
+    expect(type).toBe("update-todo");
+    expect(body.repo).toBe("github.com/acme/web");
+    expect(body.instruction).toContain("`TODO-web.md`");
+    expect(body.instruction).toContain("Merge the two lines.");
+    await vi.waitFor(() => expect(screen.queryByText("1 comment")).not.toBeInTheDocument());
+  });
+
+  it("keeps the comments when the TODO run is refused", async () => {
+    mockStart.mockResolvedValue(false);
+    searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
+    render(<ChangesBrowser workspaceName={ws} />);
+    comment("Merge the two lines.");
+
+    fireEvent.click(screen.getByRole("button", { name: /make todos/i }));
+
+    await vi.waitFor(() => expect(mockStart).toHaveBeenCalled());
+    expect(screen.getByText("1 comment")).toBeInTheDocument();
+  });
+
+  it("asks for a comment on every selection before making TODOs of them", () => {
+    searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
+    render(<ChangesBrowser workspaceName={ws} />);
+    comment("Merge the two lines.");
+    comment("");
+
+    expect(screen.getByRole("button", { name: /make todos/i })).toBeDisabled();
+    expect(screen.getByText(/1 has no comment/)).toBeInTheDocument();
+  });
+
+  it("keeps comments across a remount", () => {
+    searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
+    const first = render(<ChangesBrowser workspaceName={ws} />);
+    comment("Why?");
     first.unmount();
 
-    render(<ChangesBrowser workspaceName="ws-keep" />);
-    expect(screen.getByText("1 selection for the chat")).toBeInTheDocument();
+    render(<ChangesBrowser workspaceName={ws} />);
+    expect(screen.getByText("1 comment")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /remove/i }));
-    expect(screen.queryByText(/selection for the chat/)).not.toBeInTheDocument();
+    expect(screen.queryByText("1 comment")).not.toBeInTheDocument();
   });
 });

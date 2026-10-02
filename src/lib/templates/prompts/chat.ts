@@ -150,7 +150,8 @@ ${ON_DEMAND_READING}`;
 
 /**
  * System prompt for a chat session opened on a topic — the Pull Requests tab's
- * Chat button, with the selected review comments and failing checks.
+ * Chat button, with the selected review comments and failing checks, or the
+ * Changes tab's, with lines of the diff and the user's comments on them.
  *
  * Between the waiting variants and the task one: the topic arrived with the
  * session, so an acknowledgement that ignores it makes the user restate it, but
@@ -166,7 +167,7 @@ The first message names what the user wants to talk about — review comments or
 
 1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
 2. Read calls, issued together: the workspace \`README.md\`, and the code each item points at (the file around the referenced line, in the worktree the path names).
-3. A short reply: for each item, a sentence or two — for a comment or a check, what it is asking for and how the code currently stands against it; for quoted lines, what that part of the change does. Then wait for the user.
+3. A short reply: for each item, a sentence or two — for a comment or a check, what it is asking for and how the code currently stands against it; for quoted lines, what that part of the change does, or — when the user commented on them — your answer to that comment against the code, without making the change. Then wait for the user.
 
 For example, for one comment: "1. The reviewer says the early return at cache.ts:88 skips \`unlock()\` — it does, the lock stays held on that path. What would you like to look at?"
 
