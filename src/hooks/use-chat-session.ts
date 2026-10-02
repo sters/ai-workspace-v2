@@ -2,12 +2,6 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useTerminal } from "./use-terminal";
-import {
-  isSessionBusy,
-  readTurnProgress,
-  UNKNOWN_TURN_PROGRESS,
-  type TurnProgress,
-} from "@/lib/chat-server/activity";
 import type { SessionState, ServerMessage } from "@/types/chat";
 
 const CHAT_WS_URL =
@@ -51,28 +45,6 @@ function clearChatSession(workspaceId: string): void {
 }
 
 // ---------------------------------------------------------------------------
-// Draft paste
-// ---------------------------------------------------------------------------
-
-const DRAFT_POLL_MS = 200;
-/** Output settles for this long before a paste, even after a turn-end marker. */
-const DRAFT_MIN_QUIET_MS = 300;
-/** A session still working after this is reported rather than pasted into. */
-const DRAFT_PASTE_TIMEOUT_MS = 2 * 60 * 1000;
-
-/**
- * Whether the TUI is sitting at its prompt, so pasted text lands in the prompt
- * box. The same reading as the sidebar's busy flag, with one difference: a turn
- * known to be open is never ready, even when quiet — quiet with a turn open is
- * a permission prompt, and a paste there answers it.
- */
-function readyForDraft(output: { at: number; seen: boolean; progress: TurnProgress }, now: number): boolean {
-  if (!output.seen || output.progress.inFlight === true) return false;
-  if (now - output.at < DRAFT_MIN_QUIET_MS) return false;
-  return !isSessionBusy({ lastOutputAt: output.at, progress: output.progress }, now);
-}
-
-// ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
 
@@ -90,13 +62,8 @@ export function useChatSession(
      */
     discussion?: string;
     /**
-     * Pasted into the prompt box of whichever session opens — resumed or new —
-     * and left unsent, so the user adds their question and sends it.
-     */
-    draft?: string;
-    /**
-     * Called once the options above have reached a session: after its start,
-     * or after the draft was pasted. The caller clears its handoff here.
+     * Called once the options above are spent: a session started with them, or
+     * a saved session was resumed instead. The caller clears its handoff here.
      */
     onHandoffDelivered?: () => void;
   },
@@ -132,14 +99,8 @@ export function useChatSession(
   taskRef.current = options?.task;
   const discussionRef = useRef(options?.discussion);
   discussionRef.current = options?.discussion;
-  const draftRef = useRef(options?.draft);
-  draftRef.current = options?.draft;
   const onHandoffDeliveredRef = useRef(options?.onHandoffDelivered);
   onHandoffDeliveredRef.current = options?.onHandoffDelivered;
-  /** A draft is pasted once per mount, not once per session this mount opens. */
-  const draftPastedRef = useRef(false);
-  const outputRef = useRef({ at: 0, seen: false, progress: UNKNOWN_TURN_PROGRESS });
-  const draftTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Refs for websocket (survive re-renders)
   const onDataDisposableRef = useRef<{ dispose: () => void } | null>(null);
@@ -150,54 +111,7 @@ export function useChatSession(
   const generationRef = useRef(0);
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const stopDraftTimer = useCallback(() => {
-    if (draftTimerRef.current) {
-      clearInterval(draftTimerRef.current);
-      draftTimerRef.current = null;
-    }
-  }, []);
-
-  const noteOutput = useCallback((data: string) => {
-    outputRef.current = {
-      at: Date.now(),
-      seen: true,
-      progress: readTurnProgress(data, outputRef.current.progress),
-    };
-  }, []);
-
-  /** The session is open: paste the draft when it is at its prompt, then report delivery. */
-  const deliverHandoff = useCallback(
-    (term: { paste: (data: string) => void; focus?: () => void }) => {
-      const draft = draftRef.current;
-      if (!draft || draftPastedRef.current) {
-        onHandoffDeliveredRef.current?.();
-        return;
-      }
-      stopDraftTimer();
-      const deadline = Date.now() + DRAFT_PASTE_TIMEOUT_MS;
-      draftTimerRef.current = setInterval(() => {
-        const now = Date.now();
-        if (readyForDraft(outputRef.current, now)) {
-          stopDraftTimer();
-          draftPastedRef.current = true;
-          // `paste` rather than a raw input frame: xterm wraps it in bracketed
-          // paste when the TUI asked for that, so newlines stay in the box
-          // instead of each one sending a line.
-          term.paste(draft);
-          term.focus?.();
-          onHandoffDeliveredRef.current?.();
-        } else if (now > deadline) {
-          stopDraftTimer();
-          setError("The session stayed busy, so the selected changes were not pasted. Reload to try again.");
-        }
-      }, DRAFT_POLL_MS);
-    },
-    [stopDraftTimer],
-  );
-
   const cleanup = useCallback(() => {
-    stopDraftTimer();
-    outputRef.current = { at: 0, seen: false, progress: UNKNOWN_TURN_PROGRESS };
     if (resumeTimeoutRef.current) {
       clearTimeout(resumeTimeoutRef.current);
       resumeTimeoutRef.current = null;
@@ -211,7 +125,7 @@ export function useChatSession(
       wsRef.current = null;
     }
     dispose();
-  }, [dispose, stopDraftTimer]);
+  }, [dispose]);
 
   // Cleanup on unmount — close WS + dispose xterm, but keep localStorage
   useEffect(() => {
@@ -289,10 +203,7 @@ export function useChatSession(
             resumedExitCode = msg.exitCode;
             break;
           case "output":
-            if (msg.data) {
-              term.write(msg.data);
-              noteOutput(msg.data);
-            }
+            if (msg.data) term.write(msg.data);
             break;
           case "replay_done":
             if (resumeTimeoutRef.current) {
@@ -304,7 +215,8 @@ export function useChatSession(
               setExitCode(resumedExitCode ?? -1);
             } else {
               setState("running");
-              deliverHandoff(term);
+              // A task never reaches a resumed session, so it is spent here.
+              onHandoffDeliveredRef.current?.();
             }
             break;
           case "exited":
@@ -351,7 +263,7 @@ export function useChatSession(
         }
       });
     },
-    [workspaceId, cleanup, init, dispose, termRef, noteOutput, deliverHandoff],
+    [workspaceId, cleanup, init, dispose, termRef],
   );
 
   const startSession = useCallback(async () => {
@@ -418,16 +330,12 @@ export function useChatSession(
           if (msg.sessionId) {
             saveChatSession(workspaceId, msg.sessionId);
           }
-          deliverHandoff(term);
+          onHandoffDeliveredRef.current?.();
           break;
         case "output":
-          if (msg.data) {
-            term.write(msg.data);
-            noteOutput(msg.data);
-          }
+          if (msg.data) term.write(msg.data);
           break;
         case "exited":
-          stopDraftTimer();
           setState("exited");
           setExitCode(msg.code ?? -1);
           break;
@@ -460,7 +368,7 @@ export function useChatSession(
         ws.send(JSON.stringify({ type: "input", data }));
       }
     });
-  }, [workspaceId, cleanup, init, dispose, termRef, noteOutput, deliverHandoff, stopDraftTimer]);
+  }, [workspaceId, cleanup, init, dispose, termRef]);
 
   const cancelResume = useCallback(() => {
     clearChatSession(workspaceId);
@@ -480,7 +388,6 @@ export function useChatSession(
   // Auto-resume on mount if localStorage has a saved session,
   // or auto-start if initialPrompt/reviewTimestamp is provided.
   // A review, research or discussion chat always starts a fresh session (skip resume).
-  // A draft goes to whichever session opens, so it resumes like a plain visit.
   useEffect(() => {
     if (stateRef.current !== "idle") return;
     if (initialPromptRef.current || reviewTimestampRef.current || researchChatRef.current || discussionRef.current) {
@@ -494,7 +401,7 @@ export function useChatSession(
         // session may be half way through, so the task only ever opens a
         // session this hook starts — which also makes reloading the URL safe.
         resumeSession(savedSessionId);
-      } else if (taskRef.current || draftRef.current) {
+      } else if (taskRef.current) {
         startSession();
       }
     }

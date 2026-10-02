@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 const mockInit = vi.fn();
 const mockDispose = vi.fn();
-const term = { cols: 100, rows: 30, write: vi.fn(), paste: vi.fn(), focus: vi.fn(), onData: vi.fn(() => ({ dispose: vi.fn() })) };
+const term = { cols: 100, rows: 30, write: vi.fn(), onData: vi.fn(() => ({ dispose: vi.fn() })) };
 
 vi.mock("@/hooks/use-terminal", () => ({
   useTerminal: () => ({
@@ -63,7 +63,6 @@ beforeEach(() => {
   mockInit.mockReset().mockResolvedValue(undefined);
   mockDispose.mockReset();
   term.onData.mockClear();
-  term.paste.mockClear();
   localStorage.clear();
   vi.stubGlobal("WebSocket", FakeSocket);
   vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
@@ -102,6 +101,18 @@ describe("useChatSession task", () => {
     expect(startFrames().some((f) => "task" in f)).toBe(false);
   });
 
+  it("spends the task on a resume, so a reload does not start it after all", async () => {
+    localStorage.setItem("aiw-chat:ws", JSON.stringify({ sessionId: "chat-1" }));
+    const onHandoffDelivered = vi.fn();
+    renderHook(() => useChatSession("ws", { task: "fix the login crash", onHandoffDelivered }));
+
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+    sockets[0].receive({ type: "resumed", exited: false });
+    expect(onHandoffDelivered).not.toHaveBeenCalled();
+    sockets[0].receive({ type: "replay_done" });
+    await waitFor(() => expect(onHandoffDelivered).toHaveBeenCalledTimes(1));
+  });
+
   it("stays idle with neither a task nor a saved session", async () => {
     renderHook(() => useChatSession("ws"));
 
@@ -138,50 +149,7 @@ describe("useChatSession discussion", () => {
   });
 });
 
-/** Claude's TUI brackets every turn with these (see `readTurnProgress`). */
-const TURN_STARTED = "\x1b]9;4;3;\x07";
-const TURN_ENDED = "\x1b]9;4;0;\x07";
-
-describe("useChatSession draft", () => {
-  it("starts a plain session and pastes the draft once its opening turn is over", async () => {
-    const onHandoffDelivered = vi.fn();
-    renderHook(() => useChatSession("ws", { draft: "about this diff", onHandoffDelivered }));
-
-    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
-    const frame = sockets[0].firstFrame();
-    expect(frame.type).toBe("start");
-    // The draft is for the prompt box, not the opening message.
-    expect(JSON.stringify(frame)).not.toContain("about this diff");
-
-    sockets[0].receive({ type: "started", sessionId: "chat-1" });
-    sockets[0].receive({ type: "output", data: `${TURN_STARTED}reading README` });
-    await new Promise<void>((r) => setTimeout(r, 700));
-    // Pasting into a turn still in flight would land in whatever it is showing.
-    expect(term.paste).not.toHaveBeenCalled();
-    expect(onHandoffDelivered).not.toHaveBeenCalled();
-
-    sockets[0].receive({ type: "output", data: `Ready.${TURN_ENDED}` });
-    await waitFor(() => expect(term.paste).toHaveBeenCalledWith("about this diff"));
-    expect(onHandoffDelivered).toHaveBeenCalledTimes(1);
-  });
-
-  it("pastes into a resumed session rather than replacing it", async () => {
-    localStorage.setItem("aiw-chat:ws", JSON.stringify({ sessionId: "chat-1" }));
-    const onHandoffDelivered = vi.fn();
-    renderHook(() => useChatSession("ws", { draft: "about this diff", onHandoffDelivered }));
-
-    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
-    expect(sockets[0].firstFrame()).toMatchObject({ type: "resume", sessionId: "chat-1" });
-
-    sockets[0].receive({ type: "resumed", exited: false });
-    sockets[0].receive({ type: "output", data: `${TURN_STARTED}old turn${TURN_ENDED}` });
-    sockets[0].receive({ type: "replay_done" });
-
-    await waitFor(() => expect(term.paste).toHaveBeenCalledWith("about this diff"));
-    expect(startFrames().some((f) => f.type === "start")).toBe(false);
-    expect(onHandoffDelivered).toHaveBeenCalledTimes(1);
-  });
-
+describe("useChatSession handoff delivery", () => {
   it("reports a task delivered once its session has started", async () => {
     const onHandoffDelivered = vi.fn();
     renderHook(() => useChatSession("ws", { task: "fix it", onHandoffDelivered }));

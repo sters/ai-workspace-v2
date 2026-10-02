@@ -100,7 +100,7 @@ describe("ChangesBrowser", () => {
     );
   });
 
-  it("collects selections and hands them to the chat as one draft", () => {
+  it("collects selections and opens a chat whose first message is all of them", () => {
     searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
     render(<ChangesBrowser workspaceName="ws" />);
 
@@ -111,9 +111,11 @@ describe("ChangesBrowser", () => {
     fireEvent.click(screen.getByRole("button", { name: /talk in chat/i }));
 
     expect(mockPush).toHaveBeenCalledWith("/workspace/ws/chat/interactive");
-    const draft = peekChatHandoff("ws")?.draft ?? "";
-    expect(draft).toContain("1. github.com/acme/web/src/app.ts, lines 4-5");
-    expect(draft).toContain("2. github.com/acme/web/src/app.ts, lines 4-5");
+    const handoff = peekChatHandoff("ws");
+    // The opening message of a new session, not text left in a prompt box.
+    const topic = handoff?.discussion ?? "";
+    expect(topic).toContain("1. github.com/acme/web/src/app.ts, lines 4-5");
+    expect(topic).toContain("2. github.com/acme/web/src/app.ts, lines 4-5");
     // Handed over, so the tray starts empty next time.
     expect(screen.queryByText(/selections? for the chat/)).not.toBeInTheDocument();
   });

@@ -13,7 +13,7 @@ export default function ChatInteractivePage({
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
   useDocumentTitle(`Interactive Chat - ${decodedName}`);
-  // What the page that navigated here asked for — a task, a draft, a chat
+  // What the page that navigated here asked for — a task, a topic, a chat
   // variant. Read without consuming, and cleared only once a session has it,
   // so a reload before then still applies it and a reload after resumes.
   const [handoff] = useState(() =>
@@ -29,7 +29,6 @@ export default function ChatInteractivePage({
         researchChat={handoff?.researchChat}
         task={handoff?.task}
         discussion={handoff?.discussion}
-        draft={handoff?.draft}
         onHandoffDelivered={handoff ? onHandoffDelivered : undefined}
       />
     </div>

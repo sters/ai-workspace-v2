@@ -21,7 +21,7 @@ import { Card } from "../shared/containers/card";
 import { UnifiedDiffViewer } from "../shared/content/unified-diff-viewer";
 import { StatusText } from "../shared/feedback/status-text";
 import { chatPagePath, stashChatHandoff } from "@/lib/chat-handoff";
-import { buildSelectionDraft, locateSelection, type ChatSelection } from "@/lib/chat-selection";
+import { buildSelectionTopic, locateSelection, type ChatSelection } from "@/lib/chat-selection";
 import { CHANGES_DIFF_MAX_BYTES } from "@/lib/constants";
 import { buildFileTree, type FileTreeRow } from "@/lib/file-tree";
 import type { LineRangeDescription } from "@/lib/unified-diff";
@@ -32,9 +32,9 @@ import type { ChangedFile, ChangedFileStatus, RepoChangeSet } from "@/types/chan
  * Every worktree's change against its base branch: one collapsible group per
  * repository, each a file tree, with the selected file's diff beside them.
  *
- * Lines selected in a diff can be collected and handed to the chat as one
- * prompt-box draft, so a question about several places in the change is asked
- * once, with all of them quoted.
+ * Lines selected in a diff can be collected and handed to the chat as the
+ * opening message of a new session, so a question about several places in the
+ * change is asked once, with all of them quoted.
  *
  * The selected file lives in `?repo=&file=`, so a reload and a pasted link land
  * on it.
@@ -57,7 +57,7 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
   };
 
   const talkInChat = () => {
-    stashChatHandoff(workspaceName, { draft: buildSelectionDraft(selections.items) });
+    stashChatHandoff(workspaceName, { discussion: buildSelectionTopic(selections.items) });
     selections.clear();
     router.push(chatPagePath(workspaceName));
   };

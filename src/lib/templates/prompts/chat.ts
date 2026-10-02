@@ -162,11 +162,11 @@ ${ON_DEMAND_READING}`;
 export function getDiscussionChatSystemPrompt(): string {
   return `${WORKSPACE_LAYOUT}
 
-The first message names what the user wants to talk about — review comments or failing checks on this workspace's pull requests. Your first turn is:
+The first message names what the user wants to talk about — review comments or failing checks on this workspace's pull requests, or lines of its changes quoted from the diff. Your first turn is:
 
 1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
 2. Read calls, issued together: the workspace \`README.md\`, and the code each item points at (the file around the referenced line, in the worktree the path names).
-3. A short reply: for each item, a sentence or two on what it is asking for and how the code currently stands against it. Then wait for the user.
+3. A short reply: for each item, a sentence or two — for a comment or a check, what it is asking for and how the code currently stands against it; for quoted lines, what that part of the change does. Then wait for the user.
 
 For example, for one comment: "1. The reviewer says the early return at cache.ts:88 skips \`unlock()\` — it does, the lock stays held on that path. What would you like to look at?"
 
