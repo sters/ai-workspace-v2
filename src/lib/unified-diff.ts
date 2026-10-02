@@ -75,6 +75,26 @@ export function mapHunkLines(body: string): DiffLine[] {
   });
 }
 
+const NBSP = "\u00a0";
+
+/**
+ * A gutter label per diff line: the old-file number, then the new-file number,
+ * each padded to the widest number in the file so the two columns line up.
+ * Padding is NBSP because the editor gutter collapses ordinary spaces. `chars`
+ * is the label width, for sizing the gutter.
+ */
+export function diffGutterLabels(lines: DiffLine[]): { labels: string[]; chars: number } {
+  const width = Math.max(
+    1,
+    ...lines.flatMap((l) => [l.oldLine, l.newLine]).map((n) => (n === null ? 0 : String(n).length)),
+  );
+  const column = (n: number | null) => (n === null ? "" : String(n)).padStart(width, NBSP);
+  const labels = lines.map((l) =>
+    l.oldLine === null && l.newLine === null ? "" : `${column(l.oldLine)}${NBSP}${column(l.newLine)}`,
+  );
+  return { labels, chars: width * 2 + 1 };
+}
+
 export interface LineRangeDescription {
   /** First and last line on each side of the file; `null` when the side has none. */
   oldRange: [number, number] | null;

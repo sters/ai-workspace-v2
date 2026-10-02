@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { hunkBody, mapHunkLines, describeLineRange, parseDiffByFile } from "@/lib/unified-diff";
+import {
+  hunkBody,
+  mapHunkLines,
+  describeLineRange,
+  diffGutterLabels,
+  parseDiffByFile,
+} from "@/lib/unified-diff";
 
 const DIFF = [
   "diff --git a/src/a.ts b/src/a.ts",
@@ -62,6 +68,43 @@ describe("describeLineRange", () => {
 
   it("clamps a range that runs past the end", () => {
     expect(describeLineRange(lines, 9, 99).newRange).toEqual([42, 42]);
+  });
+});
+
+describe("diffGutterLabels", () => {
+  // The gutter collapses ordinary spaces, so the labels pad with NBSP.
+  const shown = (label: string) => label.replaceAll("\u00a0", " ");
+
+  it("labels each line with its old and new file line numbers", () => {
+    const { labels, chars } = diffGutterLabels(mapHunkLines(hunkBody(DIFF)));
+    expect(labels.map(shown)).toEqual([
+      "",
+      "10 10",
+      "11   ",
+      "   11",
+      "   12",
+      "12 13",
+      "",
+      "40 41",
+      "41   ",
+      "   42",
+    ]);
+    expect(chars).toBe(5);
+  });
+
+  it("pads every label to the widest number in the file", () => {
+    const { labels, chars } = diffGutterLabels(
+      mapHunkLines(["@@ -9,2 +99,3 @@", " a", "-b", "+c", "+d"].join("\n")),
+    );
+    expect(labels.map(shown)).toEqual(["", "  9  99", " 10    ", "    100", "    101"]);
+    expect(chars).toBe(7);
+  });
+
+  it("leaves a no-newline marker unnumbered", () => {
+    const { labels } = diffGutterLabels(
+      mapHunkLines(["@@ -1 +1 @@", "-a", "\\ No newline at end of file", "+a"].join("\n")),
+    );
+    expect(labels.map(shown)).toEqual(["", "1  ", "", "  1"]);
   });
 });
 
