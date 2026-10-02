@@ -8,6 +8,8 @@ import type { OperationType } from "@/types/operation";
 /**
  * Hook that starts an operation via POST and navigates to the operations page.
  * Replaces the repeated `startAndNavigate` pattern across workspace components.
+ * Resolves `false` when the operation was refused, so a caller can keep what
+ * the user entered.
  */
 export function useStartAndNavigate(workspaceName: string) {
   const router = useRouter();
@@ -17,7 +19,7 @@ export function useStartAndNavigate(workspaceName: string) {
   // input — `validate-pr-comments` posts an array of thread ids — and JSON is
   // the wire format either way.
   return useCallback(
-    async (type: OperationType, body: Record<string, unknown>) => {
+    async (type: OperationType, body: Record<string, unknown>): Promise<boolean> => {
       const res = await fetch(`/api/operations/${type}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -25,7 +27,7 @@ export function useStartAndNavigate(workspaceName: string) {
       });
       if (!res.ok) {
         console.error("Failed to start operation:", await res.text());
-        return;
+        return false;
       }
       const op = await res.json();
       // Invalidate operations SWR caches so the new operation appears on the target page
@@ -37,6 +39,7 @@ export function useStartAndNavigate(workspaceName: string) {
       router.push(
         `/workspace/${encodeURIComponent(workspaceName)}/operations?operationId=${encodeURIComponent(op.id)}`
       );
+      return true;
     },
     [router, workspaceName, mutate],
   );

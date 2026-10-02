@@ -6,7 +6,7 @@
  * own `gh`, so it can read a log when the conversation turns out to need one.
  */
 
-import { fenceFor } from "@/lib/chat-selection";
+import { fenceFor } from "@/lib/change-comments";
 import { renderValidationForPrompt } from "@/lib/templates/prompts/triage-pr-comments";
 import type { PrThreadValidation } from "@/types/pull-request";
 

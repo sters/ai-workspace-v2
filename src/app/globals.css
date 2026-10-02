@@ -104,3 +104,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* The diff viewer's gutter mark beside lines that carry an inline comment. */
+.monaco-editor .aiw-diff-zone-lines {
+  border-left: 3px solid #d29922;
+  margin-left: 3px;
+}
