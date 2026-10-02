@@ -192,13 +192,14 @@ export function UnifiedDiffViewer({
     if (!ed) return;
     const wanted = new Map((zones ?? []).map((z) => [z.key, z]));
 
-    for (const [key, mounted] of mountedZones.current) {
-      if (wanted.has(key)) continue;
-      ed.removeOverlayWidget(mounted.widget);
-      mountedZones.current.delete(key);
-      zoneNodes.current.delete(key);
-    }
     ed.changeViewZones((accessor) => {
+      for (const [key, mounted] of mountedZones.current) {
+        if (wanted.has(key)) continue;
+        if (mounted.zoneId) accessor.removeZone(mounted.zoneId);
+        ed.removeOverlayWidget(mounted.widget);
+        mountedZones.current.delete(key);
+        zoneNodes.current.delete(key);
+      }
       for (const [key, z] of wanted) {
         let mounted = mountedZones.current.get(key);
         if (mounted?.zoneId && mounted.afterLine === z.toLine) continue;
