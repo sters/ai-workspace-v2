@@ -10,14 +10,12 @@ import { Card } from "../shared/containers/card";
 import { cardVariants } from "../shared/containers/card";
 import { MarkdownRenderer } from "../shared/content/markdown-renderer";
 import { Textarea } from "../shared/forms/textarea";
-import { InteractionLevelSelector } from "../shared/forms/interaction-level-selector";
 import { StatusText } from "../shared/feedback/status-text";
 import { ReviewFindingsList } from "./review-findings-list";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { ARTIFACT_MAX_BYTES } from "@/lib/constants";
 import { formatBytes } from "@/lib/utils";
-import type { InteractionLevel } from "@/types/prompts";
 import type { ReviewFileRef } from "@/types/workspace";
 
 export function ReviewDetail({
@@ -28,7 +26,6 @@ export function ReviewDetail({
   timestamp: string;
 }) {
   const [instruction, setInstruction] = useState("");
-  const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
   const { summary, files, isLoading } = useReviewDetail(
     workspaceName,
     timestamp
@@ -55,21 +52,12 @@ export function ReviewDetail({
               disabled={isRunning}
               rows={2}
             />
-            <div className="flex items-center justify-end gap-4">
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-muted-foreground">Interaction:</span>
-                <InteractionLevelSelector
-                  value={interactionLevel}
-                  onChange={setInteractionLevel}
-                  disabled={isRunning}
-                />
-              </div>
+            <div className="flex items-center justify-end">
               <Button
                 onClick={() =>
                   startAndNavigate("create-todo", {
                     workspace: workspace.path,
                     reviewTimestamp: timestamp,
-                    interactionLevel,
                     ...(instruction.trim() && {
                       instruction: instruction.trim(),
                     }),

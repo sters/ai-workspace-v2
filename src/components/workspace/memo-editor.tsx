@@ -146,7 +146,6 @@ export function MemoEditor({
     startAndNavigate("update-todo", {
       workspace: workspacePath,
       instruction,
-      interactionLevel: "mid",
     });
   }, [getSelectedText, buildPrompt, clearInputs, saveMemo, startAndNavigate, workspacePath]);
 

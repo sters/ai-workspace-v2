@@ -4,10 +4,8 @@ import { useState, type ReactNode } from "react";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";
 import { Textarea } from "../shared/forms/textarea";
-import { InteractionLevelSelector } from "../shared/forms/interaction-level-selector";
 import { getAddressPrReviewsInstruction } from "@/lib/templates/prompts/address-pr-reviews";
 import type { SplitButtonItem } from "@/types/components";
-import type { InteractionLevel } from "@/types/prompts";
 
 export function UpdateForm({
   label,
@@ -19,10 +17,10 @@ export function UpdateForm({
 }: {
   label: ReactNode;
   placeholder: string;
-  onSubmit: (instruction: string, interactionLevel: InteractionLevel) => void;
+  onSubmit: (instruction: string) => void;
   disabled: boolean;
   /** When provided, renders a SplitButton with batch dropdown items. */
-  batchItems?: (instruction: string, interactionLevel: InteractionLevel) => SplitButtonItem[];
+  batchItems?: (instruction: string) => SplitButtonItem[];
   /**
    * Rendered to the left of the quick-fill button. For actions that start their
    * own operation rather than filling this form's textarea, so they need the
@@ -31,16 +29,15 @@ export function UpdateForm({
   extraActions?: ReactNode;
 }) {
   const [instruction, setInstruction] = useState("");
-  const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
 
   const handleSubmit = () => {
     const trimmed = instruction.trim();
     if (!trimmed) return;
-    onSubmit(trimmed, interactionLevel);
+    onSubmit(trimmed);
     setInstruction("");
   };
 
-  const items = batchItems ? batchItems(instruction, interactionLevel) : undefined;
+  const items = batchItems ? batchItems(instruction) : undefined;
 
   return (
     <div className="space-y-2">
@@ -67,29 +64,23 @@ export function UpdateForm({
         >
           Address PR Reviews
         </button>
-        <div className="ml-auto flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">Interaction:</span>
-          <InteractionLevelSelector
-            value={interactionLevel}
-            onChange={setInteractionLevel}
-            disabled={disabled}
-          />
+        <div className="ml-auto">
+          {items ? (
+            <SplitButton
+              label={label}
+              onClick={handleSubmit}
+              disabled={disabled || !instruction.trim()}
+              items={items}
+            />
+          ) : (
+            <Button
+              onClick={handleSubmit}
+              disabled={disabled || !instruction.trim()}
+            >
+              {label}
+            </Button>
+          )}
         </div>
-        {items ? (
-          <SplitButton
-            label={label}
-            onClick={handleSubmit}
-            disabled={disabled || !instruction.trim()}
-            items={items}
-          />
-        ) : (
-          <Button
-            onClick={handleSubmit}
-            disabled={disabled || !instruction.trim()}
-          >
-            {label}
-          </Button>
-        )}
       </div>
     </div>
   );

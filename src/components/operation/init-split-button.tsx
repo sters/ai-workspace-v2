@@ -1,7 +1,6 @@
 "use client";
 
 import { SplitButton } from "@/components/shared/buttons/split-button";
-import type { InteractionLevel } from "@/types/prompts";
 import type { OperationType } from "@/types/operation";
 
 /**
@@ -13,12 +12,10 @@ import type { OperationType } from "@/types/operation";
  */
 export function InitSplitButton({
   description,
-  interactionLevel,
   start,
   disabled,
 }: {
   description: string;
-  interactionLevel: InteractionLevel;
   start: (type: OperationType, body: Record<string, string>) => void | Promise<unknown>;
   disabled?: boolean;
 }) {
@@ -30,7 +27,6 @@ export function InitSplitButton({
         if (!trimmed) return;
         return start("autonomous", {
           description: trimmed,
-          interactionLevel,
           startWith: "init",
         });
       }}
@@ -40,7 +36,7 @@ export function InitSplitButton({
           label: "Init only",
           onClick: () => {
             if (!trimmed) return;
-            return start("init", { description: trimmed, interactionLevel });
+            return start("init", { description: trimmed });
           },
         },
       ]}

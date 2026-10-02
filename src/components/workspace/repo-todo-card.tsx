@@ -183,16 +183,15 @@ export function RepoTodoCard({
               label="Start autonomous"
               placeholder={`Update TODOs for ${todo.repoName}...`}
               disabled={disabled}
-              onSubmit={(instruction, interactionLevel) => {
+              onSubmit={(instruction) => {
                 onStartAndNavigate("autonomous", {
                   ...baseBody,
                   workspace: workspacePath,
                   instruction,
-                  interactionLevel,
                   startWith: "update-todo",
                 });
               }}
-              batchItems={(instruction, interactionLevel) => [
+              batchItems={(instruction) => [
                 {
                   label: "Update TODOs only",
                   onClick: () =>
@@ -200,7 +199,6 @@ export function RepoTodoCard({
                       ...baseBody,
                       workspace: workspacePath,
                       instruction: instruction.trim(),
-                      interactionLevel,
                     }),
                 },
               ]}

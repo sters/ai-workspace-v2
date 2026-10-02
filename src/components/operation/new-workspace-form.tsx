@@ -4,12 +4,10 @@ import { useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
 import { InitSplitButton } from "./init-split-button";
 import { StatusText } from "@/components/shared/feedback/status-text";
-import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import { RepositoryPicker } from "@/components/shared/forms/repository-picker";
 import { SnippetPicker } from "@/components/shared/forms/snippet-picker";
 import { postJson } from "@/lib/api";
 import { SELECTED_REPOS_HEADING, withSelectedRepositories } from "@/lib/task-description";
-import type { InteractionLevel } from "@/types/prompts";
 import type { OperationType } from "@/types/operation";
 
 /** The routes answer a refusal with `{ error }`; anything else is shown as it came. */
@@ -32,7 +30,6 @@ export function NewWorkspaceForm({
 }) {
   const { mutate } = useSWRConfig();
   const [description, setDescription] = useState(initialDescription);
-  const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
   const [selected, setSelected] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -112,23 +109,7 @@ export function NewWorkspaceForm({
         </p>
       </div>
 
-      <div>
-        <label className="mb-1 block text-xs font-medium">Interaction Level</label>
-        <InteractionLevelSelector value={interactionLevel} onChange={setInteractionLevel} />
-        <p className="mt-1 text-xs text-muted-foreground">
-          {interactionLevel === "low"
-            ? "AI decides autonomously. Asks only when critical info is missing."
-            : interactionLevel === "mid"
-              ? "Asks about important unknowns like missing repositories."
-              : "Confirms scope, approach, and requirements. Adds checkpoints during TODO planning."}
-        </p>
-      </div>
-
-      <InitSplitButton
-        description={composed}
-        interactionLevel={interactionLevel}
-        start={start}
-      />
+      <InitSplitButton description={composed} start={start} />
 
       {error && <StatusText variant="error">Failed to start: {error}</StatusText>}
       {confirmed && <StatusText>Started — it is listed under Recent New Operations below.</StatusText>}

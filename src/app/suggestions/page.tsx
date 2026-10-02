@@ -7,11 +7,9 @@ import { useOperation } from "@/hooks/use-operation";
 import { useSuggestions } from "@/hooks/use-suggestions";
 import { postJson } from "@/lib/api";
 import { InitSplitButton } from "@/components/operation/init-split-button";
-import { InteractionLevelSelector } from "@/components/shared/forms/interaction-level-selector";
 import { CollapsibleSection } from "@/components/shared/containers/collapsible-section";
 import { X, Search, Trash2, Layers } from "lucide-react";
 import Link from "next/link";
-import type { InteractionLevel } from "@/types/prompts";
 import type { OperationType } from "@/types/operation";
 
 const AGGREGATE_STORAGE_KEY = "aggregate-suggestions";
@@ -37,7 +35,6 @@ export default function SuggestionsPage() {
   const { start } = useOperation();
   const { start: startAggregate } = useOperation(AGGREGATE_STORAGE_KEY);
   const router = useRouter();
-  const [interactionLevel, setInteractionLevel] = useState<InteractionLevel>("mid");
   const [starting, setStarting] = useState(false);
   const [startNote, setStartNote] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [query, setQuery] = useState("");
@@ -84,17 +81,6 @@ export default function SuggestionsPage() {
     <div>
       <div className="space-y-4">
         <div className="flex flex-wrap items-end gap-4">
-          <div>
-            <label className="mb-1 block text-xs font-medium">
-              Interaction Level
-            </label>
-            <InteractionLevelSelector
-              value={interactionLevel}
-              onChange={setInteractionLevel}
-              disabled={starting}
-            />
-          </div>
-
           <button
             onClick={handleAggregate}
             disabled={starting || suggestions.length < 2}
@@ -211,7 +197,6 @@ export default function SuggestionsPage() {
                     <div className="mt-3">
                       <InitSplitButton
                         description={s.description}
-                        interactionLevel={interactionLevel}
                         start={(type, body) => handleStart(s.id, type, body)}
                         disabled={starting}
                       />

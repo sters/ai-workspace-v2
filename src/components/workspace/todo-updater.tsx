@@ -71,11 +71,10 @@ export function TodoUpdater({
     />
   );
 
-  const interjectSubmit = (instruction: string, interactionLevel: string) => {
+  const interjectSubmit = (instruction: string) => {
     startAndNavigate("update-todo", {
       workspace: workspacePath,
       instruction,
-      interactionLevel,
       interject: "true",
     });
   };
@@ -104,22 +103,20 @@ export function TodoUpdater({
               label="Start autonomous"
               placeholder="Describe TODO changes to apply across all repositories..."
               disabled={isUpdateTodoRunning}
-              onSubmit={(instruction, interactionLevel) => {
+              onSubmit={(instruction) => {
                 startAndNavigate("autonomous", {
                   workspace: workspacePath,
                   instruction,
-                  interactionLevel,
                   startWith: "update-todo",
                 });
               }}
-              batchItems={(instruction, interactionLevel) => [
+              batchItems={(instruction) => [
                 {
                   label: "Update TODOs only",
                   onClick: () =>
                     startAndNavigate("update-todo", {
                       workspace: workspacePath,
                       instruction: instruction.trim(),
-                      interactionLevel,
                     }),
                 },
               ]}

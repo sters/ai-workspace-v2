@@ -52,7 +52,6 @@ describe("NewWorkspaceForm", () => {
     expect(sentBody()).toEqual({
       description:
         "Add retry logic to the payment path\n\n## Selected Repos\n- github.com/acme/api\n- github.com/acme/web",
-      interactionLevel: "mid",
       startWith: "init",
     });
   });
@@ -90,15 +89,13 @@ describe("NewWorkspaceForm", () => {
     expect(screen.getByLabelText(/task description/i)).toHaveValue("from a suggestion");
   });
 
-  it("empties the request it just started, and keeps the interaction level", async () => {
+  it("empties the request it just started", async () => {
     render(<NewWorkspaceForm initialDescription="from a suggestion" />);
-    fireEvent.click(screen.getByRole("button", { name: "Low" }));
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
     submit();
 
     await waitFor(() => expect(screen.getByLabelText(/task description/i)).toHaveValue(""));
     expect(screen.getByRole("checkbox", { name: /acme\/web/ })).not.toBeChecked();
-    expect(screen.getByRole("button", { name: "Low" })).toHaveClass("bg-primary");
   });
 
   it("takes the next request without a reload", async () => {

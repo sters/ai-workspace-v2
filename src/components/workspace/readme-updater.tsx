@@ -29,11 +29,10 @@ export function ReadmeUpdater({
         label={canInterject ? "Interject + restart" : "Update README"}
         placeholder="Describe README changes (e.g., 'add a Risks section', 'tighten Objective')..."
         disabled={isUpdateReadmeRunning}
-        onSubmit={(instruction, interactionLevel) => {
+        onSubmit={(instruction) => {
           startAndNavigate("update-readme", {
             workspace: workspacePath,
             instruction,
-            interactionLevel,
             ...(canInterject && { interject: "true" }),
           });
         }}
