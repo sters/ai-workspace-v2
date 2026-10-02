@@ -34,12 +34,13 @@
 import path from "node:path";
 import { existsSync } from "node:fs";
 import { quickWorkspaceName } from "@/lib/naming";
-import { denormalizeRepoPath } from "@/lib/parsers/readme";
+import { denormalizeRepoPath, type RepoConstraint } from "@/lib/parsers/readme";
 import { parsePrUrl, type PrUrlInfo } from "@/lib/github-pr-url";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 import type { SelectableRepository } from "@/types/workspace";
 import { commitWorkspaceSnapshot, listAllRepositories } from "./git";
 import { localBaseBranch, repoDir } from "./helpers";
+import { appendRepoConstraints } from "./repo-constraints-cache";
 import { setupWorkspace } from "./setup";
 import type { PrBranchInfo } from "./pr-url";
 
@@ -115,6 +116,12 @@ export interface QuickCreateDeps {
   ) => SetupRepositoryResult;
   /** `gh pr view`, injected for the same reason. */
   resolvePullRequest: (pr: PrUrlInfo) => PrBranchInfo;
+  /**
+   * The repository's constraints from an earlier workspace's discovery, when
+   * they are still current. This path discovers nothing itself, so a
+   * repository without them reaches review with no lint/test/build declared.
+   */
+  cachedConstraints?: (worktreePath: string) => RepoConstraint[] | null;
 }
 
 /** The PR as it goes into `## Initial Request`: what a reader needs without opening it. */
@@ -296,11 +303,15 @@ export async function createQuickWorkspace(
 
   const readmePath = path.join(workspacePath, "README.md");
   if (existsSync(readmePath)) {
-    const content = await Bun.file(readmePath).text();
-    await Bun.write(
-      readmePath,
-      fillQuickReadme(content, { title: name || workspaceName, repositories }),
-    );
+    let content = fillQuickReadme(await Bun.file(readmePath).text(), {
+      title: name || workspaceName,
+      repositories,
+    });
+    for (const repo of repositories) {
+      const constraints = deps.cachedConstraints?.(repo.worktreePath);
+      if (constraints) content = appendRepoConstraints(content, repo.repoName, constraints);
+    }
+    await Bun.write(readmePath, content);
   }
 
   await commitWorkspaceSnapshot(workspaceName, `Quick init: ${workspaceName} created`);

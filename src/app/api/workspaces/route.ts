@@ -4,6 +4,7 @@ import { quickCreateWorkspaceSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 import { createQuickWorkspace, QuickCreateRefusal } from "@/lib/workspace/quick-create";
 import { resolvePrBranch } from "@/lib/workspace/pr-url";
+import { cachedRepoConstraints } from "@/lib/workspace/repo-constraints-cache";
 import { listWorkspaceItems } from "@/lib/workspace/reader";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
     const result = await createQuickWorkspace(parsed.data, {
       setupRepository,
       resolvePullRequest: resolvePrBranch,
+      cachedConstraints: cachedRepoConstraints,
     });
     return NextResponse.json(result);
   } catch (err) {
