@@ -18,6 +18,8 @@ export interface PrChatThread {
   line: number | null;
   comments: { author: string; url: string; body: string }[];
   validation?: PrThreadValidation;
+  /** What the user wrote on the thread when selecting it. */
+  note?: string;
 }
 
 export interface PrChatCheck {
@@ -25,6 +27,12 @@ export interface PrChatCheck {
   prUrl: string;
   name: string;
   url: string | null;
+  note?: string;
+}
+
+function myNote(note: string | undefined): string[] {
+  const said = note?.trim();
+  return said ? [`My note: ${said}`] : [];
 }
 
 function locateThread(thread: PrChatThread): string {
@@ -38,7 +46,7 @@ function renderThread(thread: PrChatThread): string {
   const fence = fenceFor(comments);
   const parts = [`Review comment at ${locateThread(thread)}`];
   if (thread.comments[0]) parts.push(thread.comments[0].url);
-  parts.push(`${fence}\n${comments}\n${fence}`);
+  parts.push(`${fence}\n${comments}\n${fence}`, ...myNote(thread.note));
   if (thread.validation) parts.push(renderValidationForPrompt(thread.validation));
   return parts.join("\n");
 }
@@ -47,6 +55,7 @@ function renderCheck(check: PrChatCheck): string {
   return [
     `Failing check \`${check.name}\` on ${check.prUrl} (worktree ${check.repoPath})`,
     check.url ? `Log: ${check.url}` : "No log link was reported for it.",
+    ...myNote(check.note),
   ].join("\n");
 }
 

@@ -79,6 +79,19 @@ describe("buildPrChatTopic", () => {
     expect(draft).toContain("https://github.com/acme/widgets/actions/runs/1/job/2");
   });
 
+  it("carries the note written on a comment or a check, after what it is about", () => {
+    const draft = buildPrChatTopic({
+      threads: [{ ...thread, note: "A or B? I lean A." }],
+      checks: [{ repoPath: "github.com/acme/widgets", prUrl: "p", name: "lint", url: null, note: "Flaky?" }],
+    });
+    expect(draft).toMatch(/Is it\?\n`{3,}\nMy note: A or B\? I lean A\./);
+    expect(draft).toContain("My note: Flaky?");
+  });
+
+  it("adds no note line when none was written", () => {
+    expect(buildPrChatTopic({ threads: [{ ...thread, note: " " }], checks: [] })).not.toContain("My note:");
+  });
+
   it("numbers comments and checks as one list", () => {
     const draft = buildPrChatTopic({
       threads: [thread],

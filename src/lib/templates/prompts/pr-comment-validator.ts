@@ -15,6 +15,7 @@
  * into a coin flip, which is worse than no button.
  */
 
+import { fenceFor } from "@/lib/change-comments";
 import { REPO_SEARCH_EFFICIENCY, worktreeCdRules } from "./shared";
 import type { PrCommentValidatorInput } from "@/types/prompts";
 
@@ -128,6 +129,22 @@ ${c.body}
     })
     .join("\n\n");
 
+  // The human's note is usually where they already are: options they see and the
+  // one they lean towards. A verdict that ignores it answers a question they were
+  // past, so the recommendation is asked to take a position on it.
+  const note = input.note?.trim();
+  const noteSection = note
+    ? `
+## A Note From the Human Who Asked
+
+${fenceFor(note)}
+${note}
+${fenceFor(note)}
+
+This is their current thinking about the comment — often the options they see and the one they lean towards. Judge the comment as usual, and in \`recommendation\` also say whether their preferred direction holds against the code. If another option they named, or one they did not, is better, say which and why.
+`
+    : "";
+
   return `# Task: Validate one PR review comment on ${input.repoName}
 
 ## Workspace: ${input.workspaceName}
@@ -141,7 +158,7 @@ ${outdated}
 ## The Thread
 
 ${comments || "_(the thread has no readable comment body)_"}
-
+${noteSection}
 ## What This PR Changed
 
 \`\`\`bash

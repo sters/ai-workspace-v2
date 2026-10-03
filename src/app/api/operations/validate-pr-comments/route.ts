@@ -18,7 +18,11 @@ export async function POST(request: Request) {
   const threadIds = [...new Set(parsed.data.threadIds)];
 
   try {
-    const phases = buildValidatePrCommentsPipeline({ workspace, threadIds });
+    const phases = buildValidatePrCommentsPipeline({
+      workspace,
+      threadIds,
+      notes: parsed.data.notes,
+    });
     const operation = startOperationPipeline(
       "validate-pr-comments",
       workspace,

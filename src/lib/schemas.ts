@@ -107,6 +107,8 @@ export const resolveBaseConflictsSchema = z.object({
 export const validatePrCommentsSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   threadIds: z.array(z.string().min(1)).min(1, "at least one threadId is required"),
+  /** What the human wrote on a selected thread, keyed by thread id. */
+  notes: z.record(z.string(), z.string()).optional(),
 });
 
 /**

@@ -9,6 +9,7 @@ import {
   operationAnswerSchema,
   mcpAuthSchema,
   quickCreateWorkspaceSchema,
+  validatePrCommentsSchema,
 } from "@/lib/schemas";
 
 describe("initSchema", () => {
@@ -203,6 +204,26 @@ describe("quickCreateWorkspaceSchema", () => {
   it("still requires a repository", () => {
     expect(
       quickCreateWorkspaceSchema.safeParse({ name: "login crash", repositories: [] }).success,
+    ).toBe(false);
+  });
+});
+
+describe("validatePrCommentsSchema", () => {
+  it("accepts a note per thread, and no notes at all", () => {
+    expect(
+      validatePrCommentsSchema.safeParse({
+        workspace: "ws",
+        threadIds: ["PRRT_a"],
+        notes: { PRRT_a: "A looks best." },
+      }).success,
+    ).toBe(true);
+    expect(validatePrCommentsSchema.safeParse({ workspace: "ws", threadIds: ["PRRT_a"] }).success).toBe(true);
+  });
+
+  it("rejects a note that is not text", () => {
+    expect(
+      validatePrCommentsSchema.safeParse({ workspace: "ws", threadIds: ["PRRT_a"], notes: { PRRT_a: 1 } })
+        .success,
     ).toBe(false);
   });
 });

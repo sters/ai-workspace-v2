@@ -20,6 +20,7 @@
  * `stripCompletedTodoItems` deleting the `[x]` items worth replying about.
  */
 
+import { fenceFor } from "@/lib/change-comments";
 import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
 import type { PrCheckFailureLog, PrThreadValidation } from "@/types/pull-request";
 
@@ -56,6 +57,35 @@ export interface TriageThread {
   author: string;
   /** The thread's comments, already flattened into one block of text. */
   body: string;
+  /** How the human who selected the thread wants it handled. */
+  note?: string;
+}
+
+/**
+ * The human's direction for one item, quoted.
+ *
+ * A note is typically a choice the human has half made — "A, B or C; A looks
+ * best, or something better if you find one" — so the block says both that it
+ * governs and that the room it leaves is the run's to use. The approach has to
+ * land in the TODO item because the executor reads nothing else.
+ */
+function renderDirection(note: string | undefined, kind: "thread" | "check"): string {
+  const said = note?.trim();
+  if (!said) return "";
+  const fence = fenceFor(said);
+  const outranks =
+    kind === "thread"
+      ? "It outranks the prior validation's recommendation and your own preference where they differ"
+      : "It outranks your own reading of the log where they differ — if it says the failure is not this branch's, record it under `## Notes` as described below instead of adding an item";
+  return `
+**Direction from the human who selected this ${kind}:**
+
+${fence}
+${said}
+${fence}
+
+${outranks}. Where it leaves a choice open — several options, a preferred one, "or something better" — settle it against the code, and write the approach you chose and why into the TODO item: the executor reads only the TODO file, so a direction left in this instruction never reaches the code. If the code shows the direction it prefers cannot work, take the next option it allows; if none can, add the item as \`[!]\` blocked with the reason.
+`;
 }
 
 function renderThread(
@@ -90,7 +120,7 @@ Treat that as a starting point, not as the plan: it was written before this tria
 \`\`\`
 ${thread.body}
 \`\`\`
-${validationBlock}`;
+${renderDirection(thread.note, "thread")}${validationBlock}`;
 }
 
 /**
@@ -103,6 +133,7 @@ ${validationBlock}`;
  */
 export interface TriageCiFailure extends PrCheckFailureLog {
   prUrl: string;
+  note?: string;
 }
 
 function renderCiFailure(failure: TriageCiFailure, index: number): string {
@@ -124,7 +155,7 @@ ${failure.excerpt}
 - Pull request: ${failure.prUrl}
 - Failing check: \`${failure.name}\`${failure.url ? `\n- Logs: ${failure.url}` : ""}
 
-${logBlock}`;
+${logBlock}${renderDirection(failure.note, "check")}`;
 }
 
 export function buildTriagePrCommentsInstruction(input: {
@@ -155,7 +186,7 @@ export function buildTriagePrCommentsInstruction(input: {
       ? ""
       : `## Threads to triage
 
-A human read each of these and already decided it is valid and worth doing, so do not re-judge whether to act on it — plan the work.
+A human read each of these and already decided it is valid and worth doing, so do not re-judge whether to act on it — plan the work. Where they also wrote how they want it handled, that direction is quoted under the thread.
 
 ${threads.map((thread, i) => renderThread(thread, i + 1, validations?.[thread.id])).join("\n")}`;
 

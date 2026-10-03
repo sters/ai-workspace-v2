@@ -3,6 +3,7 @@
 import { ExternalLink } from "lucide-react";
 import { MarkdownRenderer } from "../shared/content/markdown-renderer";
 import { StatusBadge } from "../shared/feedback/status-badge";
+import { PrSelectionNote } from "./pr-selection-note";
 import { cn } from "@/lib/utils";
 import type { PrReviewThread, PrThreadValidation } from "@/types/pull-request";
 
@@ -20,12 +21,16 @@ export function PrReviewThreadRow({
   selected,
   onToggle,
   disabled,
+  note,
+  onNoteChange,
 }: {
   thread: PrReviewThread;
   validation?: PrThreadValidation;
   selected: boolean;
   onToggle: (threadId: string) => void;
   disabled: boolean;
+  note: string;
+  onNoteChange: (threadId: string, note: string) => void;
 }) {
   const location = thread.path
     ? `${thread.path}${thread.line != null ? `:${thread.line}` : ""}`
@@ -135,6 +140,16 @@ export function PrReviewThreadRow({
                 )}
               </dl>
             </div>
+          )}
+
+          {/* Below the verdict, since the note is usually written after reading it. */}
+          {selected && (
+            <PrSelectionNote
+              label={`review thread on ${location}`}
+              className="mt-2"
+              value={note}
+              onChange={(value) => onNoteChange(thread.id, value)}
+            />
           )}
         </div>
       </div>

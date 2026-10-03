@@ -130,6 +130,18 @@ describe("buildPrCommentValidatorPrompt", () => {
     );
   });
 
+  it("hands over the human's note and asks for the recommendation to answer it", () => {
+    const note = "Options A, B or C. A looks best — is there a better one?";
+    const withNote = buildPrCommentValidatorPrompt({ ...input, note });
+    expect(withNote).toContain(note);
+    expect(withNote).toMatch(/`recommendation`.*whether (the|their) (preferred )?direction holds/i);
+  });
+
+  it("adds no note section when the human wrote none", () => {
+    expect(prompt).not.toMatch(/Note From the Human/i);
+    expect(buildPrCommentValidatorPrompt({ ...input, note: "   " })).not.toMatch(/Note From the Human/i);
+  });
+
   it("survives a thread anchored to no file", () => {
     const unanchored = buildPrCommentValidatorPrompt({
       ...input,

@@ -163,6 +163,49 @@ describe("buildTriagePrCommentsInstruction", () => {
   it("says nothing about CI when only threads were selected", () => {
     expect(instruction).not.toMatch(/Failing CI checks/);
   });
+
+  describe("a direction the human wrote on the thread", () => {
+    const note = "Options A, B or C. A looks best; if there's a better one, use that.";
+    const directed = buildTriagePrCommentsInstruction({
+      threads: [{ ...thread, note }],
+      validations: { [thread.id]: validation },
+    });
+
+    it("quotes the note under the thread it belongs to", () => {
+      const section = directed.slice(directed.indexOf("### 1."));
+      expect(section).toContain(note);
+    });
+
+    it("puts the note ahead of the prior validation's recommendation", () => {
+      // The human wrote the note after reading the verdict, so where the two
+      // disagree the note is the later decision.
+      expect(directed.indexOf(note)).toBeLessThan(directed.indexOf("Prior validation"));
+      expect(directed).toMatch(/outranks the prior validation/i);
+    });
+
+    it("has the chosen approach written into the item, since the executor reads only the TODO", () => {
+      expect(directed).toMatch(/write the approach you chose.*into the TODO item/i);
+    });
+
+    it("says what to do when the code rules the preferred option out", () => {
+      expect(directed).toMatch(/cannot work/i);
+      expect(directed).toContain("`[!]`");
+    });
+
+    it("adds no direction block to a thread without a note", () => {
+      expect(instruction).not.toMatch(/Direction from the human/);
+      expect(
+        buildTriagePrCommentsInstruction({ threads: [{ ...thread, note: "  \n " }] }),
+      ).not.toMatch(/Direction from the human/);
+    });
+
+    it("cannot be closed early by a code fence inside the note", () => {
+      const fenced = buildTriagePrCommentsInstruction({
+        threads: [{ ...thread, note: "Like this:\n```ts\nfinally { unlock(); }\n```" }],
+      });
+      expect(fenced).toContain("````\nLike this:");
+    });
+  });
 });
 
 const ciFailure: TriageCiFailure = {
@@ -252,6 +295,13 @@ describe("buildTriagePrCommentsInstruction — failing CI checks", () => {
 
   it("skips the thread-record section when only checks were selected", () => {
     expect(instruction).not.toContain("| Thread ID | Comment URL | Summary | TODO item |");
+  });
+
+  it("carries a direction written on a check, which can settle the flake question", () => {
+    const note = "This is the known flaky snapshot; record it, do not fix it.";
+    const directed = buildTriagePrCommentsInstruction({ ciFailures: [{ ...ciFailure, note }] });
+    expect(directed.slice(directed.indexOf("### C1."))).toContain(note);
+    expect(directed).toMatch(/outranks your own reading of the log/i);
   });
 
   it("returns an empty string when neither kind was selected", () => {
