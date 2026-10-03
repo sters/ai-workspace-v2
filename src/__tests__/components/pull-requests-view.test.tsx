@@ -262,6 +262,116 @@ describe("PullRequestsView", () => {
     expect(draft).toContain("https://ci/lint");
   });
 
+  describe("a note on the selection", () => {
+    const note = "Options A, B or C. A looks best; if there's a better one, use that.";
+    const noteBox = () => screen.getByRole("textbox", { name: /note on .*src\/cache\.ts:88/i });
+
+    function tickAndWrite() {
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      fireEvent.change(noteBox(), { target: { value: note } });
+    }
+
+    it("opens a note box under a comment once it is ticked, and not before", () => {
+      setData();
+      render(<PullRequestsView workspaceName="feat" />);
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      expect(noteBox()).toBeInTheDocument();
+    });
+
+    it("hands the note to triage with the thread it was written on", () => {
+      setData();
+      render(<PullRequestsView workspaceName="feat" />);
+      tickAndWrite();
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+      expect(mockStartAndNavigate.mock.calls[0][1].instruction).toContain(note);
+    });
+
+    it("hands the note to validate, keyed by the thread", () => {
+      setData();
+      render(<PullRequestsView workspaceName="feat" />);
+      tickAndWrite();
+      fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+      expect(mockStartAndNavigate).toHaveBeenCalledWith("validate-pr-comments", {
+        workspace: "feat",
+        threadIds: ["PRRT_open"],
+        notes: { PRRT_open: note },
+      });
+    });
+
+    it("hands the note to the chat", () => {
+      setData();
+      render(<PullRequestsView workspaceName="feat" />);
+      tickAndWrite();
+      fireEvent.click(screen.getByRole("button", { name: "Chat" }));
+      expect(peekChatHandoff("feat")?.discussion).toContain(`My note: ${note}`);
+    });
+
+    it("keeps the note when the box is unticked and ticked again", () => {
+      setData();
+      render(<PullRequestsView workspaceName="feat" />);
+      tickAndWrite();
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      expect(noteBox()).toHaveValue(note);
+    });
+
+    it("keeps the note across leaving the tab, like the Changes tab's comments", () => {
+      setData();
+      const { unmount } = render(<PullRequestsView workspaceName="feat" />);
+      tickAndWrite();
+      unmount();
+      render(<PullRequestsView workspaceName="feat" />);
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      expect(noteBox()).toHaveValue(note);
+    });
+
+    it("drops the notes a started triage carried, so they are not sent twice", async () => {
+      mockStartAndNavigate.mockResolvedValue(true);
+      setData();
+      const { unmount } = render(<PullRequestsView workspaceName="feat" />);
+      tickAndWrite();
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+      await waitFor(() => expect(mockStartAndNavigate).toHaveBeenCalled());
+      unmount();
+      render(<PullRequestsView workspaceName="feat" />);
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      await waitFor(() => expect(noteBox()).toHaveValue(""));
+    });
+
+    it("keeps the notes when the triage was refused", async () => {
+      mockStartAndNavigate.mockResolvedValue(false);
+      setData();
+      const { unmount } = render(<PullRequestsView workspaceName="feat" />);
+      tickAndWrite();
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+      await waitFor(() => expect(mockStartAndNavigate).toHaveBeenCalled());
+      unmount();
+      render(<PullRequestsView workspaceName="feat" />);
+      fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+      expect(noteBox()).toHaveValue(note);
+    });
+
+    it("takes a note on a failing check into triage too", async () => {
+      setData({
+        pullRequests: [
+          pr({
+            threads: [],
+            checks: checksOf([{ name: "lint", state: "failure", url: "https://ci/lint" }]),
+          }),
+        ],
+      });
+      render(<PullRequestsView workspaceName="feat" />);
+      fireEvent.click(screen.getByRole("checkbox", { name: /lint/ }));
+      fireEvent.change(screen.getByRole("textbox", { name: /note on .*lint/i }), {
+        target: { value: "Known flaky snapshot." },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+      await waitFor(() => expect(mockStartAndNavigate).toHaveBeenCalled());
+      expect(mockStartAndNavigate.mock.calls[0][1].instruction).toContain("Known flaky snapshot.");
+    });
+  });
+
   it("blocks both actions while another operation holds the worktrees", () => {
     workspaceRunning = true;
     setData();

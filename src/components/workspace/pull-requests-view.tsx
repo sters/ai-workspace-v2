@@ -20,6 +20,7 @@ import {
 } from "@/lib/templates/prompts/triage-pr-comments";
 import { chatPagePath, stashChatHandoff } from "@/lib/chat-handoff";
 import { buildPrChatTopic } from "@/lib/pr-chat-topic";
+import { loadPrNotes, savePrNotes } from "@/lib/pr-notes";
 import type {
   PrCheck,
   PrCheckFailureLog,
@@ -34,8 +35,13 @@ function flattenComments(thread: PrReviewThread): string {
     .join("\n\n--- reply ---\n\n");
 }
 
-function toTriageThread(pr: WorkspacePullRequest, thread: PrReviewThread): TriageThread {
+function toTriageThread(
+  pr: WorkspacePullRequest,
+  thread: PrReviewThread,
+  note: string | undefined,
+): TriageThread {
   return {
+    note,
     id: thread.id,
     repoName: pr.repoName,
     prUrl: pr.url,
@@ -123,6 +129,26 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
   // The log read is a `gh` round trip per check, so the click has to say it is
   // doing something before the operation page takes over.
   const [isReadingLogs, setIsReadingLogs] = useState(false);
+  // Keyed like the selections (thread id, check key). Unticking keeps a note, so
+  // a box ticked again gets back what was written in it.
+  const [notes, setNotes] = useState<Record<string, string>>(() => loadPrNotes(workspaceName));
+
+  const updateNotes = (update: (prev: Record<string, string>) => Record<string, string>) =>
+    setNotes((prev) => {
+      const next = update(prev);
+      savePrNotes(workspaceName, next);
+      return next;
+    });
+
+  const setNote = (key: string, note: string) =>
+    updateNotes((prev) => {
+      const next = { ...prev };
+      if (note) next[key] = note;
+      else delete next[key];
+      return next;
+    });
+
+  const noteFor = (key: string): string | undefined => notes[key]?.trim() || undefined;
 
   // A validate reads the worktrees and a triage writes TODO files, so both would
   // be judging or planning against a tree another operation is editing.
@@ -208,9 +234,17 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
     .join(", ")} selected`;
 
   const handleValidate = async () => {
+    const threadIds = [...selectedIds];
+    const threadNotes = Object.fromEntries(
+      threadIds.flatMap((id) => {
+        const note = noteFor(id);
+        return note ? [[id, note]] : [];
+      }),
+    );
     await startAndNavigate("validate-pr-comments", {
       workspace: workspaceName,
-      threadIds: [...selectedIds],
+      threadIds,
+      ...(Object.keys(threadNotes).length > 0 && { notes: threadNotes }),
     });
   };
 
@@ -218,7 +252,7 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
     const threads = [...selectedIds]
       .map((id) => threadsById.get(id))
       .filter((entry): entry is { pr: WorkspacePullRequest; thread: PrReviewThread } => entry != null)
-      .map(({ pr, thread }) => toTriageThread(pr, thread));
+      .map(({ pr, thread }) => toTriageThread(pr, thread, noteFor(thread.id)));
 
     const checkTargets = [...selectedCheckKeys]
       .map((key) => failuresByKey.get(key))
@@ -230,19 +264,33 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
     if (checkTargets.length > 0) {
       setIsReadingLogs(true);
       try {
-        ciFailures = await loadCiFailures(workspaceName, checkTargets);
+        const logs = await loadCiFailures(workspaceName, checkTargets);
+        ciFailures = logs.map((failure, i) => ({
+          ...failure,
+          note: noteFor(checkKey(checkTargets[i].pr, checkTargets[i].check)),
+        }));
       } finally {
         setIsReadingLogs(false);
       }
     }
 
-    await startAndNavigate("autonomous", {
+    const sentKeys = [...selectedIds, ...selectedCheckKeys];
+    const started = await startAndNavigate("autonomous", {
       workspace: workspaceName,
       startWith: "update-todo",
       instruction: buildTriagePrCommentsInstruction({ threads, ciFailures, validations }),
       interactionLevel: "low",
       ...(scopedRepo && { repo: scopedRepo }),
     });
+    // Only a started run has consumed them: a refused one (the concurrency limit)
+    // keeps what was written for the next try.
+    if (started) {
+      updateNotes((prev) => {
+        const next = { ...prev };
+        for (const key of sentKeys) delete next[key];
+        return next;
+      });
+    }
   };
 
   const handleChat = () => {
@@ -256,11 +304,18 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
         line: thread.line,
         comments: thread.comments,
         validation: validations[thread.id],
+        note: noteFor(thread.id),
       }));
     const checks = [...selectedCheckKeys]
       .map((key) => failuresByKey.get(key))
       .filter((entry): entry is { pr: WorkspacePullRequest; check: PrCheck } => entry != null)
-      .map(({ pr, check }) => ({ repoPath: pr.repoPath, prUrl: pr.url, name: check.name, url: check.url }));
+      .map(({ pr, check }) => ({
+        repoPath: pr.repoPath,
+        prUrl: pr.url,
+        name: check.name,
+        url: check.url,
+        note: noteFor(checkKey(pr, check)),
+      }));
     if (threads.length === 0 && checks.length === 0) return;
 
     stashChatHandoff(workspaceName, { discussion: buildPrChatTopic({ threads, checks }) });
@@ -364,6 +419,8 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
                   selectedKeys={selectedCheckKeys}
                   onToggle={toggleCheck}
                   disabled={isRunning}
+                  notes={notes}
+                  onNoteChange={setNote}
                 />
                 <span className="ml-auto text-xs text-muted-foreground">
                   {pr.headRefName} → {pr.baseRefName} · {pr.threads.length} thread
@@ -388,6 +445,8 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
                     selected={selectedIds.has(thread.id)}
                     onToggle={toggle}
                     disabled={isRunning}
+                    note={notes[thread.id] ?? ""}
+                    onNoteChange={setNote}
                   />
                 ))
               )}

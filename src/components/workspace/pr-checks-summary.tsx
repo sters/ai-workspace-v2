@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { StatusBadge } from "../shared/feedback/status-badge";
 import { Button } from "../shared/buttons/button";
+import { PrSelectionNote } from "./pr-selection-note";
 import type { PrCheck, PrCheckState, PrChecksSummary } from "@/types/pull-request";
 
 const STATE_LABEL: Record<PrCheckState, string> = {
@@ -52,6 +53,8 @@ export function PrChecksSummaryView({
   selectedKeys,
   onToggle,
   disabled,
+  notes,
+  onNoteChange,
 }: {
   checks: PrChecksSummary;
   /** Selection key for a check, owned by the parent so both sides agree on it. */
@@ -59,6 +62,9 @@ export function PrChecksSummaryView({
   selectedKeys?: Set<string>;
   onToggle?: (key: string) => void;
   disabled?: boolean;
+  /** Notes keyed by `keyOf`; a selected check shows a box to write one. */
+  notes?: Record<string, string>;
+  onNoteChange?: (key: string, note: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -111,36 +117,51 @@ export function PrChecksSummaryView({
 
       {(expanded || counts.failure > 0) && shown.length > 0 && (
         <ul className="mt-1 w-full space-y-0.5 text-xs">
-          {shown.map((check) => (
-            <li key={`${check.name}-${check.state}`} className="flex items-center gap-2">
-              {onToggle && keyOf && isTriageableCheck(check) && (
-                <input
-                  type="checkbox"
-                  className="h-3 w-3 shrink-0 cursor-pointer accent-foreground"
-                  checked={selectedKeys?.has(keyOf(check)) ?? false}
-                  onChange={() => onToggle(keyOf(check))}
-                  disabled={disabled}
-                  aria-label={`Select failing check ${check.name} for triage`}
-                />
-              )}
-              <StatusBadge
-                label={STATE_LABEL[check.state]}
-                variant={STATE_VARIANT[check.state]}
-                shape="square"
-              />
-              <span className="truncate">{check.name}</span>
-              {check.url && (
-                <a
-                  href={check.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
-                >
-                  logs <ExternalLink className="h-3 w-3" />
-                </a>
-              )}
-            </li>
-          ))}
+          {shown.map((check) => {
+            const key = onToggle && keyOf && isTriageableCheck(check) ? keyOf(check) : null;
+            const selected = key != null && (selectedKeys?.has(key) ?? false);
+            return (
+              <li key={`${check.name}-${check.state}`}>
+                <div className="flex items-center gap-2">
+                  {key != null && (
+                    <input
+                      type="checkbox"
+                      className="h-3 w-3 shrink-0 cursor-pointer accent-foreground"
+                      checked={selected}
+                      onChange={() => onToggle?.(key)}
+                      disabled={disabled}
+                      aria-label={`Select failing check ${check.name} for triage`}
+                    />
+                  )}
+                  <StatusBadge
+                    label={STATE_LABEL[check.state]}
+                    variant={STATE_VARIANT[check.state]}
+                    shape="square"
+                  />
+                  <span className="truncate">{check.name}</span>
+                  {check.url && (
+                    <a
+                      href={check.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+                    >
+                      logs <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+                {selected && key != null && onNoteChange && (
+                  <div className="my-1 pl-5">
+                    <PrSelectionNote
+                      label={`failing check ${check.name}`}
+                      value={notes?.[key] ?? ""}
+                      onChange={(value) => onNoteChange(key, value)}
+                    />
+                  </div>
+                )}
+              </li>
+            );
+          })}
           {!expanded && checks.checks.length > shown.length && (
             <li>
               <Button variant="ghost" onClick={() => setExpanded(true)}>

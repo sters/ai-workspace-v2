@@ -153,6 +153,8 @@ export interface PrCommentValidatorInput extends RepoPromptInput {
   prUrl: string;
   prTitle?: string;
   thread: PrReviewThread;
+  /** What the human who asked for the validation wrote on the thread. */
+  note?: string;
 }
 
 /**

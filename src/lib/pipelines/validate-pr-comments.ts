@@ -94,8 +94,9 @@ export function parseValidationResult(
 export function buildValidatePrCommentsPipeline(input: {
   workspace: string;
   threadIds: string[];
+  notes?: Record<string, string>;
 }): PipelinePhase[] {
-  const { workspace, threadIds } = input;
+  const { workspace, threadIds, notes } = input;
   const wanted = new Set(threadIds);
 
   return [
@@ -154,6 +155,7 @@ export function buildValidatePrCommentsPipeline(input: {
             prUrl: pr.url,
             prTitle: pr.title,
             thread,
+            note: notes?.[thread.id],
           }),
           cwd: pr.worktreePath,
           addDirs: [pr.worktreePath],
