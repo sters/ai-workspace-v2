@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronDown,
@@ -35,21 +35,24 @@ import {
 import { CHANGES_DIFF_MAX_BYTES } from "@/lib/constants";
 import { buildFileTree, type FileTreeRow } from "@/lib/file-tree";
 import { buildChangeCommentsTodoInstruction } from "@/lib/templates/prompts/change-comments-todo";
-import { hunkBody, mapHunkLines, type LineRangeDescription } from "@/lib/unified-diff";
+import { hunkBody, mapHunkLines, type DiffLine, type LineRangeDescription } from "@/lib/unified-diff";
 import { cn, formatBytes } from "@/lib/utils";
-import type { ChangedFile, ChangedFileStatus, RepoChangeSet } from "@/types/changes";
+import type { ChangedFile, ChangedFileStatus, FileDiff, RepoChangeSet } from "@/types/changes";
 
 /**
  * Every worktree's change against its base branch: one collapsible group per
- * repository, each a file tree, with the selected file's diff beside them.
+ * repository, each a file tree, beside every changed file's diff in one list
+ * read top to bottom, the way a pull request's files are. A diff is read only
+ * as its file nears the visible part of the list, so a large change costs
+ * nothing for the files nobody scrolls to.
  *
  * Lines selected in a diff can be commented on, the comment shown under them the
  * way a pull request review shows it. The comments are collected across files
  * and handed over together: as the opening message of a new chat session, or as
  * an `autonomous` run that plans what they ask for and carries it out.
  *
- * The selected file lives in `?repo=&file=`, so a reload and a pasted link land
- * on it.
+ * A file clicked in the tree lives in `?repo=&file=`, so a reload and a pasted
+ * link scroll to it.
  */
 export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
   const router = useRouter();
@@ -62,13 +65,90 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
   const comments = useChangeComments(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
   const { isWorkspaceRunning } = useRunningOperations();
+  // The page's bottom padding (`p-6` on <main>).
+  const { attach: attachFill, height: fillHeight } = useViewportFillHeight({
+    bottomGap: 24,
+    minHeight: 320,
+  });
+
+  // State as well as an element, so the sections observe it once it exists.
+  const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  const sectionEls = useRef(new Map<string, HTMLElement>());
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+
+  const ordered = useMemo(
+    () =>
+      repos.map((repo) => {
+        const byPath = new Map(repo.files.map((f) => [f.path, f]));
+        const files = buildFileTree(repo.files.map((f) => f.path))
+          .filter((row) => !row.isDir)
+          .map((row) => byPath.get(row.path)!);
+        return { repo, files };
+      }),
+    [repos],
+  );
+  const orderedKeys = useMemo(
+    () => ordered.flatMap(({ repo, files }) => files.map((f) => fileKey(repo.repoPath, f.path))),
+    [ordered],
+  );
+
+  const scrollToFile = useCallback(
+    (key: string) => {
+      const el = sectionEls.current.get(key);
+      if (!el) return;
+      // Below `md` the list does not scroll by itself; the page does.
+      if (scroller && scroller.scrollHeight > scroller.clientHeight) {
+        scroller.scrollBy({ top: el.getBoundingClientRect().top - scroller.getBoundingClientRect().top });
+      } else {
+        el.scrollIntoView({ block: "start" });
+      }
+    },
+    [scroller],
+  );
 
   const select = (repoPath: string, filePath: string) => {
     const query = new URLSearchParams({ repo: repoPath, file: filePath });
     router.replace(`/workspace/${encodeURIComponent(workspaceName)}/changes?${query}`, {
       scroll: false,
     });
+    const key = fileKey(repoPath, filePath);
+    scrollToFile(key);
+    setActiveKey(key);
   };
+
+  // A linked file is scrolled to once, when it first appears in the list.
+  const scrolledToLink = useRef(false);
+  useEffect(() => {
+    if (scrolledToLink.current || !selectedRepo || !selectedFile || !scroller) return;
+    const key = fileKey(selectedRepo, selectedFile);
+    if (!orderedKeys.includes(key)) return;
+    scrolledToLink.current = true;
+    scrollToFile(key);
+  }, [orderedKeys, selectedRepo, selectedFile, scroller, scrollToFile]);
+
+  // The tree marks the file whose section is at the top of the list.
+  useEffect(() => {
+    if (!scroller) return;
+    let frame = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const top = scroller.getBoundingClientRect().top + 8;
+        let current: string | null = null;
+        for (const key of orderedKeys) {
+          const el = sectionEls.current.get(key);
+          if (!el || el.getBoundingClientRect().top > top) break;
+          current = key;
+        }
+        setActiveKey(current ?? orderedKeys[0] ?? null);
+      });
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      scroller.removeEventListener("scroll", onScroll);
+    };
+  }, [scroller, orderedKeys]);
 
   const talkInChat = () => {
     stashChatHandoff(workspaceName, { discussion: buildCommentsTopic(comments.items) });
@@ -96,8 +176,8 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
     return <StatusText>This workspace has no repositories.</StatusText>;
   }
 
-  const selectedRepoSet = repos.find((r) => r.repoPath === selectedRepo);
-  const selectedEntry = selectedRepoSet?.files.find((f) => f.path === selectedFile);
+  const highlighted =
+    activeKey ?? (selectedRepo && selectedFile ? fileKey(selectedRepo, selectedFile) : null);
 
   return (
     <div className="space-y-4">
@@ -113,8 +193,14 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
         />
       )}
 
-      <div className="grid gap-4 md:grid-cols-[minmax(14rem,22rem)_1fr]">
-        <div className="space-y-3">
+      {/* Both columns scroll on their own, so the tree stays beside the list
+          however far down it the reader is. */}
+      <div
+        ref={attachFill}
+        className="grid gap-4 md:h-(--changes-fill) md:grid-cols-[minmax(14rem,22rem)_1fr]"
+        style={{ "--changes-fill": fillHeight ? `${fillHeight}px` : "calc(100vh - 10rem)" } as React.CSSProperties}
+      >
+        <div className="space-y-3 md:overflow-y-auto">
           {repos.map((repo) => (
             <RepoGroup
               key={repo.repoPath}
@@ -128,48 +214,82 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
                   return next;
                 })
               }
-              selectedFile={repo.repoPath === selectedRepo ? selectedFile : null}
+              selectedFile={
+                highlighted?.startsWith(`${repo.repoPath}\0`)
+                  ? highlighted.slice(repo.repoPath.length + 1)
+                  : null
+              }
               onSelect={(filePath) => select(repo.repoPath, filePath)}
             />
           ))}
         </div>
 
-        {/* Sticky, because a repository's tree runs far past one screen and
-            the diff has to stay beside whichever file was clicked. */}
-        <div className="min-w-0 self-start md:sticky md:top-4">
-          {selectedRepoSet && selectedEntry ? (
-            <ChangeViewer
-              // Keyed so a comment being written does not follow the reader to another file.
-              key={`${selectedRepoSet.repoPath}\0${selectedEntry.path}`}
-              workspaceName={workspaceName}
-              repoPath={selectedRepoSet.repoPath}
-              file={selectedEntry}
-              comments={comments.items.filter(
-                (c) => c.repoPath === selectedRepoSet.repoPath && c.filePath === selectedEntry.path,
-              )}
-              onRefresh={() => refresh()}
-              onAddComment={(range, comment) =>
-                comments.add({
-                  id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-                  repoPath: selectedRepoSet.repoPath,
-                  repoName: selectedRepoSet.repoName,
-                  filePath: selectedEntry.path,
-                  ...range,
-                  comment,
-                })
-              }
-              onSetComment={comments.setComment}
-              onRemoveComment={comments.remove}
-            />
-          ) : (
-            <StatusText>
-              {selectedFile ? "This file is no longer changed." : "Select a file."}
-            </StatusText>
+        <div ref={setScroller} className="min-w-0 space-y-4 md:overflow-y-auto">
+          {orderedKeys.length > 0 && (
+            <p className="text-xs text-muted-foreground">Select lines in a diff to comment on them.</p>
           )}
+          {ordered.map(({ repo, files }) => (
+            <div key={repo.repoPath} className="space-y-3">
+              <p className="flex items-center gap-1.5 text-sm font-medium">
+                <span className="truncate" title={repo.repoPath}>
+                  {repo.repoName}
+                </span>
+                <span className="flex shrink-0 items-center gap-1 text-xs font-normal text-muted-foreground">
+                  <GitBranch className="h-3 w-3" />
+                  against origin/{repo.baseBranch || "?"}
+                </span>
+              </p>
+              {repo.error ? (
+                <p className="text-xs text-red-500">{repo.error}</p>
+              ) : files.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No changes.</p>
+              ) : (
+                files.map((file) => {
+                  const key = fileKey(repo.repoPath, file.path);
+                  return (
+                    <div
+                      key={key}
+                      ref={(el) => {
+                        if (el) sectionEls.current.set(key, el);
+                        else sectionEls.current.delete(key);
+                      }}
+                    >
+                      <FileDiffSection
+                        workspaceName={workspaceName}
+                        repoPath={repo.repoPath}
+                        file={file}
+                        root={scroller}
+                        comments={comments.items.filter(
+                          (c) => c.repoPath === repo.repoPath && c.filePath === file.path,
+                        )}
+                        onRefresh={() => refresh()}
+                        onAddComment={(range, comment) =>
+                          comments.add({
+                            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                            repoPath: repo.repoPath,
+                            repoName: repo.repoName,
+                            filePath: file.path,
+                            ...range,
+                            comment,
+                          })
+                        }
+                        onSetComment={comments.setComment}
+                        onRemoveComment={comments.remove}
+                      />
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
+}
+
+function fileKey(repoPath: string, filePath: string): string {
+  return `${repoPath}\0${filePath}`;
 }
 
 function CommentsTray({
@@ -421,10 +541,26 @@ function LineCounts({ file }: { file: ChangedFile }) {
   );
 }
 
-function ChangeViewer({
+/** How far outside the list's visible part a file's diff starts loading. */
+const LOAD_AHEAD_MARGIN = "800px 0px";
+const DIFF_MAX_HEIGHT = "70vh";
+const ESTIMATED_LINE_PX = 18;
+
+/**
+ * A stand-in height for a diff not read yet, from the listing's line counts plus
+ * some context, so the list's scroll length roughly matches before it loads.
+ */
+function estimatedDiffHeight(file: ChangedFile): string {
+  const lines = (file.additions ?? 0) + (file.deletions ?? 0);
+  const px = Math.max(80, (lines + 8) * ESTIMATED_LINE_PX);
+  return `min(${px}px, ${DIFF_MAX_HEIGHT})`;
+}
+
+function FileDiffSection({
   workspaceName,
   repoPath,
   file,
+  root,
   comments,
   onRefresh,
   onAddComment,
@@ -434,54 +570,143 @@ function ChangeViewer({
   workspaceName: string;
   repoPath: string;
   file: ChangedFile;
+  /** The scrolling list, which decides when this file is near enough to load. */
+  root: HTMLElement | null;
   comments: ChangeComment[];
   onRefresh: () => void;
   onAddComment: (range: LineRangeDescription, comment: string) => void;
   onSetComment: (id: string, comment: string) => void;
   onRemoveComment: (id: string) => void;
 }) {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  // Without an IntersectionObserver there is nothing to wait for.
+  const [near, setNear] = useState(() => typeof IntersectionObserver === "undefined");
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (near || !el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) setNear(true);
+      },
+      { root, rootMargin: LOAD_AHEAD_MARGIN },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [near, root]);
+
   const { diff, isLoading, error, refresh } = useWorkspaceChangeDiff(
     workspaceName,
     repoPath,
-    file.path,
+    // Once read, a diff stays: dropping it would lose a comment being written.
+    near ? file.path : null,
     `${file.status}:${file.additions}:${file.deletions}`,
   );
-  // The page's bottom padding (`p-6` on <main>) plus the card's two borders.
-  const { attach: attachFill, height: fillHeight } = useViewportFillHeight({
-    bottomGap: 26,
-    minHeight: 320,
-  });
   const [draft, setDraft] = useState<LineRangeDescription | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const diffLines = useMemo(() => (diff ? mapHunkLines(hunkBody(diff.diff)) : []), [diff]);
 
-  const header = (
-    <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <div className="min-w-0">
-        <p className="truncate font-mono text-sm font-medium">
-          {file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
-        </p>
-        <p className="text-xs text-muted-foreground">
-          {STATUS_MARKS[file.status].label} · {repoPath}
-        </p>
-      </div>
-      <Button
-        variant="outline"
-        onClick={() => {
-          onRefresh();
-          refresh();
-        }}
-      >
-        <RefreshCw className="h-3.5 w-3.5" />
-        Refresh
-      </Button>
-    </div>
-  );
+  const name = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
+  const Chevron = collapsed ? ChevronRight : ChevronDown;
 
+  return (
+    <section
+      ref={sectionRef}
+      aria-label={file.path}
+      className="rounded-lg border bg-card text-card-foreground"
+    >
+      {/* Sticky, so a long diff still says which file it is. Not inside an
+          overflow-hidden box, which would make that box the one it sticks to. */}
+      <div
+        className={cn(
+          "sticky top-0 z-20 flex items-center gap-2 rounded-t-lg bg-card px-2 py-1.5",
+          collapsed ? "rounded-b-lg" : "border-b",
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? `Expand ${file.path}` : `Collapse ${file.path}`}
+          className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          <Chevron className="h-4 w-4" />
+        </button>
+        <StatusMark status={file.status} />
+        <span
+          className={cn("min-w-0 truncate font-mono text-sm", file.status === "deleted" && "line-through")}
+          title={name}
+        >
+          {name}
+        </span>
+        <LineCounts file={file} />
+        <button
+          type="button"
+          onClick={() => {
+            onRefresh();
+            refresh();
+          }}
+          aria-label={`Refresh ${file.path}`}
+          title="Refresh"
+          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {!collapsed && (
+        <FileDiffBody
+          file={file}
+          diff={diff}
+          diffLines={diffLines}
+          isLoading={!near || isLoading}
+          error={error}
+          comments={comments}
+          draft={draft}
+          setDraft={setDraft}
+          editingId={editingId}
+          setEditingId={setEditingId}
+          onAddComment={onAddComment}
+          onSetComment={onSetComment}
+          onRemoveComment={onRemoveComment}
+        />
+      )}
+    </section>
+  );
+}
+
+function FileDiffBody({
+  file,
+  diff,
+  diffLines,
+  isLoading,
+  error,
+  comments,
+  draft,
+  setDraft,
+  editingId,
+  setEditingId,
+  onAddComment,
+  onSetComment,
+  onRemoveComment,
+}: {
+  file: ChangedFile;
+  diff: FileDiff | undefined;
+  diffLines: DiffLine[];
+  isLoading: boolean;
+  error: unknown;
+  comments: ChangeComment[];
+  draft: LineRangeDescription | null;
+  setDraft: (range: LineRangeDescription | null) => void;
+  editingId: string | null;
+  setEditingId: (id: string | null) => void;
+  onAddComment: (range: LineRangeDescription, comment: string) => void;
+  onSetComment: (id: string, comment: string) => void;
+  onRemoveComment: (id: string) => void;
+}) {
   if (error) {
     return (
-      <div className="space-y-3">
-        {header}
+      <div className="p-3">
         <Callout variant="error" className="text-sm">
           This diff could not be read. The file may have changed back, or been committed away,
           since the list was loaded.
@@ -492,14 +717,24 @@ function ChangeViewer({
 
   if (!diff) {
     return (
-      <div className="space-y-3">
-        {header}
-        <StatusText>{isLoading ? "Loading diff..." : "Select a file."}</StatusText>
+      <div
+        className="flex items-center justify-center text-sm text-muted-foreground"
+        style={{ height: estimatedDiffHeight(file) }}
+      >
+        {isLoading ? "Loading diff..." : "No diff."}
       </div>
     );
   }
 
-  const hasHunks = /^@@ /m.test(diff.diff);
+  if (!/^@@ /m.test(diff.diff)) {
+    return (
+      <p className="px-3 py-2 text-sm text-muted-foreground">
+        {file.additions === null
+          ? "This is a binary file, so there is no line diff to show."
+          : "No line changes — only the file's mode or name changed."}
+      </p>
+    );
+  }
 
   const zones: DiffZone[] = [];
   let unplaced = 0;
@@ -552,36 +787,25 @@ function ChangeViewer({
   }
 
   return (
-    <div className="space-y-3">
-      {header}
+    <div className="overflow-hidden rounded-b-lg">
       {diff.truncated && (
-        <Callout variant="warning" className="text-sm">
+        <Callout variant="warning" className="m-2 text-sm">
           Showing the first {formatBytes(CHANGES_DIFF_MAX_BYTES)} of this diff.
         </Callout>
       )}
-      {hasHunks && (
-        <p className="text-xs text-muted-foreground">
-          Select lines in the diff to comment on them.
-          {unplaced > 0 &&
-            ` ${unplaced} comment${unplaced === 1 ? "" : "s"} on this file no longer match${unplaced === 1 ? "es" : ""} the diff, so ${unplaced === 1 ? "it is" : "they are"} only in the list above.`}
+      {unplaced > 0 && (
+        <p className="px-3 py-1.5 text-xs text-muted-foreground">
+          {unplaced} comment{unplaced === 1 ? "" : "s"} on this file no longer match
+          {unplaced === 1 ? "es" : ""} the diff, so {unplaced === 1 ? "it is" : "they are"} only in
+          the list above.
         </p>
       )}
-      {hasHunks ? (
-        <Card variant="flush" className="overflow-hidden" ref={attachFill}>
-          <UnifiedDiffViewer
-            content={diff.diff}
-            height={fillHeight ?? "calc(100vh - 10rem)"}
-            onSelectLines={setDraft}
-            zones={zones}
-          />
-        </Card>
-      ) : (
-        <StatusText>
-          {file.additions === null
-            ? "This is a binary file, so there is no line diff to show."
-            : "No line changes — only the file's mode or name changed."}
-        </StatusText>
-      )}
+      <UnifiedDiffViewer
+        content={diff.diff}
+        maxHeight={DIFF_MAX_HEIGHT}
+        onSelectLines={setDraft}
+        zones={zones}
+      />
     </div>
   );
 }

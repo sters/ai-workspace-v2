@@ -126,9 +126,13 @@ export function UnifiedDiffViewer({
       lineNumbersMinChars: chars,
       renderLineHighlight: "none" as const,
       folding: false,
+      // A diff fitted to its content has nothing to scroll, and the page under it does.
+      scrollbar: { alwaysConsumeMouseWheel: false },
     };
   }, [lines]);
-  const contentHeight = Math.max(80, lines.length * LINE_HEIGHT_PX);
+  // The editor's own measure once it exists, which counts the zones between the lines.
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+  const contentHeight = Math.max(80, measuredHeight ?? lines.length * LINE_HEIGHT_PX);
   const height =
     fixedHeight ??
     (typeof maxHeight === "number"
@@ -164,6 +168,10 @@ export function UnifiedDiffViewer({
     (ed) => {
       editorRef.current = ed;
       setMountedEditor(ed);
+      const measure = () =>
+        setMeasuredHeight(ed.getContentHeight() + (ed.getLayoutInfo().horizontalScrollbarHeight ?? 0));
+      measure();
+      ed.onDidContentSizeChange(measure);
       if (!onSelectLines) return;
       ed.onDidChangeCursorSelection(placeAction);
       ed.onDidScrollChange(placeAction);

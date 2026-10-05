@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { act, render, screen, fireEvent, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import type { RepoChangeSet } from "@/types/changes";
 
 const mockReplace = vi.fn();
@@ -84,7 +84,14 @@ const API: RepoChangeSet = {
   error: "origin/master could not be compared with HEAD",
 };
 
+const scrolledTo = vi.fn();
+
 beforeEach(() => {
+  // jsdom lays nothing out, so nothing scrolls by itself; this records what was scrolled to.
+  Element.prototype.scrollIntoView = function (this: Element) {
+    scrolledTo(this);
+  };
+  scrolledTo.mockReset();
   mockReplace.mockReset();
   mockPush.mockReset();
   mockStart.mockReset();
@@ -94,6 +101,7 @@ beforeEach(() => {
   sessionStorage.clear();
   searchParams = new URLSearchParams();
   mockUseChanges.mockReturnValue({ repos: [WEB, API], isLoading: false, error: undefined, refresh: vi.fn() });
+  mockUseDiff.mockClear();
   mockUseDiff.mockReturnValue({
     diff: { diff: "@@ -4,1 +4,2 @@\n-a\n+b\n+c\n", truncated: false },
     isLoading: false,
@@ -101,6 +109,14 @@ beforeEach(() => {
     refresh: vi.fn(),
   });
 });
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function fileSection(path: string): HTMLElement {
+  return screen.getByRole("region", { name: path });
+}
 
 function groupOf(repoName: string): HTMLElement {
   return screen.getByRole("button", { name: new RegExp(`^${repoName}`) }).parentElement!;
@@ -120,11 +136,46 @@ describe("ChangesBrowser", () => {
     render(<ChangesBrowser workspaceName="ws" />);
 
     fireEvent.click(screen.getByRole("button", { name: /^web/ }));
-    expect(screen.queryByText("app.ts")).not.toBeInTheDocument();
-    expect(screen.getByText(/could not be compared/)).toBeInTheDocument();
+    expect(within(groupOf("web")).queryByText("app.ts")).not.toBeInTheDocument();
+    expect(within(groupOf("api")).getByText(/could not be compared/)).toBeInTheDocument();
   });
 
-  it("selects a file by repository and path in the URL", () => {
+  it("lists every changed file's diff in the tree's order, with nothing selected", () => {
+    render(<ChangesBrowser workspaceName="ws" />);
+
+    // The tree puts directories before files, so `src/lib/` comes before `src/app.ts`.
+    const names = screen
+      .getAllByRole("region")
+      .map((r) => r.getAttribute("aria-label"))
+      .filter((n) => !n?.startsWith("under lines"));
+    expect(names).toEqual(["src/lib/util.ts", "src/app.ts"]);
+    expect(within(fileSection("src/app.ts")).getByRole("button", { name: "select lines" })).toBeInTheDocument();
+  });
+
+  it("reads a file's diff only once its section nears the visible part of the list", () => {
+    const observed = new Map<Element, (entries: { isIntersecting: boolean }[]) => void>();
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(private cb: (entries: { isIntersecting: boolean }[]) => void) {}
+        observe(el: Element) {
+          observed.set(el, this.cb);
+        }
+        disconnect() {}
+      },
+    );
+    mockUseDiff.mockReturnValue({ diff: undefined, isLoading: false, error: undefined, refresh: vi.fn() });
+    render(<ChangesBrowser workspaceName="ws" />);
+
+    const requested = () => mockUseDiff.mock.calls.map((c) => c[2]).filter((p) => p !== null);
+    expect(requested()).toEqual([]);
+
+    act(() => observed.get(fileSection("src/app.ts"))!([{ isIntersecting: true }]));
+
+    expect(new Set(requested())).toEqual(new Set(["src/app.ts"]));
+  });
+
+  it("scrolls the list to a file clicked in the tree, and keeps it in the URL", () => {
     render(<ChangesBrowser workspaceName="ws" />);
 
     fireEvent.click(screen.getByText("util.ts"));
@@ -132,10 +183,28 @@ describe("ChangesBrowser", () => {
       "/workspace/ws/changes?repo=github.com%2Facme%2Fweb&file=src%2Flib%2Futil.ts",
       { scroll: false },
     );
+    expect(scrolledTo).toHaveBeenLastCalledWith(fileSection("src/lib/util.ts").parentElement);
+  });
+
+  it("scrolls to a linked file when the page opens", () => {
+    searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
+    render(<ChangesBrowser workspaceName="ws" />);
+
+    expect(scrolledTo).toHaveBeenCalledTimes(1);
+    expect(scrolledTo).toHaveBeenCalledWith(fileSection("src/app.ts").parentElement);
+  });
+
+  it("collapses one file's diff without touching the others", () => {
+    render(<ChangesBrowser workspaceName="ws" />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse src/app.ts" }));
+
+    expect(within(fileSection("src/app.ts")).queryByRole("button", { name: "select lines" })).not.toBeInTheDocument();
+    expect(within(fileSection("src/lib/util.ts")).getByRole("button", { name: "select lines" })).toBeInTheDocument();
   });
 
   function comment(text: string) {
-    fireEvent.click(screen.getByRole("button", { name: "select lines" }));
+    fireEvent.click(within(fileSection("src/app.ts")).getByRole("button", { name: "select lines" }));
     const box = screen.getByPlaceholderText(/leave a comment/i);
     fireEvent.change(box, { target: { value: text } });
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
@@ -171,7 +240,7 @@ describe("ChangesBrowser", () => {
     });
     rerender(<ChangesBrowser workspaceName={ws} />);
 
-    expect(screen.queryByRole("region")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: /under lines/ })).not.toBeInTheDocument();
     expect(screen.getByText(/no longer match/)).toBeInTheDocument();
     // Still in the list, so it can still be handed over or removed.
     expect(screen.getByText("1 comment")).toBeInTheDocument();

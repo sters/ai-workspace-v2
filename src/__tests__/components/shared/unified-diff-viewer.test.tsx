@@ -26,6 +26,8 @@ function fakeEditor() {
     removeOverlayWidget: (w: { getId: () => string }) => overlays.delete(w.getId()),
     createDecorationsCollection: () => ({ clear: () => {} }),
     getLayoutInfo: () => ({ contentLeft: 40, contentWidth: 600, verticalScrollbarWidth: 10 }),
+    getContentHeight: () => 54,
+    onDidContentSizeChange: () => ({ dispose: () => {} }),
     onDidLayoutChange: () => ({ dispose: () => {} }),
     onDidChangeCursorSelection: () => ({ dispose: () => {} }),
     onDidScrollChange: () => ({ dispose: () => {} }),
