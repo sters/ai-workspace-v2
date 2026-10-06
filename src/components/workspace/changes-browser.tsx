@@ -73,6 +73,7 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
 
   // State as well as an element, so the sections observe it once it exists.
   const [scroller, setScroller] = useState<HTMLDivElement | null>(null);
+  const [treePane, setTreePane] = useState<HTMLElement | null>(null);
   const sectionEls = useRef(new Map<string, HTMLElement>());
   const [activeKey, setActiveKey] = useState<string | null>(null);
 
@@ -150,6 +151,22 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
     };
   }, [scroller, orderedKeys]);
 
+  const highlighted =
+    activeKey ?? (selectedRepo && selectedFile ? fileKey(selectedRepo, selectedFile) : null);
+
+  // The tree follows the list: a marked row scrolled out of the tree is brought
+  // back to its middle, while one still on screen leaves the tree where it is.
+  useEffect(() => {
+    // Below `md` the tree does not scroll by itself; the page does.
+    if (!treePane || !highlighted || treePane.scrollHeight <= treePane.clientHeight) return;
+    const row = treePane.querySelector('[aria-current="true"]');
+    if (!row) return;
+    const pane = treePane.getBoundingClientRect();
+    const box = row.getBoundingClientRect();
+    if (box.top >= pane.top && box.bottom <= pane.bottom) return;
+    treePane.scrollBy({ top: box.top - pane.top - (pane.height - box.height) / 2 });
+  }, [treePane, highlighted]);
+
   const talkInChat = () => {
     stashChatHandoff(workspaceName, { discussion: buildCommentsTopic(comments.items) });
     comments.clear();
@@ -176,9 +193,6 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
     return <StatusText>This workspace has no repositories.</StatusText>;
   }
 
-  const highlighted =
-    activeKey ?? (selectedRepo && selectedFile ? fileKey(selectedRepo, selectedFile) : null);
-
   return (
     <div className="space-y-4">
       {comments.items.length > 0 && (
@@ -200,7 +214,7 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
         className="grid gap-4 md:h-(--changes-fill) md:grid-cols-[minmax(14rem,22rem)_1fr]"
         style={{ "--changes-fill": fillHeight ? `${fillHeight}px` : "calc(100vh - 10rem)" } as React.CSSProperties}
       >
-        <div className="space-y-3 md:overflow-y-auto">
+        <nav ref={setTreePane} aria-label="Changed files" className="space-y-3 md:overflow-y-auto">
           {repos.map((repo) => (
             <RepoGroup
               key={repo.repoPath}
@@ -222,7 +236,7 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
               onSelect={(filePath) => select(repo.repoPath, filePath)}
             />
           ))}
-        </div>
+        </nav>
 
         <div ref={setScroller} className="min-w-0 space-y-4 md:overflow-y-auto">
           {orderedKeys.length > 0 && (
@@ -491,6 +505,7 @@ function FileTree({
             <button
               type="button"
               onClick={() => onSelect(row.path)}
+              aria-current={row.path === selectedFile ? "true" : undefined}
               className={cn(ROW_CLASS, row.path === selectedFile && "bg-accent font-medium")}
               style={indent(row.depth)}
               title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}
