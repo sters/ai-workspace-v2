@@ -1,14 +1,26 @@
 import { listAllOperationLogsWithAge, deleteStoredOperation } from "@/lib/operation-store";
+import { getArchivedNameSet } from "@/lib/db";
 import type { PipelinePhase } from "@/types/pipeline";
 
-export function buildOperationPrunePipeline(days: number): PipelinePhase[] {
+export interface OperationPruneOptions {
+  days: number;
+  /** Only logs whose workspace is archived are deleted. */
+  archivedOnly: boolean;
+}
+
+export function buildOperationPrunePipeline({ days, archivedOnly }: OperationPruneOptions): PipelinePhase[] {
   return [
     {
       kind: "function",
       label: "Prune old operation logs",
       fn: async (ctx) => {
-        ctx.emitStatus(`Scanning operation logs (threshold: ${days} days)...`);
+        ctx.emitStatus(
+          `Scanning operation logs (threshold: ${days} days${archivedOnly ? ", archived workspaces only" : ""})...`,
+        );
         const all = listAllOperationLogsWithAge(days);
+        const archived = archivedOnly ? getArchivedNameSet() : null;
+        const isTarget = (workspace: string, isStale: boolean) =>
+          isStale && (archived === null || archived.has(workspace));
 
         if (all.length === 0) {
           ctx.emitResult("No operation logs found.");
@@ -17,9 +29,13 @@ export function buildOperationPrunePipeline(days: number): PipelinePhase[] {
 
         for (const log of all) {
           const daysUntilStale = days - log.ageDays;
-          if (log.isStale) {
+          if (isTarget(log.workspace, log.isStale)) {
             ctx.emitStatus(
               `  [STALE]  ${log.workspace}/${log.type}  (${log.ageDays}d old, started: ${log.startedAt})`,
+            );
+          } else if (log.isStale) {
+            ctx.emitStatus(
+              `  [KEEP]   ${log.workspace}/${log.type}  (${log.ageDays}d old, workspace not archived)`,
             );
           } else {
             ctx.emitStatus(
@@ -28,10 +44,14 @@ export function buildOperationPrunePipeline(days: number): PipelinePhase[] {
           }
         }
 
-        const stale = all.filter((log) => log.isStale);
+        const stale = all.filter((log) => isTarget(log.workspace, log.isStale));
 
         if (stale.length === 0) {
-          ctx.emitResult(`All ${all.length} operation log(s) are within ${days} days. Nothing to prune.`);
+          ctx.emitResult(
+            archivedOnly
+              ? `No operation log of an archived workspace among ${all.length} is older than ${days} days. Nothing to prune.`
+              : `All ${all.length} operation log(s) are within ${days} days. Nothing to prune.`,
+          );
           return true;
         }
 

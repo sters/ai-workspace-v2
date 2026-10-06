@@ -2,16 +2,28 @@ import {
   listAllWorkspacesWithAge,
   deleteWorkspace,
 } from "@/lib/workspace";
+import { getArchivedNameSet } from "@/lib/db";
 import type { PipelinePhase } from "@/types/pipeline";
 
-export function buildWorkspacePrunePipeline(days: number): PipelinePhase[] {
+export interface WorkspacePruneOptions {
+  days: number;
+  /** Only archived workspaces are deleted; a stale one still in use is kept. */
+  archivedOnly: boolean;
+}
+
+export function buildWorkspacePrunePipeline({ days, archivedOnly }: WorkspacePruneOptions): PipelinePhase[] {
   return [
     {
       kind: "function",
       label: "Prune stale workspaces",
       fn: async (ctx) => {
-        ctx.emitStatus(`Scanning workspaces (threshold: ${days} days)...`);
+        ctx.emitStatus(
+          `Scanning workspaces (threshold: ${days} days${archivedOnly ? ", archived only" : ""})...`,
+        );
         const all = listAllWorkspacesWithAge(days);
+        const archived = archivedOnly ? getArchivedNameSet() : null;
+        const isTarget = (name: string, isStale: boolean) =>
+          isStale && (archived === null || archived.has(name));
 
         if (all.length === 0) {
           ctx.emitResult("No workspaces found.");
@@ -21,10 +33,12 @@ export function buildWorkspacePrunePipeline(days: number): PipelinePhase[] {
         // Log every workspace with age and whether it will be pruned
         for (const ws of all) {
           const daysUntilStale = days - ws.ageDays;
-          if (ws.isStale) {
+          if (isTarget(ws.name, ws.isStale)) {
             ctx.emitStatus(
               `  [STALE]  ${ws.name}  (${ws.ageDays}d old, last modified: ${ws.lastModified.toISOString()})`,
             );
+          } else if (ws.isStale) {
+            ctx.emitStatus(`  [KEEP]   ${ws.name}  (${ws.ageDays}d old, not archived)`);
           } else {
             ctx.emitStatus(
               `  [KEEP]   ${ws.name}  (${ws.ageDays}d old, ${daysUntilStale}d until stale)`,
@@ -32,10 +46,14 @@ export function buildWorkspacePrunePipeline(days: number): PipelinePhase[] {
           }
         }
 
-        const stale = all.filter((ws) => ws.isStale);
+        const stale = all.filter((ws) => isTarget(ws.name, ws.isStale));
 
         if (stale.length === 0) {
-          ctx.emitResult(`All ${all.length} workspace(s) are within ${days} days. Nothing to prune.`);
+          ctx.emitResult(
+            archivedOnly
+              ? `No archived workspace among ${all.length} is older than ${days} days. Nothing to prune.`
+              : `All ${all.length} workspace(s) are within ${days} days. Nothing to prune.`,
+          );
           return true;
         }
 

@@ -11,10 +11,11 @@ export async function POST(request: Request) {
   const parsed = parseBody(operationPruneSchema, body);
   if (!parsed.success) return parsed.response;
   const d = parsed.data.days && parsed.data.days > 0 ? parsed.data.days : 7;
+  const { archivedOnly } = parsed.data;
 
   try {
-    const phases = buildOperationPrunePipeline(d);
-    const operation = startOperationPipeline("operation-prune", `op-prune-${d}d`, phases);
+    const phases = buildOperationPrunePipeline({ days: d, archivedOnly });
+    const operation = startOperationPipeline("operation-prune", `op-prune-${d}d${archivedOnly ? "-archived" : ""}`, phases);
     return NextResponse.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {
