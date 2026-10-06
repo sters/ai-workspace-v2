@@ -156,12 +156,23 @@ export const createTodoSchema = z.object({
 
 export const deleteSchema = workspaceSchema;
 
+/**
+ * Prune scope flag. Parsed strictly rather than with `z.coerce.boolean()`, which
+ * reads the string `"false"` the operation forms send as `true`. Defaults to the
+ * narrower scope, so a caller that says nothing deletes only what was archived.
+ */
+const archivedOnlyFlag = z
+  .union([z.boolean(), z.enum(["true", "false"]).transform((v) => v === "true")])
+  .default(true);
+
 export const workspacePruneSchema = z.object({
   days: z.coerce.number().positive().optional(),
+  archivedOnly: archivedOnlyFlag,
 });
 
 export const operationPruneSchema = z.object({
   days: z.coerce.number().positive().optional(),
+  archivedOnly: archivedOnlyFlag,
 });
 
 export const repositoryPruneSchema = z.object({

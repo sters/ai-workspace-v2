@@ -8,12 +8,13 @@ import { PageHeader } from "@/components/shared/feedback/page-header";
 
 export default function OperationPrunePage() {
   const [days, setDays] = useState("7");
+  const [archivedOnly, setArchivedOnly] = useState(true);
 
   return (
     <div>
       <PageHeader
         title="Operation Log Prune"
-        description="Delete operation logs older than the specified number of days."
+        description="Delete operation logs older than the specified number of days. By default only logs of archived workspaces are deleted."
       />
 
       <ClaudeOperation storageKey="utility:operation-prune" vertical>
@@ -30,10 +31,21 @@ export default function OperationPrunePage() {
                 className="w-32"
               />
             </div>
+            <label className="flex items-center gap-2 py-1.5 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={archivedOnly}
+                onChange={(e) => setArchivedOnly(e.target.checked)}
+                disabled={isRunning}
+              />
+              Logs of archived workspaces only
+            </label>
             <Button
               onClick={() =>
                 start("operation-prune", {
                   days: String(Number(days) || 7),
+                  archivedOnly: String(archivedOnly),
                 })
               }
               disabled={isRunning}

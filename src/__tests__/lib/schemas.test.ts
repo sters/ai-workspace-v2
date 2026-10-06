@@ -5,6 +5,7 @@ import {
   createPrSchema,
   updateTodoSchema,
   workspacePruneSchema,
+  operationPruneSchema,
   operationKillSchema,
   operationAnswerSchema,
   mcpAuthSchema,
@@ -103,6 +104,28 @@ describe("workspacePruneSchema", () => {
 
   it("rejects negative days as string", () => {
     expect(workspacePruneSchema.safeParse({ days: "-1" }).success).toBe(false);
+  });
+});
+
+describe.each([
+  ["workspacePruneSchema", workspacePruneSchema],
+  ["operationPruneSchema", operationPruneSchema],
+])("%s archivedOnly", (_name, schema) => {
+  it("defaults to archived workspaces only when omitted", () => {
+    expect(schema.parse({}).archivedOnly).toBe(true);
+  });
+
+  it('reads the string "false" the form sends as false', () => {
+    // z.coerce.boolean() would turn "false" into true and silently restore the
+    // narrower scope the user had just unticked — or, the other way round for
+    // a destructive flag, widen it.
+    expect(schema.parse({ archivedOnly: "false" }).archivedOnly).toBe(false);
+    expect(schema.parse({ archivedOnly: false }).archivedOnly).toBe(false);
+    expect(schema.parse({ archivedOnly: "true" }).archivedOnly).toBe(true);
+  });
+
+  it("rejects a value that is not a boolean", () => {
+    expect(schema.safeParse({ archivedOnly: "yes" }).success).toBe(false);
   });
 });
 
