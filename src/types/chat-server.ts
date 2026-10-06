@@ -67,6 +67,12 @@ interface StartMessage {
    * what the topic points at and say how it stands before waiting.
    */
   discussion?: string;
+  /**
+   * The session this start takes the place of. A new chat opens a new
+   * connection, which holds no session, so without it the displaced session
+   * keeps running with nothing left to reach it from the chat tab.
+   */
+  replaces?: string;
   /** Size of the browser terminal, so the PTY is born at the right size. */
   cols?: number;
   rows?: number;

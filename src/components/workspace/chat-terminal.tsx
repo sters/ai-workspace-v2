@@ -26,7 +26,7 @@ export function ChatTerminal({
     state,
     exitCode,
     error,
-    startSession,
+    openSession,
     cancelResume,
     stopSession,
   } = useChatSession(workspaceId, {
@@ -35,7 +35,7 @@ export function ChatTerminal({
     researchChat,
     task,
     discussion,
-      onHandoffDelivered,
+    onHandoffDelivered,
   });
 
   return (
@@ -43,7 +43,7 @@ export function ChatTerminal({
       {/* Toolbar */}
       <div className="flex items-center gap-2 border-b px-4 py-2">
         {state === "idle" && (
-          <Button onClick={startSession}>Start Chat</Button>
+          <Button onClick={openSession}>Start Chat</Button>
         )}
         {state === "connecting" && (
           <StatusText>Connecting...</StatusText>
@@ -62,7 +62,7 @@ export function ChatTerminal({
             <StatusText>
               Session ended{exitCode !== null ? ` (code ${exitCode})` : ""}
             </StatusText>
-            <Button onClick={startSession}>New Session</Button>
+            <Button onClick={openSession}>New Session</Button>
           </>
         )}
         {error && (
@@ -89,7 +89,7 @@ export function ChatTerminal({
             <p className="mb-4 text-sm text-muted-foreground">
               Start an interactive Claude session to discuss this workspace
             </p>
-            <Button onClick={startSession}>Start Chat</Button>
+            <Button onClick={openSession}>Start Chat</Button>
           </div>
         </div>
       )}

@@ -62,6 +62,16 @@ function buildChatOpening(
   return { prompt: buildInitPrompt(msg.workspaceId, workspacePath), agentName: "chat" };
 }
 
+function endSession(sessionId: string): void {
+  const store = getStore();
+  const existing = store.__chatSessions!.get(sessionId);
+  if (existing && !existing.exited) {
+    existing.proc.kill();
+  }
+  store.__chatSessions!.delete(sessionId);
+  persistSessionDeleted(sessionId);
+}
+
 export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" }>): Promise<void> {
   const store = getStore();
   const wsData = ws.data;
@@ -81,14 +91,11 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     return;
   }
 
-  if (wsData.sessionId) {
-    // Kill existing session
-    const existing = store.__chatSessions!.get(wsData.sessionId);
-    if (existing && !existing.exited) {
-      existing.proc.kill();
-    }
-    store.__chatSessions!.delete(wsData.sessionId);
-    persistSessionDeleted(wsData.sessionId);
+  if (wsData.sessionId) endSession(wsData.sessionId);
+  // Scoped to the workspace being started, so a stale id cannot end a chat
+  // somewhere else.
+  if (msg.replaces && store.__chatSessions!.get(msg.replaces)?.workspaceId === msg.workspaceId) {
+    endSession(msg.replaces);
   }
 
   // Run GC opportunistically
