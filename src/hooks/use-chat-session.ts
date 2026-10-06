@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useTerminal } from "./use-terminal";
-import type { SessionState, ServerMessage } from "@/types/chat";
+import type { ChatSessionInfo, SessionState, ServerMessage } from "@/types/chat";
 
 const CHAT_WS_URL =
   typeof window !== "undefined"
@@ -41,6 +41,24 @@ function clearChatSession(workspaceId: string): void {
     localStorage.removeItem(chatStorageKey(workspaceId));
   } catch {
     // ignore
+  }
+}
+
+/**
+ * The live session of this workspace to attach to: the one this tab last held
+ * if it is still running, else the newest. Null when there is none, or when the
+ * list cannot be read — starting a session is then the only thing left to do.
+ */
+async function findLiveSession(workspaceId: string, preferred: string | null): Promise<string | null> {
+  try {
+    const res = await fetch("/api/chat-sessions");
+    if (!res.ok) return null;
+    const sessions = ((await res.json()) as ChatSessionInfo[]).filter((s) => s.workspaceId === workspaceId);
+    if (preferred && sessions.some((s) => s.id === preferred)) return preferred;
+    sessions.sort((a, b) => b.startedAt - a.startedAt);
+    return sessions[0]?.id ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -110,6 +128,9 @@ export function useChatSession(
   // After the await, if the counter has moved on, this call is stale.
   const generationRef = useRef(0);
   const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The session this hook last held. localStorage forgets it on a dropped
+  // connection, while the session itself keeps running on the server.
+  const sessionIdRef = useRef<string | null>(null);
 
   const cleanup = useCallback(() => {
     if (resumeTimeoutRef.current) {
@@ -135,6 +156,7 @@ export function useChatSession(
   const resumeSession = useCallback(
     async (sessionId: string) => {
       cleanup();
+      sessionIdRef.current = sessionId;
       const gen = ++generationRef.current;
       setState("resuming");
       setExitCode(null);
@@ -267,6 +289,7 @@ export function useChatSession(
   );
 
   const startSession = useCallback(async () => {
+    const replaces = sessionIdRef.current ?? loadChatSession(workspaceId);
     cleanup();
     const gen = ++generationRef.current;
     setState("connecting");
@@ -312,7 +335,7 @@ export function useChatSession(
       const research = researchChatRef.current;
       const task = taskRef.current;
       const discussion = discussionRef.current;
-      ws.send(JSON.stringify({ type: "start", workspaceId, cols: term.cols, rows: term.rows, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }), ...(task && { task }), ...(discussion && { discussion }) }));
+      ws.send(JSON.stringify({ type: "start", workspaceId, cols: term.cols, rows: term.rows, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }), ...(task && { task }), ...(discussion && { discussion }), ...(replaces && { replaces }) }));
     };
 
     ws.onmessage = (event) => {
@@ -328,6 +351,7 @@ export function useChatSession(
           setState("running");
           // Save session to localStorage for resume
           if (msg.sessionId) {
+            sessionIdRef.current = msg.sessionId;
             saveChatSession(workspaceId, msg.sessionId);
           }
           onHandoffDeliveredRef.current?.();
@@ -370,6 +394,28 @@ export function useChatSession(
     });
   }, [workspaceId, cleanup, init, dispose, termRef]);
 
+  // Shared by every button that opens a chat, so a burst of clicks across them
+  // opens one session rather than one per click.
+  const openingRef = useRef(false);
+
+  /**
+   * What the Start Chat / New Session buttons do: reattach to a session that is
+   * still running — a dropped connection or a resume that gave up loses the
+   * session from this tab, not from the server — and start one only when there
+   * is none.
+   */
+  const openSession = useCallback(async () => {
+    if (openingRef.current) return;
+    openingRef.current = true;
+    try {
+      const live = await findLiveSession(workspaceId, sessionIdRef.current ?? loadChatSession(workspaceId));
+      if (live) await resumeSession(live);
+      else await startSession();
+    } finally {
+      openingRef.current = false;
+    }
+  }, [workspaceId, resumeSession, startSession]);
+
   const cancelResume = useCallback(() => {
     clearChatSession(workspaceId);
     setError(null);
@@ -391,8 +437,9 @@ export function useChatSession(
   useEffect(() => {
     if (stateRef.current !== "idle") return;
     if (initialPromptRef.current || reviewTimestampRef.current || researchChatRef.current || discussionRef.current) {
-      // Custom prompt requested — start a fresh session regardless of saved state
-      clearChatSession(workspaceId);
+      // Custom prompt requested — start a fresh session regardless of saved
+      // state. The saved one stays in localStorage so the start can name it as
+      // the session it replaces; "started" overwrites it.
       startSession();
     } else {
       const savedSessionId = loadChatSession(workspaceId);
@@ -413,7 +460,7 @@ export function useChatSession(
     state,
     exitCode,
     error,
-    startSession,
+    openSession,
     cancelResume,
     stopSession,
   };

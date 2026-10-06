@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 const mockInit = vi.fn();
@@ -159,5 +159,93 @@ describe("useChatSession handoff delivery", () => {
 
     sockets[0].receive({ type: "started", sessionId: "chat-1" });
     await waitFor(() => expect(onHandoffDelivered).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("useChatSession replacing a session", () => {
+  it("names the saved session a discussion displaces, so the server can end it", async () => {
+    localStorage.setItem("aiw-chat:ws", JSON.stringify({ sessionId: "chat-1" }));
+    renderHook(() => useChatSession("ws", { discussion: "this comment" }));
+
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+    expect(sockets[0].firstFrame()).toMatchObject({ type: "start", replaces: "chat-1" });
+  });
+
+  it("names the session this hook held once localStorage has forgotten it", async () => {
+    // A dropped socket clears localStorage; the session it held is no longer
+    // live, so New Session starts one and the server drops the old record.
+    const { result } = renderHook(() => useChatSession("ws", { task: "fix it" }));
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+    act(() => sockets[0].receive({ type: "started", sessionId: "chat-1" }));
+    act(() => sockets[0].onerror?.());
+    expect(localStorage.getItem("aiw-chat:ws")).toBeNull();
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [] })));
+
+    await act(() => result.current.openSession());
+    await waitFor(() => expect(sockets[1]?.sent).toHaveLength(1));
+    expect(sockets[1].firstFrame()).toMatchObject({ type: "start", replaces: "chat-1" });
+  });
+
+  it("names nothing when there is no session to displace", async () => {
+    renderHook(() => useChatSession("ws", { task: "fix it" }));
+
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+    expect("replaces" in sockets[0].firstFrame()).toBe(false);
+  });
+});
+
+describe("useChatSession openSession", () => {
+  function stubLiveSessions(sessions: { id: string; workspaceId: string; startedAt: number }[]) {
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => sessions }));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("attaches to the workspace's live session instead of starting another", async () => {
+    stubLiveSessions([
+      { id: "chat-1", workspaceId: "ws", startedAt: 1 },
+      { id: "chat-2", workspaceId: "ws", startedAt: 2 },
+      { id: "chat-3", workspaceId: "other", startedAt: 3 },
+    ]);
+    const { result } = renderHook(() => useChatSession("ws"));
+
+    await act(() => result.current.openSession());
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+
+    expect(sockets[0].firstFrame()).toMatchObject({ type: "resume", sessionId: "chat-2" });
+    expect(startFrames().some((f) => f.type === "start")).toBe(false);
+  });
+
+  it("starts a session when the workspace has none live", async () => {
+    stubLiveSessions([{ id: "chat-3", workspaceId: "other", startedAt: 3 }]);
+    const { result } = renderHook(() => useChatSession("ws"));
+
+    await act(() => result.current.openSession());
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+
+    expect(sockets[0].firstFrame()).toMatchObject({ type: "start", workspaceId: "ws" });
+  });
+
+  it("starts a session when the live list cannot be read", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("down"); }));
+    const { result } = renderHook(() => useChatSession("ws"));
+
+    await act(() => result.current.openSession());
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+
+    expect(sockets[0].firstFrame()).toMatchObject({ type: "start" });
+  });
+
+  it("opens once however many times it is called while opening", async () => {
+    const fetchMock = stubLiveSessions([]);
+    const { result } = renderHook(() => useChatSession("ws"));
+
+    await act(() =>
+      Promise.all([result.current.openSession(), result.current.openSession(), result.current.openSession()]),
+    );
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sockets).toHaveLength(1);
   });
 });

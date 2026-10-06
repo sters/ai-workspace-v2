@@ -198,6 +198,73 @@ describe("handleStart", () => {
     expect(ws.data.sessionId).toBe(liveSessionId);
   });
 
+  describe("replaces", () => {
+    /** Each spawn gets its own process, so a kill can be told apart per session. */
+    function spawnDistinctProcesses() {
+      const kills: ReturnType<typeof vi.fn>[] = [];
+      mockSpawnClaudeTerminal.mockImplementation(() => {
+        const kill = vi.fn();
+        kills.push(kill);
+        return {
+          terminal: { write: vi.fn(), resize: vi.fn() },
+          kill,
+          exited: new Promise<number>(() => {}),
+        };
+      });
+      return kills;
+    }
+    const sessions = () =>
+      (globalThis as unknown as { __chatSessions: Map<string, unknown> }).__chatSessions;
+
+    it("kills the session a fresh start on a new connection displaces", async () => {
+      // A new chat opens a new WebSocket, whose connection holds no session, so
+      // only the client can say which one it is replacing.
+      const kills = spawnDistinctProcesses();
+      const previous = (await startSession()).data.sessionId!;
+
+      const { handleStart } = await import("@/lib/chat-server/handlers");
+      const ws = makeWs();
+      await handleStart(ws, { type: "start", workspaceId: WITH_README, replaces: previous });
+
+      expect(kills[0]).toHaveBeenCalledTimes(1);
+      expect(kills[1]).not.toHaveBeenCalled();
+      expect(sessions().has(previous)).toBe(false);
+      expect(sessions().has(ws.data.sessionId!)).toBe(true);
+    });
+
+    it("leaves a session of another workspace alone", async () => {
+      const kills = spawnDistinctProcesses();
+      const { handleStart } = await import("@/lib/chat-server/handlers");
+      const other = makeWs();
+      await handleStart(other, { type: "start", workspaceId: WITHOUT_README, initialPrompt: "x" });
+
+      await handleStart(makeWs(), {
+        type: "start",
+        workspaceId: WITH_README,
+        replaces: other.data.sessionId!,
+      });
+
+      expect(kills[0]).not.toHaveBeenCalled();
+      expect(sessions().has(other.data.sessionId!)).toBe(true);
+    });
+
+    it("keeps the displaced session when the start is refused", async () => {
+      const kills = spawnDistinctProcesses();
+      const { handleStart } = await import("@/lib/chat-server/handlers");
+      const previous = makeWs();
+      await handleStart(previous, { type: "start", workspaceId: WITHOUT_README, initialPrompt: "x" });
+
+      await handleStart(makeWs(), {
+        type: "start",
+        workspaceId: WITHOUT_README,
+        replaces: previous.data.sessionId!,
+      });
+
+      expect(kills[0]).not.toHaveBeenCalled();
+      expect(sessions().has(previous.data.sessionId!)).toBe(true);
+    });
+  });
+
   it("starts with a caller-supplied prompt even without a README", async () => {
     const { handleStart } = await import("@/lib/chat-server/handlers");
     const ws = makeWs();

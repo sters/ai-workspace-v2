@@ -117,6 +117,7 @@ const wsStartSchema = z.object({
   researchChat: z.boolean().optional(),
   task: z.string().optional(),
   discussion: z.string().optional(),
+  replaces: z.string().optional(),
   cols: z.number().optional(),
   rows: z.number().optional(),
 });
