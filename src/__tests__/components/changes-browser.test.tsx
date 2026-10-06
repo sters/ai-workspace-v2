@@ -186,6 +186,49 @@ describe("ChangesBrowser", () => {
     expect(scrolledTo).toHaveBeenLastCalledWith(fileSection("src/lib/util.ts").parentElement);
   });
 
+  it("scrolls the tree along with the list, so the file being read stays in view", () => {
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    });
+    render(<ChangesBrowser workspaceName="ws" />);
+
+    const rect = (el: Element, top: number, height: number) =>
+      (el.getBoundingClientRect = () => ({ top, bottom: top + height, height }) as DOMRect);
+    const scrollable = (el: HTMLElement) => {
+      Object.defineProperty(el, "scrollHeight", { value: 1000 });
+      Object.defineProperty(el, "clientHeight", { value: 200 });
+    };
+
+    const tree = screen.getByRole("navigation", { name: "Changed files" });
+    scrollable(tree);
+    rect(tree, 0, 200);
+    const treeScroll = vi.fn();
+    tree.scrollBy = treeScroll;
+    rect(screen.getByText("util.ts").closest("button")!, 40, 20);
+    // Below the part of the tree that is on screen.
+    rect(screen.getByText("app.ts").closest("button")!, 500, 20);
+
+    const list = screen.getByText(/Select lines in a diff/).parentElement!;
+    scrollable(list);
+    rect(list, 0, 200);
+    rect(fileSection("src/lib/util.ts").parentElement!, -800, 700);
+    rect(fileSection("src/app.ts").parentElement!, 0, 700);
+    fireEvent.scroll(list);
+
+    expect(screen.getByText("app.ts").closest("button")).toHaveAttribute("aria-current", "true");
+    expect(treeScroll).toHaveBeenCalledTimes(1);
+    // The row is brought to the middle of the tree: 500 - (200 - 20) / 2.
+    expect(treeScroll).toHaveBeenCalledWith({ top: 410 });
+
+    // A row already on screen leaves the tree where the reader put it.
+    rect(fileSection("src/lib/util.ts").parentElement!, 0, 700);
+    rect(fileSection("src/app.ts").parentElement!, 700, 700);
+    fireEvent.scroll(list);
+    expect(screen.getByText("util.ts").closest("button")).toHaveAttribute("aria-current", "true");
+    expect(treeScroll).toHaveBeenCalledTimes(1);
+  });
+
   it("scrolls to a linked file when the page opens", () => {
     searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
     render(<ChangesBrowser workspaceName="ws" />);
