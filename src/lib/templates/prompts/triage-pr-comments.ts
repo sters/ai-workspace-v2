@@ -22,7 +22,7 @@
 
 import { fenceFor } from "@/lib/change-comments";
 import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
-import type { PrCheckFailureLog, PrThreadValidation } from "@/types/pull-request";
+import type { PrCheckFailureLog, PrThreadKind, PrThreadValidation } from "@/types/pull-request";
 
 /**
  * A recorded validation as this instruction reads it.
@@ -45,10 +45,16 @@ export function renderValidationForPrompt(validation: PrThreadValidation): strin
   return lines.join("\n");
 }
 
-/** One selected review thread, flattened to what a triage needs to see. */
+/** One selected review thread or PR comment, flattened to what a triage needs to see. */
 export interface TriageThread {
-  /** GraphQL thread node id (`PRRT_…`) — the key `create-pr` replies by. */
+  /**
+   * GraphQL node id. For a `review-thread` (`PRRT_…`) it is the key `create-pr`
+   * replies by; a conversation comment or review body has no thread to reply in.
+   */
   id: string;
+  kind: PrThreadKind;
+  /** The review's state, for `kind: "review"`. */
+  reviewState?: string;
   repoName: string;
   prUrl: string;
   path: string | null;
@@ -88,14 +94,32 @@ ${outranks}. Where it leaves a choice open — several options, a preferred one,
 `;
 }
 
+/**
+ * Keyed on the two conversation kinds rather than on `review-thread`, so an item
+ * without a `kind` — one read before the field existed and still in the PR cache —
+ * keeps its reply row.
+ */
+function isConversation(thread: TriageThread): boolean {
+  return thread.kind === "comment" || thread.kind === "review";
+}
+
 function renderThread(
   thread: TriageThread,
   index: number,
   validation: PrThreadValidation | undefined,
 ): string {
-  const location = thread.path
-    ? `\`${thread.path}\`${thread.line != null ? `:${thread.line}` : ""}`
-    : "(not anchored to a file)";
+  const location =
+    thread.kind === "comment"
+      ? "PR conversation comment"
+      : thread.kind === "review"
+        ? `review summary${thread.reviewState ? ` (${thread.reviewState})` : ""}`
+        : thread.path
+          ? `\`${thread.path}\`${thread.line != null ? `:${thread.line}` : ""}`
+          : "(not anchored to a file)";
+  const idLine =
+    !isConversation(thread)
+      ? `- Thread ID: \`${thread.id}\``
+      : `- Comment ID: \`${thread.id}\` (not a review thread — no \`## ${PR_REVIEW_THREADS_HEADING}\` row)`;
 
   const validationBlock = validation
     ? `\n**Prior validation** (an agent already looked at this comment):
@@ -114,7 +138,7 @@ Treat that as a starting point, not as the plan: it was written before this tria
 - Repository: **${thread.repoName}** (its TODO file is \`TODO-${thread.repoName}.md\`)
 - Pull request: ${thread.prUrl}
 - Comment: ${thread.commentUrl}
-- Thread ID: \`${thread.id}\`
+${idLine}
 - Comment author: ${thread.author}
 
 \`\`\`
@@ -179,6 +203,8 @@ export function buildTriagePrCommentsInstruction(input: {
     .join(" and ");
 
   const repoNames = [...new Set(threads.map((t) => t.repoName))];
+  const reviewThreads = threads.filter((t) => !isConversation(t));
+  const hasConversation = threads.length > reviewThreads.length;
   const ciRepoNames = [...new Set(ciFailures.map((f) => f.repoName))];
 
   const threadSection =
@@ -209,7 +235,13 @@ For each thread, add a TODO item to \`TODO-<repo>.md\` for the repository the th
           .join(", ")}). The item must name the file and the change concretely enough to implement without going back to the PR, and its \`Verify:\` must state how the fix is proved.
 
 Where a thread's fix is genuinely more than one unit of work, write more than one item for it — but every item must trace back to a listed thread.
-`;
+${
+  hasConversation
+    ? `
+A PR conversation comment or review summary is attached to no line, so work out from the code which files it is about and name them in the item. It gets no \`## ${PR_REVIEW_THREADS_HEADING}\` row: it has no thread for a later phase to reply in or resolve, so answering it on the PR is left to the human. **Do NOT reply to it now either.**
+`
+    : ""
+}`;
 
   const ciWriteSection =
     ciFailures.length === 0
@@ -231,11 +263,11 @@ Do not add a \`## PR Review Threads\` row for a CI failure — there is no revie
 `;
 
   const recordSection =
-    threads.length === 0
+    reviewThreads.length === 0
       ? ""
       : `## Recording the threads
 
-Append (or extend) a \`## ${PR_REVIEW_THREADS_HEADING}\` section at the end of each TODO file you touch, with one row per thread you turned into an item in that file:
+Append (or extend) a \`## ${PR_REVIEW_THREADS_HEADING}\` section at the end of each TODO file you touch, with one row per review thread (an item listed with a \`Thread ID\`) you turned into an item in that file:
 
 \`\`\`markdown
 ## ${PR_REVIEW_THREADS_HEADING}

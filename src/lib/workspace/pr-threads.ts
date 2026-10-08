@@ -1,6 +1,7 @@
 /**
- * Reads the PR on each workspace worktree's branch, together with its unresolved
- * review threads, for the workspace's Pull Requests tab.
+ * Reads the PR on each workspace worktree's branch, together with its review
+ * threads and its conversation comments / review bodies, for the workspace's
+ * Pull Requests tab.
  *
  * Everything here joins on the GraphQL **thread node id** rather than the
  * comment's numeric id, because that is the id the rest of the pipeline already
@@ -27,12 +28,14 @@ import type {
 /** Comments per thread. A thread longer than this is a discussion, not an ask. */
 const MAX_COMMENTS_PER_THREAD = 20;
 const MAX_THREADS = 100;
+/** Conversation comments and reviews, newest kept — `last`, not `first`. */
+const MAX_CONVERSATION = 100;
 
 /** Checks on the head commit. Well past what any repo runs on one PR. */
 const MAX_CHECKS = 100;
 
 /**
- * Threads and CI in one query.
+ * Threads, conversation comments, review bodies and CI in one query.
  *
  * The CI half could equally be `gh pr checks`, but that is another process spawn
  * and another network round trip per repository for data GitHub already returns
@@ -53,6 +56,12 @@ export const REVIEW_THREADS_QUERY = `query($owner:String!,$name:String!,$number:
             nodes{ url author{login} body createdAt }
           }
         }
+      }
+      comments(last:${MAX_CONVERSATION}){
+        nodes{ id url author{login} body createdAt isMinimized }
+      }
+      reviews(last:${MAX_CONVERSATION}){
+        nodes{ id url author{login} body createdAt state isMinimized }
       }
       commits(last:1){
         nodes{
@@ -159,6 +168,7 @@ export function parseReviewThreads(raw: string): PrReviewThread[] {
     const commentNodes = (n.comments as { nodes?: unknown } | undefined)?.nodes;
     threads.push({
       id: n.id,
+      kind: "review-thread",
       isResolved: n.isResolved === true,
       isOutdated: n.isOutdated === true,
       path: typeof n.path === "string" ? n.path : null,
@@ -175,6 +185,65 @@ export function parseReviewThreads(raw: string): PrReviewThread[] {
     });
   }
   return threads;
+}
+
+/**
+ * The PR's top-level comments and review bodies — what a reviewer writes outside
+ * any diff line — as single-comment items alongside the inline threads.
+ *
+ * A review with an empty body is skipped: it only carried inline comments, which
+ * already arrive as review threads. A `PENDING` review is skipped too, since it is
+ * an unsubmitted draft nobody but its author can see.
+ */
+export function parseConversationComments(raw: string): PrReviewThread[] {
+  let pullRequest: { comments?: { nodes?: unknown }; reviews?: { nodes?: unknown } } | undefined;
+  try {
+    const json = JSON.parse(raw) as { data?: { repository?: { pullRequest?: typeof pullRequest } } };
+    pullRequest = json.data?.repository?.pullRequest;
+  } catch {
+    return [];
+  }
+  if (!pullRequest) return [];
+
+  const nodesOf = (conn: { nodes?: unknown } | undefined): Record<string, unknown>[] =>
+    Array.isArray(conn?.nodes) ? (conn.nodes as Record<string, unknown>[]) : [];
+  const str = (value: unknown): string => (typeof value === "string" ? value : "");
+
+  const toItem = (
+    n: Record<string, unknown>,
+    kind: "comment" | "review",
+  ): PrReviewThread | null => {
+    if (typeof n.id !== "string" || n.id === "") return null;
+    if (str(n.body).trim() === "") return null;
+    return {
+      id: n.id,
+      kind,
+      isResolved: n.isMinimized === true,
+      isOutdated: false,
+      ...(kind === "review" && { reviewState: str(n.state) }),
+      path: null,
+      line: null,
+      comments: [
+        {
+          url: str(n.url),
+          author: login(n.author),
+          body: str(n.body),
+          createdAt: str(n.createdAt),
+        },
+      ],
+    };
+  };
+
+  const items = [
+    ...nodesOf(pullRequest.comments).map((n) => toItem(n, "comment")),
+    ...nodesOf(pullRequest.reviews)
+      .filter((n) => n.state !== "PENDING")
+      .map((n) => toItem(n, "review")),
+  ].filter((item): item is PrReviewThread => item !== null);
+
+  return items.sort((a, b) =>
+    a.comments[0].createdAt.localeCompare(b.comments[0].createdAt),
+  );
 }
 
 /**
@@ -328,7 +397,10 @@ function fetchThreadsAndChecks(pr: WorkspacePullRequest): {
     "-F", `number=${pr.number}`,
   ];
   const raw = execArgs(args, { cwd: pr.worktreePath });
-  return { threads: parseReviewThreads(raw), checks: parseStatusChecks(raw) };
+  return {
+    threads: [...parseReviewThreads(raw), ...parseConversationComments(raw)],
+    checks: parseStatusChecks(raw),
+  };
 }
 
 /**

@@ -7,6 +7,7 @@ import type { PrReviewThread } from "@/types/pull-request";
 
 const thread: PrReviewThread = {
   id: "PRRT_a",
+  kind: "review-thread",
   isResolved: false,
   isOutdated: false,
   path: "src/cache.ts",

@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import type {
   PrCheck,
   PrCheckState,
+  PrReviewThread,
   PrThreadValidation,
   WorkspacePullRequest,
 } from "@/types/pull-request";
@@ -75,6 +76,7 @@ function pr(overrides: Partial<WorkspacePullRequest> = {}): WorkspacePullRequest
     threads: [
       {
         id: "PRRT_open",
+        kind: "review-thread",
         isResolved: false,
         isOutdated: false,
         path: "src/cache.ts",
@@ -90,6 +92,7 @@ function pr(overrides: Partial<WorkspacePullRequest> = {}): WorkspacePullRequest
       },
       {
         id: "PRRT_done",
+        kind: "review-thread",
         isResolved: true,
         isOutdated: false,
         path: "src/other.ts",
@@ -178,6 +181,86 @@ describe("PullRequestsView", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /show 1 resolved/i }));
     expect(screen.getByText("src/other.ts:3")).toBeInTheDocument();
+  });
+
+  describe("a comment outside the diff", () => {
+    const reviewBody: PrReviewThread = {
+      id: "PRR_summary",
+      kind: "review",
+      reviewState: "CHANGES_REQUESTED",
+      isResolved: false,
+      isOutdated: false,
+      path: null,
+      line: null,
+      comments: [
+        {
+          url: "https://github.com/acme/widgets/pull/42#pullrequestreview-1",
+          author: "lead",
+          body: "The cache never evicts. Needs a bound.",
+          createdAt: "2026-08-04T09:00:00Z",
+        },
+      ],
+    };
+    const conversation: PrReviewThread = {
+      id: "IC_comment",
+      kind: "comment",
+      isResolved: false,
+      isOutdated: false,
+      path: null,
+      line: null,
+      comments: [
+        {
+          url: "https://github.com/acme/widgets/pull/42#issuecomment-3",
+          author: "lead",
+          body: "Please update the changelog too.",
+          createdAt: "2026-08-04T12:00:00Z",
+        },
+      ],
+    };
+
+    function withConversation() {
+      const base = pr();
+      setData({ pullRequests: [pr({ threads: [...base.threads, reviewBody, conversation] })] });
+      render(<PullRequestsView workspaceName="feat" />);
+    }
+
+    it("lists a review body and a conversation comment as candidates", () => {
+      withConversation();
+      expect(screen.getByRole("checkbox", { name: /review \(changes requested\)/i })).toBeInTheDocument();
+      expect(screen.getByRole("checkbox", { name: /pr conversation/i })).toBeInTheDocument();
+      expect(screen.getByText("Please update the changelog too.")).toBeInTheDocument();
+    });
+
+    it("validates one by its node id, like a thread", () => {
+      withConversation();
+      fireEvent.click(screen.getByRole("checkbox", { name: /pr conversation/i }));
+      fireEvent.click(screen.getByRole("button", { name: "Validate" }));
+      expect(mockStartAndNavigate).toHaveBeenCalledWith("validate-pr-comments", {
+        workspace: "feat",
+        threadIds: ["IC_comment"],
+      });
+    });
+
+    it("triages one without recording it as a thread to reply in", () => {
+      withConversation();
+      fireEvent.click(screen.getByRole("checkbox", { name: /review \(changes requested\)/i }));
+      fireEvent.click(screen.getByRole("button", { name: "Triage" }));
+
+      const { instruction } = mockStartAndNavigate.mock.calls[0][1];
+      expect(instruction).toContain("The cache never evicts. Needs a bound.");
+      expect(instruction).not.toContain("| Thread ID |");
+    });
+
+    it("hides a minimized comment with the resolved threads", () => {
+      const base = pr();
+      setData({
+        pullRequests: [pr({ threads: [...base.threads, { ...conversation, isResolved: true }] })],
+      });
+      render(<PullRequestsView workspaceName="feat" />);
+      expect(screen.queryByText("Please update the changelog too.")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: /show 2 resolved/i }));
+      expect(screen.getByText("Please update the changelog too.")).toBeInTheDocument();
+    });
   });
 
   it("shows no action bar until something is selected", () => {

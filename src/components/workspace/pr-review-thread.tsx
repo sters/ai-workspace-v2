@@ -8,7 +8,22 @@ import { cn } from "@/lib/utils";
 import type { PrReviewThread, PrThreadValidation } from "@/types/pull-request";
 
 /**
- * One review thread: its comments, its recorded validation verdict if it has
+ * Where an item sits on the PR. A conversation comment or review body has no
+ * file, so it is named by what it is rather than by a missing anchor.
+ */
+function describeLocation(thread: PrReviewThread): string {
+  if (thread.kind === "comment") return "PR conversation";
+  if (thread.kind === "review") {
+    const state = thread.reviewState?.toLowerCase().replace(/_/g, " ");
+    return state ? `Review (${state})` : "Review";
+  }
+  return thread.path
+    ? `${thread.path}${thread.line != null ? `:${thread.line}` : ""}`
+    : "(not anchored to a file)";
+}
+
+/**
+ * One review thread — or a conversation comment / review body: its comments, its recorded validation verdict if it has
  * one, and the checkbox that puts it into the selection the action bar acts on.
  *
  * The verdict renders inline under the comment rather than in a separate panel
@@ -32,9 +47,8 @@ export function PrReviewThreadRow({
   note: string;
   onNoteChange: (threadId: string, note: string) => void;
 }) {
-  const location = thread.path
-    ? `${thread.path}${thread.line != null ? `:${thread.line}` : ""}`
-    : "(not anchored to a file)";
+  const location = describeLocation(thread);
+  const isThread = thread.kind !== "comment" && thread.kind !== "review";
   const firstComment = thread.comments[0];
 
   return (
@@ -52,12 +66,22 @@ export function PrReviewThreadRow({
           checked={selected}
           disabled={disabled}
           onChange={() => onToggle(thread.id)}
-          aria-label={`Select review thread on ${location}`}
+          aria-label={isThread ? `Select review thread on ${location}` : `Select ${location} comment`}
         />
         <div className="min-w-0 flex-1">
           <div className="mb-1.5 flex flex-wrap items-center gap-2">
             <code className="truncate text-xs font-medium">{location}</code>
-            {thread.isResolved && <StatusBadge label="resolved" variant="completed" shape="square" />}
+            {thread.isResolved &&
+              (isThread ? (
+                <StatusBadge label="resolved" variant="completed" shape="square" />
+              ) : (
+                <StatusBadge
+                  label="hidden"
+                  variant="muted"
+                  shape="square"
+                  title="Hidden (minimized) on GitHub"
+                />
+              ))}
             {thread.isOutdated && (
               <StatusBadge
                 label="outdated"
@@ -145,7 +169,7 @@ export function PrReviewThreadRow({
           {/* Below the verdict, since the note is usually written after reading it. */}
           {selected && (
             <PrSelectionNote
-              label={`review thread on ${location}`}
+              label={isThread ? `review thread on ${location}` : `${location} comment`}
               className="mt-2"
               value={note}
               onChange={(value) => onNoteChange(thread.id, value)}

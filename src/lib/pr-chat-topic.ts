@@ -8,9 +8,11 @@
 
 import { fenceFor } from "@/lib/change-comments";
 import { renderValidationForPrompt } from "@/lib/templates/prompts/triage-pr-comments";
-import type { PrThreadValidation } from "@/types/pull-request";
+import type { PrThreadKind, PrThreadValidation } from "@/types/pull-request";
 
 export interface PrChatThread {
+  kind: PrThreadKind;
+  reviewState?: string;
   /** The worktree, relative to the workspace directory. */
   repoPath: string;
   prUrl: string;
@@ -44,7 +46,13 @@ function locateThread(thread: PrChatThread): string {
 function renderThread(thread: PrChatThread): string {
   const comments = thread.comments.map((c) => `${c.author}:\n${c.body}`).join("\n\n");
   const fence = fenceFor(comments);
-  const parts = [`Review comment at ${locateThread(thread)}`];
+  const what =
+    thread.kind === "comment"
+      ? "PR conversation comment on"
+      : thread.kind === "review"
+        ? `Review summary${thread.reviewState ? ` (${thread.reviewState})` : ""} on`
+        : "Review comment at";
+  const parts = [`${what} ${locateThread(thread)}`];
   if (thread.comments[0]) parts.push(thread.comments[0].url);
   parts.push(`${fence}\n${comments}\n${fence}`, ...myNote(thread.note));
   if (thread.validation) parts.push(renderValidationForPrompt(thread.validation));
