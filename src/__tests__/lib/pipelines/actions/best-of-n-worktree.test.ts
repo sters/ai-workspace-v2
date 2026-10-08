@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { existsSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
 
 // Mock helpers before importing the module under test
 const mockExec = vi.fn();
@@ -14,20 +14,11 @@ vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/tmp/test-workspace",
 }));
 
-vi.mock("node:fs", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:fs")>();
-  return {
-    ...actual,
-    default: {
-      ...actual,
-      existsSync: vi.fn(() => false),
-      mkdirSync: vi.fn(),
-      rmSync: vi.fn(),
-    },
-    existsSync: vi.fn(() => false),
-    mkdirSync: vi.fn(),
-    rmSync: vi.fn(),
-  };
+vi.mock("@/lib/fs", () => ({ pathExists: vi.fn(async () => false) }));
+
+vi.mock("node:fs/promises", () => {
+  const fs = { mkdir: vi.fn(async () => {}), rm: vi.fn(async () => {}) };
+  return { ...fs, default: fs };
 });
 
 import {
@@ -48,13 +39,13 @@ describe("best-of-n-worktree", () => {
     },
   ];
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockRepoDir.mockReturnValue("/tmp/test-repos");
   });
 
   describe("createSubWorktrees", () => {
-    it("creates N sub-worktrees for each repo", () => {
+    it("creates N sub-worktrees for each repo", async () => {
       mockExec.mockImplementation((cmd: string) => {
         if (cmd.includes("rev-parse HEAD")) return "abc123";
         if (cmd.includes("rev-parse --abbrev-ref HEAD")) return "feature/my-branch";
@@ -64,7 +55,7 @@ describe("best-of-n-worktree", () => {
       });
 
       const emitStatus = vi.fn();
-      const result = createSubWorktrees("my-ws", repos, 3, emitStatus);
+      const result = await createSubWorktrees("my-ws", repos, 3, emitStatus);
 
       expect(result).toHaveLength(3);
       expect(result[0].label).toBe("candidate-1");
@@ -88,7 +79,7 @@ describe("best-of-n-worktree", () => {
       );
     });
 
-    it("emits status messages during creation", () => {
+    it("emits status messages during creation", async () => {
       mockExec.mockImplementation((cmd: string) => {
         if (cmd.includes("rev-parse HEAD")) return "abc123";
         if (cmd.includes("rev-parse --abbrev-ref HEAD")) return "main";
@@ -98,7 +89,7 @@ describe("best-of-n-worktree", () => {
       });
 
       const emitStatus = vi.fn();
-      createSubWorktrees("my-ws", repos, 2, emitStatus);
+      await createSubWorktrees("my-ws", repos, 2, emitStatus);
 
       expect(emitStatus).toHaveBeenCalledWith(
         "[candidate-1] Creating sub-worktree for repo",
@@ -108,7 +99,7 @@ describe("best-of-n-worktree", () => {
       );
     });
 
-    it("sets candidate repo worktreePaths to sub-worktree paths", () => {
+    it("sets candidate repo worktreePaths to sub-worktree paths", async () => {
       mockExec.mockImplementation((cmd: string) => {
         if (cmd.includes("rev-parse HEAD")) return "abc123";
         if (cmd.includes("rev-parse --abbrev-ref HEAD")) return "main";
@@ -117,7 +108,7 @@ describe("best-of-n-worktree", () => {
         return "";
       });
 
-      const result = createSubWorktrees("my-ws", repos, 2, vi.fn());
+      const result = await createSubWorktrees("my-ws", repos, 2, vi.fn());
 
       // Candidate repos should point to tmp/bon-N directories, not the original
       expect(result[0].repos[0].worktreePath).toContain("tmp/bon-1");
@@ -126,42 +117,42 @@ describe("best-of-n-worktree", () => {
   });
 
   describe("getSubWorktreeDiff", () => {
-    it("returns diff between base commit and HEAD", () => {
+    it("returns diff between base commit and HEAD", async () => {
       mockExec.mockReturnValue("diff --git a/file.ts b/file.ts\n+added line");
-      const diff = getSubWorktreeDiff("/tmp/sub-wt", "abc123");
+      const diff = await getSubWorktreeDiff("/tmp/sub-wt", "abc123");
       expect(diff).toContain("+added line");
       expect(mockExec).toHaveBeenCalledWith(
         'git -C "/tmp/sub-wt" diff "abc123"..HEAD',
       );
     });
 
-    it("returns empty string on error", () => {
+    it("returns empty string on error", async () => {
       mockExec.mockImplementation(() => { throw new Error("no diff"); });
-      const diff = getSubWorktreeDiff("/tmp/sub-wt", "abc123");
+      const diff = await getSubWorktreeDiff("/tmp/sub-wt", "abc123");
       expect(diff).toBe("");
     });
   });
 
   describe("getBaseCommit", () => {
-    it("returns merge-base of original and sub worktree", () => {
+    it("returns merge-base of original and sub worktree", async () => {
       mockExec.mockImplementation((cmd: string) => {
         if (cmd.includes("merge-base")) return "base123";
         return "head123";
       });
 
-      const base = getBaseCommit("/tmp/orig", "/tmp/sub");
+      const base = await getBaseCommit("/tmp/orig", "/tmp/sub");
       expect(base).toBe("base123");
     });
   });
 
   describe("applySubWorktreeResult", () => {
-    it("skips when no commits to apply", () => {
+    it("skips when no commits to apply", async () => {
       mockExec.mockImplementation((cmd: string) => {
         if (cmd.includes("rev-list --count")) return "0";
         return "";
       });
 
-      applySubWorktreeResult("/tmp/orig", "/tmp/sub", "base123");
+      await applySubWorktreeResult("/tmp/orig", "/tmp/sub", "base123");
 
       // Should not have called format-patch
       expect(mockExec).not.toHaveBeenCalledWith(
@@ -169,13 +160,13 @@ describe("best-of-n-worktree", () => {
       );
     });
 
-    it("applies patches when commits exist", () => {
+    it("applies patches when commits exist", async () => {
       mockExec.mockImplementation((cmd: string) => {
         if (cmd.includes("rev-list --count")) return "2";
         return "";
       });
 
-      applySubWorktreeResult("/tmp/orig", "/tmp/sub", "base123");
+      await applySubWorktreeResult("/tmp/orig", "/tmp/sub", "base123");
 
       // Should have called format-patch and am
       expect(mockExec).toHaveBeenCalledWith(
@@ -188,8 +179,8 @@ describe("best-of-n-worktree", () => {
   });
 
   describe("cleanupSubWorktrees", () => {
-    it("prunes worktrees and deletes branches", () => {
-      vi.mocked(existsSync).mockReturnValue(true);
+    it("prunes worktrees and deletes branches", async () => {
+      vi.mocked(pathExists).mockResolvedValue(true);
 
       const sub = {
         index: 0,
@@ -200,7 +191,7 @@ describe("best-of-n-worktree", () => {
       };
 
       const emitStatus = vi.fn();
-      cleanupSubWorktrees("my-ws", [sub], repos, emitStatus);
+      await cleanupSubWorktrees("my-ws", [sub], repos, emitStatus);
 
       expect(emitStatus).toHaveBeenCalledWith("Sub-worktrees cleaned up");
       // Should have called worktree prune

@@ -46,14 +46,14 @@ describe("workspace prompts cleanup", () => {
     expect(fs.existsSync(path.join(promptsDir, ".hash"))).toBe(true);
   });
 
-  it("ensureSystemPrompt removes stale .md files when regenerating due to hash mismatch", () => {
+  it("ensureSystemPrompt removes stale .md files when regenerating due to hash mismatch", async () => {
     const promptsDir = path.join(tmpDir, "prompts");
     fs.mkdirSync(promptsDir, { recursive: true });
     fs.writeFileSync(path.join(promptsDir, "researcher.md"), "stale legacy");
     // Stale hash file forces regeneration
     fs.writeFileSync(path.join(promptsDir, ".hash"), "stale-hash-value");
 
-    ensureSystemPrompt(tmpDir, "executor");
+    await ensureSystemPrompt(tmpDir, "executor");
 
     expect(fs.existsSync(path.join(promptsDir, "researcher.md"))).toBe(false);
     expect(fs.existsSync(path.join(promptsDir, "executor.md"))).toBe(true);

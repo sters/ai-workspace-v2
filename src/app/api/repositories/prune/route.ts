@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    return NextResponse.json({ repositories: listRepositoryPruneCandidates() });
+    return NextResponse.json({ repositories: await listRepositoryPruneCandidates() });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return parsed.response;
 
   try {
-    return NextResponse.json({ outcomes: pruneRepositories(parsed.data.repositories) });
+    return NextResponse.json({ outcomes: await pruneRepositories(parsed.data.repositories) });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

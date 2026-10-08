@@ -1,23 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const mockExistsSync = vi.fn();
-const mockReadFileSync = vi.fn();
-const mockWriteFileSync = vi.fn();
-const mockMkdirSync = vi.fn();
+const mockPathExists = vi.fn();
+const mockReadFile = vi.fn();
+const mockWriteFile = vi.fn();
+const mockMkdir = vi.fn();
 
-vi.mock("node:fs", () => ({
-  default: {
-    existsSync: (...args: unknown[]) => mockExistsSync(...args),
-    readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
-    writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
-    mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
-  },
-  existsSync: (...args: unknown[]) => mockExistsSync(...args),
-  readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
-  writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
-  mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
+vi.mock("@/lib/fs", () => ({
+  pathExists: async (...args: unknown[]) => mockPathExists(...args),
 }));
+
+vi.mock("node:fs/promises", () => {
+  const fs = {
+    readFile: async (...args: unknown[]) => mockReadFile(...args),
+    writeFile: async (...args: unknown[]) => mockWriteFile(...args),
+    mkdir: async (...args: unknown[]) => mockMkdir(...args),
+  };
+  return { ...fs, default: fs };
+});
 
 const mockResetConfig = vi.fn();
 
@@ -68,17 +68,17 @@ async function callPOST(body: Record<string, unknown>) {
 }
 
 beforeEach(() => {
-  mockExistsSync.mockReset();
-  mockReadFileSync.mockReset();
-  mockWriteFileSync.mockReset();
-  mockMkdirSync.mockReset();
+  mockPathExists.mockReset();
+  mockReadFile.mockReset();
+  mockWriteFile.mockReset();
+  mockMkdir.mockReset();
   mockResetConfig.mockReset();
 });
 
 describe("GET /api/aiw-settings", () => {
   it("returns config content when file exists", async () => {
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue("workspaceRoot: /path/to/workspace\n");
+    mockPathExists.mockReturnValue(true);
+    mockReadFile.mockReturnValue("workspaceRoot: /path/to/workspace\n");
 
     const { status, data } = await callGET();
     expect(status).toBe(200);
@@ -88,7 +88,7 @@ describe("GET /api/aiw-settings", () => {
   });
 
   it("returns exists=false when file does not exist", async () => {
-    mockExistsSync.mockReturnValue(false);
+    mockPathExists.mockReturnValue(false);
 
     const { status, data } = await callGET();
     expect(status).toBe(200);
@@ -103,11 +103,11 @@ describe("POST /api/aiw-settings", () => {
     const { status, data } = await callPOST({ content });
     expect(status).toBe(200);
     expect(data.ok).toBe(true);
-    expect(mockMkdirSync).toHaveBeenCalledWith(
+    expect(mockMkdir).toHaveBeenCalledWith(
       expect.stringContaining(".ai-workspace"),
       { recursive: true },
     );
-    expect(mockWriteFileSync).toHaveBeenCalledWith(
+    expect(mockWriteFile).toHaveBeenCalledWith(
       "/mock-workspace/.ai-workspace/config.yml",
       content,
       "utf-8",
@@ -156,6 +156,6 @@ describe("POST /api/aiw-settings", () => {
     const { status, data } = await callPOST({ content });
     expect(status).toBe(400);
     expect(data.error).toMatch(/\{path\}/);
-    expect(mockWriteFileSync).not.toHaveBeenCalled();
+    expect(mockWriteFile).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
 import path from "node:path";
 import os from "node:os";
-import { spawnClaude, spawnClaudeSync } from "./cli";
+import { runClaudeCommand, spawnClaude } from "./cli";
 import { getResolvedWorkspaceRoot } from "../config";
 import type {
   McpAuthStatus,
@@ -135,13 +135,12 @@ export function parseClaudeMcpList(output: string): McpConnectionStatus[] {
 }
 
 /** Run `claude mcp list` and return parsed connection statuses. */
-export function getMcpStatuses(): McpConnectionStatus[] {
-  const result = spawnClaudeSync({ args: ["mcp", "list"] });
+export async function getMcpStatuses(): Promise<McpConnectionStatus[]> {
+  const result = await runClaudeCommand({ args: ["mcp", "list"] });
   if (!result.success) {
-    const stderr = result.stderr.toString().trim();
-    throw new Error(stderr || "claude mcp list failed");
+    throw new Error(result.stderr.trim() || "claude mcp list failed");
   }
-  return parseClaudeMcpList(result.stdout.toString());
+  return parseClaudeMcpList(result.stdout);
 }
 
 // ---------------------------------------------------------------------------

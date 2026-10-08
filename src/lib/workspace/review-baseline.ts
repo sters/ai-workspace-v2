@@ -13,7 +13,8 @@
  * session self-describing and survives a DB reset.
  */
 
-import { existsSync, readdirSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { execArgs } from "./helpers";
 
@@ -29,9 +30,9 @@ function reviewsDirPath(wsPath: string): string {
 }
 
 /** Resolve a worktree's current HEAD, or null when it isn't a readable repo. */
-export function captureRepoHead(worktreePath: string): string | null {
+export async function captureRepoHead(worktreePath: string): Promise<string | null> {
   try {
-    const sha = execArgs(["git", "-C", worktreePath, "rev-parse", "HEAD"]);
+    const sha = await execArgs(["git", "-C", worktreePath, "rev-parse", "HEAD"]);
     return sha.trim() || null;
   } catch {
     return null;
@@ -61,11 +62,11 @@ async function findBaseline(
   accept: (timestamp: string) => boolean,
 ): Promise<{ timestamp: string; heads: Record<string, string> } | null> {
   const reviewsDir = reviewsDirPath(wsPath);
-  if (!existsSync(reviewsDir)) return null;
+  if (!(await pathExists(reviewsDir))) return null;
 
   let candidates: string[];
   try {
-    candidates = readdirSync(reviewsDir, { withFileTypes: true })
+    candidates = (await readdir(reviewsDir, { withFileTypes: true }))
       .filter((e) => e.isDirectory() && accept(e.name))
       .map((e) => e.name)
       .sort((a, b) => b.localeCompare(a));

@@ -4,7 +4,8 @@
  * ctx.runChildGroup, then uses AI reviewer to select or synthesize.
  */
 
-import { mkdirSync, copyFileSync, existsSync, readFileSync, rmSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { copyFile, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { STEP_TYPES } from "@/types/pipeline";
@@ -88,8 +89,8 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
   // Save originals for comparison
   const originals = new Map<string, string>();
   for (const p of filesToCapture) {
-    if (existsSync(p)) {
-      originals.set(p, readFileSync(p, "utf-8"));
+    if (await pathExists(p)) {
+      originals.set(p, await readFile(p, "utf-8"));
     }
   }
 
@@ -101,9 +102,9 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
     for (const relPath of relativePaths) {
       const src = path.join(commonParent, relPath);
       const dst = path.join(dir, relPath);
-      mkdirSync(path.dirname(dst), { recursive: true });
-      if (existsSync(src)) {
-        copyFileSync(src, dst);
+      await mkdir(path.dirname(dst), { recursive: true });
+      if (await pathExists(src)) {
+        await copyFile(src, dst);
       }
     }
     candidateDirs.push(dir);
@@ -156,22 +157,22 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
     }
 
     if (successful.length === 1) {
-      copyResultFiles(successful[0].dir, commonParent, relativePaths);
+      await copyResultFiles(successful[0].dir, commonParent, relativePaths);
       ctx.emitStatus(`Only one candidate succeeded (${successful[0].label}) — auto-selected`);
       return true;
     }
 
     // Collect file contents from each successful candidate for review
-    const reviewCandidates = successful.map((c) => {
+    const reviewCandidates = await Promise.all(successful.map(async (c) => {
       const files: { name: string; content: string }[] = [];
       for (const relPath of relativePaths) {
         const filePath = path.join(c.dir, relPath);
-        if (existsSync(filePath)) {
-          files.push({ name: path.basename(relPath), content: readFileSync(filePath, "utf-8") });
+        if (await pathExists(filePath)) {
+          files.push({ name: path.basename(relPath), content: await readFile(filePath, "utf-8") });
         }
       }
       return { label: c.label, files };
-    });
+    }));
 
     // Run AI reviewer
     ctx.emitStatus(`Running AI reviewer to compare ${successful.length} candidates`);
@@ -184,14 +185,14 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
     const reviewOk = await ctx.runChild("Best-of-N File Reviewer", reviewPrompt, {
       jsonSchema: BEST_OF_N_REVIEW_SCHEMA as unknown as Record<string, unknown>,
       stepType: STEP_TYPES.BEST_OF_N_FILE_REVIEWER,
-      appendSystemPromptFile: ensureGlobalSystemPrompt("best-of-n-file-reviewer"),
+      appendSystemPromptFile: await ensureGlobalSystemPrompt("best-of-n-file-reviewer"),
       onResultText: (text) => { reviewResultText = text; },
     });
 
     if (!reviewOk) {
       // Fallback: use first successful candidate
       ctx.emitStatus("Reviewer failed — using first successful candidate");
-      copyResultFiles(successful[0].dir, commonParent, relativePaths);
+      await copyResultFiles(successful[0].dir, commonParent, relativePaths);
       return true;
     }
 
@@ -208,7 +209,7 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
       reasoning = decision.reasoning ?? "";
     } catch {
       ctx.emitStatus("Failed to parse reviewer result — using first successful candidate");
-      copyResultFiles(successful[0].dir, commonParent, relativePaths);
+      await copyResultFiles(successful[0].dir, commonParent, relativePaths);
       return true;
     }
 
@@ -232,7 +233,7 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
         if (match) {
           const overrideIdx = parseInt(match[1], 10) - 1;
           const selected = successful[overrideIdx] ?? successful[0];
-          copyResultFiles(selected.dir, commonParent, relativePaths);
+          await copyResultFiles(selected.dir, commonParent, relativePaths);
           ctx.emitStatus(`Human override: applied ${selected.label}`);
           return true;
         }
@@ -241,7 +242,7 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
 
     if (action === "select") {
       const selected = successful[candidateNum - 1] ?? successful[0];
-      copyResultFiles(selected.dir, commonParent, relativePaths);
+      await copyResultFiles(selected.dir, commonParent, relativePaths);
       ctx.emitStatus(`Reviewer selected ${selected.label}`);
       return true;
     }
@@ -261,14 +262,14 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
     const synthOk = await ctx.runChild("Best-of-N Synthesizer", synthPrompt, {
       addDirs: [commonParent, ...successful.map((c) => c.dir)],
       stepType: STEP_TYPES.BEST_OF_N_SYNTHESIZER,
-      appendSystemPromptFile: ensureGlobalSystemPrompt("best-of-n-synthesizer"),
+      appendSystemPromptFile: await ensureGlobalSystemPrompt("best-of-n-synthesizer"),
     });
 
     if (!synthOk) {
       // Fallback: use the base candidate
       ctx.emitStatus("Synthesizer failed — falling back to base candidate");
       const selected = successful[candidateNum - 1] ?? successful[0];
-      copyResultFiles(selected.dir, commonParent, relativePaths);
+      await copyResultFiles(selected.dir, commonParent, relativePaths);
     } else {
       ctx.emitStatus("Synthesized result applied");
     }
@@ -276,19 +277,19 @@ export async function runBestOfNFiles(input: BestOfNFilesInput): Promise<boolean
   } finally {
     // Cleanup temp dirs
     try {
-      rmSync(tmpBase, { recursive: true, force: true });
+      await rm(tmpBase, { recursive: true, force: true });
     } catch { /* ignore cleanup errors */ }
   }
 }
 
 /** Copy result files from candidate dir back to the original locations. */
-function copyResultFiles(candidateDir: string, commonParent: string, relativePaths: string[]): void {
+async function copyResultFiles(candidateDir: string, commonParent: string, relativePaths: string[]): Promise<void> {
   for (const relPath of relativePaths) {
     const src = path.join(candidateDir, relPath);
     const dst = path.join(commonParent, relPath);
-    if (existsSync(src)) {
-      mkdirSync(path.dirname(dst), { recursive: true });
-      copyFileSync(src, dst);
+    if (await pathExists(src)) {
+      await mkdir(path.dirname(dst), { recursive: true });
+      await copyFile(src, dst);
     }
   }
 }

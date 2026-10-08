@@ -11,7 +11,9 @@
  * included, and the walk never follows one out either.
  */
 
-import fs from "node:fs";
+import { pathExists } from "@/lib/fs";
+import type { Dirent, Stats } from "node:fs";
+import { open, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { ARTIFACT_MAX_BYTES } from "@/lib/constants";
 import type {
@@ -38,9 +40,9 @@ function isInside(dir: string, target: string): boolean {
   return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel));
 }
 
-function realPathOrSelf(target: string): string {
+async function realPathOrSelf(target: string): Promise<string> {
   try {
-    return fs.realpathSync(target);
+    return await realpath(target);
   } catch {
     return target;
   }
@@ -55,7 +57,7 @@ function realPathOrSelf(target: string): string {
  * paths on both sides because the workspace root may itself sit behind one
  * (`/tmp` on macOS).
  */
-export function resolveArtifactPath(wsPath: string, relPath: string): string | null {
+export async function resolveArtifactPath(wsPath: string, relPath: string): Promise<string | null> {
   if (!relPath || path.isAbsolute(relPath)) return null;
 
   const normalized = path.normalize(relPath);
@@ -65,7 +67,7 @@ export function resolveArtifactPath(wsPath: string, relPath: string): string | n
   const full = path.resolve(dir, normalized);
   if (!isInside(dir, full)) return null;
 
-  if (fs.existsSync(full) && !isInside(realPathOrSelf(dir), realPathOrSelf(full))) {
+  if ((await pathExists(full)) && !isInside(await realPathOrSelf(dir), await realPathOrSelf(full))) {
     return null;
   }
 
@@ -84,25 +86,25 @@ function kindFromPath(relPath: string): Exclude<ArtifactKind, "binary"> {
  * directories before files, so a caller can render the tree by walking the array
  * once.
  */
-export function listArtifacts(
+export async function listArtifacts(
   wsPath: string,
   opts: { maxEntries?: number; maxDepth?: number } = {},
-): ArtifactListing {
+): Promise<ArtifactListing> {
   const maxEntries = opts.maxEntries ?? ARTIFACT_MAX_ENTRIES;
   const maxDepth = opts.maxDepth ?? ARTIFACT_MAX_DEPTH;
   const root = getArtifactsDir(wsPath);
   const entries: ArtifactEntry[] = [];
   let truncated = false;
 
-  const walk = (dir: string, relDir: string, depth: number) => {
+  const walk = async (dir: string, relDir: string, depth: number): Promise<void> => {
     if (depth >= maxDepth) {
       truncated = true;
       return;
     }
 
-    let dirents: fs.Dirent[];
+    let dirents: Dirent[];
     try {
-      dirents = fs.readdirSync(dir, { withFileTypes: true });
+      dirents = await readdir(dir, { withFileTypes: true });
     } catch {
       return;
     }
@@ -127,9 +129,9 @@ export function listArtifacts(
       const full = path.join(dir, dirent.name);
       const rel = relDir ? `${relDir}/${dirent.name}` : dirent.name;
 
-      let stat: fs.Stats;
+      let st: Stats;
       try {
-        stat = fs.statSync(full);
+        st = await stat(full);
       } catch {
         continue;
       }
@@ -140,16 +142,16 @@ export function listArtifacts(
         name: dirent.name,
         depth,
         isDir,
-        size: isDir ? 0 : stat.size,
-        modifiedAt: stat.mtimeMs,
+        size: isDir ? 0 : st.size,
+        modifiedAt: st.mtimeMs,
       });
 
-      if (isDir) walk(full, rel, depth + 1);
+      if (isDir) await walk(full, rel, depth + 1);
     }
   };
 
-  if (!fs.existsSync(root)) return { entries: [], truncated: false };
-  walk(root, "", 0);
+  if (!(await pathExists(root))) return { entries: [], truncated: false };
+  await walk(root, "", 0);
 
   return { entries, truncated };
 }
@@ -162,34 +164,34 @@ export function listArtifacts(
  * the file binary — an agent can write anything in here, and a megabyte of PNG
  * rendered as text is worse than saying it is a PNG.
  */
-export function readArtifact(wsPath: string, relPath: string): ArtifactFileContent | null {
-  const full = resolveArtifactPath(wsPath, relPath);
+export async function readArtifact(wsPath: string, relPath: string): Promise<ArtifactFileContent | null> {
+  const full = await resolveArtifactPath(wsPath, relPath);
   if (!full) return null;
 
-  let stat: fs.Stats;
+  let st: Stats;
   try {
-    stat = fs.statSync(full);
+    st = await stat(full);
   } catch {
     return null;
   }
-  if (!stat.isFile()) return null;
+  if (!st.isFile()) return null;
 
-  const readLength = Math.min(stat.size, ARTIFACT_MAX_BYTES);
+  const readLength = Math.min(st.size, ARTIFACT_MAX_BYTES);
   let buffer = Buffer.alloc(0);
   if (readLength > 0) {
     buffer = Buffer.alloc(readLength);
-    let fd: number;
+    let file;
     try {
-      fd = fs.openSync(full, "r");
+      file = await open(full, "r");
     } catch {
       return null;
     }
     try {
-      fs.readSync(fd, buffer, 0, readLength, 0);
+      await file.read(buffer, 0, readLength, 0);
     } catch {
       return null;
     } finally {
-      fs.closeSync(fd);
+      await file.close();
     }
   }
 
@@ -197,10 +199,10 @@ export function readArtifact(wsPath: string, relPath: string): ArtifactFileConte
 
   return {
     path: relPath,
-    size: stat.size,
-    modifiedAt: stat.mtimeMs,
+    size: st.size,
+    modifiedAt: st.mtimeMs,
     kind: isBinary ? "binary" : kindFromPath(relPath),
     content: isBinary ? "" : buffer.toString("utf-8"),
-    truncated: stat.size > readLength,
+    truncated: st.size > readLength,
   };
 }

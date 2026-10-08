@@ -1,5 +1,6 @@
+import { pathExists } from "@/lib/fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { NextRequest, NextResponse } from "next/server";
-import fs from "node:fs";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import {
@@ -17,10 +18,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const filePath = getConfigFilePath();
-    const exists = fs.existsSync(filePath);
+    const exists = await pathExists(filePath);
     let content: string | null = null;
     if (exists) {
-      content = fs.readFileSync(filePath, "utf-8");
+      content = await readFile(filePath, "utf-8");
     }
     return NextResponse.json({
       filePath,
@@ -77,10 +78,10 @@ export async function POST(request: NextRequest) {
     // Ensure parent directory exists
     const filePath = getConfigFilePath();
     const dir = path.dirname(filePath);
-    fs.mkdirSync(dir, { recursive: true });
+    await mkdir(dir, { recursive: true });
 
     // Write config file
-    fs.writeFileSync(filePath, content, "utf-8");
+    await writeFile(filePath, content, "utf-8");
 
     // Invalidate cached config so the app picks up changes immediately
     _resetConfig();

@@ -23,8 +23,8 @@ export interface PrBranchInfo {
  * Resolve PR branch info via `gh pr view`.
  * Requires `gh` CLI to be installed and authenticated.
  */
-export function resolvePrBranch(prUrl: PrUrlInfo): PrBranchInfo {
-  const output = exec(
+export async function resolvePrBranch(prUrl: PrUrlInfo): Promise<PrBranchInfo> {
+  const output = await exec(
     `gh pr view "${prUrl.url}" --json headRefName,baseRefName,headRepositoryOwner,title,body`,
   );
   const data = JSON.parse(output) as {

@@ -153,17 +153,17 @@ export function selectTargetPullRequests(
   return open.filter((pr) => pr.repoPath === repository || pr.repoName === repository);
 }
 
-export function buildResolveBaseConflictsPipeline(input: {
+export async function buildResolveBaseConflictsPipeline(input: {
   workspace: string;
   /** Single-repo filter, matching the review pipeline's `repository` option. */
   repository?: string;
-}): PipelinePhase[] {
+}): Promise<PipelinePhase[]> {
   const { workspace, repository } = input;
 
   // Sized from the worktrees on disk, which is an upper bound on the pull
   // requests found at run time: the PRs themselves are read inside the first
   // phase, so they are not available while the budgets are being set.
-  const repoCount = repository ? 1 : Math.max(1, listWorkspaceRepos(workspace).length);
+  const repoCount = repository ? 1 : Math.max(1, (await listWorkspaceRepos(workspace)).length);
 
   // One object per built pipeline, captured by all three phases. Nothing here
   // survives the operation, which is what keeps two concurrent runs on different
@@ -205,7 +205,7 @@ export function buildResolveBaseConflictsPipeline(input: {
         for (const pr of targets) {
           const baseBranch = pr.baseRefName || "main";
           ctx.emitStatus(`${pr.repoName}: merging origin/${baseBranch} into ${pr.headRefName}...`);
-          const attempt = mergeBaseIntoBranch(
+          const attempt = await mergeBaseIntoBranch(
             { repoName: pr.repoName, worktreePath: pr.worktreePath },
             {
               baseBranch,
@@ -249,15 +249,15 @@ export function buildResolveBaseConflictsPipeline(input: {
          * left mid-merge is dirty to every later phase — including the next run
          * of this operation, which refuses to merge on top of one.
          */
-        const rollbackOpen = (why: string) => {
+        const rollbackOpen = async (why: string) => {
           for (const { pr } of openMerges()) {
-            abortMerge({ worktreePath: pr.worktreePath });
+            await abortMerge({ worktreePath: pr.worktreePath });
             run.rolledBack.set(pr.repoName, `${pr.repoName}: ${why} The merge was rolled back, so the branch is unchanged.`);
             ctx.emitStatus(`${pr.repoName}: the in-progress merge was rolled back`);
           }
         };
 
-        const systemPromptFile = ensureSystemPrompt(wsPath, "conflict-resolver");
+        const systemPromptFile = await ensureSystemPrompt(wsPath, "conflict-resolver");
         const resultTexts = new Map<string, string>();
 
         const children: GroupChild[] = conflicted.map(({ pr, attempt }) => ({
@@ -293,7 +293,7 @@ export function buildResolveBaseConflictsPipeline(input: {
         try {
           await ctx.runChildGroup(children);
         } catch (err) {
-          rollbackOpen(`the conflict resolution failed: ${err}.`);
+          await rollbackOpen(`the conflict resolution failed: ${err}.`);
           ctx.emitResult(`Conflict resolution failed: ${err}`);
           // True so the push phase still runs: another repository's clean merge
           // is still worth pushing, and the summary belongs there.
@@ -301,7 +301,7 @@ export function buildResolveBaseConflictsPipeline(input: {
         }
 
         if (ctx.signal.aborted) {
-          rollbackOpen("the operation was interrupted while conflicts were being resolved.");
+          await rollbackOpen("the operation was interrupted while conflicts were being resolved.");
           ctx.emitResult("Interrupted while resolving conflicts. Every in-progress merge was rolled back.");
           return false;
         }
@@ -389,7 +389,7 @@ export function buildResolveBaseConflictsPipeline(input: {
           let committedDetail = attempt.detail;
 
           if (aiResolved) {
-            const finalized = finalizeConflictedMerge(
+            const finalized = await finalizeConflictedMerge(
               { repoName: pr.repoName, worktreePath: pr.worktreePath },
               attempt.conflictedFiles,
             );
@@ -410,7 +410,7 @@ export function buildResolveBaseConflictsPipeline(input: {
             committedDetail = finalized.detail;
           }
 
-          const pushed = pushMergedBranch(
+          const pushed = await pushMergedBranch(
             { repoName: pr.repoName, worktreePath: pr.worktreePath },
             attempt.branch,
           );

@@ -209,7 +209,7 @@ async function runAutonomousGate(
   const ok = await ctx.runChild("Autonomous Gate", prompt, {
     jsonSchema: AUTONOMOUS_GATE_SCHEMA,
     stepType: STEP_TYPES.AUTONOMOUS_GATE,
-    appendSystemPromptFile: ensureSystemPrompt(wsPath, "autonomous-gate"),
+    appendSystemPromptFile: await ensureSystemPrompt(wsPath, "autonomous-gate"),
     onResultText: (text) => { resultText = text; },
     skipAskUserQuestion: true,
   });
@@ -391,7 +391,7 @@ export function buildAutonomousPipeline(input: {
         }
 
         const wsPath = path.join(getWorkspaceDir(), ws);
-        const repos = listWorkspaceRepos(ws);
+        const repos = await listWorkspaceRepos(ws);
         if (repos.length === 0) {
           ctx.emitResult(
             "No repositories in workspace — cannot plan TODOs. Run Ensure repositories first.",
@@ -548,7 +548,7 @@ export function buildAutonomousPipeline(input: {
           return false;
         }
         ctx.emitStatus(`Cycle ${loopNumber}/${maxLoops}: Evaluating review results`);
-        const repos = selectRepos(listWorkspaceRepos(ws), { repository: repo });
+        const repos = selectRepos(await listWorkspaceRepos(ws), { repository: repo });
         const repoNames = repos.map((r) => r.repoName);
         const gateResult = await runAutonomousGate(
           ctx,
@@ -749,7 +749,7 @@ export function buildAutonomousPipeline(input: {
           prompt: buildReadmeClarityGatePrompt({ workspaceName: ws, readmeContent, acceptanceCriteria }),
           jsonSchema: README_CLARITY_GATE_SCHEMA,
           stepType: STEP_TYPES.README_CLARITY_GATE,
-          appendSystemPromptFile: ensureSystemPrompt(wsPath, "readme-clarity-gate"),
+          appendSystemPromptFile: await ensureSystemPrompt(wsPath, "readme-clarity-gate"),
           onResultText: (text) => { resultText = text; },
           skipAskUserQuestion: true,
         };

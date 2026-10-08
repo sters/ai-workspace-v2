@@ -27,7 +27,7 @@ export async function GET(
     return NextResponse.json({ error: "Missing path" }, { status: 400 });
   }
 
-  const file = readArtifact(path.join(getWorkspaceDir(), name), relPath);
+  const file = await readArtifact(path.join(getWorkspaceDir(), name), relPath);
   if (!file) {
     return NextResponse.json({ error: "Artifact not found" }, { status: 404 });
   }

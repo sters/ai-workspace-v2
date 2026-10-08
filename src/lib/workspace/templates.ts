@@ -3,15 +3,16 @@
  * Template content is defined in @/lib/templates.
  */
 
-import { existsSync, mkdirSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { selectTodoTemplate, REPORT_TEMPLATES, RESEARCH_REPORT_TEMPLATES } from "../templates";
 
 /** Ensure the templates/ subdirectory exists and return its path. */
-function ensureTemplatesDir(wsPath: string): string {
+async function ensureTemplatesDir(wsPath: string): Promise<string> {
   const dir = path.join(wsPath, "templates");
-  mkdirSync(dir, { recursive: true });
+  await mkdir(dir, { recursive: true });
   return dir;
 }
 
@@ -20,7 +21,7 @@ function ensureTemplatesDir(wsPath: string): string {
  * based on the task type.
  */
 export async function writeTodoTemplate(wsPath: string, taskType: string): Promise<void> {
-  const dir = ensureTemplatesDir(wsPath);
+  const dir = await ensureTemplatesDir(wsPath);
   const template = selectTodoTemplate(taskType);
   await Bun.write(path.join(dir, "TODO-template.md"), template);
 }
@@ -30,7 +31,7 @@ export async function writeTodoTemplate(wsPath: string, taskType: string): Promi
  * These are used by review, verification, research, and summary agents.
  */
 export async function writeReportTemplates(wsPath: string): Promise<void> {
-  const dir = ensureTemplatesDir(wsPath);
+  const dir = await ensureTemplatesDir(wsPath);
   await Promise.all(
     Object.entries(REPORT_TEMPLATES).map(([filename, content]) =>
       Bun.write(path.join(dir, filename), content),
@@ -43,9 +44,9 @@ export async function writeReportTemplates(wsPath: string): Promise<void> {
  * Also ensures the artifacts/research/ output directory exists.
  */
 export async function writeResearchTemplates(wsPath: string): Promise<string> {
-  const dir = ensureTemplatesDir(wsPath);
+  const dir = await ensureTemplatesDir(wsPath);
   const researchDir = path.join(wsPath, "artifacts", "research");
-  mkdirSync(researchDir, { recursive: true });
+  await mkdir(researchDir, { recursive: true });
   await Promise.all(
     Object.entries(RESEARCH_REPORT_TEMPLATES).map(([filename, content]) =>
       Bun.write(path.join(dir, `research-${filename}`), content),
@@ -58,9 +59,9 @@ export async function writeResearchTemplates(wsPath: string): Promise<string> {
 // prepareReviewDir
 // ---------------------------------------------------------------------------
 
-export function prepareReviewDir(workspaceName: string): string {
+export async function prepareReviewDir(workspaceName: string): Promise<string> {
   const wsPath = path.join(getWorkspaceDir(), workspaceName);
-  if (!existsSync(wsPath)) {
+  if (!(await pathExists(wsPath))) {
     throw new Error(`Workspace directory not found: ${wsPath}`);
   }
 
@@ -77,6 +78,6 @@ export function prepareReviewDir(workspaceName: string): string {
   ].join("");
 
   const reviewDir = path.join(wsPath, "artifacts", "reviews", timestamp);
-  mkdirSync(reviewDir, { recursive: true });
+  await mkdir(reviewDir, { recursive: true });
   return timestamp;
 }

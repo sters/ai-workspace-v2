@@ -1,3 +1,4 @@
+import { globScan } from "@/lib/fs";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { getReadme } from "@/lib/workspace/reader";
@@ -122,7 +123,7 @@ export async function buildReviewPipeline(
   const hasRequestedFixes = requestedFixes !== undefined && requestedFixes.length > 0;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const allRepos = input.repos ?? listWorkspaceRepos(workspace);
+  const allRepos = input.repos ?? await listWorkspaceRepos(workspace);
   const boundaryRepos = selectRepos(allRepos, { repository });
   const repos = selectRepos(boundaryRepos, { repositories: input.repositories });
   const reviewedNames = new Set(repos.map((r) => r.repoName));
@@ -131,7 +132,7 @@ export async function buildReviewPipeline(
   // Write report templates (idempotent — ensures templates exist for older workspaces)
   await writeReportTemplates(wsPath);
 
-  const reviewTimestamp = prepareReviewDir(workspace);
+  const reviewTimestamp = await prepareReviewDir(workspace);
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);
 
   // Parse constraints from README for programmatic verification
@@ -171,14 +172,14 @@ export async function buildReviewPipeline(
     const metaRepo = meta.repositories.find(
       (r) => r.path === repo.repoPath || r.alias === repo.repoName,
     );
-    const baseBranch = metaRepo?.baseBranch ?? detectBaseBranch(repo.worktreePath);
+    const baseBranch = metaRepo?.baseBranch ?? (await detectBaseBranch(repo.worktreePath));
     repoBaseBranches.set(repo.repoName, baseBranch);
 
-    const head = captureRepoHead(repo.worktreePath);
+    const head = await captureRepoHead(repo.worktreePath);
     if (head) currentHeads[repo.repoName] = head;
 
     const sinceSha = previousBaseline?.heads[repo.repoName];
-    const changes = getRepoChanges(workspace, repo.repoPath, baseBranch, sinceSha);
+    const changes = await getRepoChanges(workspace, repo.repoPath, baseBranch, sinceSha);
     const repoChangesText = `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`;
     const reviewScope =
       changes.incremental && previousBaseline
@@ -233,7 +234,7 @@ export async function buildReviewPipeline(
         reviewScope,
       }),
       addDirs: [reviewDir],
-      appendSystemPromptFile: ensureSystemPrompt(wsPath, "code-reviewer"),
+      appendSystemPromptFile: await ensureSystemPrompt(wsPath, "code-reviewer"),
     });
 
     // Requested-fix verifier — only when something was actually asked for,
@@ -265,7 +266,7 @@ export async function buildReviewPipeline(
           sinceTimestamp: reviewScope?.sinceTimestamp,
         }),
         addDirs: [reviewDir],
-        appendSystemPromptFile: ensureSystemPrompt(wsPath, "fix-verifier"),
+        appendSystemPromptFile: await ensureSystemPrompt(wsPath, "fix-verifier"),
       });
     }
 
@@ -292,7 +293,7 @@ export async function buildReviewPipeline(
           verifyFilePath: path.join(reviewDir, verifyFileName),
         }),
         addDirs: [reviewDir],
-        appendSystemPromptFile: ensureSystemPrompt(wsPath, "todo-verifier"),
+        appendSystemPromptFile: await ensureSystemPrompt(wsPath, "todo-verifier"),
       });
     }
 
@@ -318,7 +319,7 @@ export async function buildReviewPipeline(
         constraintReportPath: path.join(reviewDir, constraintFileName),
       }),
       addDirs: [reviewDir],
-      appendSystemPromptFile: ensureSystemPrompt(wsPath, "readme-verifier"),
+      appendSystemPromptFile: await ensureSystemPrompt(wsPath, "readme-verifier"),
     });
   }
 
@@ -351,7 +352,7 @@ export async function buildReviewPipeline(
         knownFindings,
       }),
       addDirs: [reviewDir, ...boundaryRepos.map((r) => r.worktreePath)],
-      appendSystemPromptFile: ensureSystemPrompt(wsPath, "cross-repository-reviewer"),
+      appendSystemPromptFile: await ensureSystemPrompt(wsPath, "cross-repository-reviewer"),
     });
   }
 
@@ -489,11 +490,11 @@ export async function buildReviewPipeline(
         const readmeVerifyGlob = new Bun.Glob("VERIFY-README-*");
         const constraintGlob = new Bun.Glob("CONSTRAINTS-*");
         const fixVerifyGlob = new Bun.Glob("VERIFY-FIXES-*");
-        const actualReviewFiles = [...reviewGlob.scanSync({ cwd: reviewDir })];
-        const actualReadmeVerifyFiles = new Set([...readmeVerifyGlob.scanSync({ cwd: reviewDir })]);
-        const actualVerifyFiles = [...verifyGlob.scanSync({ cwd: reviewDir })];
-        const actualConstraintFiles = [...constraintGlob.scanSync({ cwd: reviewDir })];
-        const actualFixVerifyFiles = [...fixVerifyGlob.scanSync({ cwd: reviewDir })];
+        const actualReviewFiles = (await globScan(reviewGlob, reviewDir));
+        const actualReadmeVerifyFiles = new Set((await globScan(readmeVerifyGlob, reviewDir)));
+        const actualVerifyFiles = (await globScan(verifyGlob, reviewDir));
+        const actualConstraintFiles = (await globScan(constraintGlob, reviewDir));
+        const actualFixVerifyFiles = (await globScan(fixVerifyGlob, reviewDir));
 
         const prompt = buildCollectorPrompt({
           workspaceName: workspace,
@@ -506,7 +507,7 @@ export async function buildReviewPipeline(
           fixVerifyFiles: actualFixVerifyFiles.map((f) => path.join(reviewDir, f)),
         });
 
-        const ok = await ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir], stepType: STEP_TYPES.COLLECT_REVIEWS, appendSystemPromptFile: ensureSystemPrompt(wsPath, "collector") });
+        const ok = await ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir], stepType: STEP_TYPES.COLLECT_REVIEWS, appendSystemPromptFile: await ensureSystemPrompt(wsPath, "collector") });
         return ok;
       },
     },

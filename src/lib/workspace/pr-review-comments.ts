@@ -253,7 +253,7 @@ export async function readFindingsTargetPr(repo: {
 }): Promise<{ pr: FindingsTargetPr | null; problem: string | null }> {
   let raw: string;
   try {
-    raw = execArgs(["gh", "pr", "view", "--json", PR_FIELDS], { cwd: repo.worktreePath });
+    raw = await execArgs(["gh", "pr", "view", "--json", PR_FIELDS], { cwd: repo.worktreePath });
   } catch (err) {
     return {
       pr: null,
@@ -276,7 +276,7 @@ export async function readFindingsTargetPr(repo: {
   const headSha = typeof json.headRefOid === "string" ? json.headRefOid : "";
   let localHead = "";
   try {
-    localHead = execArgs(["git", "rev-parse", "HEAD"], { cwd: repo.worktreePath });
+    localHead = await execArgs(["git", "rev-parse", "HEAD"], { cwd: repo.worktreePath });
   } catch {
     // Leave it empty: an unreadable local HEAD is reported as a stale worktree
     // rather than silently claimed to match.

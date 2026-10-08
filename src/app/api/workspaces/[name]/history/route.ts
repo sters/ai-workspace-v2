@@ -15,7 +15,7 @@ export async function GET(
     }
     const url = new URL(request.url);
     const skip = Math.max(0, parseInt(url.searchParams.get("skip") ?? "0", 10) || 0);
-    const { entries, hasMore } = getHistory(name, skip);
+    const { entries, hasMore } = await getHistory(name, skip);
     return NextResponse.json({ entries, hasMore });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

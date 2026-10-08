@@ -1,7 +1,8 @@
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { globScan, pathExists } from "@/lib/fs";
+import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
-import { getCleanEnv } from "../env";
+import { runProcess } from "../process/run";
 import { getArchivedNameSet, isWorkspaceArchived } from "../db/archives";
 import { parseTodoFile } from "../parsers/todo";
 import { parseReadmeMeta } from "../parsers/readme";
@@ -21,10 +22,10 @@ const DEFAULT_DISPLAY_LIMIT = 20;
 export async function listWorkspaces(
   options?: { recentOnly?: boolean },
 ): Promise<{ workspaces: WorkspaceSummary[]; olderCount: number; archivedCount: number }> {
-  if (!existsSync(getWorkspaceDir()))
+  if (!(await pathExists(getWorkspaceDir())))
     return { workspaces: [], olderCount: 0, archivedCount: 0 };
 
-  const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
+  const entries = await readdir(getWorkspaceDir(), { withFileTypes: true });
   const archived = getArchivedNameSet();
   const candidates: { name: string; wsPath: string; mtime: number }[] = [];
   let archivedCount = 0;
@@ -33,14 +34,14 @@ export async function listWorkspaces(
     if (!entry.isDirectory()) continue;
     const wsPath = path.join(getWorkspaceDir(), entry.name);
     const readmePath = path.join(wsPath, "README.md");
-    if (!existsSync(readmePath)) continue;
+    if (!(await pathExists(readmePath))) continue;
 
     if (archived.has(entry.name)) {
       archivedCount++;
       continue;
     }
 
-    const mtime = statSync(wsPath).mtime.getTime();
+    const mtime = (await stat(wsPath)).mtime.getTime();
     candidates.push({ name: entry.name, wsPath, mtime });
   }
 
@@ -78,10 +79,10 @@ export async function listWorkspaces(
 export async function listWorkspaceItems(
   options?: { recentOnly?: boolean; includeArchived?: boolean },
 ): Promise<{ workspaces: WorkspaceListItem[]; olderCount: number; archivedCount: number }> {
-  if (!existsSync(getWorkspaceDir()))
+  if (!(await pathExists(getWorkspaceDir())))
     return { workspaces: [], olderCount: 0, archivedCount: 0 };
 
-  const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
+  const entries = await readdir(getWorkspaceDir(), { withFileTypes: true });
   const archived = getArchivedNameSet();
   const includeArchived = options?.includeArchived ?? false;
   const candidates: { name: string; wsPath: string; mtime: number }[] = [];
@@ -91,7 +92,7 @@ export async function listWorkspaceItems(
     if (!entry.isDirectory()) continue;
     const wsPath = path.join(getWorkspaceDir(), entry.name);
     const readmePath = path.join(wsPath, "README.md");
-    if (!existsSync(readmePath)) continue;
+    if (!(await pathExists(readmePath))) continue;
 
     const isArch = archived.has(entry.name);
     if (isArch && !includeArchived) {
@@ -99,7 +100,7 @@ export async function listWorkspaceItems(
       continue;
     }
 
-    const mtime = statSync(wsPath).mtime.getTime();
+    const mtime = (await stat(wsPath)).mtime.getTime();
     candidates.push({ name: entry.name, wsPath, mtime });
   }
 
@@ -135,7 +136,7 @@ export async function listWorkspaceItems(
 
 export async function getWorkspaceSummary(name: string): Promise<WorkspaceSummary | null> {
   const wsPath = path.join(getWorkspaceDir(), name);
-  if (!existsSync(wsPath)) return null;
+  if (!(await pathExists(wsPath))) return null;
 
   const summary = await buildWorkspaceSummary(name, wsPath);
   // Only this path needs it: `listWorkspaces` drops archived workspaces before
@@ -161,7 +162,7 @@ async function buildWorkspaceSummary(
   const overallProgress =
     totalItems > 0 ? Math.round((totalCompleted * 100) / totalItems) : 100;
 
-  const stat = statSync(wsPath);
+  const st = await stat(wsPath);
 
   return {
     name,
@@ -171,7 +172,7 @@ async function buildWorkspaceSummary(
     overallProgress,
     totalCompleted,
     totalItems,
-    lastModified: stat.mtime.toISOString(),
+    lastModified: st.mtime.toISOString(),
   };
 }
 
@@ -190,7 +191,7 @@ async function buildWorkspaceListItem(
   const { completed, total } = await countTodoProgress(wsPath);
   const overallProgress =
     total > 0 ? Math.round((completed * 100) / total) : 100;
-  const stat = statSync(wsPath);
+  const st = await stat(wsPath);
 
   return {
     name,
@@ -202,7 +203,7 @@ async function buildWorkspaceListItem(
     overallProgress,
     totalCompleted: completed,
     totalItems: total,
-    lastModified: stat.mtime.toISOString(),
+    lastModified: st.mtime.toISOString(),
   };
 }
 
@@ -210,7 +211,7 @@ const TODO_CHECKBOX_RE = /^[ \t]*- \[(.)\]/gm;
 
 async function countTodoProgress(wsPath: string): Promise<{ completed: number; total: number }> {
   const glob = new Bun.Glob("TODO-*.md");
-  const files = [...glob.scanSync({ cwd: wsPath })].filter(
+  const files = (await globScan(glob, wsPath)).filter(
     (f) => f !== "TODO-template.md",
   );
   let completed = 0;
@@ -229,7 +230,7 @@ async function countTodoProgress(wsPath: string): Promise<{ completed: number; t
 
 async function listTodoFiles(wsPath: string): Promise<TodoFile[]> {
   const glob = new Bun.Glob("TODO-*.md");
-  const files = [...glob.scanSync({ cwd: wsPath })].filter(
+  const files = (await globScan(glob, wsPath)).filter(
     (f) => f !== "TODO-template.md",
   );
   const results: TodoFile[] = [];
@@ -242,9 +243,9 @@ async function listTodoFiles(wsPath: string): Promise<TodoFile[]> {
 
 async function listReviewSessions(wsPath: string): Promise<ReviewSession[]> {
   const reviewsDir = path.join(wsPath, "artifacts", "reviews");
-  if (!existsSync(reviewsDir)) return [];
+  if (!(await pathExists(reviewsDir))) return [];
 
-  const entries = readdirSync(reviewsDir, { withFileTypes: true });
+  const entries = await readdir(reviewsDir, { withFileTypes: true });
   const sessions: ReviewSession[] = [];
 
   for (const entry of entries) {
@@ -269,12 +270,12 @@ export async function getResearchReport(
 ): Promise<{ summary: string; files: { name: string; content: string }[] } | null> {
   const researchDir = path.join(getWorkspaceDir(), name, "artifacts", "research");
 
-  if (existsSync(researchDir)) {
+  if (await pathExists(researchDir)) {
     const summaryFile = Bun.file(path.join(researchDir, "summary.md"));
     const summary = (await summaryFile.exists()) ? await summaryFile.text() : "";
 
     const glob = new Bun.Glob("*.md");
-    const mdFiles = [...glob.scanSync({ cwd: researchDir })].filter((f) => f !== "summary.md").sort();
+    const mdFiles = (await globScan(glob, researchDir)).filter((f) => f !== "summary.md").sort();
     const files: { name: string; content: string }[] = [];
     for (const f of mdFiles) {
       const content = await Bun.file(path.join(researchDir, f)).text();
@@ -300,13 +301,13 @@ export async function getReadme(name: string): Promise<string | null> {
 
 export async function getTodos(name: string): Promise<TodoFile[]> {
   const wsPath = path.join(getWorkspaceDir(), name);
-  if (!existsSync(wsPath)) return [];
+  if (!(await pathExists(wsPath))) return [];
   return listTodoFiles(wsPath);
 }
 
 export async function getReviewSessions(name: string): Promise<ReviewSession[]> {
   const wsPath = path.join(getWorkspaceDir(), name);
-  if (!existsSync(wsPath)) return [];
+  if (!(await pathExists(wsPath))) return [];
   return listReviewSessions(wsPath);
 }
 
@@ -319,9 +320,9 @@ async function readReviewSummary(reviewDir: string): Promise<string> {
   return (await summaryFile.exists()) ? await summaryFile.text() : "";
 }
 
-function reviewReportNames(reviewDir: string): string[] {
+async function reviewReportNames(reviewDir: string): Promise<string[]> {
   const glob = new Bun.Glob("*.md");
-  return [...glob.scanSync({ cwd: reviewDir })]
+  return (await globScan(glob, reviewDir))
     .filter((f) => f !== "SUMMARY.md")
     .sort();
 }
@@ -339,13 +340,13 @@ export async function getReviewFileList(
   timestamp: string
 ): Promise<{ summary: string; files: ReviewFileRef[] } | null> {
   const reviewDir = reviewDirPath(name, timestamp);
-  if (!existsSync(reviewDir)) return null;
+  if (!(await pathExists(reviewDir))) return null;
 
   const summary = await readReviewSummary(reviewDir);
   const files: ReviewFileRef[] = [];
-  for (const f of reviewReportNames(reviewDir)) {
+  for (const f of await reviewReportNames(reviewDir)) {
     try {
-      files.push({ name: f, size: statSync(path.join(reviewDir, f)).size });
+      files.push({ name: f, size: (await stat(path.join(reviewDir, f))).size });
     } catch {
       // Gone between the scan and the stat: a running review rewrites this directory.
     }
@@ -360,11 +361,11 @@ export async function getReviewDetail(
   timestamp: string
 ): Promise<{ summary: string; files: { name: string; content: string }[] } | null> {
   const reviewDir = reviewDirPath(name, timestamp);
-  if (!existsSync(reviewDir)) return null;
+  if (!(await pathExists(reviewDir))) return null;
 
   const summary = await readReviewSummary(reviewDir);
   const files: { name: string; content: string }[] = [];
-  for (const f of reviewReportNames(reviewDir)) {
+  for (const f of await reviewReportNames(reviewDir)) {
     const content = await Bun.file(path.join(reviewDir, f)).text();
     files.push({ name: f, content });
   }
@@ -372,29 +373,26 @@ export async function getReviewDetail(
   return { summary, files };
 }
 
-export function getCommitDiff(name: string, hash: string): string | null {
+export async function getCommitDiff(name: string, hash: string): Promise<string | null> {
   const wsPath = path.join(getWorkspaceDir(), name);
-  if (!existsSync(path.join(wsPath, ".git"))) return null;
+  if (!(await pathExists(path.join(wsPath, ".git")))) return null;
 
   // Validate hash format to prevent injection
   if (!/^[0-9a-f]{4,40}$/i.test(hash)) return null;
 
   try {
-    const result = Bun.spawnSync(
-      ["git", "-C", wsPath, "show", hash, "--format=", "--patch"],
-      { stdout: "pipe", stderr: "pipe", env: getCleanEnv() }
-    );
+    const result = await runProcess(["git", "-C", wsPath, "show", hash, "--format=", "--patch"]);
     if (!result.success) return null;
-    return result.stdout.toString();
+    return result.stdout;
   } catch {
     return null;
   }
 }
 
 export async function quickSearchWorkspaces(query: string): Promise<QuickSearchResult[]> {
-  if (!existsSync(getWorkspaceDir())) return [];
+  if (!(await pathExists(getWorkspaceDir()))) return [];
 
-  const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
+  const entries = await readdir(getWorkspaceDir(), { withFileTypes: true });
   const archived = getArchivedNameSet();
   const results: QuickSearchResult[] = [];
   const lowerQuery = query.toLowerCase();
@@ -402,7 +400,7 @@ export async function quickSearchWorkspaces(query: string): Promise<QuickSearchR
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const readmePath = path.join(getWorkspaceDir(), entry.name, "README.md");
-    if (!existsSync(readmePath)) continue;
+    if (!(await pathExists(readmePath))) continue;
 
     try {
       const content = await Bun.file(readmePath).text();
@@ -418,11 +416,11 @@ export async function quickSearchWorkspaces(query: string): Promise<QuickSearchR
       if (matches.length > 0) {
         const meta = parseReadmeMeta(content);
         const wsPath = path.join(getWorkspaceDir(), entry.name);
-        const stat = statSync(wsPath);
+        const st = await stat(wsPath);
         const result: QuickSearchResult = {
           workspaceName: entry.name,
           title: meta.title || entry.name,
-          lastModified: stat.mtime.toISOString(),
+          lastModified: st.mtime.toISOString(),
           matches,
         };
         if (archived.has(entry.name)) result.archived = true;
@@ -443,18 +441,20 @@ export async function quickSearchWorkspaces(query: string): Promise<QuickSearchR
 
 const HISTORY_PAGE_SIZE = 30;
 
-export function getHistory(name: string, skip = 0): { entries: HistoryEntry[]; hasMore: boolean } {
+export async function getHistory(
+  name: string,
+  skip = 0,
+): Promise<{ entries: HistoryEntry[]; hasMore: boolean }> {
   const wsPath = path.join(getWorkspaceDir(), name);
-  if (!existsSync(path.join(wsPath, ".git"))) return { entries: [], hasMore: false };
+  if (!(await pathExists(path.join(wsPath, ".git")))) return { entries: [], hasMore: false };
 
   try {
     // Fetch one extra to detect if there are more commits beyond this page
     const args = ["git", "-C", wsPath, "log", "--format=%H|%aI|%s|%an", `-${HISTORY_PAGE_SIZE + 1}`];
     if (skip > 0) args.push(`--skip=${skip}`);
-    const result = Bun.spawnSync(args, { stdout: "pipe", stderr: "pipe", env: getCleanEnv() });
+    const result = await runProcess(args);
     if (!result.success) return { entries: [], hasMore: false };
     const all = result.stdout
-      .toString()
       .trim()
       .split("\n")
       .filter(Boolean)

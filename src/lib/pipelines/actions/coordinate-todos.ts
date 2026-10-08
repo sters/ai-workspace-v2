@@ -47,7 +47,7 @@ export function buildCoordinateTodosPhase(input: {
       });
 
       ctx.emitStatus("Coordinating TODOs across repositories");
-      return ctx.runChild("Coordinate TODOs", prompt, { addDirs: [input.wsPath], stepType: STEP_TYPES.COORDINATE_TODOS, appendSystemPromptFile: ensureSystemPrompt(input.wsPath, "coordinator") });
+      return ctx.runChild("Coordinate TODOs", prompt, { addDirs: [input.wsPath], stepType: STEP_TYPES.COORDINATE_TODOS, appendSystemPromptFile: await ensureSystemPrompt(input.wsPath, "coordinator") });
     },
   };
 }

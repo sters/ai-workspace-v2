@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { runProcess } from "./process/run";
 
 export const GITHUB_REPO_URL =
   "https://github.com/sters/ai-workspace-v2.git";
@@ -13,12 +13,12 @@ export async function checkForUpdate(
   currentHash: string
 ): Promise<UpdateCheckResult> {
   try {
-    const proc = spawnSync("git", ["ls-remote", GITHUB_REPO_URL, "HEAD"], {
-      timeout: 5000,
-      encoding: "utf-8",
+    const proc = await runProcess(["git", "ls-remote", GITHUB_REPO_URL, "HEAD"], {
+      env: process.env,
+      timeoutMs: 5000,
     });
 
-    if (proc.status !== 0) {
+    if (!proc.success) {
       return { currentHash, latestHash: null, updateAvailable: false };
     }
 

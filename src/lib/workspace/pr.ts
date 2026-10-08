@@ -2,7 +2,8 @@
  * PR and repo change analysis utilities.
  */
 
-import fs from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { exec, execArgs } from "./helpers";
@@ -28,11 +29,11 @@ const PR_TEMPLATE_PATHS = [
  * Searches standard GitHub PR template locations in priority order.
  * Returns the template content or null if not found.
  */
-export function readPRTemplate(worktreePath: string): string | null {
+export async function readPRTemplate(worktreePath: string): Promise<string | null> {
   for (const templatePath of PR_TEMPLATE_PATHS) {
     const fullPath = path.join(worktreePath, templatePath);
-    if (fs.existsSync(fullPath)) {
-      return fs.readFileSync(fullPath, "utf-8");
+    if (await pathExists(fullPath)) {
+      return await readFile(fullPath, "utf-8");
     }
   }
   return null;
@@ -42,12 +43,11 @@ export function readPRTemplate(worktreePath: string): string | null {
 // checkExistingPR
 // ---------------------------------------------------------------------------
 
-export function checkExistingPR(worktreePath: string): ExistingPR {
+export async function checkExistingPR(worktreePath: string): Promise<ExistingPR> {
   try {
-    const url = exec(`gh pr view --json url -q ".url"`, { cwd: worktreePath });
-    const title = exec(`gh pr view --json title -q ".title"`, { cwd: worktreePath });
-    const body = exec(`gh pr view --json body -q ".body"`, { cwd: worktreePath });
-    return { exists: true, url, title, body };
+    const out = await execArgs(["gh", "pr", "view", "--json", "url,title,body"], { cwd: worktreePath });
+    const pr = JSON.parse(out) as { url: string; title: string; body: string };
+    return { exists: true, url: pr.url, title: pr.title, body: pr.body };
   } catch {
     return { exists: false };
   }
@@ -79,27 +79,27 @@ const MAX_PATHSPEC_ENTRIES = 400;
  * a file both the branch and the base branch changed stays in scope, which is
  * wanted, since that is where a merge resolution lands.
  */
-export function getIncrementalChanges(
+export async function getIncrementalChanges(
   worktreePath: string,
   baseBranch: string,
   sinceSha: string,
-): { sinceSha: string; changedFiles: string; diffStat: string; commitLog: string; hasChanges: boolean } | null {
+): Promise<{ sinceSha: string; changedFiles: string; diffStat: string; commitLog: string; hasChanges: boolean } | null> {
   if (!sinceSha.trim()) return null;
 
   // Ancestry, not mere existence: a rebased or force-pushed baseline still
   // resolves but no longer describes a point on this history, so a diff against
   // it would report unrelated churn as new work.
   try {
-    execArgs(["git", "-C", worktreePath, "merge-base", "--is-ancestor", sinceSha, "HEAD"]);
+    await execArgs(["git", "-C", worktreePath, "merge-base", "--is-ancestor", sinceSha, "HEAD"]);
   } catch {
     return null;
   }
 
-  const branchPaths = (() => {
+  const branchPaths = await (async () => {
     try {
-      return execArgs([
+      return (await execArgs([
         "git", "-C", worktreePath, "diff", "--name-only", `origin/${baseBranch}...HEAD`,
-      ])
+      ]))
         .split("\n")
         .map((l) => l.trim())
         .filter((l) => l !== "");
@@ -113,17 +113,17 @@ export function getIncrementalChanges(
       ? ["--", ...branchPaths]
       : [];
 
-  const run = (args: string[]): string => {
-    try { return execArgs(["git", "-C", worktreePath, ...args]); }
+  const run = async (args: string[]): Promise<string> => {
+    try { return await execArgs(["git", "-C", worktreePath, ...args]); }
     catch { return ""; }
   };
 
-  const changedFiles = run(["diff", "--name-status", sinceSha, "HEAD", ...pathspec]);
-  const diffStat = run(["diff", "--stat", sinceSha, "HEAD", ...pathspec]);
-  // --no-merges --first-parent so the log names the branch's own commits and not
-  // the ones a base-branch merge dragged along.
-  const commitLog = run([
-    "log", "--oneline", "--no-merges", "--first-parent", `${sinceSha}..HEAD`, ...pathspec,
+  const [changedFiles, diffStat, commitLog] = await Promise.all([
+    run(["diff", "--name-status", sinceSha, "HEAD", ...pathspec]),
+    run(["diff", "--stat", sinceSha, "HEAD", ...pathspec]),
+    // --no-merges --first-parent so the log names the branch's own commits and not
+    // the ones a base-branch merge dragged along.
+    run(["log", "--oneline", "--no-merges", "--first-parent", `${sinceSha}..HEAD`, ...pathspec]),
   ]);
 
   return {
@@ -135,45 +135,34 @@ export function getIncrementalChanges(
   };
 }
 
-export function getRepoChanges(
+export async function getRepoChanges(
   workspaceName: string,
   repoPath: string,
   baseBranch: string,
   sinceSha?: string,
-): RepoChanges {
+): Promise<RepoChanges> {
   const worktreePath = path.join(getWorkspaceDir(), workspaceName, repoPath);
 
   // Fetch latest
   try {
-    exec(`git -C "${worktreePath}" fetch origin "${baseBranch}"`);
+    await exec(`git -C "${worktreePath}" fetch origin "${baseBranch}"`);
   } catch (err) {
     console.debug("[pr] fetch baseBranch failed, trying fetch all:", err);
-    try { exec(`git -C "${worktreePath}" fetch origin`); } catch { /* ignore fetch fallback */ }
+    try { await exec(`git -C "${worktreePath}" fetch origin`); } catch { /* ignore fetch fallback */ }
   }
 
-  const currentBranch = (() => {
-    try { return exec(`git -C "${worktreePath}" branch --show-current`); }
-    catch { return "(unknown)"; }
-  })();
+  const read = async (cmd: string, fallback: string): Promise<string> => {
+    try { return await exec(`git -C "${worktreePath}" ${cmd}`); }
+    catch { return fallback; }
+  };
 
-  const changedFiles = (() => {
-    try { return exec(`git -C "${worktreePath}" diff --name-status "origin/${baseBranch}...HEAD"`); }
-    catch { return "(no changes)"; }
-  })();
+  const [currentBranch, changedFiles, diffStat, commitLog, incremental] = await Promise.all([
+    read("branch --show-current", "(unknown)"),
+    read(`diff --name-status "origin/${baseBranch}...HEAD"`, "(no changes)"),
+    read(`diff --stat "origin/${baseBranch}...HEAD"`, "(no changes)"),
+    read(`log --oneline "origin/${baseBranch}...HEAD"`, "(no commits)"),
+    sinceSha ? getIncrementalChanges(worktreePath, baseBranch, sinceSha) : Promise.resolve(null),
+  ]);
 
-  const diffStat = (() => {
-    try { return exec(`git -C "${worktreePath}" diff --stat "origin/${baseBranch}...HEAD"`); }
-    catch { return "(no changes)"; }
-  })();
-
-  const commitLog = (() => {
-    try { return exec(`git -C "${worktreePath}" log --oneline "origin/${baseBranch}...HEAD"`); }
-    catch { return "(no commits)"; }
-  })();
-
-  const incremental = sinceSha
-    ? getIncrementalChanges(worktreePath, baseBranch, sinceSha) ?? undefined
-    : undefined;
-
-  return { currentBranch, changedFiles, diffStat, commitLog, incremental };
+  return { currentBranch, changedFiles, diffStat, commitLog, incremental: incremental ?? undefined };
 }

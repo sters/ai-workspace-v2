@@ -15,5 +15,5 @@ export async function GET(
     return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
   }
 
-  return NextResponse.json(listArtifacts(path.join(getWorkspaceDir(), name)));
+  return NextResponse.json(await listArtifacts(path.join(getWorkspaceDir(), name)));
 }

@@ -14,6 +14,6 @@ export async function GET(
     return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
   }
 
-  const body: WorkspaceChanges = { repos: listWorkspaceChanges(name) };
+  const body: WorkspaceChanges = { repos: await listWorkspaceChanges(name) };
   return NextResponse.json(body);
 }

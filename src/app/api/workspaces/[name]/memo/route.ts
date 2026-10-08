@@ -1,5 +1,6 @@
+import { pathExists } from "@/lib/fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
-import fs from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { memoSaveSchema } from "@/lib/schemas";
@@ -22,8 +23,8 @@ export async function GET(
   }
 
   const memoPath = getMemoPath(name);
-  const content = fs.existsSync(memoPath)
-    ? fs.readFileSync(memoPath, "utf-8")
+  const content = await pathExists(memoPath)
+    ? await readFile(memoPath, "utf-8")
     : "";
 
   return NextResponse.json({ content });
@@ -44,8 +45,8 @@ export async function POST(
   if (!parsed.success) return parsed.response;
 
   const memoPath = getMemoPath(name);
-  fs.mkdirSync(path.dirname(memoPath), { recursive: true });
-  fs.writeFileSync(memoPath, parsed.data.content, "utf-8");
+  await mkdir(path.dirname(memoPath), { recursive: true });
+  await writeFile(memoPath, parsed.data.content, "utf-8");
 
   return NextResponse.json({ ok: true });
 }

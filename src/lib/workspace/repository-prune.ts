@@ -13,8 +13,8 @@
  * workspace a re-clone, not its work.
  */
 
-import { existsSync, readdirSync, rmSync, rmdirSync, statSync } from "node:fs";
-import fs from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { readdir, realpath, rm, rmdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { execArgs, repoDir } from "./helpers";
@@ -33,9 +33,9 @@ import type {
  */
 const REFERENCE_SIGNALS = ["", ".git", path.join(".git", "FETCH_HEAD"), path.join(".git", "worktrees")];
 
-function realPathOrSelf(target: string): string {
+async function realPathOrSelf(target: string): Promise<string> {
   try {
-    return fs.realpathSync(target);
+    return await realpath(target);
   } catch {
     return target;
   }
@@ -47,11 +47,11 @@ function isInside(dir: string, target: string): boolean {
 }
 
 /** When the tooling last touched this clone. */
-export function lastReferencedAt(repoAbsPath: string): Date {
+export async function lastReferencedAt(repoAbsPath: string): Promise<Date> {
   let newest = 0;
   for (const signal of REFERENCE_SIGNALS) {
     try {
-      const mtime = statSync(path.join(repoAbsPath, signal)).mtimeMs;
+      const mtime = (await stat(path.join(repoAbsPath, signal))).mtimeMs;
       if (mtime > newest) newest = mtime;
     } catch {
       // A signal a clone never produced says nothing about when it was used.
@@ -73,20 +73,20 @@ function workspaceOf(worktreePath: string, workspaceDir: string): string {
  * A registration whose directory is gone is `git worktree prune` territory, not
  * usage.
  */
-export function listRepositoryUsage(repoPath: string): RepositoryUsage[] {
+export async function listRepositoryUsage(repoPath: string): Promise<RepositoryUsage[]> {
   const repoAbsPath = path.join(repoDir(), repoPath);
-  const listing = execArgs(["git", "-C", repoAbsPath, "worktree", "list", "--porcelain"]);
-  const mainWorktree = realPathOrSelf(repoAbsPath);
-  const workspaceDir = realPathOrSelf(getWorkspaceDir());
+  const listing = await execArgs(["git", "-C", repoAbsPath, "worktree", "list", "--porcelain"]);
+  const mainWorktree = await realPathOrSelf(repoAbsPath);
+  const workspaceDir = await realPathOrSelf(getWorkspaceDir());
 
   const usage: RepositoryUsage[] = [];
   for (const line of listing.split("\n")) {
     if (!line.startsWith("worktree ")) continue;
     const worktreePath = line.slice("worktree ".length).trim();
     if (!worktreePath) continue;
-    const resolved = realPathOrSelf(worktreePath);
+    const resolved = await realPathOrSelf(worktreePath);
     if (resolved === mainWorktree) continue;
-    if (!existsSync(worktreePath)) continue;
+    if (!(await pathExists(worktreePath))) continue;
     // The resolved path, so the reported location and the workspace derived
     // from it are the same string git and the filesystem agree on.
     usage.push({ workspace: workspaceOf(resolved, workspaceDir), worktreePath: resolved });
@@ -95,24 +95,24 @@ export function listRepositoryUsage(repoPath: string): RepositoryUsage[] {
 }
 
 /** Every clone under `repositories/`, least recently referenced first. */
-export function listRepositoryPruneCandidates(): RepositoryPruneCandidate[] {
-  const candidates = listAllRepositories().map((repo) => {
+export async function listRepositoryPruneCandidates(): Promise<RepositoryPruneCandidate[]> {
+  const candidates = await Promise.all((await listAllRepositories()).map(async (repo) => {
     const repoAbsPath = path.join(repoDir(), repo.repoPath);
     let usedBy: RepositoryUsage[] = [];
     let usageError: string | undefined;
     try {
-      usedBy = listRepositoryUsage(repo.repoPath);
+      usedBy = await listRepositoryUsage(repo.repoPath);
     } catch (err) {
       usageError = err instanceof Error ? err.message : String(err);
     }
     return {
       repoPath: repo.repoPath,
       repoName: repo.repoName,
-      lastReferencedAt: lastReferencedAt(repoAbsPath).toISOString(),
+      lastReferencedAt: (await lastReferencedAt(repoAbsPath)).toISOString(),
       usedBy,
       ...(usageError ? { usageError } : {}),
     };
-  });
+  }));
 
   return candidates.sort((a, b) => a.lastReferencedAt.localeCompare(b.lastReferencedAt));
 }
@@ -122,18 +122,18 @@ export function listRepositoryPruneCandidates(): RepositoryPruneCandidate[] {
  * `github.com/<org>` shells. Stops at the first directory still holding
  * anything, and never at or above `repositories/` itself.
  */
-function removeEmptiedParents(from: string, base: string): void {
+async function removeEmptiedParents(from: string, base: string): Promise<void> {
   let current = from;
   while (isInside(base, current)) {
     let entries: string[];
     try {
-      entries = readdirSync(current);
+      entries = await readdir(current);
     } catch {
       return;
     }
     if (entries.length > 0) return;
     try {
-      rmdirSync(current);
+      await rmdir(current);
     } catch {
       return;
     }
@@ -152,42 +152,50 @@ function refuse(repoPath: string, reason: string): RepositoryPruneOutcome {
  * Usage is re-checked here rather than trusted from the listing the caller
  * ticked: a workspace may have been created since it was read.
  */
-export function pruneRepositories(repoPaths: string[]): RepositoryPruneOutcome[] {
+export async function pruneRepositories(repoPaths: string[]): Promise<RepositoryPruneOutcome[]> {
   const base = repoDir();
-  const resolvedBase = realPathOrSelf(base);
+  const resolvedBase = await realPathOrSelf(base);
 
-  return repoPaths.map((repoPath) => {
-    const repoAbsPath = path.resolve(base, repoPath);
-    if (!isInside(base, repoAbsPath) || !isInside(resolvedBase, realPathOrSelf(repoAbsPath))) {
-      return refuse(repoPath, "Not a path inside repositories/.");
-    }
-    if (!existsSync(repoAbsPath)) {
-      return refuse(repoPath, "Not found under repositories/.");
-    }
-    if (!existsSync(path.join(repoAbsPath, ".git"))) {
-      return refuse(repoPath, "Not a git repository.");
-    }
+  const outcomes: RepositoryPruneOutcome[] = [];
+  for (const repoPath of repoPaths) outcomes.push(await pruneRepository(repoPath, base, resolvedBase));
+  return outcomes;
+}
 
-    let usedBy: RepositoryUsage[];
-    try {
-      // The validated path, so the clone whose worktrees decide this is the
-      // one the deletion below is aimed at.
-      usedBy = listRepositoryUsage(path.relative(base, repoAbsPath));
-    } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err);
-      return refuse(repoPath, `Could not list its worktrees, so nothing confirms it is unused: ${reason}`);
-    }
-    if (usedBy.length > 0) {
-      const holders = usedBy.map((u) => u.workspace || u.worktreePath).join(", ");
-      return refuse(repoPath, `In use by ${usedBy.length} worktree(s): ${holders}.`);
-    }
+async function pruneRepository(
+  repoPath: string,
+  base: string,
+  resolvedBase: string,
+): Promise<RepositoryPruneOutcome> {
+  const repoAbsPath = path.resolve(base, repoPath);
+  if (!isInside(base, repoAbsPath) || !isInside(resolvedBase, await realPathOrSelf(repoAbsPath))) {
+    return refuse(repoPath, "Not a path inside repositories/.");
+  }
+  if (!(await pathExists(repoAbsPath))) {
+    return refuse(repoPath, "Not found under repositories/.");
+  }
+  if (!(await pathExists(path.join(repoAbsPath, ".git")))) {
+    return refuse(repoPath, "Not a git repository.");
+  }
 
-    try {
-      rmSync(repoAbsPath, { recursive: true, force: true });
-    } catch (err) {
-      return refuse(repoPath, err instanceof Error ? err.message : String(err));
-    }
-    removeEmptiedParents(path.dirname(repoAbsPath), base);
-    return { repoPath, deleted: true };
-  });
+  let usedBy: RepositoryUsage[];
+  try {
+    // The validated path, so the clone whose worktrees decide this is the
+    // one the deletion below is aimed at.
+    usedBy = await listRepositoryUsage(path.relative(base, repoAbsPath));
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err);
+    return refuse(repoPath, `Could not list its worktrees, so nothing confirms it is unused: ${reason}`);
+  }
+  if (usedBy.length > 0) {
+    const holders = usedBy.map((u) => u.workspace || u.worktreePath).join(", ");
+    return refuse(repoPath, `In use by ${usedBy.length} worktree(s): ${holders}.`);
+  }
+
+  try {
+    await rm(repoAbsPath, { recursive: true, force: true });
+  } catch (err) {
+    return refuse(repoPath, err instanceof Error ? err.message : String(err));
+  }
+  await removeEmptiedParents(path.dirname(repoAbsPath), base);
+  return { repoPath, deleted: true };
 }

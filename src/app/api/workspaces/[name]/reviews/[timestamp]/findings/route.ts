@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
 import { NextResponse } from "next/server";
 import { loadReviewFindings, reviewDirPath } from "@/lib/workspace/review-findings";
 
@@ -27,7 +27,7 @@ export async function GET(
       return NextResponse.json({ error: "Invalid timestamp" }, { status: 400 });
     }
 
-    if (!existsSync(reviewDirPath(name, timestamp))) {
+    if (!(await pathExists(reviewDirPath(name, timestamp)))) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 

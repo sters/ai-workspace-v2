@@ -9,17 +9,18 @@ vi.mock("@/lib/workspace/helpers", () => ({
   detectBaseBranch: vi.fn(() => "master"),
   remoteBranchExists: vi.fn(() => true),
 }));
-vi.mock("node:fs", () => {
-  const fs = { existsSync: vi.fn(), mkdirSync: vi.fn(), rmSync: vi.fn() };
+vi.mock("@/lib/fs", () => ({ pathExists: vi.fn() }));
+vi.mock("node:fs/promises", () => {
+  const fs = { mkdir: vi.fn(async () => {}), rm: vi.fn(async () => {}) };
   return { ...fs, default: fs };
 });
 
-import { existsSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
 import { exec } from "@/lib/workspace/helpers";
 import { setupRepository } from "@/lib/pipelines/actions/setup-repository";
 
 const mockExec = vi.mocked(exec);
-const mockExists = vi.mocked(existsSync);
+const mockExists = vi.mocked(pathExists);
 
 const WORKSPACE = "feature-ABC-1-thing-20260101";
 const REPO_ABS = "/repos/github.com/acme/repo";
@@ -67,10 +68,10 @@ function setup(emitStatus = vi.fn()) {
 }
 
 describe("setupRepository", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     mockExec.mockImplementation(defaultExec);
-    mockExists.mockImplementation((p) => {
+    mockExists.mockImplementation(async (p) => {
       const s = String(p);
       // Post-`worktree add` verification of <worktree>/.git.
       if (s.endsWith("/.git")) return true;
@@ -79,7 +80,7 @@ describe("setupRepository", () => {
     });
   });
 
-  it("retries a failed fetch and proceeds once an attempt succeeds", () => {
+  it("retries a failed fetch and proceeds once an attempt succeeds", async () => {
     let attempts = 0;
     mockExec.mockImplementation((cmd) => {
       if (String(cmd).includes("fetch --all")) {
@@ -89,7 +90,7 @@ describe("setupRepository", () => {
       return defaultExec(cmd);
     });
 
-    const result = setup();
+    const result = await setup();
 
     expect(fetchCalls()).toHaveLength(2);
     expect(result.repoPath).toBe("github.com/acme/repo___dev");
@@ -98,14 +99,14 @@ describe("setupRepository", () => {
     ).toBe(true);
   });
 
-  it("continues with the refs already on disk when every fetch attempt fails", () => {
+  it("continues with the refs already on disk when every fetch attempt fails", async () => {
     mockExec.mockImplementation((cmd) => {
       if (String(cmd).includes("fetch --all")) throw new Error(FETCH_ERROR);
       return defaultExec(cmd);
     });
     const emitStatus = vi.fn();
 
-    const result = setup(emitStatus);
+    const result = await setup(emitStatus);
 
     expect(fetchCalls().length).toBeGreaterThanOrEqual(3);
     expect(result.branchName).toBe("feature/ABC-1-thing-dev");
@@ -122,14 +123,14 @@ describe("setupRepository", () => {
     expect(warning).toMatch(/continuing with the refs already on disk/);
   });
 
-  it("gives up on the suffix search and takes a timestamped name when every name reads as taken", () => {
+  it("gives up on the suffix search and takes a timestamped name when every name reads as taken", async () => {
     // A `rev-parse --verify` that never fails: what a broken git looks like, and
     // what an over-permissive test mock looks like. The search must not be the
     // thing that decides when to stop.
     mockExec.mockImplementation(() => "");
     const emitStatus = vi.fn();
 
-    const result = setup(emitStatus);
+    const result = await setup(emitStatus);
 
     expect(revParseCalls().length).toBeLessThan(300);
     expect(result.branchName).toMatch(/^feature\/ABC-1-thing-dev-\d{14}$/);
@@ -142,13 +143,13 @@ describe("setupRepository", () => {
     expect(warning).toMatch(/reported as taken/);
   });
 
-  it("still fails when the repository cannot be cloned", () => {
-    mockExists.mockImplementation((p) => String(p) === WS_ABS);
+  it("still fails when the repository cannot be cloned", async () => {
+    mockExists.mockImplementation(async (p) => String(p) === WS_ABS);
     mockExec.mockImplementation((cmd) => {
       if (String(cmd).includes("git clone")) throw new Error("fatal: repository not found");
       return defaultExec(cmd);
     });
 
-    expect(() => setup()).toThrow(/repository not found/);
+    await expect(setup()).rejects.toThrow(/repository not found/);
   });
 });

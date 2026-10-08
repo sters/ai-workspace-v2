@@ -20,7 +20,7 @@ export function buildWorkspacePrunePipeline({ days, archivedOnly }: WorkspacePru
         ctx.emitStatus(
           `Scanning workspaces (threshold: ${days} days${archivedOnly ? ", archived only" : ""})...`,
         );
-        const all = listAllWorkspacesWithAge(days);
+        const all = await listAllWorkspacesWithAge(days);
         const archived = archivedOnly ? getArchivedNameSet() : null;
         const isTarget = (name: string, isStale: boolean) =>
           isStale && (archived === null || archived.has(name));

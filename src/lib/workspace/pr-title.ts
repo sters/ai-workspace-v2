@@ -14,19 +14,10 @@
  * unit-testable without a repository.
  */
 
-import { getCleanEnv } from "../env";
+import { runGit, type GitExec } from "./git-exec";
 
-export type GitExec = (args: string[], cwd: string) => { ok: boolean; out: string };
+export type { GitExec };
 
-function runGit(args: string[], cwd: string): { ok: boolean; out: string } {
-  const result = Bun.spawnSync(["git", ...args], {
-    cwd,
-    env: getCleanEnv(),
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  return { ok: result.exitCode === 0, out: result.stdout.toString() };
-}
 
 /** Headings that mean nobody wrote one — the template's own, and `parseReadmeMeta`'s absence marker. */
 const PLACEHOLDER_TITLE = /^(TBD|Untitled)$/i;
@@ -72,12 +63,12 @@ const CHECKPOINT_SUBJECT = /^(wip\b|\[wip\]|fixup!|squash!|amend!|tmp\b|temp\b)/
  * other number of them. A single commit's subject already describes the whole
  * change, so it beats having the agent compose a second description of it.
  */
-export function getSoleCommitSubject(
+export async function getSoleCommitSubject(
   worktreePath: string,
   baseBranch: string,
   git: GitExec = runGit,
-): string | null {
-  const result = git(["log", "--format=%s", `origin/${baseBranch}..HEAD`], worktreePath);
+): Promise<string | null> {
+  const result = await git(["log", "--format=%s", `origin/${baseBranch}..HEAD`], worktreePath);
   if (!result.ok) return null;
 
   const subjects = result.out.split("\n").map((line) => line.trim()).filter(Boolean);

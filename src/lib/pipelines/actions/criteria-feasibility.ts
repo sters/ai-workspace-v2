@@ -41,7 +41,7 @@ export async function prepareCriteriaFeasibility(ws: string): Promise<{
   if (autoCriteria.length === 0) return null;
 
   const wsPath = path.join(getWorkspaceDir(), ws);
-  const repos = listWorkspaceRepos(ws);
+  const repos = await listWorkspaceRepos(ws);
   let resultText = "";
 
   const child: GroupChild = {
@@ -57,7 +57,7 @@ export async function prepareCriteriaFeasibility(ws: string): Promise<{
     jsonSchema: CRITERIA_FEASIBILITY_SCHEMA,
     stepType: STEP_TYPES.CRITERIA_FEASIBILITY,
     addDirs: repos.map((r) => r.worktreePath),
-    appendSystemPromptFile: ensureSystemPrompt(wsPath, "criteria-feasibility"),
+    appendSystemPromptFile: await ensureSystemPrompt(wsPath, "criteria-feasibility"),
     onResultText: (text) => { resultText = text; },
     skipAskUserQuestion: true,
   };

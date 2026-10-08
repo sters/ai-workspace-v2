@@ -1,5 +1,6 @@
+import { stat } from "node:fs/promises";
 import { NextResponse } from "next/server";
-import { statSync, watch, type FSWatcher } from "node:fs";
+import { watch, type FSWatcher } from "node:fs";
 import path from "node:path";
 
 export const dynamic = "force-dynamic";
@@ -52,10 +53,10 @@ export async function GET(request: Request) {
       async function sendChunk() {
         if (closed) return;
         try {
-          const stat = statSync(targetPath);
-          if (stat.size <= offset) return;
+          const st = await stat(targetPath);
+          if (st.size <= offset) return;
 
-          const readLen = Math.min(stat.size - offset, MAX_READ_BYTES);
+          const readLen = Math.min(st.size - offset, MAX_READ_BYTES);
           const content = await Bun.file(targetPath).slice(offset, offset + readLen).text();
           offset += readLen;
           controller.enqueue(

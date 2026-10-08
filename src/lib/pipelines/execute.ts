@@ -1,3 +1,4 @@
+import { globScan } from "@/lib/fs";
 import path from "node:path";
 import { getWorkspaceDir, getOperationConfig } from "@/lib/config";
 import { getReadme } from "@/lib/workspace/reader";
@@ -41,7 +42,7 @@ export async function buildExecutePipeline(input: {
   const batchSize = input.batchSize ?? getOperationConfig("execute").batchSize;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const allRepos = input.repos ?? listWorkspaceRepos(workspace);
+  const allRepos = input.repos ?? await listWorkspaceRepos(workspace);
   const repos = selectRepos(allRepos, { repository, repositories: input.repositories });
   const wsPath = path.join(getWorkspaceDir(), workspace);
 
@@ -69,10 +70,10 @@ export async function buildExecutePipeline(input: {
       wsPath,
       reportDir,
       sysPromptFiles: {
-        findingsRepo: ensureSystemPrompt(wsPath, "research-findings-repo"),
-        findingsCrossRepo: ensureSystemPrompt(wsPath, "research-findings-cross-repo"),
-        recommendations: ensureSystemPrompt(wsPath, "research-recommendations"),
-        integration: ensureSystemPrompt(wsPath, "research-integration"),
+        findingsRepo: await ensureSystemPrompt(wsPath, "research-findings-repo"),
+        findingsCrossRepo: await ensureSystemPrompt(wsPath, "research-findings-cross-repo"),
+        recommendations: await ensureSystemPrompt(wsPath, "research-recommendations"),
+        integration: await ensureSystemPrompt(wsPath, "research-integration"),
       },
     });
   }
@@ -223,7 +224,7 @@ function buildResearchPipeline(input: ResearchPipelineInput): PipelinePhase[] {
     fn: async (ctx: PhaseFunctionContext) => {
       // Read all .md files from the report directory
       const glob = new Bun.Glob("*.md");
-      const mdFiles = [...glob.scanSync({ cwd: reportDir })].sort();
+      const mdFiles = (await globScan(glob, reportDir)).sort();
       const allFiles = await Promise.all(
         mdFiles.map(async (f) => ({
           name: f,
@@ -381,7 +382,7 @@ async function executeRepoLane(
     return ctx.runChild(repo.repoName, prompt, {
       addDirs: [wsPath],
       stepType: STEP_TYPES.EXECUTE,
-      appendSystemPromptFile: ensureSystemPrompt(wsPath, "executor"),
+      appendSystemPromptFile: await ensureSystemPrompt(wsPath, "executor"),
     });
   }
 
@@ -438,7 +439,7 @@ async function executeRepoLane(
     const success = await ctx.runChild(
       `${repo.repoName} [batch ${i + 1}/${totalBatches}]`,
       prompt,
-      { addDirs: [wsPath], stepType: STEP_TYPES.EXECUTE, appendSystemPromptFile: ensureSystemPrompt(wsPath, "executor") },
+      { addDirs: [wsPath], stepType: STEP_TYPES.EXECUTE, appendSystemPromptFile: await ensureSystemPrompt(wsPath, "executor") },
     );
 
     if (!success) {

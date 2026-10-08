@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const statuses = getMcpStatuses();
+    const statuses = await getMcpStatuses();
     return NextResponse.json({ statuses });
   } catch (err) {
     return NextResponse.json(

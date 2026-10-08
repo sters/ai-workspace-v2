@@ -23,7 +23,7 @@ function fakeGit(
   answers: Record<string, { ok: boolean; out: string }>,
 ): GitExec & { calls: string[] } {
   const calls: string[] = [];
-  const git = ((args: string[]) => {
+  const git = (async (args: string[]) => {
     calls.push(args.join(" "));
     const key = args.join(" ");
     return answers[key] ?? { ok: false, out: `unexpected: git ${key}` };
@@ -71,10 +71,10 @@ function upToMerge(extra: Record<string, { ok: boolean; out: string }>) {
 }
 
 describe("mergeBaseIntoBranch", () => {
-  it("reports already-current only when the pull request holds that commit too", () => {
+  it("reports already-current only when the pull request holds that commit too", async () => {
     const git = upToMerge({ [IS_ANCESTOR]: { ok: true, out: "" } });
 
-    const attempt = mergeBaseIntoBranch(
+    const attempt = await mergeBaseIntoBranch(
       repo,
       { baseBranch: "main", prHeadSha: HEAD_SHA },
       git,
@@ -91,13 +91,13 @@ describe("mergeBaseIntoBranch", () => {
   // origin/<base> HEAD` alone, so a merge sitting unpushed in the worktree came
   // back as "already contains origin/master" while GitHub went on showing the
   // pull request as conflicting — GitHub judges the pushed head.
-  it("calls a locally-merged, unpushed branch unpushed rather than current", () => {
+  it("calls a locally-merged, unpushed branch unpushed rather than current", async () => {
     const git = upToMerge({
       [IS_ANCESTOR]: { ok: true, out: "" },
       [PUSHED_IS_BEHIND]: { ok: true, out: "" },
     });
 
-    const attempt = mergeBaseIntoBranch(
+    const attempt = await mergeBaseIntoBranch(
       repo,
       { baseBranch: "main", prHeadSha: PUSHED_SHA },
       git,
@@ -109,12 +109,12 @@ describe("mergeBaseIntoBranch", () => {
     expect(git.calls).not.toContain(MERGE);
   });
 
-  it("names the shas every verdict rests on", () => {
+  it("names the shas every verdict rests on", async () => {
     // The report that was wrong named none, so it could not be checked after
     // the fact.
     const git = upToMerge({ [IS_ANCESTOR]: { ok: true, out: "" } });
 
-    const attempt = mergeBaseIntoBranch(
+    const attempt = await mergeBaseIntoBranch(
       repo,
       { baseBranch: "main", prHeadSha: HEAD_SHA },
       git,
@@ -124,12 +124,12 @@ describe("mergeBaseIntoBranch", () => {
     expect(attempt.detail).toContain("1".repeat(8));
   });
 
-  it("refuses a worktree that is behind the pushed head", () => {
+  it("refuses a worktree that is behind the pushed head", async () => {
     // Merging here could only be pushed as a non-fast-forward, and finding that
     // out afterwards costs a conflict resolution against code that is not current.
     const git = upToMerge({ [PUSHED_IS_BEHIND]: { ok: false, out: "" } });
 
-    const attempt = mergeBaseIntoBranch(
+    const attempt = await mergeBaseIntoBranch(
       repo,
       { baseBranch: "main", prHeadSha: PUSHED_SHA },
       git,
@@ -139,43 +139,43 @@ describe("mergeBaseIntoBranch", () => {
     expect(git.calls).not.toContain(MERGE);
   });
 
-  it("falls back to the remote-tracking ref when no PR head is given", () => {
+  it("falls back to the remote-tracking ref when no PR head is given", async () => {
     const git = upToMerge({
       [IS_ANCESTOR]: { ok: true, out: "" },
       [TRACKED]: { ok: true, out: PUSHED_SHA },
       [PUSHED_IS_BEHIND]: { ok: true, out: "" },
     });
 
-    expect(mergeBaseIntoBranch(repo, { baseBranch: "main" }, git).stage).toBe("unpushed");
+    expect((await mergeBaseIntoBranch(repo, { baseBranch: "main" }, git)).stage).toBe("unpushed");
     expect(git.calls).toContain(TRACKED);
   });
 
-  it("treats a branch with no pushed state as needing the push", () => {
+  it("treats a branch with no pushed state as needing the push", async () => {
     const git = upToMerge({
       [IS_ANCESTOR]: { ok: true, out: "" },
       [TRACKED]: { ok: false, out: "fatal: Needed a single revision" },
     });
 
-    expect(mergeBaseIntoBranch(repo, { baseBranch: "main" }, git).stage).toBe("unpushed");
+    expect((await mergeBaseIntoBranch(repo, { baseBranch: "main" }, git)).stage).toBe("unpushed");
   });
 
-  it("creates the merge commit when there are no conflicts", () => {
+  it("creates the merge commit when there are no conflicts", async () => {
     const git = upToMerge({ [MERGE]: { ok: true, out: "Merge made by the 'ort' strategy." } });
 
-    const attempt = mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
+    const attempt = await mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
 
     expect(attempt.stage).toBe("clean");
     expect(attempt.branch).toBe("feature/widget-x");
     expect(attempt.conflictedFiles).toEqual([]);
   });
 
-  it("returns the conflicted paths and leaves the merge in progress", () => {
+  it("returns the conflicted paths and leaves the merge in progress", async () => {
     const git = upToMerge({
       [MERGE]: { ok: false, out: "CONFLICT (content): Merge conflict in src/a.ts" },
       [UNMERGED]: { ok: true, out: "src/a.ts\nsrc/b.ts\n" },
     });
 
-    const attempt = mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
+    const attempt = await mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
 
     expect(attempt.stage).toBe("conflicted");
     expect(attempt.conflictedFiles).toEqual(["src/a.ts", "src/b.ts"]);
@@ -183,7 +183,7 @@ describe("mergeBaseIntoBranch", () => {
     expect(git.calls).not.toContain(ABORT);
   });
 
-  it("rolls back a merge that failed with nothing to resolve", () => {
+  it("rolls back a merge that failed with nothing to resolve", async () => {
     // git refuses for reasons that are not conflicts — an untracked file in the
     // way, a missing identity. Leaving the worktree half-merged would strand
     // every later phase, and there is nothing for an agent to fix.
@@ -193,27 +193,27 @@ describe("mergeBaseIntoBranch", () => {
       [ABORT]: { ok: true, out: "" },
     });
 
-    const attempt = mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
+    const attempt = await mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
 
     expect(attempt.stage).toBe("failed");
     expect(git.calls).toContain(ABORT);
   });
 
-  it("never merges into a dirty worktree", () => {
+  it("never merges into a dirty worktree", async () => {
     const git = upToMerge({ [STATUS]: { ok: true, out: " M src/a.ts" } });
 
-    const attempt = mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
+    const attempt = await mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
 
     expect(attempt.stage).toBe("dirty");
     expect(git.calls).not.toContain(MERGE);
   });
 
-  it("refuses a worktree that is not on the pull request's head branch", () => {
+  it("refuses a worktree that is not on the pull request's head branch", async () => {
     // Everything downstream pushes to the PR's branch, so merging here would put
     // this branch's commits on that PR.
     const git = upToMerge({});
 
-    const attempt = mergeBaseIntoBranch(
+    const attempt = await mergeBaseIntoBranch(
       repo,
       { baseBranch: "main", expectedBranch: "feature/other" },
       git,
@@ -224,10 +224,10 @@ describe("mergeBaseIntoBranch", () => {
     expect(git.calls).not.toContain(MERGE);
   });
 
-  it("accepts a worktree that is on the pull request's head branch", () => {
+  it("accepts a worktree that is on the pull request's head branch", async () => {
     const git = upToMerge({ [MERGE]: { ok: true, out: "" } });
 
-    const attempt = mergeBaseIntoBranch(
+    const attempt = await mergeBaseIntoBranch(
       repo,
       { baseBranch: "main", expectedBranch: "feature/widget-x" },
       git,
@@ -236,17 +236,17 @@ describe("mergeBaseIntoBranch", () => {
     expect(attempt.stage).toBe("clean");
   });
 
-  it("refuses to touch a merge that is already in progress", () => {
+  it("refuses to touch a merge that is already in progress", async () => {
     const git = upToMerge({ [MERGE_HEAD]: { ok: true, out: "3".repeat(40) } });
 
-    const attempt = mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
+    const attempt = await mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
 
     expect(attempt.stage).toBe("failed");
     expect(attempt.detail).toContain("already in progress");
     expect(git.calls).not.toContain(MERGE);
   });
 
-  it("merges a locally known base ref when the fetch fails", () => {
+  it("merges a locally known base ref when the fetch fails", async () => {
     // The same trade `refreshWorktree` makes: a ref from an earlier fetch is a
     // few commits stale at worst, and merging it beats not merging at all.
     const git = upToMerge({
@@ -254,50 +254,50 @@ describe("mergeBaseIntoBranch", () => {
       [MERGE]: { ok: true, out: "" },
     });
 
-    const attempt = mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
+    const attempt = await mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
 
     expect(attempt.stage).toBe("clean");
     expect(attempt.detail).toContain("fetch failed");
   });
 
-  it("fails when the base ref cannot be resolved at all", () => {
+  it("fails when the base ref cannot be resolved at all", async () => {
     const git = upToMerge({
       [FETCH]: { ok: false, out: "fatal: unable to access remote" },
       [BASE_SHA]: { ok: false, out: "fatal: Needed a single revision" },
     });
 
-    const attempt = mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
+    const attempt = await mergeBaseIntoBranch(repo, { baseBranch: "main" }, git);
 
     expect(attempt.stage).toBe("failed");
     expect(git.calls).not.toContain(MERGE);
   });
 
-  it("fails on a detached HEAD, which has no branch to push", () => {
+  it("fails on a detached HEAD, which has no branch to push", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: HEAD_SHA },
       [BRANCH]: { ok: false, out: "fatal: ref HEAD is not a symbolic ref" },
     });
 
-    expect(mergeBaseIntoBranch(repo, { baseBranch: "main" }, git).stage).toBe("failed");
+    expect((await mergeBaseIntoBranch(repo, { baseBranch: "main" }, git)).stage).toBe("failed");
   });
 });
 
 describe("findConflictMarkers", () => {
   const GREP = "grep --cached -I -l -E ^(<<<<<<<|>>>>>>>)  -- src/a.ts";
 
-  it("reports the staged files that still carry markers", () => {
+  it("reports the staged files that still carry markers", async () => {
     const git = fakeGit({ [GREP]: { ok: true, out: "src/a.ts\n" } });
-    expect(findConflictMarkers("/ws/task/widgets", ["src/a.ts"], git)).toEqual(["src/a.ts"]);
+    expect(await findConflictMarkers("/ws/task/widgets", ["src/a.ts"], git)).toEqual(["src/a.ts"]);
   });
 
-  it("treats git grep's no-match exit as clean", () => {
+  it("treats git grep's no-match exit as clean", async () => {
     const git = fakeGit({ [GREP]: { ok: false, out: "" } });
-    expect(findConflictMarkers("/ws/task/widgets", ["src/a.ts"], git)).toEqual([]);
+    expect(await findConflictMarkers("/ws/task/widgets", ["src/a.ts"], git)).toEqual([]);
   });
 
-  it("does not run git grep without paths to scan", () => {
+  it("does not run git grep without paths to scan", async () => {
     const git = fakeGit({});
-    expect(findConflictMarkers("/ws/task/widgets", [], git)).toEqual([]);
+    expect(await findConflictMarkers("/ws/task/widgets", [], git)).toEqual([]);
     expect(git.calls).toEqual([]);
   });
 });
@@ -305,7 +305,7 @@ describe("findConflictMarkers", () => {
 describe("finalizeConflictedMerge", () => {
   const GREP = "grep --cached -I -l -E ^(<<<<<<<|>>>>>>>)  -- src/a.ts";
 
-  it("commits the merge once the index is clean", () => {
+  it("commits the merge once the index is clean", async () => {
     const git = fakeGit({
       [UNMERGED]: { ok: true, out: "" },
       [GREP]: { ok: false, out: "" },
@@ -313,13 +313,13 @@ describe("finalizeConflictedMerge", () => {
       [COMMIT]: { ok: true, out: "[feature/widget-x abc1234] Merge" },
     });
 
-    const result = finalizeConflictedMerge(repo, ["src/a.ts"], git);
+    const result = await finalizeConflictedMerge(repo, ["src/a.ts"], git);
 
     expect(result.ok).toBe(true);
     expect(result.aborted).toBe(false);
   });
 
-  it("rolls back when a path was left unmerged", () => {
+  it("rolls back when a path was left unmerged", async () => {
     // The resolver can report a file as done and forget to `git add` it, so the
     // verdict comes from git rather than from what it said.
     const git = fakeGit({
@@ -327,7 +327,7 @@ describe("finalizeConflictedMerge", () => {
       [ABORT]: { ok: true, out: "" },
     });
 
-    const result = finalizeConflictedMerge(repo, ["src/a.ts"], git);
+    const result = await finalizeConflictedMerge(repo, ["src/a.ts"], git);
 
     expect(result.ok).toBe(false);
     expect(result.aborted).toBe(true);
@@ -335,21 +335,21 @@ describe("finalizeConflictedMerge", () => {
     expect(git.calls).not.toContain(COMMIT);
   });
 
-  it("rolls back when conflict markers are still staged", () => {
+  it("rolls back when conflict markers are still staged", async () => {
     const git = fakeGit({
       [UNMERGED]: { ok: true, out: "" },
       [GREP]: { ok: true, out: "src/a.ts" },
       [ABORT]: { ok: true, out: "" },
     });
 
-    const result = finalizeConflictedMerge(repo, ["src/a.ts"], git);
+    const result = await finalizeConflictedMerge(repo, ["src/a.ts"], git);
 
     expect(result.ok).toBe(false);
     expect(result.unresolved).toEqual(["src/a.ts"]);
     expect(git.calls).not.toContain(COMMIT);
   });
 
-  it("accepts a merge the resolver committed itself", () => {
+  it("accepts a merge the resolver committed itself", async () => {
     // Its prompt forbids that, and the tool grants cannot reliably prevent it.
     // MERGE_HEAD is gone and the index is clean, so the work is where the push
     // needs it; re-committing would fail and roll back a correct resolution.
@@ -359,13 +359,13 @@ describe("finalizeConflictedMerge", () => {
       [MERGE_HEAD]: { ok: false, out: "" },
     });
 
-    const result = finalizeConflictedMerge(repo, ["src/a.ts"], git);
+    const result = await finalizeConflictedMerge(repo, ["src/a.ts"], git);
 
     expect(result.ok).toBe(true);
     expect(git.calls).not.toContain(COMMIT);
   });
 
-  it("rolls back a commit that git refused", () => {
+  it("rolls back a commit that git refused", async () => {
     const git = fakeGit({
       [UNMERGED]: { ok: true, out: "" },
       [GREP]: { ok: false, out: "" },
@@ -374,7 +374,7 @@ describe("finalizeConflictedMerge", () => {
       [ABORT]: { ok: true, out: "" },
     });
 
-    const result = finalizeConflictedMerge(repo, ["src/a.ts"], git);
+    const result = await finalizeConflictedMerge(repo, ["src/a.ts"], git);
 
     expect(result.ok).toBe(false);
     expect(result.aborted).toBe(true);
@@ -382,25 +382,25 @@ describe("finalizeConflictedMerge", () => {
 });
 
 describe("abortMerge", () => {
-  it("rolls an in-progress merge back", () => {
+  it("rolls an in-progress merge back", async () => {
     // The escape hatch for a phase that is going away mid-resolution: the
     // resolution in the worktree was never checked, and a mid-merge worktree
     // reads as dirty to everything downstream.
     const git = fakeGit({ [ABORT]: { ok: true, out: "" } });
-    abortMerge(repo, git);
+    await abortMerge(repo, git);
     expect(git.calls).toEqual([ABORT]);
   });
 });
 
 describe("pushMergedBranch", () => {
-  it("pushes without any force flag", () => {
+  it("pushes without any force flag", async () => {
     const git = fakeGit({ "push origin feature/widget-x": { ok: true, out: "" } });
 
-    expect(pushMergedBranch(repo, "feature/widget-x", git).ok).toBe(true);
+    expect((await pushMergedBranch(repo, "feature/widget-x", git)).ok).toBe(true);
     expect(git.calls.join(" ")).not.toContain("--force");
   });
 
-  it("reports a rejected push rather than retrying it", () => {
+  it("reports a rejected push rather than retrying it", async () => {
     const git = fakeGit({
       "push origin feature/widget-x": {
         ok: false,
@@ -408,7 +408,7 @@ describe("pushMergedBranch", () => {
       },
     });
 
-    const result = pushMergedBranch(repo, "feature/widget-x", git);
+    const result = await pushMergedBranch(repo, "feature/widget-x", git);
 
     expect(result.ok).toBe(false);
     expect(result.detail).toContain("rejected");
@@ -440,7 +440,7 @@ describe("summarizeBaseMergeAttempts", () => {
     };
   }
 
-  it("counts the states the merge phase can leave behind", () => {
+  it("counts the states the merge phase can leave behind", async () => {
     const text = summarizeBaseMergeAttempts([
       attempt("clean"),
       attempt("conflicted", "api"),
@@ -452,7 +452,7 @@ describe("summarizeBaseMergeAttempts", () => {
     expect(text).toContain("- api: conflicted");
   });
 
-  it("groups the three untouched states as left alone", () => {
+  it("groups the three untouched states as left alone", async () => {
     const text = summarizeBaseMergeAttempts([
       attempt("dirty"),
       attempt("stale", "api"),
@@ -464,7 +464,7 @@ describe("summarizeBaseMergeAttempts", () => {
   // It says what the merge did; the push phase's summary says what reached the
   // pull request. A reader of a three-phase log needs the first without the
   // second being implied.
-  it("does not claim anything about the pull request", () => {
+  it("does not claim anything about the pull request", async () => {
     const text = summarizeBaseMergeAttempts([attempt("clean")]);
     expect(text).not.toContain("pushed");
     expect(text).not.toContain("lint / test / build");
@@ -472,7 +472,7 @@ describe("summarizeBaseMergeAttempts", () => {
 });
 
 describe("isBaseMergeProblem", () => {
-  it("counts only the two settled states as fine", () => {
+  it("counts only the two settled states as fine", async () => {
     expect(isBaseMergeProblem("pushed")).toBe(false);
     expect(isBaseMergeProblem("already-current")).toBe(false);
     for (const status of ["unresolved", "dirty", "failed", "push-failed"] as const) {
@@ -482,7 +482,7 @@ describe("isBaseMergeProblem", () => {
 });
 
 describe("summarizeBaseMerges", () => {
-  it("says nothing was pending when every pull request already had its base", () => {
+  it("says nothing was pending when every pull request already had its base", async () => {
     const text = summarizeBaseMerges([outcome({ status: "already-current" })]);
     // The headline says whose state it describes — the pull request's, not the
     // worktree's, which is the distinction the wrong report collapsed.
@@ -491,7 +491,7 @@ describe("summarizeBaseMerges", () => {
     expect(text).not.toContain("lint / test / build");
   });
 
-  it("counts the conflicts an agent resolved separately from clean merges", () => {
+  it("counts the conflicts an agent resolved separately from clean merges", async () => {
     const text = summarizeBaseMerges([
       outcome(),
       outcome({ repoName: "api", aiResolved: true, detail: "api: resolved" }),
@@ -500,7 +500,7 @@ describe("summarizeBaseMerges", () => {
     expect(text).toContain("1 after resolving conflicts");
   });
 
-  it("names what a human has to look at, and that nothing verified the merge", () => {
+  it("names what a human has to look at, and that nothing verified the merge", async () => {
     const text = summarizeBaseMerges([
       outcome(),
       outcome({ repoName: "api", status: "unresolved", detail: "api: still unresolved" }),
@@ -510,7 +510,7 @@ describe("summarizeBaseMerges", () => {
     expect(text).toContain("lint / test / build");
   });
 
-  it("reports an empty selection as nothing to do", () => {
+  it("reports an empty selection as nothing to do", async () => {
     expect(summarizeBaseMerges([])).toContain("No open pull requests");
   });
 });

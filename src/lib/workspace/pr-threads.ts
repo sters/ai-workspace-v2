@@ -384,10 +384,10 @@ export function parseStatusChecks(raw: string): PrChecksSummary {
   return { checks, counts, reported: true };
 }
 
-function fetchThreadsAndChecks(pr: WorkspacePullRequest): {
+async function fetchThreadsAndChecks(pr: WorkspacePullRequest): Promise<{
   threads: PrReviewThread[];
   checks: PrChecksSummary;
-} {
+}> {
   const args = [
     "gh", "api", "graphql",
     "--hostname", pr.host,
@@ -396,7 +396,7 @@ function fetchThreadsAndChecks(pr: WorkspacePullRequest): {
     "-F", `name=${pr.repo}`,
     "-F", `number=${pr.number}`,
   ];
-  const raw = execArgs(args, { cwd: pr.worktreePath });
+  const raw = await execArgs(args, { cwd: pr.worktreePath });
   return {
     threads: [...parseReviewThreads(raw), ...parseConversationComments(raw)],
     checks: parseStatusChecks(raw),
@@ -415,13 +415,13 @@ export async function listWorkspacePullRequests(workspaceName: string): Promise<
   pullRequests: WorkspacePullRequest[];
   problems: PullRequestProblem[];
 }> {
-  const repos = listWorkspaceRepos(workspaceName);
+  const repos = await listWorkspaceRepos(workspaceName);
 
   const results = await Promise.all(
     repos.map(async (repo) => {
       let pr: WorkspacePullRequest | null;
       try {
-        const raw = execArgs(
+        const raw = await execArgs(
           ["gh", "pr", "view", "--json", PR_VIEW_FIELDS],
           { cwd: repo.worktreePath },
         );
@@ -440,7 +440,7 @@ export async function listWorkspacePullRequests(workspaceName: string): Promise<
       }
 
       try {
-        const { threads, checks } = fetchThreadsAndChecks(pr);
+        const { threads, checks } = await fetchThreadsAndChecks(pr);
         pr.threads = threads;
         pr.checks = checks;
       } catch (err) {

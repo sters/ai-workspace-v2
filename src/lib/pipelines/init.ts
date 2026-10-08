@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { readWorkspaceReadme, denormalizeRepoPath } from "@/lib/parsers/readme";
 import {
@@ -130,11 +131,12 @@ export function buildInitPipeline(
           interactionLevel,
         });
 
+        const initReadmePromptFile = await ensureGlobalSystemPrompt("init-readme");
         const runOnce = (label?: string) =>
           ctx.runChild(label ?? "Analyze & draft README", prompt, {
             jsonSchema: INIT_ANALYSIS_SCHEMA,
             stepType: STEP_TYPES.ANALYZE_README,
-            appendSystemPromptFile: ensureGlobalSystemPrompt("init-readme"),
+            appendSystemPromptFile: initReadmePromptFile,
             onResultText: (text) => {
               analysis = parseAnalysis(text, description);
             },
@@ -170,7 +172,7 @@ export function buildInitPipeline(
               prompt,
               jsonSchema: INIT_ANALYSIS_SCHEMA as Record<string, unknown>,
               stepType: STEP_TYPES.ANALYZE_README,
-              appendSystemPromptFile: ensureGlobalSystemPrompt("init-readme"),
+              appendSystemPromptFile: initReadmePromptFile,
               onResultText: (text: string) => {
                 candidateAnalyses.set(label, parseAnalysis(text, description));
               },
@@ -213,7 +215,7 @@ export function buildInitPipeline(
           let reviewResultText: string | undefined;
           const reviewOk = await ctx.runChild("Best-of-N README Reviewer", reviewPrompt, {
             jsonSchema: INIT_REVIEW_SCHEMA as Record<string, unknown>,
-            appendSystemPromptFile: ensureGlobalSystemPrompt("best-of-n-file-reviewer"),
+            appendSystemPromptFile: await ensureGlobalSystemPrompt("best-of-n-file-reviewer"),
             onResultText: (text) => { reviewResultText = text; },
           });
 
@@ -282,7 +284,7 @@ export function buildInitPipeline(
           let synthResultText: string | undefined;
           const synthOk = await ctx.runChild("Best-of-N README Synthesizer", synthPrompt, {
             jsonSchema: INIT_SYNTH_SCHEMA as Record<string, unknown>,
-            appendSystemPromptFile: ensureGlobalSystemPrompt("best-of-n-synthesizer"),
+            appendSystemPromptFile: await ensureGlobalSystemPrompt("best-of-n-synthesizer"),
             onResultText: (text) => { synthResultText = text; },
           });
 
@@ -356,7 +358,7 @@ export function buildInitPipeline(
         for (const prUrl of prUrls) {
           try {
             ctx.emitStatus(`Resolving PR branch info: ${prUrl.url}`);
-            const prInfo = resolvePrBranch(prUrl);
+            const prInfo = await resolvePrBranch(prUrl);
             prUrlMap.set(prUrl.repoPath, prInfo);
             ctx.emitStatus(`PR #${prUrl.prNumber}: ${prInfo.headBranch} → ${prInfo.baseBranch}${prInfo.isFork ? " (fork)" : ""}`);
           } catch (err) {
@@ -374,7 +376,7 @@ export function buildInitPipeline(
             try {
               // Only use PR info for baseBranch — init always creates a new branch.
               // Checking out the PR's headBranch would conflict with existing worktrees.
-              const repoResult = setupRepository(wsName, repoPath, prInfo?.baseBranch, ctx.emitStatus);
+              const repoResult = await setupRepository(wsName, repoPath, prInfo?.baseBranch, ctx.emitStatus);
               repoResults.push(repoResult);
             } catch (err) {
               ctx.emitResult(`Failed to setup repository ${repoPath}: ${err}`);
@@ -396,7 +398,7 @@ export function buildInitPipeline(
             ctx.emitStatus(`Setting up newly identified repository: ${metaRepo.path}`);
             try {
               // Parser stores `___alias`; setupRepository expects the `:alias` form.
-              const repoResult = setupRepository(
+              const repoResult = await setupRepository(
                 wsName,
                 denormalizeRepoPath(metaRepo.path),
                 metaRepo.baseBranch,
@@ -412,8 +414,8 @@ export function buildInitPipeline(
         // Update README base branch info from resolved PR data
         if (prUrlMap.size > 0) {
           const readmePath = path.join(wsPath, "README.md");
-          if (existsSync(readmePath)) {
-            let readmeText = readFileSync(readmePath, "utf-8");
+          if (await pathExists(readmePath)) {
+            let readmeText = await readFile(readmePath, "utf-8");
             for (const [_repoPath, prInfo] of prUrlMap) {
               // Update (base: `main`) → (base: `actual-branch`) for matching repos
               const repoName = _repoPath.split("/").pop() ?? "";
@@ -425,7 +427,7 @@ export function buildInitPipeline(
                 readmeText = readmeText.replace(basePattern, "$1" + prInfo.baseBranch + "$3");
               }
             }
-            writeFileSync(readmePath, readmeText, "utf-8");
+            await writeFile(readmePath, readmeText, "utf-8");
           }
         }
 

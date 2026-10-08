@@ -127,7 +127,7 @@ export async function converse(
   return result.text;
 }
 
-function runTurn(
+async function runTurn(
   threadKey: string,
   prompt: string,
   resumeSessionId: string | undefined,
@@ -140,7 +140,7 @@ function runTurn(
     // (same as every other operation). The write policy (read-only by default,
     // explicitly-requested writes only, no repo/destructive changes) is
     // enforced by the system prompt, not at the tool layer.
-    appendSystemPromptFile: ensureGlobalSystemPrompt("slack-chat"),
+    appendSystemPromptFile: await ensureGlobalSystemPrompt("slack-chat"),
     resumeSessionId,
     skipAskUserQuestion: true,
     model: config.slack.chatModel ?? undefined,

@@ -21,9 +21,9 @@
  * (dirty tree, rejected push), not an exception.
  */
 
-import { getCleanEnv } from "../env";
+import { runGit, type GitExec } from "./git-exec";
 
-export type GitExec = (args: string[], cwd: string) => { ok: boolean; out: string };
+export type { GitExec };
 
 /** What the deterministic merge attempt left behind. */
 export type BaseMergeStage =
@@ -82,18 +82,6 @@ export interface BaseMergeOutcome {
   detail: string;
 }
 
-function runGit(args: string[], cwd: string): { ok: boolean; out: string } {
-  const result = Bun.spawnSync(["git", ...args], {
-    cwd,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: getCleanEnv(),
-  });
-  const out = result.success
-    ? result.stdout.toString().trim()
-    : result.stderr.toString().trim();
-  return { ok: result.success, out };
-}
 
 function firstLine(text: string): string {
   return text.split("\n")[0]?.trim() ?? "";
@@ -119,13 +107,13 @@ function lines(text: string): string[] {
  * about merges, and a file this merge never touched is none of our business.
  * `git grep` exits 1 when it matches nothing, which is the wanted case.
  */
-export function findConflictMarkers(
+export async function findConflictMarkers(
   worktreePath: string,
   files: string[],
   git: GitExec = runGit,
-): string[] {
+): Promise<string[]> {
   if (files.length === 0) return [];
-  const result = git(
+  const result = await git(
     ["grep", "--cached", "-I", "-l", "-E", "^(<<<<<<<|>>>>>>>) ", "--", ...files],
     worktreePath,
   );
@@ -177,7 +165,7 @@ export function findConflictMarkers(
  * Every verdict names the shas it rests on, because the report that was wrong
  * named none and so could not be checked after the fact.
  */
-export function mergeBaseIntoBranch(
+export async function mergeBaseIntoBranch(
   repo: { repoName: string; worktreePath: string },
   opts: {
     baseBranch: string;
@@ -190,13 +178,13 @@ export function mergeBaseIntoBranch(
     prHeadSha?: string;
   },
   git: GitExec = runGit,
-): BaseMergeAttempt {
+): Promise<BaseMergeAttempt> {
   const { repoName, worktreePath } = repo;
   const { baseBranch, expectedBranch } = opts;
   const baseRef = `origin/${baseBranch}`;
   const base = { repoName, conflictedFiles: [] as string[], fromSha: "", branch: "" };
 
-  const head = git(["rev-parse", "HEAD"], worktreePath);
+  const head = await git(["rev-parse", "HEAD"], worktreePath);
   if (!head.ok || head.out === "") {
     return {
       ...base,
@@ -206,7 +194,7 @@ export function mergeBaseIntoBranch(
   }
   const fromSha = head.out;
 
-  const branchRef = git(["symbolic-ref", "--short", "HEAD"], worktreePath);
+  const branchRef = await git(["symbolic-ref", "--short", "HEAD"], worktreePath);
   if (!branchRef.ok || branchRef.out === "") {
     return {
       ...base,
@@ -229,7 +217,7 @@ export function mergeBaseIntoBranch(
     };
   }
 
-  const inMerge = git(["rev-parse", "--verify", "--quiet", "MERGE_HEAD"], worktreePath);
+  const inMerge = await git(["rev-parse", "--verify", "--quiet", "MERGE_HEAD"], worktreePath);
   if (inMerge.ok && inMerge.out !== "") {
     return {
       ...base,
@@ -240,13 +228,13 @@ export function mergeBaseIntoBranch(
     };
   }
 
-  const fetched = git(
+  const fetched = await git(
     ["fetch", "--force", "origin", `refs/heads/${baseBranch}:refs/remotes/origin/${baseBranch}`],
     worktreePath,
   );
   const fetchNote = fetched.ok ? "" : ` (fetch failed: ${firstLine(fetched.out)})`;
 
-  const baseRev = git(["rev-parse", "--verify", baseRef], worktreePath);
+  const baseRev = await git(["rev-parse", "--verify", baseRef], worktreePath);
   if (!baseRev.ok || baseRev.out === "") {
     return {
       ...base,
@@ -261,10 +249,10 @@ export function mergeBaseIntoBranch(
   // What the pull request actually holds. Everything below is judged against
   // this rather than against the worktree, since that is the commit GitHub
   // computes the PR's mergeability from.
-  const pushedSha = (() => {
+  const pushedSha = await (async () => {
     const given = opts.prHeadSha?.trim();
     if (given) return given;
-    const tracked = git(["rev-parse", "--verify", `refs/remotes/origin/${branch}`], worktreePath);
+    const tracked = await git(["rev-parse", "--verify", `refs/remotes/origin/${branch}`], worktreePath);
     return tracked.ok ? tracked.out : "";
   })();
   const pushedLabel = pushedSha === "" ? "(unknown)" : shortSha(pushedSha);
@@ -272,7 +260,7 @@ export function mergeBaseIntoBranch(
   const pushedIsBehind =
     pushedSha === "" ||
     pushedSha === fromSha ||
-    git(["merge-base", "--is-ancestor", pushedSha, "HEAD"], worktreePath).ok;
+    (await git(["merge-base", "--is-ancestor", pushedSha, "HEAD"], worktreePath)).ok;
 
   if (!pushedIsBehind) {
     return {
@@ -287,7 +275,7 @@ export function mergeBaseIntoBranch(
     };
   }
 
-  if (git(["merge-base", "--is-ancestor", baseRef, "HEAD"], worktreePath).ok) {
+  if ((await git(["merge-base", "--is-ancestor", baseRef, "HEAD"], worktreePath)).ok) {
     if (pushedSha === fromSha) {
       return {
         ...base,
@@ -310,7 +298,7 @@ export function mergeBaseIntoBranch(
     };
   }
 
-  const dirty = git(["status", "--porcelain", "--untracked-files=no"], worktreePath);
+  const dirty = await git(["status", "--porcelain", "--untracked-files=no"], worktreePath);
   if (dirty.ok && dirty.out !== "") {
     return {
       ...base,
@@ -323,7 +311,7 @@ export function mergeBaseIntoBranch(
     };
   }
 
-  const merge = git(["merge", "--no-ff", "--no-edit", baseRef], worktreePath);
+  const merge = await git(["merge", "--no-ff", "--no-edit", baseRef], worktreePath);
   if (merge.ok) {
     return {
       ...base,
@@ -334,9 +322,9 @@ export function mergeBaseIntoBranch(
     };
   }
 
-  const unmerged = lines(git(["diff", "--name-only", "--diff-filter=U"], worktreePath).out);
+  const unmerged = lines((await git(["diff", "--name-only", "--diff-filter=U"], worktreePath)).out);
   if (unmerged.length === 0) {
-    git(["merge", "--abort"], worktreePath);
+    await git(["merge", "--abort"], worktreePath);
     return {
       ...base,
       fromSha,
@@ -362,11 +350,11 @@ export function mergeBaseIntoBranch(
  * left mid-merge is dirty to every later phase and to whoever opens it next,
  * and the resolution it holds was never verified.
  */
-export function abortMerge(
+export async function abortMerge(
   repo: { worktreePath: string },
   git: GitExec = runGit,
-): void {
-  git(["merge", "--abort"], repo.worktreePath);
+): Promise<void> {
+  await git(["merge", "--abort"], repo.worktreePath);
 }
 
 export interface ConflictFinalizeResult {
@@ -392,35 +380,35 @@ export interface ConflictFinalizeResult {
  * re-committed: MERGE_HEAD is gone, the index is clean, and the work is already
  * where the push needs it.
  */
-export function finalizeConflictedMerge(
+export async function finalizeConflictedMerge(
   repo: { repoName: string; worktreePath: string },
   conflictedFiles: string[],
   git: GitExec = runGit,
-): ConflictFinalizeResult {
+): Promise<ConflictFinalizeResult> {
   const { repoName, worktreePath } = repo;
 
-  const rollback = (unresolved: string[], detail: string): ConflictFinalizeResult => {
-    git(["merge", "--abort"], worktreePath);
+  const rollback = async (unresolved: string[], detail: string): Promise<ConflictFinalizeResult> => {
+    await git(["merge", "--abort"], worktreePath);
     return { ok: false, unresolved, aborted: true, detail };
   };
 
-  const unmerged = lines(git(["diff", "--name-only", "--diff-filter=U"], worktreePath).out);
+  const unmerged = lines((await git(["diff", "--name-only", "--diff-filter=U"], worktreePath)).out);
   if (unmerged.length > 0) {
-    return rollback(
+    return await rollback(
       unmerged,
       `${repoName}: ${unmerged.length} file(s) are still unresolved (${unmerged.join(", ")}). The merge was rolled back, so the branch is unchanged.`,
     );
   }
 
-  const marked = findConflictMarkers(worktreePath, conflictedFiles, git);
+  const marked = await findConflictMarkers(worktreePath, conflictedFiles, git);
   if (marked.length > 0) {
-    return rollback(
+    return await rollback(
       marked,
       `${repoName}: conflict markers are still staged in ${marked.join(", ")}. The merge was rolled back rather than pushed.`,
     );
   }
 
-  const inMerge = git(["rev-parse", "--verify", "--quiet", "MERGE_HEAD"], worktreePath);
+  const inMerge = await git(["rev-parse", "--verify", "--quiet", "MERGE_HEAD"], worktreePath);
   if (!inMerge.ok || inMerge.out === "") {
     return {
       ok: true,
@@ -430,9 +418,9 @@ export function finalizeConflictedMerge(
     };
   }
 
-  const commit = git(["commit", "--no-edit"], worktreePath);
+  const commit = await git(["commit", "--no-edit"], worktreePath);
   if (!commit.ok) {
-    return rollback(
+    return await rollback(
       conflictedFiles,
       `${repoName}: the resolved merge could not be committed — ${firstLine(commit.out)}. The merge was rolled back.`,
     );
@@ -453,12 +441,12 @@ export function finalizeConflictedMerge(
  * rejected push means the remote holds something this worktree has not seen,
  * which is a state to report rather than to overwrite.
  */
-export function pushMergedBranch(
+export async function pushMergedBranch(
   repo: { repoName: string; worktreePath: string },
   branch: string,
   git: GitExec = runGit,
-): { ok: boolean; detail: string } {
-  const push = git(["push", "origin", branch], repo.worktreePath);
+): Promise<{ ok: boolean; detail: string }> {
+  const push = await git(["push", "origin", branch], repo.worktreePath);
   if (push.ok) {
     return { ok: true, detail: `${repo.repoName}: pushed \`${branch}\` to origin` };
   }

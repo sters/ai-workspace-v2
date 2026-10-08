@@ -11,7 +11,7 @@ vi.mock("@/lib/workspace/helpers", async (importOriginal) => {
 });
 
 describe("extractPrUrls", () => {
-  it("extracts a single PR URL", () => {
+  it("extracts a single PR URL", async () => {
     const text = "Please review https://github.com/sters/ai-workspace-v2/pull/42";
     const result = extractPrUrls(text);
     expect(result).toEqual([
@@ -25,7 +25,7 @@ describe("extractPrUrls", () => {
     ]);
   });
 
-  it("extracts multiple PR URLs", () => {
+  it("extracts multiple PR URLs", async () => {
     const text = [
       "Frontend: https://github.com/sters/ai-workspace-v2/pull/10",
       "Backend: https://github.com/sters/other-repo/pull/20",
@@ -38,28 +38,28 @@ describe("extractPrUrls", () => {
     expect(result[1].prNumber).toBe(20);
   });
 
-  it("returns empty array when no PR URLs", () => {
+  it("returns empty array when no PR URLs", async () => {
     expect(extractPrUrls("just some text")).toEqual([]);
     expect(extractPrUrls("")).toEqual([]);
   });
 
-  it("ignores GitHub issue URLs", () => {
+  it("ignores GitHub issue URLs", async () => {
     const text = "See https://github.com/sters/ai-workspace-v2/issues/42";
     expect(extractPrUrls(text)).toEqual([]);
   });
 
-  it("ignores non-GitHub URLs", () => {
+  it("ignores non-GitHub URLs", async () => {
     const text = "See https://gitlab.com/sters/ai-workspace-v2/merge_requests/42";
     expect(extractPrUrls(text)).toEqual([]);
   });
 
-  it("builds repoPath in github.com/owner/repo format", () => {
+  it("builds repoPath in github.com/owner/repo format", async () => {
     const text = "https://github.com/sters/ai-workspace-v2/pull/1";
     const result = extractPrUrls(text);
     expect(result[0].repoPath).toBe("github.com/sters/ai-workspace-v2");
   });
 
-  it("deduplicates same PR URL appearing multiple times", () => {
+  it("deduplicates same PR URL appearing multiple times", async () => {
     const text = [
       "https://github.com/sters/ai-workspace-v2/pull/42",
       "same PR: https://github.com/sters/ai-workspace-v2/pull/42",
@@ -98,7 +98,7 @@ describe("resolvePrBranch", () => {
       }),
     );
 
-    const result = resolvePrBranch(mockPrUrl);
+    const result = await resolvePrBranch(mockPrUrl);
     expect(result).toEqual({
       headBranch: "feature/new-widget",
       baseBranch: "main",
@@ -120,7 +120,7 @@ describe("resolvePrBranch", () => {
       }),
     );
 
-    const result = resolvePrBranch(mockPrUrl);
+    const result = await resolvePrBranch(mockPrUrl);
     expect(result.isFork).toBe(true);
     expect(result.headBranch).toBe("fork-branch");
   });
@@ -131,6 +131,6 @@ describe("resolvePrBranch", () => {
       throw new Error("gh: command not found");
     });
 
-    expect(() => resolvePrBranch(mockPrUrl)).toThrow("gh: command not found");
+    await expect(resolvePrBranch(mockPrUrl)).rejects.toThrow("gh: command not found");
   });
 });

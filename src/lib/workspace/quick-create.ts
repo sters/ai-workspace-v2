@@ -31,8 +31,8 @@
  * everything a model would otherwise have been asked to draft a README from.
  */
 
+import { pathExists } from "@/lib/fs";
 import path from "node:path";
-import { existsSync } from "node:fs";
 import { quickWorkspaceName } from "@/lib/naming";
 import { denormalizeRepoPath, type RepoConstraint } from "@/lib/parsers/readme";
 import { parsePrUrl, type PrUrlInfo } from "@/lib/github-pr-url";
@@ -49,12 +49,12 @@ import type { PrBranchInfo } from "./pr-url";
  * this list is still usable — the caller may type its path, and setup clones
  * it — so this is a shortcut, not the set of allowed values.
  */
-export function listSelectableRepositories(): SelectableRepository[] {
-  return listAllRepositories().map((repo) => ({
+export async function listSelectableRepositories(): Promise<SelectableRepository[]> {
+  return Promise.all((await listAllRepositories()).map(async (repo) => ({
     repoPath: repo.repoPath,
     repoName: repo.repoName,
-    baseBranch: localBaseBranch(path.join(repoDir(), repo.repoPath)),
-  }));
+    baseBranch: await localBaseBranch(path.join(repoDir(), repo.repoPath)),
+  })));
 }
 
 export interface QuickCreateInput {
@@ -113,15 +113,15 @@ export interface QuickCreateDeps {
     baseBranchOverride: string | undefined,
     emitStatus: (message: string) => void,
     checkoutBranch?: string,
-  ) => SetupRepositoryResult;
+  ) => Promise<SetupRepositoryResult>;
   /** `gh pr view`, injected for the same reason. */
-  resolvePullRequest: (pr: PrUrlInfo) => PrBranchInfo;
+  resolvePullRequest: (pr: PrUrlInfo) => Promise<PrBranchInfo>;
   /**
    * The repository's constraints from an earlier workspace's discovery, when
    * they are still current. This path discovers nothing itself, so a
    * repository without them reaches review with no lint/test/build declared.
    */
-  cachedConstraints?: (worktreePath: string) => RepoConstraint[] | null;
+  cachedConstraints?: (worktreePath: string) => Promise<RepoConstraint[] | null>;
 }
 
 /** The PR as it goes into `## Initial Request`: what a reader needs without opening it. */
@@ -140,11 +140,11 @@ function pullRequestRequest(pr: PrBranchInfo): string {
  * Read every PR entry before anything is created, since a PR's title may be
  * the only thing to name the workspace by. Keyed by the entry as typed.
  */
-function resolvePullRequests(
+async function resolvePullRequests(
   entries: string[],
   resolve: QuickCreateDeps["resolvePullRequest"],
   problems: QuickCreateProblem[],
-): Map<string, PrBranchInfo> {
+): Promise<Map<string, PrBranchInfo>> {
   const resolved = new Map<string, PrBranchInfo>();
   const repos = new Set<string>();
 
@@ -154,7 +154,7 @@ function resolvePullRequests(
 
     let pr: PrBranchInfo;
     try {
-      pr = resolve(info);
+      pr = await resolve(info);
     } catch (err) {
       problems.push({ repository: entry, error: String(err) });
       continue;
@@ -244,7 +244,7 @@ export async function createQuickWorkspace(
   deps: QuickCreateDeps,
 ): Promise<QuickCreateResult> {
   const problems: QuickCreateProblem[] = [];
-  const pullRequestsByEntry = resolvePullRequests(
+  const pullRequestsByEntry = await resolvePullRequests(
     input.repositories,
     deps.resolvePullRequest,
     problems,
@@ -289,11 +289,11 @@ export async function createQuickWorkspace(
     try {
       if (pr) {
         repositories.push(
-          deps.setupRepository(workspaceName, pr.repoPath, pr.baseBranch, emit, pr.headBranch),
+          await deps.setupRepository(workspaceName, pr.repoPath, pr.baseBranch, emit, pr.headBranch),
         );
         pullRequests.push({ url: pr.prUrl, repoPath: pr.repoPath, headBranch: pr.headBranch });
       } else {
-        repositories.push(deps.setupRepository(workspaceName, entry, undefined, emit));
+        repositories.push(await deps.setupRepository(workspaceName, entry, undefined, emit));
       }
     } catch (err) {
       problems.push({ repository: entry, error: String(err) });
@@ -302,13 +302,13 @@ export async function createQuickWorkspace(
   }
 
   const readmePath = path.join(workspacePath, "README.md");
-  if (existsSync(readmePath)) {
+  if (await pathExists(readmePath)) {
     let content = fillQuickReadme(await Bun.file(readmePath).text(), {
       title: name || workspaceName,
       repositories,
     });
     for (const repo of repositories) {
-      const constraints = deps.cachedConstraints?.(repo.worktreePath);
+      const constraints = await deps.cachedConstraints?.(repo.worktreePath);
       if (constraints) content = appendRepoConstraints(content, repo.repoName, constraints);
     }
     await Bun.write(readmePath, content);

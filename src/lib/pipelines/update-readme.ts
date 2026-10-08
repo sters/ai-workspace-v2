@@ -48,7 +48,7 @@ export async function buildUpdateReadmePipeline(input: {
       stepType: STEP_TYPES.UPDATE_README,
       addDirs: [workspacePath],
       allowedTools,
-      appendSystemPromptFile: ensureSystemPrompt(workspacePath, "readme-updater"),
+      appendSystemPromptFile: await ensureSystemPrompt(workspacePath, "readme-updater"),
     },
     // After the README is updated, set up any repositories newly declared in it
     // and discover their constraints — the updater agent can only write the

@@ -12,7 +12,7 @@ export async function GET(
   if (name.includes('..') || name.includes('/') || name.includes('\\')) {
     return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
   }
-  const diff = getCommitDiff(name, hash);
+  const diff = await getCommitDiff(name, hash);
   if (diff === null) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

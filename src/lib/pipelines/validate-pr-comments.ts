@@ -141,7 +141,7 @@ export function buildValidatePrCommentsPipeline(input: {
           return false;
         }
 
-        const systemPromptFile = ensureSystemPrompt(wsPath, "pr-comment-validator");
+        const systemPromptFile = await ensureSystemPrompt(wsPath, "pr-comment-validator");
         const resultTexts = new Map<string, string>();
 
         const children: GroupChild[] = targets.map(({ pr, thread }) => ({

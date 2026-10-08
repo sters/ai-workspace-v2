@@ -156,7 +156,7 @@ export async function fetchPrCheckFailureLogs(input: {
   checks: { repoName: string; name: string; url?: string | null }[];
 }): Promise<PrCheckFailureLog[]> {
   const worktrees = new Map(
-    listWorkspaceRepos(input.workspace).map((r) => [r.repoName, r.worktreePath]),
+    (await listWorkspaceRepos(input.workspace)).map((r) => [r.repoName, r.worktreePath]),
   );
   return Promise.all(input.checks.map((check) => fetchOne(check, worktrees.get(check.repoName))));
 }

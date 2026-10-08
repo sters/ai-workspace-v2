@@ -7,10 +7,10 @@ import {
   type GitExec,
 } from "@/lib/workspace/pr-title";
 
-const git = (out: string, ok = true): GitExec => vi.fn(() => ({ ok, out }));
+const git = (out: string, ok = true): GitExec => vi.fn(async () => ({ ok, out }));
 
 describe("resolveTaskTitle", () => {
-  it("takes the README heading as written", () => {
+  it("takes the README heading as written", async () => {
     expect(resolveTaskTitle("Add pagination to user search API")).toBe(
       "Add pagination to user search API",
     );
@@ -39,13 +39,13 @@ describe("applyTicketPrefix", () => {
     },
   );
 
-  it("adds nothing when there is no ticket", () => {
+  it("adds nothing when there is no ticket", async () => {
     expect(applyTicketPrefix("Add pagination", "")).toBe("Add pagination");
     expect(applyTicketPrefix("Add pagination", undefined)).toBe("Add pagination");
   });
 
   // The heading, or the commit subject, may already name the ticket.
-  it("does not name the ticket twice", () => {
+  it("does not name the ticket twice", async () => {
     expect(applyTicketPrefix("[ABC-123] Add pagination", "ABC-123")).toBe(
       "[ABC-123] Add pagination",
     );
@@ -54,15 +54,15 @@ describe("applyTicketPrefix", () => {
     );
   });
 
-  it("tolerates a trailing separator on the field", () => {
+  it("tolerates a trailing separator on the field", async () => {
     expect(applyTicketPrefix("Add pagination", "ABC-123,")).toBe("[ABC-123] Add pagination");
   });
 });
 
 describe("getSoleCommitSubject", () => {
-  it("returns the subject of a branch holding one commit", () => {
+  it("returns the subject of a branch holding one commit", async () => {
     const exec = git("Add pagination to user search API\n");
-    expect(getSoleCommitSubject("/wt", "main", exec)).toBe("Add pagination to user search API");
+    expect(await getSoleCommitSubject("/wt", "main", exec)).toBe("Add pagination to user search API");
     expect(exec).toHaveBeenCalledWith(
       ["log", "--format=%s", "origin/main..HEAD"],
       "/wt",
@@ -71,32 +71,32 @@ describe("getSoleCommitSubject", () => {
 
   // With several commits there is no one subject that describes the branch, so
   // the agent composes instead — which is what it did before this existed.
-  it("returns null for a branch holding more than one commit", () => {
-    expect(getSoleCommitSubject("/wt", "main", git("Second\nFirst\n"))).toBeNull();
+  it("returns null for a branch holding more than one commit", async () => {
+    expect(await getSoleCommitSubject("/wt", "main", git("Second\nFirst\n"))).toBeNull();
   });
 
-  it("returns null for a branch holding no commits", () => {
-    expect(getSoleCommitSubject("/wt", "main", git("\n"))).toBeNull();
+  it("returns null for a branch holding no commits", async () => {
+    expect(await getSoleCommitSubject("/wt", "main", git("\n"))).toBeNull();
   });
 
   // `origin/<base>` may not be on disk. Fail closed: a title is composed rather
   // than derived from a range git could not resolve.
-  it("returns null when git fails", () => {
-    expect(getSoleCommitSubject("/wt", "main", git("", false))).toBeNull();
+  it("returns null when git fails", async () => {
+    expect(await getSoleCommitSubject("/wt", "main", git("", false))).toBeNull();
   });
 
   // A one-commit branch whose commit is a checkpoint says nothing about the
   // change, and the subject becomes the PR title verbatim.
   it.each(["wip", "WIP: pagination", "fixup! Add pagination", "tmp"])(
     "returns null for the checkpoint subject %p",
-    (subject) => {
-      expect(getSoleCommitSubject("/wt", "main", git(`${subject}\n`))).toBeNull();
+    async (subject) => {
+      expect(await getSoleCommitSubject("/wt", "main", git(`${subject}\n`))).toBeNull();
     },
   );
 });
 
 describe("resolvePrTitle", () => {
-  it("prefers the task title over the branch's sole commit", () => {
+  it("prefers the task title over the branch's sole commit", async () => {
     expect(
       resolvePrTitle({
         taskTitle: "Add pagination to user search API",
@@ -108,7 +108,7 @@ describe("resolvePrTitle", () => {
 
   // The task title is what makes sibling PRs match, so the commit subject is
   // only reached when there is none — and then each repo's title is its own.
-  it("falls back to the sole commit subject", () => {
+  it("falls back to the sole commit subject", async () => {
     expect(
       resolvePrTitle({
         taskTitle: null,
@@ -118,7 +118,7 @@ describe("resolvePrTitle", () => {
     ).toBe("[ABC-123] Tweak the search query");
   });
 
-  it("yields null when neither is available", () => {
+  it("yields null when neither is available", async () => {
     expect(resolvePrTitle({ taskTitle: null, ticketId: "ABC-123", soleCommitSubject: null }))
       .toBeNull();
   });

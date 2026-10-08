@@ -30,7 +30,7 @@ export async function buildUpdateTodoPipeline(input: {
     ? await readmeFile.text()
     : "";
 
-  const repos = selectRepos(listWorkspaceRepos(workspace), { repository: repo, repositories });
+  const repos = selectRepos(await listWorkspaceRepos(workspace), { repository: repo, repositories });
 
   // Read TODO content once (shared across all candidates)
   const todoContents = await Promise.all(repos.map(async (r) => {
@@ -119,6 +119,7 @@ export async function buildUpdateTodoPipeline(input: {
       label: "Update TODOs (Best-of-N)",
       timeoutMs: 60 * 60 * 1000,
       fn: async (ctx) => {
+        const updaterPromptFile = await ensureSystemPrompt(workspacePath, "updater");
         return runBestOfNFiles({
           ctx,
           n: bestOfN,
@@ -136,13 +137,13 @@ export async function buildUpdateTodoPipeline(input: {
                 `Write(${candidatePrefix}${candidateDir}/TODO-*.md)`,
                 "Bash(git:*)",
               ],
-              appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater"),
+              appendSystemPromptFile: updaterPromptFile,
             }];
           },
           confirm: bestOfNConfirm,
           interactionLevel,
           runNormal: async (innerCtx) => {
-            return innerCtx.runChild("Update TODOs", prompt, { addDirs: [workspacePath], allowedTools: todoAllowedTools, stepType: STEP_TYPES.UPDATE_TODO, appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater") });
+            return innerCtx.runChild("Update TODOs", prompt, { addDirs: [workspacePath], allowedTools: todoAllowedTools, stepType: STEP_TYPES.UPDATE_TODO, appendSystemPromptFile: await ensureSystemPrompt(workspacePath, "updater") });
           },
         });
       },
@@ -150,7 +151,7 @@ export async function buildUpdateTodoPipeline(input: {
   }
 
   return [
-    { kind: "single", label: "Update TODOs", prompt, stepType: STEP_TYPES.UPDATE_TODO, addDirs: [workspacePath], allowedTools: todoAllowedTools, appendSystemPromptFile: ensureSystemPrompt(workspacePath, "updater") },
+    { kind: "single", label: "Update TODOs", prompt, stepType: STEP_TYPES.UPDATE_TODO, addDirs: [workspacePath], allowedTools: todoAllowedTools, appendSystemPromptFile: await ensureSystemPrompt(workspacePath, "updater") },
     normalizePhase,
   ];
 }

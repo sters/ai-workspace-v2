@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { detectBaseBranch, remoteBranchExists, exec } from "@/lib/workspace/helpers";
+import { detectBaseBranch, remoteBranchExists } from "@/lib/workspace/helpers";
+import { sh as exec } from "../../fixtures/sh";
 
 /**
  * These tests build a real "remote" bare repo whose default branch is `master`
@@ -14,7 +15,7 @@ describe("branch detection helpers", () => {
   let remoteDir: string;
   let cloneDir: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join("/tmp", "aiw-helpers-test-"));
     remoteDir = path.join(tmpDir, "remote.git");
     cloneDir = path.join(tmpDir, "clone");
@@ -34,19 +35,19 @@ describe("branch detection helpers", () => {
     exec(`git clone -q "${remoteDir}" "${cloneDir}"`);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  it("remoteBranchExists is true for an existing remote branch", () => {
-    expect(remoteBranchExists(cloneDir, "master")).toBe(true);
+  it("remoteBranchExists is true for an existing remote branch", async () => {
+    expect(await remoteBranchExists(cloneDir, "master")).toBe(true);
   });
 
-  it("remoteBranchExists is false for a branch the remote does not have", () => {
-    expect(remoteBranchExists(cloneDir, "main")).toBe(false);
+  it("remoteBranchExists is false for a branch the remote does not have", async () => {
+    expect(await remoteBranchExists(cloneDir, "main")).toBe(false);
   });
 
-  it("detectBaseBranch resolves the remote default branch (master)", () => {
-    expect(detectBaseBranch(cloneDir)).toBe("master");
+  it("detectBaseBranch resolves the remote default branch (master)", async () => {
+    expect(await detectBaseBranch(cloneDir)).toBe("master");
   });
 });

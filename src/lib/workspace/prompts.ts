@@ -10,7 +10,8 @@
  * checked at most once per process to avoid redundant I/O.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { getResolvedWorkspaceRoot } from "@/lib/config";
@@ -120,17 +121,20 @@ function computePromptsHash(): string {
 
 const HASH_FILENAME = ".hash";
 
-/** Directories already verified in this process. */
-const _verifiedDirs = new Set<string>();
+/**
+ * Directories verified (or being verified) in this process. The promise, not a
+ * flag, so concurrent callers share one check instead of each rewriting the files.
+ */
+const _verifiedDirs = new Map<string, Promise<void>>();
 
 /**
  * Remove stale .md files in promptsDir that are no longer in SYSTEM_PROMPTS.
  * Leaves the .hash file and any non-.md files alone.
  */
-function removeStalePromptFiles(promptsDir: string): void {
+async function removeStalePromptFiles(promptsDir: string): Promise<void> {
   let entries: string[];
   try {
-    entries = readdirSync(promptsDir);
+    entries = await readdir(promptsDir);
   } catch {
     return; // Directory doesn't exist yet — nothing to clean up.
   }
@@ -138,7 +142,7 @@ function removeStalePromptFiles(promptsDir: string): void {
     if (!entry.endsWith(".md")) continue;
     if (entry in SYSTEM_PROMPTS) continue;
     try {
-      unlinkSync(path.join(promptsDir, entry));
+      await unlink(path.join(promptsDir, entry));
     } catch {
       // Best-effort cleanup; ignore failures.
     }
@@ -151,17 +155,26 @@ function removeStalePromptFiles(promptsDir: string): void {
  * and remove any stale .md files no longer in SYSTEM_PROMPTS.
  * Each directory is checked at most once per process.
  */
-function ensureUpToDate(dir: string): void {
+function ensureUpToDate(dir: string): Promise<void> {
   const promptsDir = path.join(dir, "prompts");
-  if (_verifiedDirs.has(promptsDir)) return;
+  let verified = _verifiedDirs.get(promptsDir);
+  if (!verified) {
+    verified = regenerateIfStale(promptsDir);
+    _verifiedDirs.set(promptsDir, verified);
+    // A failed check is retried by the next caller rather than cached.
+    verified.catch(() => _verifiedDirs.delete(promptsDir));
+  }
+  return verified;
+}
 
+async function regenerateIfStale(promptsDir: string): Promise<void> {
   const hashFile = path.join(promptsDir, HASH_FILENAME);
   const currentHash = computePromptsHash();
 
   let needsUpdate = true;
-  if (existsSync(hashFile)) {
+  if (await pathExists(hashFile)) {
     try {
-      const storedHash = readFileSync(hashFile, "utf-8").trim();
+      const storedHash = (await readFile(hashFile, "utf-8")).trim();
       if (storedHash === currentHash) {
         needsUpdate = false;
       }
@@ -171,15 +184,13 @@ function ensureUpToDate(dir: string): void {
   }
 
   if (needsUpdate) {
-    mkdirSync(promptsDir, { recursive: true });
+    await mkdir(promptsDir, { recursive: true });
     for (const [filename, getContent] of Object.entries(SYSTEM_PROMPTS)) {
-      writeFileSync(path.join(promptsDir, filename), getContent(), "utf-8");
+      await writeFile(path.join(promptsDir, filename), getContent(), "utf-8");
     }
-    removeStalePromptFiles(promptsDir);
-    writeFileSync(hashFile, currentHash, "utf-8");
+    await removeStalePromptFiles(promptsDir);
+    await writeFile(hashFile, currentHash, "utf-8");
   }
-
-  _verifiedDirs.add(promptsDir);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +200,7 @@ function ensureUpToDate(dir: string): void {
 /** Write all system prompt files to {dir}/prompts/. */
 export async function writeSystemPrompts(dir: string): Promise<void> {
   const promptsDir = path.join(dir, "prompts");
-  mkdirSync(promptsDir, { recursive: true });
+  await mkdir(promptsDir, { recursive: true });
   const currentHash = computePromptsHash();
   await Promise.all([
     ...Object.entries(SYSTEM_PROMPTS).map(([filename, getContent]) =>
@@ -197,8 +208,8 @@ export async function writeSystemPrompts(dir: string): Promise<void> {
     ),
     Bun.write(path.join(promptsDir, HASH_FILENAME), currentHash),
   ]);
-  removeStalePromptFiles(promptsDir);
-  _verifiedDirs.add(promptsDir);
+  await removeStalePromptFiles(promptsDir);
+  _verifiedDirs.set(promptsDir, Promise.resolve());
 }
 
 /**
@@ -206,11 +217,11 @@ export async function writeSystemPrompts(dir: string): Promise<void> {
  * the absolute path for the requested agent.
  * Auto-regenerates all files when the app's prompt templates have changed.
  */
-export function ensureSystemPrompt(wsPath: string, agentName: string): string {
+export async function ensureSystemPrompt(wsPath: string, agentName: string): Promise<string> {
   if (!SYSTEM_PROMPTS[`${agentName}.md`]) {
     throw new Error(`Unknown system prompt agent: ${agentName}`);
   }
-  ensureUpToDate(wsPath);
+  await ensureUpToDate(wsPath);
   return path.join(wsPath, "prompts", `${agentName}.md`);
 }
 
@@ -219,12 +230,12 @@ export function ensureSystemPrompt(wsPath: string, agentName: string): string {
  * ({workspaceRoot}/prompts/) and return the absolute path for the requested agent.
  * Used for agents that run outside a specific workspace (init-readme, search, discovery).
  */
-export function ensureGlobalSystemPrompt(agentName: string): string {
+export async function ensureGlobalSystemPrompt(agentName: string): Promise<string> {
   if (!SYSTEM_PROMPTS[`${agentName}.md`]) {
     throw new Error(`Unknown system prompt agent: ${agentName}`);
   }
   const rootPath = getResolvedWorkspaceRoot();
-  ensureUpToDate(rootPath);
+  await ensureUpToDate(rootPath);
   return path.join(rootPath, "prompts", `${agentName}.md`);
 }
 
@@ -233,38 +244,38 @@ export function ensureGlobalSystemPrompt(agentName: string): string {
  * plus dynamic workspace context. Returns the absolute path to the session file.
  * Used for chat sessions where workspace-specific info must be in the system prompt.
  */
-export function ensureSessionSystemPrompt(
+export async function ensureSessionSystemPrompt(
   wsPath: string,
   agentName: string,
   sessionId: string,
   context: { workspaceId: string },
-): string {
-  const baseFile = ensureSystemPrompt(wsPath, agentName);
-  const baseContent = readFileSync(baseFile, "utf-8");
+): Promise<string> {
+  const baseFile = await ensureSystemPrompt(wsPath, agentName);
+  const baseContent = await readFile(baseFile, "utf-8");
   const contextBlock = `\n\nWorkspace: "${context.workspaceId}"\nWorkspace directory: ${wsPath}`;
 
   const sessionDir = path.join(wsPath, "prompts", "sessions");
-  mkdirSync(sessionDir, { recursive: true });
+  await mkdir(sessionDir, { recursive: true });
 
   // Clean up stale session prompt files for this agent left over from previous runs.
   // Only removes files matching the naming convention: {agentName}-{numericSessionId}.md
   const stalePattern = new RegExp(`^${agentName}-\\d+\\.md$`);
   try {
-    for (const entry of readdirSync(sessionDir)) {
+    for (const entry of await readdir(sessionDir)) {
       if (stalePattern.test(entry)) {
-        try { unlinkSync(path.join(sessionDir, entry)); } catch { /* best-effort */ }
+        try { await unlink(path.join(sessionDir, entry)); } catch { /* best-effort */ }
       }
     }
   } catch { /* directory read failed — ignore */ }
 
   const sessionFile = path.join(sessionDir, `${agentName}-${sessionId}.md`);
-  writeFileSync(sessionFile, baseContent + contextBlock, "utf-8");
+  await writeFile(sessionFile, baseContent + contextBlock, "utf-8");
   return sessionFile;
 }
 
 /** Best-effort cleanup of a per-session system prompt file. */
-export function cleanupSessionSystemPrompt(sessionFile: string): void {
-  try { unlinkSync(sessionFile); } catch { /* best-effort */ }
+export async function cleanupSessionSystemPrompt(sessionFile: string): Promise<void> {
+  try { await unlink(sessionFile); } catch { /* best-effort */ }
 }
 
 /** Reset verified dirs cache (for testing). */
