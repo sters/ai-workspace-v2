@@ -110,9 +110,14 @@ export const PR_COMMENT_VALIDATION_SCHEMA = {
 export function buildPrCommentValidatorPrompt(input: PrCommentValidatorInput): string {
   const { thread } = input;
 
-  const anchor = thread.path
-    ? `## Anchored at: \`${thread.path}\`${thread.line != null ? ` line ${thread.line}` : ""}`
-    : `## Anchored at: (no file — the thread is not attached to a line that still exists)`;
+  const anchor =
+    thread.kind === "comment"
+      ? `## Anchored at: (no file — a top-level comment on the PR's conversation; work out from what it says which code it is about)`
+      : thread.kind === "review"
+        ? `## Anchored at: (no file — the summary body of a review${thread.reviewState ? ` submitted as ${thread.reviewState}` : ""}; work out from what it says which code it is about)`
+        : thread.path
+          ? `## Anchored at: \`${thread.path}\`${thread.line != null ? ` line ${thread.line}` : ""}`
+          : `## Anchored at: (no file — the thread is not attached to a line that still exists)`;
 
   const outdated = thread.isOutdated
     ? `\nThis thread is marked **outdated**: the lines it was written against have changed since. Check whether the concern survived those changes.\n`

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  parseConversationComments,
   parsePrLocator,
   parsePrView,
   parseReviewThreads,
@@ -144,6 +145,7 @@ describe("parseReviewThreads", () => {
     expect(threads).toHaveLength(2);
     expect(threads[0]).toMatchObject({
       id: "PRRT_kwDOabc",
+      kind: "review-thread",
       isResolved: false,
       isOutdated: false,
       path: "src/cache.ts",
@@ -172,9 +174,126 @@ describe("parseReviewThreads", () => {
   });
 });
 
+describe("parseConversationComments", () => {
+  function response(pullRequest: Record<string, unknown>): string {
+    return JSON.stringify({ data: { repository: { pullRequest } } });
+  }
+
+  const raw = response({
+    comments: {
+      nodes: [
+        {
+          id: "IC_late",
+          url: "https://github.com/acme/widgets/pull/42#issuecomment-3",
+          author: { login: "lead" },
+          body: "Please also update the changelog.",
+          createdAt: "2026-08-04T12:00:00Z",
+          isMinimized: false,
+        },
+        {
+          id: "IC_hidden",
+          url: "https://github.com/acme/widgets/pull/42#issuecomment-4",
+          author: { login: "bot" },
+          body: "Preview deployed.",
+          createdAt: "2026-08-04T13:00:00Z",
+          isMinimized: true,
+        },
+      ],
+    },
+    reviews: {
+      nodes: [
+        {
+          id: "PRR_summary",
+          url: "https://github.com/acme/widgets/pull/42#pullrequestreview-1",
+          author: { login: "reviewer" },
+          body: "The cache never evicts. Needs a bound before this can go in.",
+          createdAt: "2026-08-04T10:00:00Z",
+          state: "CHANGES_REQUESTED",
+          isMinimized: false,
+        },
+        {
+          // A review that only carried inline comments: its body is empty and the
+          // comments themselves arrive as review threads.
+          id: "PRR_inline_only",
+          url: "https://github.com/acme/widgets/pull/42#pullrequestreview-2",
+          author: { login: "reviewer" },
+          body: "",
+          createdAt: "2026-08-04T10:05:00Z",
+          state: "COMMENTED",
+          isMinimized: false,
+        },
+        {
+          id: "PRR_pending",
+          url: "https://github.com/acme/widgets/pull/42#pullrequestreview-5",
+          author: { login: "sters" },
+          body: "Draft thoughts",
+          createdAt: "2026-08-04T10:10:00Z",
+          state: "PENDING",
+          isMinimized: false,
+        },
+      ],
+    },
+  });
+
+  it("lists PR conversation comments and review bodies as unanchored items", () => {
+    const items = parseConversationComments(raw);
+    expect(items.map((i) => i.id)).toEqual(["PRR_summary", "IC_late", "IC_hidden"]);
+    expect(items[0]).toMatchObject({
+      kind: "review",
+      reviewState: "CHANGES_REQUESTED",
+      path: null,
+      line: null,
+      isOutdated: false,
+    });
+    expect(items[1]).toMatchObject({ kind: "comment", path: null, line: null });
+    expect(items[1].comments).toEqual([
+      {
+        url: "https://github.com/acme/widgets/pull/42#issuecomment-3",
+        author: "lead",
+        body: "Please also update the changelog.",
+        createdAt: "2026-08-04T12:00:00Z",
+      },
+    ]);
+  });
+
+  it("orders comments and review bodies by time, as the PR's conversation does", () => {
+    const items = parseConversationComments(raw);
+    const times = items.map((i) => i.comments[0].createdAt);
+    expect(times).toEqual([...times].sort());
+  });
+
+  it("treats a hidden comment as settled, so the tab files it with resolved threads", () => {
+    const items = parseConversationComments(raw);
+    expect(items.find((i) => i.id === "IC_hidden")?.isResolved).toBe(true);
+    expect(items.find((i) => i.id === "IC_late")?.isResolved).toBe(false);
+  });
+
+  it("skips a review with no body, whose content is already in its threads", () => {
+    expect(parseConversationComments(raw).some((i) => i.id === "PRR_inline_only")).toBe(false);
+  });
+
+  it("skips a pending review, which nobody but its author can see yet", () => {
+    expect(parseConversationComments(raw).some((i) => i.id === "PRR_pending")).toBe(false);
+  });
+
+  it("drops a node with no id and survives malformed responses", () => {
+    expect(
+      parseConversationComments(response({ comments: { nodes: [{ body: "no id" }] } })),
+    ).toEqual([]);
+    expect(parseConversationComments("{oops")).toEqual([]);
+    expect(parseConversationComments("{}")).toEqual([]);
+  });
+});
+
 describe("REVIEW_THREADS_QUERY", () => {
   it("requests the fields the tab and the triage record both need", () => {
     for (const field of ["id", "isResolved", "isOutdated", "path", "line", "comments"]) {
+      expect(REVIEW_THREADS_QUERY).toContain(field);
+    }
+  });
+
+  it("asks for the PR's conversation comments and review bodies in the same query", () => {
+    for (const field of ["reviews(", "isMinimized"]) {
       expect(REVIEW_THREADS_QUERY).toContain(field);
     }
   });

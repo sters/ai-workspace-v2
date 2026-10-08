@@ -9,6 +9,7 @@ import type { PrThreadValidation } from "@/types/pull-request";
 
 const thread = {
   id: "PRRT_kwDOabc",
+  kind: "review-thread" as const,
   repoName: "widgets",
   prUrl: "https://github.com/acme/widgets/pull/42",
   path: "src/cache.ts",
@@ -29,6 +30,51 @@ const validation: PrThreadValidation = {
   evidence: ["src/cache.ts:88"],
   validatedAt: "2026-08-05T00:00:00.000Z",
 };
+
+const conversationComment = {
+  id: "IC_kwDOxyz",
+  kind: "comment" as const,
+  repoName: "widgets",
+  prUrl: "https://github.com/acme/widgets/pull/42",
+  path: null,
+  line: null,
+  commentUrl: "https://github.com/acme/widgets/pull/42#issuecomment-3",
+  author: "lead",
+  body: "Please update the changelog too.",
+};
+
+describe("buildTriagePrCommentsInstruction for comments outside the diff", () => {
+  it("quotes the comment and says where on the PR it was written", () => {
+    const instruction = buildTriagePrCommentsInstruction({ threads: [conversationComment] });
+    expect(instruction).toContain("Please update the changelog too.");
+    expect(instruction).toContain(conversationComment.commentUrl);
+    expect(instruction).toMatch(/PR conversation/);
+  });
+
+  it("names a review body by its state", () => {
+    const instruction = buildTriagePrCommentsInstruction({
+      threads: [{ ...conversationComment, id: "PRR_kwDO1", kind: "review", reviewState: "CHANGES_REQUESTED" }],
+    });
+    expect(instruction).toMatch(/review summary \(CHANGES_REQUESTED\)/i);
+  });
+
+  it("asks for no PR Review Threads row, since there is no thread to reply in or resolve", () => {
+    // `create-pr` replies with addPullRequestReviewThreadReply and resolves with
+    // resolveReviewThread — both reject an IssueComment or a review id.
+    const instruction = buildTriagePrCommentsInstruction({ threads: [conversationComment] });
+    expect(instruction).not.toContain("| Thread ID | Comment URL | Summary | TODO item |");
+    expect(instruction).not.toMatch(/Thread ID: `IC_/);
+    expect(instruction).toMatch(/no `## PR Review Threads` row/);
+    expect(instruction).toMatch(/do NOT reply/i);
+  });
+
+  it("keeps the row for the review threads selected alongside one", () => {
+    const instruction = buildTriagePrCommentsInstruction({ threads: [thread, conversationComment] });
+    expect(instruction).toContain("| Thread ID | Comment URL | Summary | TODO item |");
+    expect(instruction).toContain("Thread ID: `PRRT_kwDOabc`");
+    expect(instruction).toMatch(/no `## PR Review Threads` row/);
+  });
+});
 
 describe("renderValidationForPrompt", () => {
   it("carries the verdict, the reasoning and the evidence", () => {

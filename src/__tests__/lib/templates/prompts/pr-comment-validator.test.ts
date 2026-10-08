@@ -15,6 +15,7 @@ const input = {
   baseBranch: "main",
   thread: {
     id: "PRRT_kwDOabc",
+    kind: "review-thread" as const,
     isResolved: false,
     isOutdated: false,
     path: "src/cache.ts",
@@ -149,6 +150,32 @@ describe("buildPrCommentValidatorPrompt", () => {
     });
     expect(unanchored).toContain("PRRT_kwDOabc");
     expect(unanchored).not.toContain("null");
+  });
+});
+
+describe("buildPrCommentValidatorPrompt for a comment outside the diff", () => {
+  const conversation = {
+    ...input.thread,
+    id: "IC_kwDOxyz",
+    kind: "comment" as const,
+    path: null,
+    line: null,
+  };
+
+  it("says it is a top-level PR comment, not a thread whose line vanished", () => {
+    const prompt = buildPrCommentValidatorPrompt({ ...input, thread: conversation });
+    expect(prompt).toContain("IC_kwDOxyz");
+    expect(prompt).toMatch(/PR's conversation/);
+    expect(prompt).not.toMatch(/line that still exists/);
+  });
+
+  it("names a review body's state, which says how hard the reviewer is pushing", () => {
+    const prompt = buildPrCommentValidatorPrompt({
+      ...input,
+      thread: { ...conversation, id: "PRR_kwDO1", kind: "review", reviewState: "CHANGES_REQUESTED" },
+    });
+    expect(prompt).toMatch(/review/i);
+    expect(prompt).toContain("CHANGES_REQUESTED");
   });
 });
 

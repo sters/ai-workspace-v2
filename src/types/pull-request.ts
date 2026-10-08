@@ -18,15 +18,36 @@ export interface PrReviewComment {
   createdAt: string;
 }
 
+/**
+ * What a selectable comment is on GitHub.
+ *
+ * `review-thread` is an inline thread anchored to a diff line. `comment` (a
+ * top-level comment on the PR's conversation) and `review` (the summary body a
+ * reviewer wrote when submitting a review) are anchored to no line, and have no
+ * thread to reply in or resolve — which is why a triage records only
+ * `review-thread`s for `create-pr` to answer.
+ */
+export type PrThreadKind = "review-thread" | "comment" | "review";
+
 export interface PrReviewThread {
   /**
-   * GraphQL node id (`PRRT_…`), not the comment's numeric id. This is the key
-   * everything downstream joins on: the validation store, the `## PR Review
-   * Threads` rows a triage writes, and the reply/resolve call `create-pr` makes.
+   * GraphQL node id — `PRRT_…` for a review thread, `IC_…` / `PRR_…` for a
+   * conversation comment or review body — not the comment's numeric id. This is
+   * the key everything downstream joins on: the validation store, the `## PR
+   * Review Threads` rows a triage writes, and the reply/resolve call `create-pr`
+   * makes (review threads only).
    */
   id: string;
+  kind: PrThreadKind;
+  /**
+   * Whether GitHub considers it settled: a resolved thread, or a conversation
+   * comment / review that was hidden (minimized). Either way it needs no decision,
+   * so the tab hides it until asked.
+   */
   isResolved: boolean;
   isOutdated: boolean;
+  /** The review's state (`CHANGES_REQUESTED`, `COMMENTED`, …), for `kind: "review"` only. */
+  reviewState?: string;
   /** File the thread is anchored to, or null for a thread on no longer existing lines. */
   path: string | null;
   line: number | null;

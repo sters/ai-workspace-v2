@@ -43,6 +43,8 @@ function toTriageThread(
   return {
     note,
     id: thread.id,
+    kind: thread.kind,
+    reviewState: thread.reviewState,
     repoName: pr.repoName,
     prUrl: pr.url,
     path: thread.path,
@@ -298,6 +300,8 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
       .map((id) => threadsById.get(id))
       .filter((entry): entry is { pr: WorkspacePullRequest; thread: PrReviewThread } => entry != null)
       .map(({ pr, thread }) => ({
+        kind: thread.kind,
+        reviewState: thread.reviewState,
         repoPath: pr.repoPath,
         prUrl: pr.url,
         path: thread.path,
@@ -423,7 +427,7 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
                   onNoteChange={setNote}
                 />
                 <span className="ml-auto text-xs text-muted-foreground">
-                  {pr.headRefName} → {pr.baseRefName} · {pr.threads.length} thread
+                  {pr.headRefName} → {pr.baseRefName} · {pr.threads.length} comment
                   {pr.threads.length === 1 ? "" : "s"}
                 </span>
               </div>
@@ -433,7 +437,7 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
                   <StatusText className="text-xs">
                     {pr.threads.length === 0
                       ? "No review comments on this PR."
-                      : "All review threads on this PR are resolved."}
+                      : "All comments on this PR are resolved or hidden."}
                   </StatusText>
                 </div>
               ) : (

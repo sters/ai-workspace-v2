@@ -3,6 +3,7 @@ import { buildPrChatTopic } from "@/lib/pr-chat-topic";
 import type { PrThreadValidation } from "@/types/pull-request";
 
 const thread = {
+  kind: "review-thread" as const,
   repoPath: "github.com/acme/widgets",
   prUrl: "https://github.com/acme/widgets/pull/42",
   path: "src/cache.ts",
@@ -44,6 +45,19 @@ describe("buildPrChatTopic", () => {
       checks: [],
     });
     expect(draft).toContain("github.com/acme/widgets, on https://github.com/acme/widgets/pull/42");
+  });
+
+  it("calls a conversation comment and a review body what they are", () => {
+    const unanchored = { ...thread, path: null, line: null, comments: [thread.comments[0]] };
+    const draft = buildPrChatTopic({
+      threads: [
+        { ...unanchored, kind: "comment" },
+        { ...unanchored, kind: "review", reviewState: "CHANGES_REQUESTED" },
+      ],
+      checks: [],
+    });
+    expect(draft).toContain("1. PR conversation comment on github.com/acme/widgets, on https://github.com/acme/widgets/pull/42");
+    expect(draft).toContain("2. Review summary (CHANGES_REQUESTED) on github.com/acme/widgets, on https://github.com/acme/widgets/pull/42");
   });
 
   it("cannot be closed early by a code fence inside a comment", () => {
