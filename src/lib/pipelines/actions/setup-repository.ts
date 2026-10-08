@@ -9,6 +9,7 @@ import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { dateStamp, deriveBranchName } from "@/lib/naming";
 import { exec, repoDir, detectBaseBranch, remoteBranchExists } from "@/lib/workspace/helpers";
+import { Semaphore } from "@/lib/semaphore";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 
 /** Waits before each retry of the initial fetch; its length is the attempt count. */
@@ -73,32 +74,65 @@ async function fetchAllWithRetries(
   return false;
 }
 
-export async function setupRepository(
-  workspaceName: string,
-  repositoryPathArg: string,
-  baseBranchOverride: string | undefined,
-  emitStatus: (message: string) => void,
-  checkoutBranch?: string,
-): Promise<SetupRepositoryResult> {
-  // Parse alias syntax (e.g. github.com/org/repo:dev)
-  let actualRepoPath = repositoryPathArg;
-  let repoAlias = "";
-  let repoPathInput = repositoryPathArg;
-  if (repositoryPathArg.includes(":")) {
-    actualRepoPath = repositoryPathArg.split(":")[0];
-    repoAlias = repositoryPathArg.split(":").slice(1).join(":");
-    repoPathInput = `${actualRepoPath}___${repoAlias}`;
+/**
+ * How many worktrees are checked out at once by `setupRepositories`. The
+ * checkout is disk-bound, so past a few in flight they only slow each other.
+ */
+const WORKTREE_CHECKOUT_CONCURRENCY = 4;
+
+const g = globalThis as unknown as { __aiwCloneLocks?: Map<string, Promise<unknown>> };
+
+/**
+ * Serializes the steps that write a clone's shared metadata. Creating a branch
+ * whose start point is a remote branch records its upstream in `.git/config`,
+ * and two `worktree add -b` on one clone at once fail on that file's lock —
+ * whether they come from one operation or two.
+ */
+async function withCloneLock<T>(repoAbsPath: string, fn: () => Promise<T>): Promise<T> {
+  const locks = (g.__aiwCloneLocks ??= new Map());
+  const previous = locks.get(repoAbsPath) ?? Promise.resolve();
+  const run = previous.then(fn, fn);
+  const settled = run.then(() => undefined, () => undefined);
+  locks.set(repoAbsPath, settled);
+  try {
+    return await run;
+  } finally {
+    if (locks.get(repoAbsPath) === settled) locks.delete(repoAbsPath);
   }
+}
 
-  const repoName = path.basename(repoPathInput);
-  const repoAbsPath = path.join(repoDir(), actualRepoPath);
+interface ParsedRepoArg {
+  /** Clone path under `repositories/`, without the alias. */
+  actualRepoPath: string;
+  repoAlias: string;
+  /** Worktree directory under the workspace: `<path>___<alias>` when aliased. */
+  repoPathInput: string;
+}
+
+/** Parse alias syntax (e.g. github.com/org/repo:dev). */
+function parseRepoArg(repositoryPathArg: string): ParsedRepoArg {
+  if (!repositoryPathArg.includes(":")) {
+    return { actualRepoPath: repositoryPathArg, repoAlias: "", repoPathInput: repositoryPathArg };
+  }
+  const actualRepoPath = repositoryPathArg.split(":")[0];
+  const repoAlias = repositoryPathArg.split(":").slice(1).join(":");
+  return { actualRepoPath, repoAlias, repoPathInput: `${actualRepoPath}___${repoAlias}` };
+}
+
+async function requireWorkspaceDir(workspaceName: string): Promise<string> {
   const wsPath = path.join(getWorkspaceDir(), workspaceName);
-
   if (!(await pathExists(wsPath))) {
     throw new Error(`Workspace directory does not exist: ${wsPath}`);
   }
+  return wsPath;
+}
 
-  // Clone or fetch
+/** Clone the repository, or fetch it when it is already on disk. */
+async function ensureLocalClone(
+  actualRepoPath: string,
+  emitStatus: (message: string) => void,
+): Promise<void> {
+  const repoAbsPath = path.join(repoDir(), actualRepoPath);
   if (!(await pathExists(repoAbsPath))) {
     emitStatus(`Repository not found locally, cloning ${actualRepoPath}...`);
     const parentDir = path.dirname(repoAbsPath);
@@ -106,16 +140,27 @@ export async function setupRepository(
     const repoUrl = `https://${actualRepoPath}.git`;
     await exec(`git clone "${repoUrl}" "${repoAbsPath}"`);
     emitStatus("Clone complete.");
-    try {
-      await exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
-    } catch (err) { console.debug("[setup] set-head failed (non-critical):", err); }
   } else {
     emitStatus(`Repository found locally, fetching latest...`);
     await fetchAllWithRetries(repoAbsPath, emitStatus);
-    try {
-      await exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
-    } catch (err) { console.debug("[setup] set-head failed (non-critical):", err); }
   }
+  try {
+    await exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
+  } catch (err) { console.debug("[setup] set-head failed (non-critical):", err); }
+}
+
+/** Cut a worktree from a clone that is already on disk and current. */
+async function createWorktree(
+  workspaceName: string,
+  wsPath: string,
+  repositoryPathArg: string,
+  baseBranchOverride: string | undefined,
+  emitStatus: (message: string) => void,
+  checkoutBranch?: string,
+): Promise<SetupRepositoryResult> {
+  const { actualRepoPath, repoAlias, repoPathInput } = parseRepoArg(repositoryPathArg);
+  const repoName = path.basename(repoPathInput);
+  const repoAbsPath = path.join(repoDir(), actualRepoPath);
 
   // Detect base branch. A README-declared override (e.g. `main`) may not match
   // the repo's actual default branch (e.g. `master`); trusting it blindly makes
@@ -138,82 +183,83 @@ export async function setupRepository(
   const worktreePath = path.resolve(path.join(wsPath, repoPathInput));
   await mkdir(path.dirname(worktreePath), { recursive: true });
 
-  let branchName: string;
+  // The worktree is registered without a checkout inside the clone lock, and
+  // its files are checked out after it is released: the checkout is the slow
+  // part and touches nothing the other worktrees share.
+  const branchName = await withCloneLock(repoAbsPath, async () => {
+    if (checkoutBranch) {
+      // --- Checkout existing remote branch (PR-based setup) ---
 
-  if (checkoutBranch) {
-    // --- Checkout existing remote branch (PR-based setup) ---
+      // If the target directory already exists, remove it
+      if (await pathExists(worktreePath)) {
+        emitStatus(`Target directory already exists, removing: ${repoPathInput}`);
+        await rm(worktreePath, { recursive: true, force: true });
+        try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+      }
 
-    // If the target directory already exists, remove it
-    if (await pathExists(worktreePath)) {
-      emitStatus(`Target directory already exists, removing: ${repoPathInput}`);
-      await rm(worktreePath, { recursive: true, force: true });
-      try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+      // Check if the local branch is already used by another worktree.
+      // If so, create a worktree with a suffixed local branch name that tracks the same remote.
+      let localBranchName = checkoutBranch;
+      try {
+        const worktreeList = await exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
+        const isInUse = worktreeList
+          .split("\n")
+          .some((line) => line === `branch refs/heads/${checkoutBranch}`);
+        if (isInUse) {
+          let suffix = 2;
+          while (
+            worktreeList.split("\n").some((line) => line === `branch refs/heads/${checkoutBranch}-${suffix}`)
+          ) {
+            suffix++;
+          }
+          localBranchName = `${checkoutBranch}-${suffix}`;
+          emitStatus(`Branch ${checkoutBranch} in use by another worktree, using local name ${localBranchName}`);
+        }
+      } catch { /* worktree list failed — proceed and let git error if needed */ }
+
+      emitStatus(`Creating worktree: checking out existing branch ${checkoutBranch}`);
+      await exec(
+        `git -C "${repoAbsPath}" worktree add --no-checkout -b "${localBranchName}" "${worktreePath}" "origin/${checkoutBranch}"`,
+      );
+      // Set up tracking so push/pull work against the original remote branch
+      await exec(
+        `git -C "${worktreePath}" branch --set-upstream-to="origin/${checkoutBranch}"`,
+      );
+      return localBranchName;
     }
 
-    // Check if the local branch is already used by another worktree.
-    // If so, create a worktree with a suffixed local branch name that tracks the same remote.
-    let localBranchName = checkoutBranch;
-    try {
-      const worktreeList = await exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
-      const isInUse = worktreeList
-        .split("\n")
-        .some((line) => line === `branch refs/heads/${checkoutBranch}`);
-      if (isInUse) {
-        let suffix = 2;
-        while (
-          worktreeList.split("\n").some((line) => line === `branch refs/heads/${checkoutBranch}-${suffix}`)
-        ) {
-          suffix++;
-        }
-        localBranchName = `${checkoutBranch}-${suffix}`;
-        emitStatus(`Branch ${checkoutBranch} in use by another worktree, using local name ${localBranchName}`);
-      }
-    } catch { /* worktree list failed — proceed and let git error if needed */ }
-
-    emitStatus(`Creating worktree: checking out existing branch ${checkoutBranch}`);
-    await exec(
-      `git -C "${repoAbsPath}" worktree add -b "${localBranchName}" "${worktreePath}" "origin/${checkoutBranch}"`,
-    );
-    // Set up tracking so push/pull work against the original remote branch
-    await exec(
-      `git -C "${worktreePath}" branch --set-upstream-to="origin/${checkoutBranch}"`,
-    );
-    branchName = localBranchName;
-  } else {
     // --- Create new branch (default behavior) ---
 
-    branchName = deriveBranchName(workspaceName, repoAlias, dateStamp(new Date()));
+    let newBranch = deriveBranchName(workspaceName, repoAlias, dateStamp(new Date()));
 
     // If the branch already exists (locally or on remote), always use a new name
     // to avoid inheriting commits from the existing branch.
-    {
-      const branchExists = async (name: string): Promise<boolean> => {
-        try { await exec(`git -C "${repoAbsPath}" rev-parse --verify "${name}"`); return true; } catch { /* noop */ }
-        try { await exec(`git -C "${repoAbsPath}" rev-parse --verify "origin/${name}"`); return true; } catch { /* noop */ }
-        return false;
-      };
+    const branchExists = async (name: string): Promise<boolean> => {
+      try { await exec(`git -C "${repoAbsPath}" rev-parse --verify "${name}"`); return true; } catch { /* noop */ }
+      try { await exec(`git -C "${repoAbsPath}" rev-parse --verify "origin/${name}"`); return true; } catch { /* noop */ }
+      return false;
+    };
 
-      if (await branchExists(branchName)) {
-        const origName = branchName;
-        let suffix = 2;
-        while (suffix <= MAX_BRANCH_NAME_ATTEMPTS && (await branchExists(`${origName}-${suffix}`))) {
-          suffix++;
-        }
-        if (suffix > MAX_BRANCH_NAME_ATTEMPTS) {
-          // A timestamp needs no probe to be unused, and the point of the search
-          // was only ever a fresh name. If this one is somehow taken as well,
-          // `worktree add -b` refuses it and says so — git is the authority here,
-          // not the probe that just claimed a hundred names in a row.
-          branchName = `${origName}-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`;
-          emitStatus(
-            `Warning: ${MAX_BRANCH_NAME_ATTEMPTS} names from ${origName} are all reported as taken, using ${branchName} instead.`,
-          );
-        } else {
-          branchName = `${origName}-${suffix}`;
-          emitStatus(`Branch ${origName} already exists, using ${branchName} instead.`);
-        }
-        try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+    if (await branchExists(newBranch)) {
+      const origName = newBranch;
+      let suffix = 2;
+      while (suffix <= MAX_BRANCH_NAME_ATTEMPTS && (await branchExists(`${origName}-${suffix}`))) {
+        suffix++;
       }
+      if (suffix > MAX_BRANCH_NAME_ATTEMPTS) {
+        // A timestamp needs no probe to be unused, and the point of the search
+        // was only ever a fresh name. If this one is somehow taken as well,
+        // `worktree add -b` refuses it and says so — git is the authority here,
+        // not the probe that just claimed a hundred names in a row.
+        newBranch = `${origName}-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`;
+        emitStatus(
+          `Warning: ${MAX_BRANCH_NAME_ATTEMPTS} names from ${origName} are all reported as taken, using ${newBranch} instead.`,
+        );
+      } else {
+        newBranch = `${origName}-${suffix}`;
+        emitStatus(`Branch ${origName} already exists, using ${newBranch} instead.`);
+      }
+      try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
     }
 
     // If the target directory already exists (e.g. from a previous failed attempt),
@@ -224,14 +270,15 @@ export async function setupRepository(
       try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
     }
 
-    emitStatus(`Creating worktree: branch ${branchName} from origin/${baseBranch}`);
+    emitStatus(`Creating worktree: branch ${newBranch} from origin/${baseBranch}`);
     const worktreeOutput = await exec(
-      `git -C "${repoAbsPath}" worktree add -b "${branchName}" "${worktreePath}" "origin/${baseBranch}"`,
+      `git -C "${repoAbsPath}" worktree add --no-checkout -b "${newBranch}" "${worktreePath}" "origin/${baseBranch}"`,
     );
     if (worktreeOutput) {
       emitStatus(`git worktree add: ${worktreeOutput}`);
     }
-  }
+    return newBranch;
+  });
 
   // Verify the worktree was actually created
   if (!(await pathExists(path.join(worktreePath, ".git")))) {
@@ -243,6 +290,11 @@ export async function setupRepository(
       `repoAbsPath=${repoAbsPath}, branchName=${branchName}, baseBranch=origin/${baseBranch}`,
     );
   }
+
+  const checkoutOutput = await exec(`git -C "${worktreePath}" reset --hard`);
+  if (checkoutOutput) {
+    emitStatus(`git checkout: ${checkoutOutput}`);
+  }
   emitStatus(`Worktree ready at ${repoPathInput}`);
 
   return {
@@ -252,4 +304,84 @@ export async function setupRepository(
     baseBranch,
     branchName,
   };
+}
+
+export async function setupRepository(
+  workspaceName: string,
+  repositoryPathArg: string,
+  baseBranchOverride: string | undefined,
+  emitStatus: (message: string) => void,
+  checkoutBranch?: string,
+): Promise<SetupRepositoryResult> {
+  const wsPath = await requireWorkspaceDir(workspaceName);
+  await ensureLocalClone(parseRepoArg(repositoryPathArg).actualRepoPath, emitStatus);
+  return createWorktree(workspaceName, wsPath, repositoryPathArg, baseBranchOverride, emitStatus, checkoutBranch);
+}
+
+export interface RepositorySetupRequest {
+  /** Repository path, with an optional `:alias` suffix. */
+  repoPath: string;
+  baseBranchOverride?: string;
+  checkoutBranch?: string;
+}
+
+export type RepositorySetupOutcome =
+  | { repoPath: string; ok: true; result: SetupRepositoryResult }
+  | { repoPath: string; ok: false; error: unknown };
+
+/**
+ * Set up several worktrees at once. Each clone is cloned or fetched once
+ * however many worktrees are cut from it, and the worktrees are checked out
+ * concurrently. One failing does not stop the others: each request gets an
+ * outcome, in input order, and the caller decides what a failure means.
+ */
+export async function setupRepositories(
+  workspaceName: string,
+  requests: RepositorySetupRequest[],
+  emitStatus: (message: string) => void,
+  options: { signal?: AbortSignal } = {},
+): Promise<RepositorySetupOutcome[]> {
+  const wsPath = await requireWorkspaceDir(workspaceName);
+
+  const clones = [...new Set(requests.map((r) => parseRepoArg(r.repoPath).actualRepoPath))];
+  const cloneErrors = new Map<string, unknown>();
+  await Promise.all(
+    clones.map(async (clone) => {
+      try {
+        await ensureLocalClone(clone, (m) => emitStatus(`[${clone}] ${m}`));
+      } catch (err) {
+        cloneErrors.set(clone, err);
+      }
+    }),
+  );
+
+  const semaphore = new Semaphore(WORKTREE_CHECKOUT_CONCURRENCY);
+  return Promise.all(
+    requests.map((req) =>
+      semaphore.run(async (): Promise<RepositorySetupOutcome> => {
+        const { repoPath } = req;
+        const clone = parseRepoArg(repoPath).actualRepoPath;
+        if (cloneErrors.has(clone)) {
+          return { repoPath, ok: false, error: cloneErrors.get(clone) };
+        }
+        if (options.signal?.aborted) {
+          return { repoPath, ok: false, error: new Error("Setup was interrupted") };
+        }
+        emitStatus(`Setting up repository: ${repoPath}`);
+        try {
+          const result = await createWorktree(
+            workspaceName,
+            wsPath,
+            repoPath,
+            req.baseBranchOverride,
+            (m) => emitStatus(`[${repoPath}] ${m}`),
+            req.checkoutBranch,
+          );
+          return { repoPath, ok: true, result };
+        } catch (error) {
+          return { repoPath, ok: false, error };
+        }
+      }),
+    ),
+  );
 }
