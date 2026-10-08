@@ -29,6 +29,8 @@ async function alreadyDeclared(wsPath: string): Promise<Set<string>> {
 }
 
 type Repo = { repoName: string; worktreePath: string };
+type Pending = { repo: Repo; entry: RepoConstraintsCacheEntry | null };
+type CheckoutGroup = { leader: Pending; followers: Repo[] };
 
 /**
  * Write the cached repositories' blocks into the README and return the ones
@@ -39,7 +41,7 @@ async function applyCachedConstraints(
   ctx: PhaseFunctionContext,
   wsPath: string,
   repos: Repo[],
-): Promise<{ repo: Repo; entry: RepoConstraintsCacheEntry | null }[]> {
+): Promise<Pending[]> {
   const located = await Promise.all(repos.map(async (repo) => {
     const entry = await locateRepoConstraintsCache(repo.worktreePath);
     return { repo, entry, cached: entry ? await readRepoConstraintsCache(entry) : null };
@@ -63,25 +65,63 @@ async function applyCachedConstraints(
 }
 
 /**
- * Cache what each successful child appended. The key is the one computed
- * before the child ran, which is the checkout it read.
+ * Split pending repositories into one discovery per checkout and the
+ * repositories that take its result. Worktrees of one clone whose build files
+ * compute the same key would discover the same commands, so only the first
+ * runs. A repository without a cache entry is always discovered on its own.
  */
-async function cacheDiscoveredConstraints(
+function groupByCheckout(pending: Pending[]): CheckoutGroup[] {
+  const groups: CheckoutGroup[] = [];
+  const byKey = new Map<string, CheckoutGroup>();
+  for (const p of pending) {
+    const id = p.entry ? `${p.entry.file}\0${p.entry.key}` : null;
+    const existing = id ? byKey.get(id) : undefined;
+    if (existing) {
+      existing.followers.push(p.repo);
+      continue;
+    }
+    const group: CheckoutGroup = { leader: p, followers: [] };
+    groups.push(group);
+    if (id) byKey.set(id, group);
+  }
+  return groups;
+}
+
+/**
+ * Cache what each successful child appended, under the key computed before it
+ * ran, and declare the same block for the repositories that shared its
+ * discovery. Returns whether every follower of a successful child was declared.
+ */
+async function settleDiscovered(
   ctx: PhaseFunctionContext,
   wsPath: string,
-  discovered: { repo: Repo; entry: RepoConstraintsCacheEntry | null }[],
+  groups: CheckoutGroup[],
   results: boolean[],
-): Promise<void> {
-  if (!discovered.some((d, i) => d.entry && results[i])) return;
+): Promise<boolean> {
+  const succeeded = groups.filter((_, i) => results[i]);
+  if (!succeeded.some((g) => g.leader.entry || g.followers.length > 0)) return true;
+  let followersDeclared = !succeeded.some((g) => g.followers.length > 0);
   try {
-    const declared = parseConstraints((await readWorkspaceReadme(wsPath)).content);
-    for (const [i, { repo, entry }] of discovered.entries()) {
-      if (!entry || !results[i]) continue;
-      const block = declared.find((c) => c.repoName === repo.repoName);
-      if (block) await writeRepoConstraintsCache(entry, block.constraints);
+    let { content } = await readWorkspaceReadme(wsPath);
+    const declared = parseConstraints(content);
+    const blocks = succeeded.flatMap(({ leader, followers }) => {
+      const block = declared.find((c) => c.repoName === leader.repo.repoName);
+      return block ? [{ leader, followers, constraints: block.constraints }] : [];
+    });
+    if (blocks.some((b) => b.followers.length > 0)) {
+      for (const { followers, constraints } of blocks) {
+        for (const follower of followers) content = appendRepoConstraints(content, follower.repoName, constraints);
+      }
+      await Bun.write(path.join(wsPath, "README.md"), content);
     }
+    followersDeclared = true;
+    for (const { leader, constraints } of blocks) {
+      if (leader.entry) await writeRepoConstraintsCache(leader.entry, constraints);
+    }
+    return true;
   } catch (err) {
-    ctx.emitStatus(`Could not cache discovered constraints: ${err}`);
+    ctx.emitStatus(`Could not record discovered constraints: ${err}`);
+    return followersDeclared;
   }
 }
 
@@ -118,7 +158,8 @@ export function buildDiscoverConstraintsPhase(input: {
       const readmePath = path.join(input.wsPath, "README.md");
 
       const systemPromptFile = await ensureSystemPrompt(input.wsPath, "repo-constraints");
-      const children = pending.map(({ repo }) => ({
+      const groups = groupByCheckout(pending);
+      const children = groups.map(({ leader: { repo } }) => ({
         label: `constraints-${repo.repoName}`,
         stepType: STEP_TYPES.DISCOVER_CONSTRAINTS,
         prompt: buildRepoConstraintsPrompt({
@@ -131,11 +172,18 @@ export function buildDiscoverConstraintsPhase(input: {
         appendSystemPromptFile: systemPromptFile,
       }));
 
+      for (const { leader, followers } of groups) {
+        if (followers.length === 0) continue;
+        ctx.emitStatus(
+          `Sharing ${leader.repo.repoName}'s discovery with ${followers.map((f) => f.repoName).join(", ")} (same checkout of one clone)`,
+        );
+      }
       ctx.emitStatus(`Discovering constraints for ${children.length} repositories`);
       const results = await ctx.runChildGroup(children);
-      await cacheDiscoveredConstraints(ctx, input.wsPath, pending, results);
+      const shared = await settleDiscovered(ctx, input.wsPath, groups, results);
       const succeeded = results.filter(Boolean).length;
       ctx.emitStatus(`Constraint discovery complete: ${succeeded}/${results.length} succeeded`);
+      if (!shared) return false;
       return results.every(Boolean);
     },
   };

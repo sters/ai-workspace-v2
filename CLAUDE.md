@@ -42,7 +42,7 @@ Next.js 16 App Router, React 19, TypeScript strict, Tailwind CSS 4, SWR, Bun run
 - **TODO files** — `TODO-<repo>.md` per worktree with `[ ]` / `[~]` / `[x]` / `[!]` (`src/lib/parsers/todo.ts`).
 - **Artifacts** — `artifacts/` holds reviews (`reviews/<ts>/`, incl. `baseline.json`), `known-findings.md` (findings deliberately not acted on, read by reviewers and the gate), `pr-validations.json`, `finding-groundings.json`, `memo.md`.
 - **Repository setup** — `setupRepository` / `setupRepositories` (`pipelines/actions/setup-repository.ts`). `repo:alias` gives another worktree of one clone. `setupRepositories` fetches each clone once and checks out worktrees in parallel, with branch creation serialized per clone (`withCloneLock`: concurrent `worktree add -b` fail on the `.git/config` lock). A failed fetch proceeds on local refs; a failed clone is fatal.
-- **Constraints** — `## Repository Constraints` in the README is written by constraint discovery (probes each tool, never runs lint/test/build; cached per clone in `.ai-workspace/repo-constraints/`, bump `FINGERPRINT_VERSION` when key rules change) and executed only by review's `Verify constraints` phase.
+- **Constraints** — `## Repository Constraints` in the README is written by constraint discovery (probes each tool, never runs lint/test/build; cached per clone in `.ai-workspace/repo-constraints/`; worktrees of one clone with the same key share one discovery; bump `FINGERPRINT_VERSION` when key rules change) and executed only by review's `Verify constraints` phase.
 
 ### Autonomous loop
 
