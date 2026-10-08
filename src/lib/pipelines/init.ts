@@ -11,7 +11,7 @@ import {
 } from "@/lib/workspace";
 import { ensureGlobalSystemPrompt } from "@/lib/workspace/prompts";
 import type { TaskAnalysis } from "@/types/workspace";
-import { setupRepository } from "./actions/setup-repository";
+import { setupRepositories, setupRepository } from "./actions/setup-repository";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 import { extractPrUrls, resolvePrBranch } from "@/lib/workspace/pr-url";
 import type { PrBranchInfo } from "@/lib/workspace/pr-url";
@@ -34,6 +34,13 @@ interface InitBestOfNOptions {
 
 /** Reuse the same schema structure for reviewing README candidates. */
 const INIT_REVIEW_SCHEMA = BEST_OF_N_REVIEW_SCHEMA;
+
+/**
+ * Budget for `Setup workspace`, which clones or fetches every repository and
+ * checks out one worktree per entry. A first clone of a large repository, or
+ * a request for a worktree per environment of many services, takes minutes.
+ */
+const SETUP_WORKSPACE_TIMEOUT_MS = 15 * 60 * 1000;
 
 /** Schema for README synthesizer output. */
 const INIT_SYNTH_SCHEMA = {
@@ -314,6 +321,7 @@ export function buildInitPipeline(
       kind: "function",
       label: "Setup workspace",
       maxRetries: 0,
+      timeoutMs: SETUP_WORKSPACE_TIMEOUT_MS,
       fn: async (ctx) => {
         // Use structured output analysis; fall back to defaults if unavailable
         if (!analysis) {
@@ -367,22 +375,27 @@ export function buildInitPipeline(
         }
 
         if (analysis.repositories.length > 0) {
-          for (const repoPath of analysis.repositories) {
-            if (ctx.signal.aborted) return false;
-            ctx.emitStatus(`Setting up repository: ${repoPath}`);
-            // PR URLs are keyed by bare repo path, but repoPath may carry a `:alias` suffix
-            const bareRepoPath = repoPath.split(":")[0];
-            const prInfo = prUrlMap.get(bareRepoPath);
-            try {
+          const outcomes = await setupRepositories(
+            wsName,
+            analysis.repositories.map((repoPath) => ({
+              repoPath,
+              // PR URLs are keyed by bare repo path, but repoPath may carry a `:alias` suffix.
               // Only use PR info for baseBranch — init always creates a new branch.
               // Checking out the PR's headBranch would conflict with existing worktrees.
-              const repoResult = await setupRepository(wsName, repoPath, prInfo?.baseBranch, ctx.emitStatus);
-              repoResults.push(repoResult);
-            } catch (err) {
-              ctx.emitResult(`Failed to setup repository ${repoPath}: ${err}`);
-              return false;
-            }
+              baseBranchOverride: prUrlMap.get(repoPath.split(":")[0])?.baseBranch,
+            })),
+            ctx.emitStatus,
+            { signal: ctx.signal },
+          );
+          if (ctx.signal.aborted) return false;
+          const failures = outcomes.flatMap((o) =>
+            o.ok ? [] : [`Failed to setup repository ${o.repoPath}: ${o.error}`],
+          );
+          if (failures.length > 0) {
+            ctx.emitResult(failures.join("\n"));
+            return false;
           }
+          for (const o of outcomes) if (o.ok) repoResults.push(o.result);
         }
 
         if (ctx.signal.aborted) return false;
