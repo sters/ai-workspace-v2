@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -29,6 +29,9 @@ import {
   readRepoConstraintsCache,
   writeRepoConstraintsCache,
 } from "@/lib/workspace/repo-constraints-cache";
+
+const { parseConstraints: realParseConstraints } =
+  await vi.importActual<typeof import("@/lib/parsers/readme")>("@/lib/parsers/readme");
 
 const mockReadReadme = vi.mocked(readWorkspaceReadme);
 const mockParseConstraints = vi.mocked(parseConstraints);
@@ -220,6 +223,73 @@ describe("buildDiscoverConstraintsPhase", () => {
       expect(await phase.fn(ctx)).toBe(false);
       expect(mockWriteCache).toHaveBeenCalledTimes(1);
       expect(mockWriteCache).toHaveBeenCalledWith(entryFor("/w/a"), LINT);
+    });
+
+    describe("worktrees of one clone", () => {
+      let wsPath: string;
+      let readmePath: string;
+
+      beforeEach(() => {
+        wsPath = fs.mkdtempSync(path.join(os.tmpdir(), "discover-shared-"));
+        readmePath = path.join(wsPath, "README.md");
+        fs.writeFileSync(readmePath, "# Task: x\n\n## Repository Constraints\n");
+        mockReadReadme.mockImplementation(async () => ({
+          content: fs.readFileSync(readmePath, "utf8"),
+          meta: { title: "t", taskType: "feature", ticketId: "", date: "", repositories: [] },
+        }));
+        mockParseConstraints.mockImplementation(realParseConstraints);
+      });
+
+      afterEach(() => {
+        fs.rmSync(wsPath, { recursive: true, force: true });
+      });
+
+      /** A child that appends its repository's block, as discovery does. */
+      function discoveringGroup(results: boolean[]) {
+        return vi.fn(async (children: { label: string }[]) => {
+          children.forEach((c, i) => {
+            if (results[i]) {
+              fs.appendFileSync(readmePath, `\n### ${c.label.replace("constraints-", "")}\n\n- Lint: \`make lint\`\n`);
+            }
+          });
+          return results;
+        });
+      }
+
+      const repos = [
+        { repoName: "repo", worktreePath: "/w/repo" },
+        { repoName: "repo___dev", worktreePath: "/w/repo___dev" },
+      ];
+
+      it("discovers once when the checkouts compute the same key, and declares the result for both", async () => {
+        mockLocate.mockReturnValue({ file: "/cache/repo.md", key: "same" });
+        const ctx = createMockCtx({ runChildGroup: discoveringGroup([true]) });
+
+        expect(await buildDiscoverConstraintsPhase({ workspace: "ws", wsPath, repos }).fn(ctx)).toBe(true);
+        const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+        expect(children.map((c) => c.label)).toEqual(["constraints-repo"]);
+        expect(realParseConstraints(fs.readFileSync(readmePath, "utf8"))).toEqual([
+          { repoName: "repo", constraints: LINT },
+          { repoName: "repo___dev", constraints: LINT },
+        ]);
+      });
+
+      it("discovers each checkout whose key differs", async () => {
+        mockLocate.mockImplementation((wt) => ({ file: "/cache/repo.md", key: `key-${wt}` }));
+        const ctx = createMockCtx({ runChildGroup: discoveringGroup([true, true]) });
+
+        expect(await buildDiscoverConstraintsPhase({ workspace: "ws", wsPath, repos }).fn(ctx)).toBe(true);
+        const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+        expect(children.map((c) => c.label)).toEqual(["constraints-repo", "constraints-repo___dev"]);
+      });
+
+      it("leaves the other worktree undeclared when the shared discovery fails", async () => {
+        mockLocate.mockReturnValue({ file: "/cache/repo.md", key: "same" });
+        const ctx = createMockCtx({ runChildGroup: discoveringGroup([false]) });
+
+        expect(await buildDiscoverConstraintsPhase({ workspace: "ws", wsPath, repos }).fn(ctx)).toBe(false);
+        expect(realParseConstraints(fs.readFileSync(readmePath, "utf8"))).toEqual([]);
+      });
     });
 
     it("caches nothing for a repository outside the managed clones", async () => {
