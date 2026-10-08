@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { _resetConfig, _resetWorkspaceRoot, setWorkspaceRoot } from "@/lib/config";
-import { exec } from "@/lib/workspace/helpers";
+import { sh as exec } from "../../fixtures/sh";
 import {
   listRepositoryPruneCandidates,
   listRepositoryUsage,
@@ -56,7 +56,7 @@ function setMtime(target: string, iso: string) {
   fs.utimesSync(target, when, when);
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   root = fs.mkdtempSync(path.join("/tmp", "aiw-repo-prune-"));
   reposDir = path.join(root, "repositories");
   wsDir = path.join(root, "workspace");
@@ -66,71 +66,71 @@ beforeEach(() => {
   _resetConfig();
 });
 
-afterEach(() => {
+afterEach(async () => {
   _resetConfig();
   _resetWorkspaceRoot();
   fs.rmSync(root, { recursive: true, force: true });
 });
 
 describe("listRepositoryUsage", () => {
-  it("does not count the clone's own main worktree", () => {
+  it("does not count the clone's own main worktree", async () => {
     cloneRepository("alpha");
-    expect(listRepositoryUsage("github.com/acme/alpha")).toEqual([]);
+    expect(await listRepositoryUsage("github.com/acme/alpha")).toEqual([]);
   });
 
-  it("names the workspace holding a worktree", () => {
+  it("names the workspace holding a worktree", async () => {
     cloneRepository("alpha");
     const worktree = addWorktree("alpha", "feature-x-20260101");
 
-    expect(listRepositoryUsage("github.com/acme/alpha")).toEqual([
+    expect(await listRepositoryUsage("github.com/acme/alpha")).toEqual([
       // Resolved, since `/tmp` is a symlink on macOS and git reports the target.
       { workspace: "feature-x-20260101", worktreePath: fs.realpathSync(worktree) },
     ]);
   });
 
-  it("counts an aliased worktree directory as usage of the clone it came from", () => {
+  it("counts an aliased worktree directory as usage of the clone it came from", async () => {
     cloneRepository("alpha");
     addWorktree("alpha", "feature-x-20260101", "alpha___dev");
 
-    const usage = listRepositoryUsage("github.com/acme/alpha");
+    const usage = await listRepositoryUsage("github.com/acme/alpha");
     expect(usage).toHaveLength(1);
     expect(usage[0].workspace).toBe("feature-x-20260101");
   });
 
-  it("ignores a registration whose worktree directory is gone", () => {
+  it("ignores a registration whose worktree directory is gone", async () => {
     cloneRepository("alpha");
     const worktree = addWorktree("alpha", "feature-x-20260101");
     fs.rmSync(worktree, { recursive: true, force: true });
 
-    expect(listRepositoryUsage("github.com/acme/alpha")).toEqual([]);
+    expect(await listRepositoryUsage("github.com/acme/alpha")).toEqual([]);
   });
 
-  it("throws when the clone cannot be read, so callers cannot mistake it for unused", () => {
+  it("throws when the clone cannot be read, so callers cannot mistake it for unused", async () => {
     const abs = path.join(reposDir, "github.com", "acme", "broken");
     fs.mkdirSync(abs, { recursive: true });
     fs.writeFileSync(path.join(abs, ".git"), "not a gitfile");
 
-    expect(() => listRepositoryUsage("github.com/acme/broken")).toThrow();
+    await expect(listRepositoryUsage("github.com/acme/broken")).rejects.toThrow();
   });
 });
 
 describe("listRepositoryPruneCandidates", () => {
-  it("reports nothing when nothing has been cloned", () => {
-    expect(listRepositoryPruneCandidates()).toEqual([]);
+  it("reports nothing when nothing has been cloned", async () => {
+    expect(await listRepositoryPruneCandidates()).toEqual([]);
   });
 
-  it("takes the last reference from the newest signal inside .git, not the directory's own mtime", () => {
+  it("takes the last reference from the newest signal inside .git, not the directory's own mtime", async () => {
     const abs = cloneRepository("alpha");
     setMtime(abs, "2026-01-01T00:00:00.000Z");
     fs.writeFileSync(path.join(abs, ".git", "FETCH_HEAD"), "");
     setMtime(path.join(abs, ".git", "FETCH_HEAD"), "2026-05-05T00:00:00.000Z");
     setMtime(path.join(abs, ".git"), "2026-02-02T00:00:00.000Z");
 
-    const [candidate] = listRepositoryPruneCandidates();
+    const [candidate] = await listRepositoryPruneCandidates();
     expect(candidate.lastReferencedAt).toBe("2026-05-05T00:00:00.000Z");
   });
 
-  it("orders the least recently referenced first", () => {
+  it("orders the least recently referenced first", async () => {
     const alpha = cloneRepository("alpha");
     const beta = cloneRepository("beta");
     setMtime(path.join(alpha, ".git"), "2026-06-06T00:00:00.000Z");
@@ -138,78 +138,78 @@ describe("listRepositoryPruneCandidates", () => {
     setMtime(path.join(beta, ".git"), "2026-01-01T00:00:00.000Z");
     setMtime(beta, "2026-01-01T00:00:00.000Z");
 
-    expect(listRepositoryPruneCandidates().map((c) => c.repoPath)).toEqual([
+    expect((await listRepositoryPruneCandidates()).map((c) => c.repoPath)).toEqual([
       "github.com/acme/beta",
       "github.com/acme/alpha",
     ]);
   });
 
-  it("carries the usage that decides whether a row can be ticked", () => {
+  it("carries the usage that decides whether a row can be ticked", async () => {
     cloneRepository("alpha");
     cloneRepository("beta");
     addWorktree("beta", "feature-x-20260101");
 
-    const byPath = new Map(listRepositoryPruneCandidates().map((c) => [c.repoPath, c]));
+    const byPath = new Map((await listRepositoryPruneCandidates()).map((c) => [c.repoPath, c]));
     expect(byPath.get("github.com/acme/alpha")?.usedBy).toEqual([]);
     expect(byPath.get("github.com/acme/beta")?.usedBy).toHaveLength(1);
   });
 
-  it("reports the read failure instead of an empty usage list", () => {
+  it("reports the read failure instead of an empty usage list", async () => {
     const abs = path.join(reposDir, "github.com", "acme", "broken");
     fs.mkdirSync(abs, { recursive: true });
     fs.writeFileSync(path.join(abs, ".git"), "not a gitfile");
 
-    const [candidate] = listRepositoryPruneCandidates();
+    const [candidate] = await listRepositoryPruneCandidates();
     expect(candidate.usageError).toBeTruthy();
   });
 });
 
 describe("pruneRepositories", () => {
-  it("deletes a clone nothing uses", () => {
+  it("deletes a clone nothing uses", async () => {
     const abs = cloneRepository("alpha");
 
-    expect(pruneRepositories(["github.com/acme/alpha"])).toEqual([
+    expect(await pruneRepositories(["github.com/acme/alpha"])).toEqual([
       { repoPath: "github.com/acme/alpha", deleted: true },
     ]);
     expect(fs.existsSync(abs)).toBe(false);
   });
 
-  it("refuses a clone a workspace still has a worktree of, and leaves it on disk", () => {
+  it("refuses a clone a workspace still has a worktree of, and leaves it on disk", async () => {
     const abs = cloneRepository("alpha");
     addWorktree("alpha", "feature-x-20260101");
 
-    const [outcome] = pruneRepositories(["github.com/acme/alpha"]);
+    const [outcome] = await pruneRepositories(["github.com/acme/alpha"]);
     expect(outcome.deleted).toBe(false);
     expect(outcome.reason).toContain("feature-x-20260101");
     expect(fs.existsSync(abs)).toBe(true);
   });
 
-  it("refuses when the worktree list cannot be read", () => {
+  it("refuses when the worktree list cannot be read", async () => {
     const abs = path.join(reposDir, "github.com", "acme", "broken");
     fs.mkdirSync(abs, { recursive: true });
     fs.writeFileSync(path.join(abs, ".git"), "not a gitfile");
 
-    const [outcome] = pruneRepositories(["github.com/acme/broken"]);
+    const [outcome] = await pruneRepositories(["github.com/acme/broken"]);
     expect(outcome.deleted).toBe(false);
     expect(fs.existsSync(abs)).toBe(true);
   });
 
-  it("settles each request on its own, so a refusal does not stop the rest", () => {
+  it("settles each request on its own, so a refusal does not stop the rest", async () => {
     const alpha = cloneRepository("alpha");
     const beta = cloneRepository("beta");
     addWorktree("alpha", "feature-x-20260101");
 
-    const outcomes = pruneRepositories(["github.com/acme/alpha", "github.com/acme/beta"]);
+    const outcomes = await pruneRepositories(["github.com/acme/alpha", "github.com/acme/beta"]);
     expect(outcomes.map((o) => o.deleted)).toEqual([false, true]);
     expect(fs.existsSync(alpha)).toBe(true);
     expect(fs.existsSync(beta)).toBe(false);
   });
 
-  it("refuses a path that leaves the repositories directory", () => {
+  it("refuses a path that leaves the repositories directory", async () => {
     const wsPath = path.join(wsDir, "feature-x-20260101");
     fs.mkdirSync(wsPath, { recursive: true });
 
-    const outcomes = pruneRepositories([
+    const outcomes = await pruneRepositories([
       "../workspace/feature-x-20260101",
       wsPath,
       "",
@@ -220,11 +220,11 @@ describe("pruneRepositories", () => {
     expect(fs.existsSync(reposDir)).toBe(true);
   });
 
-  it("refuses a path that is not a clone", () => {
+  it("refuses a path that is not a clone", async () => {
     const plain = path.join(reposDir, "github.com", "acme", "notes");
     fs.mkdirSync(plain, { recursive: true });
 
-    const [missing, notRepo] = pruneRepositories([
+    const [missing, notRepo] = await pruneRepositories([
       "github.com/acme/absent",
       "github.com/acme/notes",
     ]);
@@ -233,13 +233,13 @@ describe("pruneRepositories", () => {
     expect(fs.existsSync(plain)).toBe(true);
   });
 
-  it("clears the org directories the deletion emptied, and keeps the ones still holding a clone", () => {
+  it("clears the org directories the deletion emptied, and keeps the ones still holding a clone", async () => {
     cloneRepository("alpha");
     const other = path.join(reposDir, "github.com", "other", "beta");
     fs.mkdirSync(path.dirname(other), { recursive: true });
     exec(`git clone -q "${seedRemote("beta")}" "${other}"`);
 
-    pruneRepositories(["github.com/acme/alpha"]);
+    await pruneRepositories(["github.com/acme/alpha"]);
 
     expect(fs.existsSync(path.join(reposDir, "github.com", "acme"))).toBe(false);
     expect(fs.existsSync(path.join(reposDir, "github.com", "other", "beta"))).toBe(true);

@@ -1,5 +1,5 @@
+import { pathExists } from "@/lib/fs";
 import { NextResponse } from "next/server";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { getWorkspaceDir, resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
@@ -22,14 +22,14 @@ export async function POST(request: Request) {
 
   // Validate review directory exists
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);
-  if (!existsSync(reviewDir)) {
+  if (!(await pathExists(reviewDir))) {
     return NextResponse.json(
       { error: `Review directory not found: ${reviewTimestamp}` },
       { status: 404 },
     );
   }
 
-  const repos = listWorkspaceRepos(workspace);
+  const repos = await listWorkspaceRepos(workspace);
   if (repos.length === 0) {
     return NextResponse.json(
       { error: "No repositories found in workspace" },

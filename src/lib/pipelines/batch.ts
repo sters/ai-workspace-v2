@@ -93,7 +93,7 @@ export function buildBatchPipeline(input: {
 
       const execBon = resolveBestOfN("execute");
       if (execBon >= 2 && bestOfNPhases.includes("execute")) {
-        const repos = listWorkspaceRepos(ws);
+        const repos = await listWorkspaceRepos(ws);
         const bonPhases = await buildBestOfNPipeline({
           workspace: ws,
           n: execBon,
@@ -129,7 +129,7 @@ export function buildBatchPipeline(input: {
 
         const revBon = resolveBestOfN("review");
         if (revBon >= 2 && bestOfNPhases.includes("review")) {
-          const repos = listWorkspaceRepos(ws);
+          const repos = await listWorkspaceRepos(ws);
           const bonPhases = await buildBestOfNPipeline({
             workspace: ws,
             n: revBon,
@@ -205,7 +205,7 @@ export function buildBatchPipeline(input: {
 
         const prBon = resolveBestOfN("create-pr");
         if (prBon >= 2 && bestOfNPhases.includes("create-pr")) {
-          const repos = listWorkspaceRepos(ws);
+          const repos = await listWorkspaceRepos(ws);
           const bonPhases = await buildBestOfNPipeline({
             workspace: ws,
             n: prBon,

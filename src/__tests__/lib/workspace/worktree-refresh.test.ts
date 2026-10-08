@@ -16,7 +16,7 @@ function fakeGit(
   answers: Record<string, { ok: boolean; out: string }>,
 ): GitExec & { calls: string[][] } {
   const calls: string[][] = [];
-  const git = ((args: string[]) => {
+  const git = (async (args: string[]) => {
     calls.push(args);
     const key = args.join(" ");
     return answers[key] ?? { ok: false, out: `unexpected: git ${key}` };
@@ -39,7 +39,7 @@ const OLD = "1111111111111111111111111111111111111111";
 const NEW = "2222222222222222222222222222222222222222";
 
 describe("refreshWorktree", () => {
-  it("reports up-to-date without touching the working tree", () => {
+  it("reports up-to-date without touching the working tree", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: OLD },
       [FETCH]: { ok: true, out: "" },
@@ -47,7 +47,7 @@ describe("refreshWorktree", () => {
       [UPSTREAM_SHA]: { ok: true, out: OLD },
     });
 
-    const result = refreshWorktree(repo, git);
+    const result = await refreshWorktree(repo, git);
 
     expect(result.status).toBe("up-to-date");
     expect(result.fromSha).toBe(OLD);
@@ -57,7 +57,7 @@ describe("refreshWorktree", () => {
     expect(git.calls.map((c) => c.join(" "))).not.toContain(STATUS);
   });
 
-  it("ignores untracked files when deciding whether the tree is dirty", () => {
+  it("ignores untracked files when deciding whether the tree is dirty", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: OLD },
       [FETCH]: { ok: true, out: "" },
@@ -68,11 +68,11 @@ describe("refreshWorktree", () => {
       [FF]: { ok: true, out: "Fast-forward" },
     });
 
-    expect(refreshWorktree(repo, git).status).toBe("fast-forwarded");
+    expect((await refreshWorktree(repo, git)).status).toBe("fast-forwarded");
     expect(git.calls.map((c) => c.join(" "))).toContain(STATUS);
   });
 
-  it("fast-forwards when upstream moved ahead", () => {
+  it("fast-forwards when upstream moved ahead", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: OLD },
       [FETCH]: { ok: true, out: "" },
@@ -82,7 +82,7 @@ describe("refreshWorktree", () => {
       [FF]: { ok: true, out: "Fast-forward" },
     });
 
-    const result = refreshWorktree(repo, git);
+    const result = await refreshWorktree(repo, git);
 
     expect(result.status).toBe("fast-forwarded");
     expect(result.toSha).toBe(NEW);
@@ -90,7 +90,7 @@ describe("refreshWorktree", () => {
     expect(git.calls.map((c) => c[0])).not.toContain("reset");
   });
 
-  it("resets onto a rewritten upstream, keeping the discarded head on a ref", () => {
+  it("resets onto a rewritten upstream, keeping the discarded head on a ref", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: OLD },
       [FETCH]: { ok: true, out: "" },
@@ -103,7 +103,7 @@ describe("refreshWorktree", () => {
       ["reset --hard origin/feature-x"]: { ok: true, out: `HEAD is now at ${NEW}` },
     });
 
-    const result = refreshWorktree(repo, git);
+    const result = await refreshWorktree(repo, git);
 
     expect(result.status).toBe("reset");
     expect(result.toSha).toBe(NEW);
@@ -114,7 +114,7 @@ describe("refreshWorktree", () => {
     expect(order.indexOf("update-ref")).toBeLessThan(order.indexOf("reset"));
   });
 
-  it("refuses to move a dirty worktree and says what the review will read", () => {
+  it("refuses to move a dirty worktree and says what the review will read", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: OLD },
       [FETCH]: { ok: true, out: "" },
@@ -123,7 +123,7 @@ describe("refreshWorktree", () => {
       [STATUS]: { ok: true, out: " M src/index.ts" },
     });
 
-    const result = refreshWorktree(repo, git);
+    const result = await refreshWorktree(repo, git);
 
     expect(result.status).toBe("dirty");
     expect(result.toSha).toBe(OLD);
@@ -133,7 +133,7 @@ describe("refreshWorktree", () => {
     expect(subcommands).not.toContain("reset");
   });
 
-  it("does not reset when the fast-forward was merely obstructed", () => {
+  it("does not reset when the fast-forward was merely obstructed", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: OLD },
       [FETCH]: { ok: true, out: "" },
@@ -146,7 +146,7 @@ describe("refreshWorktree", () => {
       [IS_ANCESTOR]: { ok: true, out: "" },
     });
 
-    const result = refreshWorktree(repo, git);
+    const result = await refreshWorktree(repo, git);
 
     expect(result.status).toBe("failed");
     expect(result.toSha).toBe(OLD);
@@ -155,7 +155,7 @@ describe("refreshWorktree", () => {
     expect(subcommands).not.toContain("update-ref");
   });
 
-  it("reports no-upstream when the tracked branch is gone", () => {
+  it("reports no-upstream when the tracked branch is gone", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: OLD },
       [FETCH]: { ok: true, out: "" },
@@ -163,14 +163,14 @@ describe("refreshWorktree", () => {
       [UPSTREAM_NAME]: { ok: false, out: "fatal: no upstream configured" },
     });
 
-    const result = refreshWorktree(repo, git);
+    const result = await refreshWorktree(repo, git);
 
     expect(result.status).toBe("no-upstream");
     expect(result.toSha).toBe(OLD);
     expect(git.calls.map((c) => c[0])).not.toContain("reset");
   });
 
-  it("still moves onto a known-newer upstream when the fetch itself failed", () => {
+  it("still moves onto a known-newer upstream when the fetch itself failed", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: OLD },
       [FETCH]: { ok: false, out: "fatal: unable to access 'https://...': network is unreachable" },
@@ -180,22 +180,22 @@ describe("refreshWorktree", () => {
       [FF]: { ok: true, out: "Fast-forward" },
     });
 
-    const result = refreshWorktree(repo, git);
+    const result = await refreshWorktree(repo, git);
 
     expect(result.status).toBe("fast-forwarded");
     expect(result.detail).toContain("fetch failed");
   });
 
-  it("fails when the path is not a git worktree", () => {
+  it("fails when the path is not a git worktree", async () => {
     const git = fakeGit({ [HEAD]: { ok: false, out: "fatal: not a git repository" } });
 
-    const result = refreshWorktree(repo, git);
+    const result = await refreshWorktree(repo, git);
 
     expect(result.status).toBe("failed");
     expect(git.calls).toHaveLength(1);
   });
 
-  it("fails when the reset itself is rejected", () => {
+  it("fails when the reset itself is rejected", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: OLD },
       [FETCH]: { ok: true, out: "" },
@@ -208,7 +208,7 @@ describe("refreshWorktree", () => {
       ["reset --hard origin/feature-x"]: { ok: false, out: "error: unable to unlink old file" },
     });
 
-    const result = refreshWorktree(repo, git);
+    const result = await refreshWorktree(repo, git);
 
     expect(result.status).toBe("failed");
     expect(result.toSha).toBe(OLD);
@@ -216,9 +216,9 @@ describe("refreshWorktree", () => {
 });
 
 describe("refreshWorktrees", () => {
-  it("returns one result per repo, in order", () => {
+  it("returns one result per repo, in order", async () => {
     const git = fakeGit({ [HEAD]: { ok: false, out: "fatal: not a git repository" } });
-    const results = refreshWorktrees(
+    const results = await refreshWorktrees(
       [
         { repoName: "a", worktreePath: "/ws/a" },
         { repoName: "b", worktreePath: "/ws/b" },
@@ -237,7 +237,7 @@ describe("summarizeWorktreeRefresh", () => {
     return { repoName, status, fromSha: OLD, toSha: NEW, upstream: "origin/x", detail: `${repoName}: ${status}` };
   }
 
-  it("names every repo's outcome under a headline", () => {
+  it("names every repo's outcome under a headline", async () => {
     const text = summarizeWorktreeRefresh([result("a", "fast-forwarded"), result("b", "dirty")]);
     expect(text).toContain("1 updated");
     expect(text).toContain("1 left as-is");
@@ -245,12 +245,12 @@ describe("summarizeWorktreeRefresh", () => {
     expect(text).toContain("- b: dirty");
   });
 
-  it("says so plainly when nothing needed moving", () => {
+  it("says so plainly when nothing needed moving", async () => {
     const text = summarizeWorktreeRefresh([result("a", "up-to-date")]);
     expect(text).toContain("already at its tracked branch");
   });
 
-  it("handles an empty repo list", () => {
+  it("handles an empty repo list", async () => {
     expect(summarizeWorktreeRefresh([])).toBe("No repositories to refresh.");
   });
 });

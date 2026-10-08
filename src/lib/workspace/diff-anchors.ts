@@ -102,7 +102,7 @@ export function parseDiffHunks(diff: string): DiffHunks {
  * The diff GitHub shows for the PR: three-dot against the base, so a base branch
  * that moved on does not turn other people's commits into this PR's changes.
  */
-export function readPrDiff(worktreePath: string, baseRefName: string): string {
+export async function readPrDiff(worktreePath: string, baseRefName: string): Promise<string> {
   return execArgs(
     ["git", "diff", "--unified=3", `origin/${baseRefName}...HEAD`],
     { cwd: worktreePath },

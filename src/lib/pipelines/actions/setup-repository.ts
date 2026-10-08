@@ -3,7 +3,8 @@
  * Handles cloning, fetching, branch creation, worktree setup, and conflict resolution.
  */
 
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { dateStamp, deriveBranchName } from "@/lib/naming";
@@ -48,13 +49,13 @@ function gitFailureReason(err: unknown): string {
  * either present (possibly a few commits stale) or missing, and `worktree add`
  * says so loudly.
  */
-function fetchAllWithRetries(
+async function fetchAllWithRetries(
   repoAbsPath: string,
   emitStatus: (message: string) => void,
-): boolean {
+): Promise<boolean> {
   for (let attempt = 0; attempt <= FETCH_RETRY_DELAYS_MS.length; attempt++) {
     try {
-      exec(`git -C "${repoAbsPath}" fetch --all --prune`);
+      await exec(`git -C "${repoAbsPath}" fetch --all --prune`);
       return true;
     } catch (err) {
       const reason = gitFailureReason(err);
@@ -66,19 +67,19 @@ function fetchAllWithRetries(
         return false;
       }
       emitStatus(`fetch failed, retrying in ${delay}ms: ${reason}`);
-      Bun.sleepSync(delay);
+      await Bun.sleep(delay);
     }
   }
   return false;
 }
 
-export function setupRepository(
+export async function setupRepository(
   workspaceName: string,
   repositoryPathArg: string,
   baseBranchOverride: string | undefined,
   emitStatus: (message: string) => void,
   checkoutBranch?: string,
-): SetupRepositoryResult {
+): Promise<SetupRepositoryResult> {
   // Parse alias syntax (e.g. github.com/org/repo:dev)
   let actualRepoPath = repositoryPathArg;
   let repoAlias = "";
@@ -93,26 +94,26 @@ export function setupRepository(
   const repoAbsPath = path.join(repoDir(), actualRepoPath);
   const wsPath = path.join(getWorkspaceDir(), workspaceName);
 
-  if (!existsSync(wsPath)) {
+  if (!(await pathExists(wsPath))) {
     throw new Error(`Workspace directory does not exist: ${wsPath}`);
   }
 
   // Clone or fetch
-  if (!existsSync(repoAbsPath)) {
+  if (!(await pathExists(repoAbsPath))) {
     emitStatus(`Repository not found locally, cloning ${actualRepoPath}...`);
     const parentDir = path.dirname(repoAbsPath);
-    mkdirSync(parentDir, { recursive: true });
+    await mkdir(parentDir, { recursive: true });
     const repoUrl = `https://${actualRepoPath}.git`;
-    exec(`git clone "${repoUrl}" "${repoAbsPath}"`);
+    await exec(`git clone "${repoUrl}" "${repoAbsPath}"`);
     emitStatus("Clone complete.");
     try {
-      exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
+      await exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
     } catch (err) { console.debug("[setup] set-head failed (non-critical):", err); }
   } else {
     emitStatus(`Repository found locally, fetching latest...`);
-    fetchAllWithRetries(repoAbsPath, emitStatus);
+    await fetchAllWithRetries(repoAbsPath, emitStatus);
     try {
-      exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
+      await exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
     } catch (err) { console.debug("[setup] set-head failed (non-critical):", err); }
   }
 
@@ -120,9 +121,9 @@ export function setupRepository(
   // the repo's actual default branch (e.g. `master`); trusting it blindly makes
   // the later `worktree add ... origin/<branch>` fail with `invalid reference`.
   // So if the override doesn't exist on the remote, fall back to the detected default.
-  let baseBranch = baseBranchOverride ?? detectBaseBranch(repoAbsPath);
-  if (baseBranchOverride && !remoteBranchExists(repoAbsPath, baseBranch)) {
-    const detected = detectBaseBranch(repoAbsPath);
+  let baseBranch = baseBranchOverride ?? (await detectBaseBranch(repoAbsPath));
+  if (baseBranchOverride && !(await remoteBranchExists(repoAbsPath, baseBranch))) {
+    const detected = await detectBaseBranch(repoAbsPath);
     if (detected !== baseBranch) {
       emitStatus(
         `Declared base branch origin/${baseBranch} not found; using detected default branch ${detected}`,
@@ -135,7 +136,7 @@ export function setupRepository(
   // Create worktree — use absolute path so git -C doesn't resolve it
   // relative to the repository directory
   const worktreePath = path.resolve(path.join(wsPath, repoPathInput));
-  mkdirSync(path.dirname(worktreePath), { recursive: true });
+  await mkdir(path.dirname(worktreePath), { recursive: true });
 
   let branchName: string;
 
@@ -143,17 +144,17 @@ export function setupRepository(
     // --- Checkout existing remote branch (PR-based setup) ---
 
     // If the target directory already exists, remove it
-    if (existsSync(worktreePath)) {
+    if (await pathExists(worktreePath)) {
       emitStatus(`Target directory already exists, removing: ${repoPathInput}`);
-      rmSync(worktreePath, { recursive: true, force: true });
-      try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+      await rm(worktreePath, { recursive: true, force: true });
+      try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
     }
 
     // Check if the local branch is already used by another worktree.
     // If so, create a worktree with a suffixed local branch name that tracks the same remote.
     let localBranchName = checkoutBranch;
     try {
-      const worktreeList = exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
+      const worktreeList = await exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
       const isInUse = worktreeList
         .split("\n")
         .some((line) => line === `branch refs/heads/${checkoutBranch}`);
@@ -170,11 +171,11 @@ export function setupRepository(
     } catch { /* worktree list failed — proceed and let git error if needed */ }
 
     emitStatus(`Creating worktree: checking out existing branch ${checkoutBranch}`);
-    exec(
+    await exec(
       `git -C "${repoAbsPath}" worktree add -b "${localBranchName}" "${worktreePath}" "origin/${checkoutBranch}"`,
     );
     // Set up tracking so push/pull work against the original remote branch
-    exec(
+    await exec(
       `git -C "${worktreePath}" branch --set-upstream-to="origin/${checkoutBranch}"`,
     );
     branchName = localBranchName;
@@ -186,16 +187,16 @@ export function setupRepository(
     // If the branch already exists (locally or on remote), always use a new name
     // to avoid inheriting commits from the existing branch.
     {
-      const branchExists = (name: string): boolean => {
-        try { exec(`git -C "${repoAbsPath}" rev-parse --verify "${name}"`); return true; } catch { /* noop */ }
-        try { exec(`git -C "${repoAbsPath}" rev-parse --verify "origin/${name}"`); return true; } catch { /* noop */ }
+      const branchExists = async (name: string): Promise<boolean> => {
+        try { await exec(`git -C "${repoAbsPath}" rev-parse --verify "${name}"`); return true; } catch { /* noop */ }
+        try { await exec(`git -C "${repoAbsPath}" rev-parse --verify "origin/${name}"`); return true; } catch { /* noop */ }
         return false;
       };
 
-      if (branchExists(branchName)) {
+      if (await branchExists(branchName)) {
         const origName = branchName;
         let suffix = 2;
-        while (suffix <= MAX_BRANCH_NAME_ATTEMPTS && branchExists(`${origName}-${suffix}`)) {
+        while (suffix <= MAX_BRANCH_NAME_ATTEMPTS && (await branchExists(`${origName}-${suffix}`))) {
           suffix++;
         }
         if (suffix > MAX_BRANCH_NAME_ATTEMPTS) {
@@ -211,20 +212,20 @@ export function setupRepository(
           branchName = `${origName}-${suffix}`;
           emitStatus(`Branch ${origName} already exists, using ${branchName} instead.`);
         }
-        try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+        try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
       }
     }
 
     // If the target directory already exists (e.g. from a previous failed attempt),
     // remove it before creating the worktree
-    if (existsSync(worktreePath)) {
+    if (await pathExists(worktreePath)) {
       emitStatus(`Target directory already exists, removing: ${repoPathInput}`);
-      rmSync(worktreePath, { recursive: true, force: true });
-      try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+      await rm(worktreePath, { recursive: true, force: true });
+      try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
     }
 
     emitStatus(`Creating worktree: branch ${branchName} from origin/${baseBranch}`);
-    const worktreeOutput = exec(
+    const worktreeOutput = await exec(
       `git -C "${repoAbsPath}" worktree add -b "${branchName}" "${worktreePath}" "origin/${baseBranch}"`,
     );
     if (worktreeOutput) {
@@ -233,9 +234,9 @@ export function setupRepository(
   }
 
   // Verify the worktree was actually created
-  if (!existsSync(path.join(worktreePath, ".git"))) {
+  if (!(await pathExists(path.join(worktreePath, ".git")))) {
     // Log diagnostic info
-    const list = exec(`git -C "${repoAbsPath}" worktree list`);
+    const list = await exec(`git -C "${repoAbsPath}" worktree list`);
     emitStatus(`Worktree list after add: ${list}`);
     throw new Error(
       `git worktree add returned successfully but ${worktreePath}/.git does not exist. ` +

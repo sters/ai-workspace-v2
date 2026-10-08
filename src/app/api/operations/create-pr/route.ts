@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const workspace = resolveWorkspaceName(data.workspace);
   const draft = data.draft;
   const repository = data.repository;
-  const repos = listWorkspaceRepos(workspace);
+  const repos = await listWorkspaceRepos(workspace);
 
   if (repos.length === 0) {
     return NextResponse.json(

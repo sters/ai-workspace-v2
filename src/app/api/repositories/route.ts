@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    return NextResponse.json({ repositories: listSelectableRepositories() });
+    return NextResponse.json({ repositories: await listSelectableRepositories() });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

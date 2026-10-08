@@ -40,10 +40,10 @@ async function applyCachedConstraints(
   wsPath: string,
   repos: Repo[],
 ): Promise<{ repo: Repo; entry: RepoConstraintsCacheEntry | null }[]> {
-  const located = repos.map((repo) => {
-    const entry = locateRepoConstraintsCache(repo.worktreePath);
-    return { repo, entry, cached: entry ? readRepoConstraintsCache(entry) : null };
-  });
+  const located = await Promise.all(repos.map(async (repo) => {
+    const entry = await locateRepoConstraintsCache(repo.worktreePath);
+    return { repo, entry, cached: entry ? await readRepoConstraintsCache(entry) : null };
+  }));
   const hits = located.filter((l) => l.cached);
   const misses = located.filter((l) => !l.cached).map(({ repo, entry }) => ({ repo, entry }));
   if (hits.length === 0) return misses;
@@ -75,11 +75,11 @@ async function cacheDiscoveredConstraints(
   if (!discovered.some((d, i) => d.entry && results[i])) return;
   try {
     const declared = parseConstraints((await readWorkspaceReadme(wsPath)).content);
-    discovered.forEach(({ repo, entry }, i) => {
-      if (!entry || !results[i]) return;
+    for (const [i, { repo, entry }] of discovered.entries()) {
+      if (!entry || !results[i]) continue;
       const block = declared.find((c) => c.repoName === repo.repoName);
-      if (block) writeRepoConstraintsCache(entry, block.constraints);
-    });
+      if (block) await writeRepoConstraintsCache(entry, block.constraints);
+    }
   } catch (err) {
     ctx.emitStatus(`Could not cache discovered constraints: ${err}`);
   }
@@ -117,6 +117,7 @@ export function buildDiscoverConstraintsPhase(input: {
 
       const readmePath = path.join(input.wsPath, "README.md");
 
+      const systemPromptFile = await ensureSystemPrompt(input.wsPath, "repo-constraints");
       const children = pending.map(({ repo }) => ({
         label: `constraints-${repo.repoName}`,
         stepType: STEP_TYPES.DISCOVER_CONSTRAINTS,
@@ -127,7 +128,7 @@ export function buildDiscoverConstraintsPhase(input: {
           readmePath,
         }),
         addDirs: [input.wsPath],
-        appendSystemPromptFile: ensureSystemPrompt(input.wsPath, "repo-constraints"),
+        appendSystemPromptFile: systemPromptFile,
       }));
 
       ctx.emitStatus(`Discovering constraints for ${children.length} repositories`);

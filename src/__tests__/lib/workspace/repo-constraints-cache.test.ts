@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { _resetConfig, _resetWorkspaceRoot, setWorkspaceRoot } from "@/lib/config";
-import { exec } from "@/lib/workspace/helpers";
+import { sh as exec } from "../../fixtures/sh";
 import { parseConstraints } from "@/lib/parsers/readme";
 import { buildReadmeContent } from "@/lib/templates";
 import {
@@ -56,7 +56,7 @@ const PACKAGE_JSON = {
   dependencies: { react: "18.2.0" },
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   root = fs.mkdtempSync(path.join("/tmp", "aiw-constraints-cache-"));
   clone = path.join(root, "repositories", "github.com", "acme", "web");
   fs.mkdirSync(clone, { recursive: true });
@@ -73,7 +73,7 @@ beforeEach(() => {
   _resetConfig();
 });
 
-afterEach(() => {
+afterEach(async () => {
   _resetConfig();
   _resetWorkspaceRoot();
   fs.rmSync(root, { recursive: true, force: true });
@@ -94,105 +94,105 @@ function addWorktree(dirName = "web"): string {
  * clone's own checkout stands in for a fresh worktree: it resolves to the same
  * entry and computes the key the same way, at a fraction of the git calls.
  */
-function cacheThenLookUp(change?: Record<string, string | null>) {
-  const first = locateRepoConstraintsCache(clone);
+async function cacheThenLookUp(change?: Record<string, string | null>) {
+  const first = await locateRepoConstraintsCache(clone);
   expect(first).not.toBeNull();
-  writeRepoConstraintsCache(first!, LINT);
+  await writeRepoConstraintsCache(first!, LINT);
   if (change) commit(clone, change);
-  return cachedRepoConstraints(clone);
+  return await cachedRepoConstraints(clone);
 }
 
 // Real git under a loaded machine can outrun the default 5s.
 describe("repo constraints cache", { timeout: 30_000 }, () => {
-  it("serves a later worktree of the same repository", () => {
-    writeRepoConstraintsCache(locateRepoConstraintsCache(addWorktree())!, LINT);
-    expect(cachedRepoConstraints(addWorktree())).toEqual(LINT);
+  it("serves a later worktree of the same repository", async () => {
+    await writeRepoConstraintsCache((await locateRepoConstraintsCache(addWorktree()))!, LINT);
+    expect(await cachedRepoConstraints(addWorktree())).toEqual(LINT);
   });
 
-  it("keeps serving across changes to files discovery does not read", () => {
-    expect(cacheThenLookUp({ "src/index.ts": "export const x = 1;\n" })).toEqual(LINT);
+  it("keeps serving across changes to files discovery does not read", async () => {
+    expect(await cacheThenLookUp({ "src/index.ts": "export const x = 1;\n" })).toEqual(LINT);
   });
 
-  it("misses once a task runner changes", () => {
-    expect(cacheThenLookUp({ Makefile: "lint:\n\tgolangci-lint run\n" })).toBeNull();
+  it("misses once a task runner changes", async () => {
+    expect(await cacheThenLookUp({ Makefile: "lint:\n\tgolangci-lint run\n" })).toBeNull();
   });
 
-  it("misses once a root doc that documents the commands changes", () => {
-    expect(cacheThenLookUp({ "CLAUDE.md": "Run `make lint` before committing.\n" })).toBeNull();
+  it("misses once a root doc that documents the commands changes", async () => {
+    expect(await cacheThenLookUp({ "CLAUDE.md": "Run `make lint` before committing.\n" })).toBeNull();
   });
 
-  it("ignores a dependency bump in package.json", () => {
+  it("ignores a dependency bump in package.json", async () => {
     const bumped = { ...PACKAGE_JSON, dependencies: { react: "18.3.0" } };
-    expect(cacheThenLookUp({ "package.json": JSON.stringify(bumped, null, 2) })).toEqual(LINT);
+    expect(await cacheThenLookUp({ "package.json": JSON.stringify(bumped, null, 2) })).toEqual(LINT);
   });
 
-  it("misses once a package.json script changes", () => {
+  it("misses once a package.json script changes", async () => {
     const rescripted = { ...PACKAGE_JSON, scripts: { lint: "biome check ." } };
-    expect(cacheThenLookUp({ "package.json": JSON.stringify(rescripted, null, 2) })).toBeNull();
+    expect(await cacheThenLookUp({ "package.json": JSON.stringify(rescripted, null, 2) })).toBeNull();
   });
 
-  it("ignores a require bump in go.mod", () => {
+  it("ignores a require bump in go.mod", async () => {
     expect(
-      cacheThenLookUp({ "go.mod": "module example.com/web\n\ngo 1.22\n\nrequire example.com/x v1.1.0\n" }),
+      await cacheThenLookUp({ "go.mod": "module example.com/web\n\ngo 1.22\n\nrequire example.com/x v1.1.0\n" }),
     ).toEqual(LINT);
   });
 
-  it("misses once the go directive changes", () => {
-    expect(cacheThenLookUp({ "go.mod": "module example.com/web\n\ngo 1.23\n" })).toBeNull();
+  it("misses once the go directive changes", async () => {
+    expect(await cacheThenLookUp({ "go.mod": "module example.com/web\n\ngo 1.23\n" })).toBeNull();
   });
 
-  it("ignores a lockfile's contents", () => {
-    expect(cacheThenLookUp({ "pnpm-lock.yaml": "lockfileVersion: 9\n# bumped\n" })).toEqual(LINT);
+  it("ignores a lockfile's contents", async () => {
+    expect(await cacheThenLookUp({ "pnpm-lock.yaml": "lockfileVersion: 9\n# bumped\n" })).toEqual(LINT);
   });
 
-  it("misses once the package manager changes", () => {
-    expect(cacheThenLookUp({ "pnpm-lock.yaml": null, "yarn.lock": "# yarn\n" })).toBeNull();
+  it("misses once the package manager changes", async () => {
+    expect(await cacheThenLookUp({ "pnpm-lock.yaml": null, "yarn.lock": "# yarn\n" })).toBeNull();
   });
 
-  it("shares one entry between a worktree and an aliased worktree of the same clone", () => {
-    const plain = locateRepoConstraintsCache(addWorktree("web"));
-    const aliased = locateRepoConstraintsCache(addWorktree("web___admin"));
+  it("shares one entry between a worktree and an aliased worktree of the same clone", async () => {
+    const plain = await locateRepoConstraintsCache(addWorktree("web"));
+    const aliased = await locateRepoConstraintsCache(addWorktree("web___admin"));
     expect(aliased?.file).toBe(plain?.file);
     expect(plain?.file).toBe(
       path.join(root, ".ai-workspace", "repo-constraints", "github.com", "acme", "web.md"),
     );
   });
 
-  it("has no entry for a directory that is not a worktree of a managed clone", () => {
+  it("has no entry for a directory that is not a worktree of a managed clone", async () => {
     const stray = path.join(root, "elsewhere");
     fs.mkdirSync(stray);
     initRepo(stray);
     commit(stray, { Makefile: "lint:\n" });
-    expect(locateRepoConstraintsCache(stray)).toBeNull();
-    expect(locateRepoConstraintsCache(path.join(root, "missing"))).toBeNull();
+    expect(await locateRepoConstraintsCache(stray)).toBeNull();
+    expect(await locateRepoConstraintsCache(path.join(root, "missing"))).toBeNull();
   });
 
-  it("serves a hand-edited command while the key still matches", () => {
-    const entry = locateRepoConstraintsCache(clone)!;
-    writeRepoConstraintsCache(entry, LINT);
+  it("serves a hand-edited command while the key still matches", async () => {
+    const entry = (await locateRepoConstraintsCache(clone))!;
+    await writeRepoConstraintsCache(entry, LINT);
     fs.writeFileSync(
       entry.file,
       fs.readFileSync(entry.file, "utf8").replace("make lint", "mise exec -- make lint"),
     );
-    expect(readRepoConstraintsCache(entry)).toEqual([
+    expect(await readRepoConstraintsCache(entry)).toEqual([
       { label: "Lint", command: "mise exec -- make lint" },
     ]);
   });
 
-  it("treats a file without a key, or without commands, as a miss", () => {
-    const entry = locateRepoConstraintsCache(clone)!;
+  it("treats a file without a key, or without commands, as a miss", async () => {
+    const entry = (await locateRepoConstraintsCache(clone))!;
     fs.mkdirSync(path.dirname(entry.file), { recursive: true });
     fs.writeFileSync(entry.file, "- Lint: `make lint`\n");
-    expect(readRepoConstraintsCache(entry)).toBeNull();
+    expect(await readRepoConstraintsCache(entry)).toBeNull();
 
-    writeRepoConstraintsCache(entry, LINT);
+    await writeRepoConstraintsCache(entry, LINT);
     fs.writeFileSync(entry.file, fs.readFileSync(entry.file, "utf8").replace(/^- .*$/m, ""));
-    expect(readRepoConstraintsCache(entry)).toBeNull();
+    expect(await readRepoConstraintsCache(entry)).toBeNull();
   });
 });
 
 describe("appendRepoConstraints", () => {
-  it("adds the block inside the section, readable by the constraint parser", () => {
+  it("adds the block inside the section, readable by the constraint parser", async () => {
     const readme = buildReadmeContent("x", "feature", "", "2026-10-02");
 
     const once = appendRepoConstraints(readme, "web", LINT);
@@ -206,7 +206,7 @@ describe("appendRepoConstraints", () => {
     expect(twice).toMatch(/## Repository Constraints[\s\S]*### api[\s\S]*\n## Related Resources/);
   });
 
-  it("creates the section when the README has none", () => {
+  it("creates the section when the README has none", async () => {
     const out = appendRepoConstraints("# Task: x\n\n## Goal\n\ny\n", "web", LINT);
     expect(parseConstraints(out)).toEqual([{ repoName: "web", constraints: LINT }]);
     expect(out.startsWith("# Task: x\n\n## Goal\n\ny\n")).toBe(true);

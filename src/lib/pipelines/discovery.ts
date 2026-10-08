@@ -81,7 +81,7 @@ export function buildDiscoveryPipeline(): PipelinePhase[] {
             prompt,
             jsonSchema: DISCOVERY_SCHEMA as Record<string, unknown>,
             skipAskUserQuestion: true,
-            appendSystemPromptFile: ensureGlobalSystemPrompt("discovery"),
+            appendSystemPromptFile: await ensureGlobalSystemPrompt("discovery"),
             onResultText: (text) => {
               resultTexts.set(ws.name, text);
             },

@@ -1,5 +1,5 @@
+import { pathExists } from "@/lib/fs";
 import path from "node:path";
-import { existsSync } from "node:fs";
 import { spawnClaudeTerminal } from "../claude/cli";
 import { clampPtySize, resizeTerminal, DEFAULT_PTY_COLS, DEFAULT_PTY_ROWS } from "../pty";
 import type { DataListener } from "@/types/pty";
@@ -83,7 +83,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
   // so a workspace without one starts a session that can only go hunting for
   // the file. Refuse before touching the caller's existing session — a rejected
   // start must not cost them a live one. A caller-supplied prompt opts out.
-  if (!msg.initialPrompt && !existsSync(path.join(workspacePath, "README.md"))) {
+  if (!msg.initialPrompt && !(await pathExists(path.join(workspacePath, "README.md")))) {
     send(ws, {
       type: "error",
       message: `Workspace "${msg.workspaceId}" has no README.md — run init before starting a chat session.`,
@@ -107,7 +107,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
   const listeners = new Set<DataListener>();
 
   const { prompt: initPrompt, agentName } = buildChatOpening(msg, workspacePath);
-  const systemPromptFile = ensureSessionSystemPrompt(
+  const systemPromptFile = await ensureSessionSystemPrompt(
     workspacePath,
     agentName,
     sessionId,
@@ -181,7 +181,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     if (session.activeWs) {
       send(session.activeWs, { type: "exited", code });
     }
-    cleanupSessionSystemPrompt(systemPromptFile);
+    void cleanupSessionSystemPrompt(systemPromptFile);
   });
 
   send(ws, { type: "started", sessionId });

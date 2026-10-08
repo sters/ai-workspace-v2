@@ -21,7 +21,7 @@ export async function stripCompletedTodosFromWorkspace(
   filter: { repository?: string; repositories?: readonly string[] } = {},
 ): Promise<string[]> {
   const workspacePath = path.join(getWorkspaceDir(), workspace);
-  const repos = selectRepos(listWorkspaceRepos(workspace), filter);
+  const repos = selectRepos(await listWorkspaceRepos(workspace), filter);
 
   const modified: string[] = [];
   for (const r of repos) {

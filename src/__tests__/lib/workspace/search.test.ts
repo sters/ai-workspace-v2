@@ -9,20 +9,21 @@ vi.mock("@/lib/db/archives", () => ({
   getArchivedNameSet: () => new Set<string>(),
 }));
 
-const mockExistsSync = vi.fn();
-const mockReaddirSync = vi.fn();
-const mockStatSync = vi.fn();
+const mockPathExists = vi.fn();
+const mockReaddir = vi.fn();
+const mockStat = vi.fn();
 
-vi.mock("node:fs", () => ({
-  default: {
-    existsSync: (...args: unknown[]) => mockExistsSync(...args),
-    readdirSync: (...args: unknown[]) => mockReaddirSync(...args),
-    statSync: (...args: unknown[]) => mockStatSync(...args),
-  },
-  existsSync: (...args: unknown[]) => mockExistsSync(...args),
-  readdirSync: (...args: unknown[]) => mockReaddirSync(...args),
-  statSync: (...args: unknown[]) => mockStatSync(...args),
+vi.mock("@/lib/fs", () => ({
+  pathExists: async (...args: unknown[]) => mockPathExists(...args),
 }));
+
+vi.mock("node:fs/promises", () => {
+  const fs = {
+    readdir: async (...args: unknown[]) => mockReaddir(...args),
+    stat: async (...args: unknown[]) => mockStat(...args),
+  };
+  return { ...fs, default: fs };
+});
 
 import { quickSearchWorkspaces } from "@/lib/workspace/reader";
 
@@ -50,20 +51,20 @@ describe("quickSearchWorkspaces", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     Bun.file = originalBunFile;
-    mockStatSync.mockReturnValue({ mtime: new Date("2025-01-01T00:00:00Z") });
+    mockStat.mockReturnValue({ mtime: new Date("2025-01-01T00:00:00Z") });
   });
 
   it("returns empty array when workspace dir does not exist", async () => {
-    mockExistsSync.mockReturnValue(false);
+    mockPathExists.mockReturnValue(false);
     const results = await quickSearchWorkspaces("test");
     expect(results).toEqual([]);
   });
 
   it("finds matching lines in README.md files", async () => {
-    mockExistsSync.mockImplementation((p: string) => {
+    mockPathExists.mockImplementation((p: string) => {
       return p === "/mock/workspace" || p === "/mock/workspace/ws1/README.md";
     });
-    mockReaddirSync.mockReturnValue([
+    mockReaddir.mockReturnValue([
       { name: "ws1", isDirectory: () => true },
     ]);
     setupBunFileMock({
@@ -81,10 +82,10 @@ describe("quickSearchWorkspaces", () => {
   });
 
   it("performs case-insensitive matching", async () => {
-    mockExistsSync.mockImplementation((p: string) => {
+    mockPathExists.mockImplementation((p: string) => {
       return p === "/mock/workspace" || p === "/mock/workspace/ws1/README.md";
     });
-    mockReaddirSync.mockReturnValue([
+    mockReaddir.mockReturnValue([
       { name: "ws1", isDirectory: () => true },
     ]);
     setupBunFileMock({
@@ -99,10 +100,10 @@ describe("quickSearchWorkspaces", () => {
   });
 
   it("returns empty results when no workspaces match", async () => {
-    mockExistsSync.mockImplementation((p: string) => {
+    mockPathExists.mockImplementation((p: string) => {
       return p === "/mock/workspace" || p === "/mock/workspace/ws1/README.md";
     });
-    mockReaddirSync.mockReturnValue([
+    mockReaddir.mockReturnValue([
       { name: "ws1", isDirectory: () => true },
     ]);
     setupBunFileMock({
@@ -114,10 +115,10 @@ describe("quickSearchWorkspaces", () => {
   });
 
   it("returns correct line numbers", async () => {
-    mockExistsSync.mockImplementation((p: string) => {
+    mockPathExists.mockImplementation((p: string) => {
       return p === "/mock/workspace" || p === "/mock/workspace/ws1/README.md";
     });
-    mockReaddirSync.mockReturnValue([
+    mockReaddir.mockReturnValue([
       { name: "ws1", isDirectory: () => true },
     ]);
     setupBunFileMock({
@@ -132,14 +133,14 @@ describe("quickSearchWorkspaces", () => {
   });
 
   it("searches across multiple workspaces", async () => {
-    mockExistsSync.mockImplementation((p: string) => {
+    mockPathExists.mockImplementation((p: string) => {
       return (
         p === "/mock/workspace" ||
         p === "/mock/workspace/ws1/README.md" ||
         p === "/mock/workspace/ws2/README.md"
       );
     });
-    mockReaddirSync.mockReturnValue([
+    mockReaddir.mockReturnValue([
       { name: "ws1", isDirectory: () => true },
       { name: "ws2", isDirectory: () => true },
     ]);
@@ -154,8 +155,8 @@ describe("quickSearchWorkspaces", () => {
   });
 
   it("skips non-directory entries", async () => {
-    mockExistsSync.mockReturnValue(true);
-    mockReaddirSync.mockReturnValue([
+    mockPathExists.mockReturnValue(true);
+    mockReaddir.mockReturnValue([
       { name: "file.txt", isDirectory: () => false },
     ]);
 
@@ -164,10 +165,10 @@ describe("quickSearchWorkspaces", () => {
   });
 
   it("extracts title from README metadata", async () => {
-    mockExistsSync.mockImplementation((p: string) => {
+    mockPathExists.mockImplementation((p: string) => {
       return p === "/mock/workspace" || p === "/mock/workspace/ws1/README.md";
     });
-    mockReaddirSync.mockReturnValue([
+    mockReaddir.mockReturnValue([
       { name: "ws1", isDirectory: () => true },
     ]);
     setupBunFileMock({

@@ -64,7 +64,7 @@ export async function loadReviewFreshness(
   opts?: { force?: boolean },
 ): Promise<ReviewFreshnessResult> {
   const wsPath = path.join(getWorkspaceDir(), workspace);
-  const repos = listWorkspaceRepos(workspace);
+  const repos = await listWorkspaceRepos(workspace);
 
   const [baseline, prs] = await Promise.all([
     readLatestReviewBaseline(wsPath),
@@ -78,16 +78,16 @@ export async function loadReviewFreshness(
 
   const prByRepo = new Map(prs.pullRequests.map((pr) => [pr.repoName, pr]));
 
-  const results = repos.map((repo) => {
+  const results = await Promise.all(repos.map(async (repo) => {
     const pr = prByRepo.get(repo.repoName);
     return computeRepoFreshness({
       repoName: repo.repoName,
-      localHead: captureRepoHead(repo.worktreePath),
+      localHead: await captureRepoHead(repo.worktreePath),
       lastReviewedSha: baseline?.heads[repo.repoName] ?? null,
       lastReviewedAt: baseline?.heads[repo.repoName] ? baseline.timestamp : null,
       pr: pr ? { url: pr.url, headSha: pr.headSha } : null,
     });
-  });
+  }));
 
   return {
     repos: results,

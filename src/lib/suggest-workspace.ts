@@ -110,7 +110,7 @@ async function runSuggester(
   const proc = runClaude(suggestOpId, prompt, {
     jsonSchema: WORKSPACE_SUGGESTION_SCHEMA,
     skipAskUserQuestion: true,
-    appendSystemPromptFile: ensureSystemPrompt(wsPath, "workspace-suggester"),
+    appendSystemPromptFile: await ensureSystemPrompt(wsPath, "workspace-suggester"),
     model,
     effort,
   });

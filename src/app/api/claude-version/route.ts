@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const version = getClaudeVersion();
+    const version = await getClaudeVersion();
     return NextResponse.json({ version });
   } catch (err) {
     return NextResponse.json(

@@ -27,13 +27,14 @@ export function buildCreateTodoPipeline(
       timeoutMs: getTimeoutDefaults("create-todo").claudeMs,
       fn: async (ctx) => {
         const { content: readmeContent, meta } = await readWorkspaceReadme(wsPath);
-        const repos = listWorkspaceRepos(workspace);
+        const repos = await listWorkspaceRepos(workspace);
 
         if (repos.length === 0) {
           ctx.emitResult("No repositories configured — skipping TODO creation.");
           return true;
         }
 
+        const plannerPromptFile = await ensureSystemPrompt(wsPath, "create-todo-planner");
         const children = repos.map((repo) => ({
           label: `plan-${repo.repoName}`,
           stepType: STEP_TYPES.PLAN_TODO_FROM_REVIEW,
@@ -48,7 +49,7 @@ export function buildCreateTodoPipeline(
             instruction,
           }),
           addDirs: [wsPath],
-          appendSystemPromptFile: ensureSystemPrompt(wsPath, "create-todo-planner"),
+          appendSystemPromptFile: plannerPromptFile,
         }));
 
         ctx.emitStatus(`Creating TODOs from review for ${children.length} repositories`);
@@ -66,8 +67,8 @@ export function buildCreateTodoPipeline(
       kind: "function",
       label: "Coordinate TODOs",
       timeoutMs: getTimeoutDefaults("create-todo").claudeMs,
-      fn: (ctx) => {
-        const repos = listWorkspaceRepos(workspace);
+      fn: async (ctx) => {
+        const repos = await listWorkspaceRepos(workspace);
         return buildCoordinateTodosPhase({
           workspace,
           wsPath,
@@ -84,8 +85,8 @@ export function buildCreateTodoPipeline(
       kind: "function",
       label: "Review TODOs",
       timeoutMs: getTimeoutDefaults("create-todo").claudeMs,
-      fn: (ctx) => {
-        const repos = listWorkspaceRepos(workspace);
+      fn: async (ctx) => {
+        const repos = await listWorkspaceRepos(workspace);
         return buildReviewTodosPhase({
           workspace,
           wsPath,

@@ -100,7 +100,7 @@ export async function buildBestOfNPipeline(
 
         ctx.emitStatus(`Creating ${n} sub-worktrees for Best-of-N execution`);
         try {
-          subWorktrees = createSubWorktrees(
+          subWorktrees = await createSubWorktrees(
             workspace,
             repos,
             n,
@@ -208,14 +208,14 @@ export async function buildBestOfNPipeline(
         const successful = candidateResults.filter((r) => r.success);
 
         // Build candidate data for the reviewer
-        const candidates = successful.map((result) => {
+        const candidates = await Promise.all(successful.map(async (result) => {
           const sub = subWorktrees[result.index];
           const diffs: string[] = [];
           for (const repo of repos) {
             const subWtPath = sub.repoPaths.get(repo.repoPath);
             if (!subWtPath) continue;
-            const baseCommit = getBaseCommit(repo.worktreePath, subWtPath);
-            const diff = getSubWorktreeDiff(subWtPath, baseCommit);
+            const baseCommit = await getBaseCommit(repo.worktreePath, subWtPath);
+            const diff = await getSubWorktreeDiff(subWtPath, baseCommit);
             if (diff) diffs.push(diff);
           }
           return {
@@ -223,7 +223,7 @@ export async function buildBestOfNPipeline(
             diff: diffs.join("\n\n"),
             resultText: result.resultText,
           };
-        });
+        }));
 
         const prompt = buildBestOfNReviewerPrompt({
           workspaceName: workspace,
@@ -252,7 +252,7 @@ export async function buildBestOfNPipeline(
           addDirs,
           jsonSchema: BEST_OF_N_REVIEW_SCHEMA as unknown as Record<string, unknown>,
           stepType: STEP_TYPES.BEST_OF_N_REVIEWER,
-          appendSystemPromptFile: ensureSystemPrompt(wsPath, "best-of-n-reviewer"),
+          appendSystemPromptFile: await ensureSystemPrompt(wsPath, "best-of-n-reviewer"),
           onResultText: (text) => { reviewResultText = text; },
         });
 
@@ -339,8 +339,8 @@ export async function buildBestOfNPipeline(
           for (const repo of repos) {
             const subWtPath = sub.repoPaths.get(repo.repoPath);
             if (!subWtPath) continue;
-            const baseCommit = getBaseCommit(repo.worktreePath, subWtPath);
-            applySubWorktreeResult(repo.worktreePath, subWtPath, baseCommit);
+            const baseCommit = await getBaseCommit(repo.worktreePath, subWtPath);
+            await applySubWorktreeResult(repo.worktreePath, subWtPath, baseCommit);
             ctx.emitStatus(`Applied changes from ${sub.label} to ${repo.repoName}`);
           }
           ctx.emitResult(
@@ -362,7 +362,7 @@ export async function buildBestOfNPipeline(
       fn: async (ctx: PhaseFunctionContext) => {
         if (skipBestOfN) return true;
         try {
-          cleanupSubWorktrees(
+          await cleanupSubWorktrees(
             workspace,
             subWorktrees,
             repos,

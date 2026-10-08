@@ -16,7 +16,8 @@
  * and only the author can settle them.
  */
 
-import { existsSync, readdirSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { readFindingGroundings } from "./finding-groundings";
@@ -95,11 +96,11 @@ export function buildPostedAsks(
 }
 
 /** Review session directory names, newest first. */
-function listReviewTimestamps(wsPath: string): string[] {
+async function listReviewTimestamps(wsPath: string): Promise<string[]> {
   const reviewsDir = path.join(wsPath, "artifacts", "reviews");
-  if (!existsSync(reviewsDir)) return [];
+  if (!(await pathExists(reviewsDir))) return [];
   try {
-    return readdirSync(reviewsDir, { withFileTypes: true })
+    return (await readdir(reviewsDir, { withFileTypes: true }))
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
       .sort((a, b) => b.localeCompare(a));
@@ -125,10 +126,10 @@ export async function collectPostedAsks(workspace: string): Promise<Map<string, 
   );
   if (postedIds.size === 0) return new Map();
 
-  const repos = listWorkspaceRepos(workspace);
+  const repos = await listWorkspaceRepos(workspace);
   const findingsById = new Map<string, ReviewFinding>();
 
-  for (const timestamp of listReviewTimestamps(wsPath)) {
+  for (const timestamp of await listReviewTimestamps(wsPath)) {
     const reviewDir = path.join(wsPath, "artifacts", "reviews", timestamp);
     for (const repo of repos) {
       const findings = await readRepoFindings(reviewDir, repo.repoPath, repo.repoName);

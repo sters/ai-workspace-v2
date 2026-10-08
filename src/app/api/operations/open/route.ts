@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { openSchema } from "@/lib/schemas";
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   if (!parsed.success) return parsed.response;
 
   const workspacePath = resolveWorkspacePath(parsed.data.workspace);
-  if (!workspacePath || !existsSync(workspacePath)) {
+  if (!workspacePath || !(await pathExists(workspacePath))) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
   }
 

@@ -28,7 +28,7 @@ describe("getIncrementalChanges", () => {
     return git("rev-parse", "HEAD");
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     repo = fs.mkdtempSync(path.join("/tmp", "aiw-incremental-"));
     git("init", "-b", "main");
     commit("base.txt", "base\n", "base commit");
@@ -38,26 +38,26 @@ describe("getIncrementalChanges", () => {
     git("checkout", "-b", "feature");
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fs.rmSync(repo, { recursive: true, force: true });
   });
 
-  it("returns null for a sha that is not an ancestor of HEAD", () => {
+  it("returns null for a sha that is not an ancestor of HEAD", async () => {
     commit("a.txt", "a\n", "add a");
     // Plausible-looking but absent — the shape a rebase or force-push leaves behind.
-    expect(getIncrementalChanges(repo, "main", "0".repeat(40))).toBeNull();
+    expect(await getIncrementalChanges(repo, "main", "0".repeat(40))).toBeNull();
   });
 
-  it("returns null for an empty sha", () => {
+  it("returns null for an empty sha", async () => {
     commit("a.txt", "a\n", "add a");
-    expect(getIncrementalChanges(repo, "main", "")).toBeNull();
+    expect(await getIncrementalChanges(repo, "main", "")).toBeNull();
   });
 
-  it("reports only the files changed after the baseline", () => {
+  it("reports only the files changed after the baseline", async () => {
     const baseline = commit("a.txt", "a\n", "add a");
     commit("b.txt", "b\n", "add b");
 
-    const inc = getIncrementalChanges(repo, "main", baseline);
+    const inc = await getIncrementalChanges(repo, "main", baseline);
     expect(inc).not.toBeNull();
     expect(inc!.changedFiles).toContain("b.txt");
     expect(inc!.changedFiles).not.toContain("a.txt");
@@ -65,10 +65,10 @@ describe("getIncrementalChanges", () => {
     expect(inc!.commitLog).not.toContain("add a");
   });
 
-  it("reports no changes when HEAD has not moved since the baseline", () => {
+  it("reports no changes when HEAD has not moved since the baseline", async () => {
     const baseline = commit("a.txt", "a\n", "add a");
 
-    const inc = getIncrementalChanges(repo, "main", baseline);
+    const inc = await getIncrementalChanges(repo, "main", baseline);
     expect(inc).not.toBeNull();
     expect(inc!.hasChanges).toBe(false);
     expect(inc!.changedFiles.trim()).toBe("");
@@ -77,7 +77,7 @@ describe("getIncrementalChanges", () => {
   // The case that motivated the path restriction: this branch merged origin/main
   // mid-run, which brought 10 other commits into <baseline>..HEAD. Without the
   // restriction the next review's target includes another team's work.
-  it("excludes files that arrived only from the base branch via a merge", () => {
+  it("excludes files that arrived only from the base branch via a merge", async () => {
     const baseline = commit("a.txt", "a\n", "add a");
 
     // Advance main with a file the feature branch never touches, then merge it in.
@@ -87,13 +87,13 @@ describe("getIncrementalChanges", () => {
     git("checkout", "feature");
     git("merge", "main", "-m", "Merge main");
 
-    const inc = getIncrementalChanges(repo, "main", baseline);
+    const inc = await getIncrementalChanges(repo, "main", baseline);
     expect(inc).not.toBeNull();
     expect(inc!.changedFiles).not.toContain("other-team.txt");
     expect(inc!.commitLog).not.toContain("other team's work");
   });
 
-  it("still reports the branch's own post-merge work", () => {
+  it("still reports the branch's own post-merge work", async () => {
     const baseline = commit("a.txt", "a\n", "add a");
 
     git("checkout", "main");
@@ -103,13 +103,13 @@ describe("getIncrementalChanges", () => {
     git("merge", "main", "-m", "Merge main");
     commit("c.txt", "c\n", "add c after merge");
 
-    const inc = getIncrementalChanges(repo, "main", baseline);
+    const inc = await getIncrementalChanges(repo, "main", baseline);
     expect(inc!.changedFiles).toContain("c.txt");
     expect(inc!.changedFiles).not.toContain("other-team.txt");
     expect(inc!.commitLog).toContain("add c after merge");
   });
 
-  it("includes a file the branch owns even when the merge also touched it", () => {
+  it("includes a file the branch owns even when the merge also touched it", async () => {
     const baseline = commit("shared.txt", "branch\n", "branch edits shared");
 
     git("checkout", "main");
@@ -124,7 +124,7 @@ describe("getIncrementalChanges", () => {
     git("add", "shared.txt");
     git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "resolve conflict");
 
-    const inc = getIncrementalChanges(repo, "main", baseline);
+    const inc = await getIncrementalChanges(repo, "main", baseline);
     expect(inc!.changedFiles).toContain("shared.txt");
   });
 });

@@ -32,7 +32,7 @@ describe("repository changes against the base branch", () => {
     git("commit", "-m", message);
   }
 
-  beforeEach(() => {
+  beforeEach(async () => {
     repo = fs.mkdtempSync(path.join("/tmp", "aiw-changes-"));
     git("init", "-b", "main");
     commit("keep.txt", "one\ntwo\nthree\n", "base");
@@ -41,29 +41,29 @@ describe("repository changes against the base branch", () => {
     git("checkout", "-b", "feature");
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     fs.rmSync(repo, { recursive: true, force: true });
   });
 
-  function paths() {
-    const result = listRepoChanges(repo, "main");
+  async function paths() {
+    const result = await listRepoChanges(repo, "main");
     if ("error" in result) throw new Error(result.error);
     return result.files.map((f) => `${f.status}:${f.path}`).sort();
   }
 
-  it("includes committed, uncommitted and untracked work", () => {
+  it("includes committed, uncommitted and untracked work", async () => {
     commit("src/committed.ts", "a\n", "feature commit");
     write("keep.txt", "one\nTWO\nthree\n");
     write("src/untracked.ts", "x\ny\n");
 
-    expect(paths()).toEqual([
+    expect(await paths()).toEqual([
       "added:src/committed.ts",
       "modified:keep.txt",
       "untracked:src/untracked.ts",
     ]);
   });
 
-  it("leaves out what the base gained after the branch was cut", () => {
+  it("leaves out what the base gained after the branch was cut", async () => {
     commit("mine.txt", "m\n", "feature commit");
     // The base moves on: a three-dot comparison must not show its commit as
     // this branch deleting the file.
@@ -72,56 +72,66 @@ describe("repository changes against the base branch", () => {
     git("update-ref", "refs/remotes/origin/main", "HEAD");
     git("checkout", "feature");
 
-    expect(paths()).toEqual(["added:mine.txt"]);
+    expect(await paths()).toEqual(["added:mine.txt"]);
   });
 
-  it("reports deletions and renames with their old path", () => {
+  it("reports deletions and renames with their old path", async () => {
     git("rm", "-q", "gone.txt");
     git("mv", "keep.txt", "kept.txt");
     git("commit", "-m", "move things");
 
-    const result = listRepoChanges(repo, "main");
+    const result = await listRepoChanges(repo, "main");
     if ("error" in result) throw new Error(result.error);
     const renamed = result.files.find((f) => f.status === "renamed");
     expect(renamed).toMatchObject({ path: "kept.txt", oldPath: "keep.txt" });
     expect(result.files.find((f) => f.path === "gone.txt")?.status).toBe("deleted");
   });
 
-  it("counts lines per file", () => {
+  it("counts lines per file", async () => {
     write("keep.txt", "one\nTWO\nthree\nfour\n");
     write("new.txt", "a\nb\nc\n");
 
-    const result = listRepoChanges(repo, "main");
+    const result = await listRepoChanges(repo, "main");
     if ("error" in result) throw new Error(result.error);
     expect(result.files.find((f) => f.path === "keep.txt")).toMatchObject({ additions: 2, deletions: 1 });
     expect(result.files.find((f) => f.path === "new.txt")).toMatchObject({ additions: 3, deletions: 0 });
   });
 
-  it("reports an error rather than an empty list when the base ref is missing", () => {
-    const result = listRepoChanges(repo, "develop");
+  it("reports an error rather than an empty list when the base ref is missing", async () => {
+    const result = await listRepoChanges(repo, "develop");
     expect("error" in result && result.error).toContain("origin/develop");
   });
 
-  it("reads the diff of a tracked file, uncommitted edits included", () => {
+  it("reads the diff of a tracked file, uncommitted edits included", async () => {
     write("keep.txt", "one\nTWO\nthree\n");
-    const diff = readRepoFileDiff(repo, "main", "keep.txt");
+    const diff = await readRepoFileDiff(repo, "main", "keep.txt");
     expect(diff?.diff).toContain("-two");
     expect(diff?.diff).toContain("+TWO");
   });
 
-  it("reads the diff of an untracked file as an addition", () => {
-    write("fresh.txt", "hello\n");
-    expect(readRepoFileDiff(repo, "main", "fresh.txt")?.diff).toContain("+hello");
+  it("reads a renamed file's diff as a rename, not as an addition", async () => {
+    git("mv", "keep.txt", "kept.txt");
+    write("kept.txt", "one\ntwo\nTHREE\n");
+    git("add", "kept.txt");
+    const diff = (await readRepoFileDiff(repo, "main", "kept.txt"))?.diff ?? "";
+    expect(diff).toContain("rename from keep.txt");
+    expect(diff).toContain("+THREE");
+    expect(diff).not.toContain("+one");
   });
 
-  it("refuses a path that is not one of the changes", () => {
+  it("reads the diff of an untracked file as an addition", async () => {
+    write("fresh.txt", "hello\n");
+    expect((await readRepoFileDiff(repo, "main", "fresh.txt"))?.diff).toContain("+hello");
+  });
+
+  it("refuses a path that is not one of the changes", async () => {
     // Unchanged files and paths outside the worktree are both unreadable here:
     // the untracked-file diff reads straight from disk, so without this check a
     // `..` path would read anything the server can.
     fs.writeFileSync(path.join(path.dirname(repo), "aiw-changes-outside.txt"), "secret\n");
     try {
-      expect(readRepoFileDiff(repo, "main", "gone.txt")).toBeNull();
-      expect(readRepoFileDiff(repo, "main", "../aiw-changes-outside.txt")).toBeNull();
+      expect(await readRepoFileDiff(repo, "main", "gone.txt")).toBeNull();
+      expect(await readRepoFileDiff(repo, "main", "../aiw-changes-outside.txt")).toBeNull();
     } finally {
       fs.rmSync(path.join(path.dirname(repo), "aiw-changes-outside.txt"), { force: true });
     }

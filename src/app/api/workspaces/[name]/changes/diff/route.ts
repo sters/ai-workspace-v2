@@ -25,7 +25,7 @@ export async function GET(
     return NextResponse.json({ error: "Missing repo or path" }, { status: 400 });
   }
 
-  const diff = readWorkspaceFileDiff(name, repo, filePath);
+  const diff = await readWorkspaceFileDiff(name, repo, filePath);
   if (!diff) {
     return NextResponse.json({ error: "Change not found" }, { status: 404 });
   }

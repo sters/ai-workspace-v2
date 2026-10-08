@@ -72,7 +72,7 @@ export function buildPruneSuggestionsPipeline(): PipelinePhase[] {
         }
 
         ctx.emitStatus(`Found ${suggestions.length} suggestion(s). Discovering local repositories...`);
-        const repos = listAllRepositories();
+        const repos = await listAllRepositories();
         ctx.emitStatus(`Found ${repos.length} local repository(ies).`);
 
         // Match and group

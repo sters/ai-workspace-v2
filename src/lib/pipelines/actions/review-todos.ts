@@ -152,7 +152,7 @@ export function buildReviewTodosPhase(input: {
           jsonSchema: TODO_REVIEW_SCHEMA as unknown as Record<string, unknown>,
           onResultText: (text) => { rawTexts.set(repo.repoName, text); },
           skipAskUserQuestion: true,
-          appendSystemPromptFile: ensureSystemPrompt(input.wsPath, "reviewer"),
+          appendSystemPromptFile: await ensureSystemPrompt(input.wsPath, "reviewer"),
         });
       }
 
@@ -203,6 +203,7 @@ export function buildReviewTodosPhase(input: {
         ? await askAboutBlockingFindings(ctx, toRevise)
         : undefined;
 
+      const updaterPromptFile = await ensureSystemPrompt(input.wsPath, "updater");
       const reviseChildren: GroupChild[] = toRevise.map((verdict) => {
         // Each reviser sees only the answers to its own repo's questions.
         const ownAnswers = answers?.filter((a) =>
@@ -227,7 +228,7 @@ export function buildReviewTodosPhase(input: {
           // Same restriction as update-todo: the reviser reads the worktree but
           // writes only the TODO file.
           allowedTools: todoAllowedTools(input.wsPath),
-          appendSystemPromptFile: ensureSystemPrompt(input.wsPath, "updater"),
+          appendSystemPromptFile: updaterPromptFile,
           skipAskUserQuestion: true,
         };
       });

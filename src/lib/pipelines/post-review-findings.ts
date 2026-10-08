@@ -231,7 +231,7 @@ export function buildPostReviewFindingsPipeline(input: {
         // the browser — so it is resolved from the same list the findings came
         // from.
         const worktrees = new Map(
-          listWorkspaceRepos(workspace).map((r) => [
+          (await listWorkspaceRepos(workspace)).map((r) => [
             r.repoName,
             { worktreePath: r.worktreePath, repoPath: r.repoPath },
           ]),
@@ -277,7 +277,7 @@ export function buildPostReviewFindingsPipeline(input: {
           return false;
         }
 
-        const systemPromptFile = ensureSystemPrompt(wsPath, "finding-grounder");
+        const systemPromptFile = await ensureSystemPrompt(wsPath, "finding-grounder");
         const resultTexts = new Map<string, string>();
 
         const children: GroupChild[] = targets.map(({ finding, repo }) => {

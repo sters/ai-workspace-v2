@@ -3,7 +3,8 @@
  * Creates N sub-worktrees per repository, collects diffs, applies results, and cleans up.
  */
 
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { exec, repoDir } from "@/lib/workspace/helpers";
@@ -24,12 +25,12 @@ export interface SubWorktree {
  * Create N sub-worktrees for each repo in the workspace.
  * Each sub-worktree branches from the current HEAD of the original worktree.
  */
-export function createSubWorktrees(
+export async function createSubWorktrees(
   workspaceName: string,
   repos: WorkspaceRepo[],
   n: number,
   emitStatus: (message: string) => void,
-): SubWorktree[] {
+): Promise<SubWorktree[]> {
   const wsPath = path.join(getWorkspaceDir(), workspaceName);
   const subWorktrees: SubWorktree[] = [];
 
@@ -45,12 +46,12 @@ export function createSubWorktrees(
       const repoAbsPath = path.join(repoDir(), repo.repoPath);
 
       // Get the current HEAD of the existing worktree
-      const baseCommit = exec(`git -C "${existingWtPath}" rev-parse HEAD`);
+      const baseCommit = await exec(`git -C "${existingWtPath}" rev-parse HEAD`);
 
       // Get the current branch name for naming
       let currentBranch: string;
       try {
-        currentBranch = exec(`git -C "${existingWtPath}" rev-parse --abbrev-ref HEAD`);
+        currentBranch = await exec(`git -C "${existingWtPath}" rev-parse --abbrev-ref HEAD`);
       } catch {
         currentBranch = `detached-${baseCommit.slice(0, 8)}`;
       }
@@ -59,29 +60,29 @@ export function createSubWorktrees(
       const subWtPath = path.resolve(path.join(wsPath, bonDir, repo.repoPath));
 
       // Remove stale sub-worktree directory if it exists
-      if (existsSync(subWtPath)) {
-        rmSync(subWtPath, { recursive: true, force: true });
-        try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+      if (await pathExists(subWtPath)) {
+        await rm(subWtPath, { recursive: true, force: true });
+        try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
       }
 
       // Delete stale branch if it exists and is not in use
       try {
-        exec(`git -C "${repoAbsPath}" rev-parse --verify "${bonBranch}"`);
+        await exec(`git -C "${repoAbsPath}" rev-parse --verify "${bonBranch}"`);
         // Branch exists — check if it's in use by a worktree
-        try { exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
-        const worktreeList = exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
+        try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
+        const worktreeList = await exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
         const isInUse = worktreeList
           .split("\n")
           .some((line) => line === `branch refs/heads/${bonBranch}`);
         if (!isInUse) {
-          exec(`git -C "${repoAbsPath}" branch -D "${bonBranch}"`);
+          await exec(`git -C "${repoAbsPath}" branch -D "${bonBranch}"`);
         }
       } catch { /* branch doesn't exist — good */ }
 
       // Create sub-worktree
-      mkdirSync(path.dirname(subWtPath), { recursive: true });
+      await mkdir(path.dirname(subWtPath), { recursive: true });
       emitStatus(`[${label}] Creating sub-worktree for ${repo.repoName}`);
-      exec(
+      await exec(
         `git -C "${repoAbsPath}" worktree add -b "${bonBranch}" "${subWtPath}" "${baseCommit}"`,
       );
 
@@ -109,12 +110,12 @@ export function createSubWorktrees(
 /**
  * Get a combined diff for a sub-worktree relative to a base commit.
  */
-export function getSubWorktreeDiff(
+export async function getSubWorktreeDiff(
   subWorktreePath: string,
   baseCommit: string,
-): string {
+): Promise<string> {
   try {
-    return exec(`git -C "${subWorktreePath}" diff "${baseCommit}"..HEAD`);
+    return await exec(`git -C "${subWorktreePath}" diff "${baseCommit}"..HEAD`);
   } catch {
     return "";
   }
@@ -123,54 +124,54 @@ export function getSubWorktreeDiff(
 /**
  * Get the base commit (common ancestor) of the sub-worktree — the commit it branched from.
  */
-export function getBaseCommit(
+export async function getBaseCommit(
   originalWorktreePath: string,
   subWorktreePath: string,
-): string {
-  const origHead = exec(`git -C "${originalWorktreePath}" rev-parse HEAD`);
-  const subHead = exec(`git -C "${subWorktreePath}" rev-parse HEAD`);
+): Promise<string> {
+  const origHead = await exec(`git -C "${originalWorktreePath}" rev-parse HEAD`);
+  const subHead = await exec(`git -C "${subWorktreePath}" rev-parse HEAD`);
   return exec(`git -C "${subWorktreePath}" merge-base "${origHead}" "${subHead}"`);
 }
 
 /**
  * Apply a sub-worktree's commits to the original worktree using format-patch + am.
  */
-export function applySubWorktreeResult(
+export async function applySubWorktreeResult(
   originalWorktreePath: string,
   subWorktreePath: string,
   baseCommit: string,
-): void {
+): Promise<void> {
   // Check if there are any commits to apply
-  const commitCount = exec(
+  const commitCount = await exec(
     `git -C "${subWorktreePath}" rev-list --count "${baseCommit}"..HEAD`,
   );
   if (commitCount === "0") return;
 
   // Generate patches
   const patchDir = path.join(subWorktreePath, ".bon-patches");
-  mkdirSync(patchDir, { recursive: true });
-  exec(
+  await mkdir(patchDir, { recursive: true });
+  await exec(
     `git -C "${subWorktreePath}" format-patch -o "${patchDir}" "${baseCommit}"..HEAD`,
   );
 
   // Apply patches to the original worktree
   try {
-    exec(`git -C "${originalWorktreePath}" am "${patchDir}"/*.patch`);
+    await exec(`git -C "${originalWorktreePath}" am "${patchDir}"/*.patch`);
   } finally {
     // Clean up patch directory
-    rmSync(patchDir, { recursive: true, force: true });
+    await rm(patchDir, { recursive: true, force: true });
   }
 }
 
 /**
  * Clean up all sub-worktrees created for a Best-of-N run.
  */
-export function cleanupSubWorktrees(
+export async function cleanupSubWorktrees(
   workspaceName: string,
   subWorktrees: SubWorktree[],
   repos: WorkspaceRepo[],
   emitStatus: (message: string) => void,
-): void {
+): Promise<void> {
   const wsPath = path.join(getWorkspaceDir(), workspaceName);
 
   for (const sub of subWorktrees) {
@@ -180,9 +181,9 @@ export function cleanupSubWorktrees(
       const repoAbsPath = path.join(repoDir(), repo.repoPath);
 
       // Remove the sub-worktree directory
-      if (subWtPath && existsSync(subWtPath)) {
+      if (subWtPath && await pathExists(subWtPath)) {
         try {
-          rmSync(subWtPath, { recursive: true, force: true });
+          await rm(subWtPath, { recursive: true, force: true });
         } catch (err) {
           emitStatus(`[cleanup] Failed to remove ${subWtPath}: ${err}`);
         }
@@ -190,22 +191,22 @@ export function cleanupSubWorktrees(
 
       // Prune worktree references
       try {
-        exec(`git -C "${repoAbsPath}" worktree prune`);
+        await exec(`git -C "${repoAbsPath}" worktree prune`);
       } catch { /* non-critical */ }
 
       // Delete the temporary branch
       if (bonBranch) {
         try {
-          exec(`git -C "${repoAbsPath}" branch -D "${bonBranch}"`);
+          await exec(`git -C "${repoAbsPath}" branch -D "${bonBranch}"`);
         } catch { /* branch may not exist or is in use */ }
       }
     }
 
     // Remove the tmp/bon-N directory from workspace
     const bonDir = path.join(wsPath, "tmp", `bon-${sub.index + 1}`);
-    if (existsSync(bonDir)) {
+    if (await pathExists(bonDir)) {
       try {
-        rmSync(bonDir, { recursive: true, force: true });
+        await rm(bonDir, { recursive: true, force: true });
       } catch { /* ignore */ }
     }
   }

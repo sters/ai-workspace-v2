@@ -1,4 +1,4 @@
-import { statSync } from "node:fs";
+import { stat } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "@/lib/templates/prompts/search";
@@ -24,7 +24,7 @@ export function buildSearchPipeline(query: string): PipelinePhase[] {
             cwd: getWorkspaceDir(),
             jsonSchema: DEEP_SEARCH_SCHEMA as Record<string, unknown>,
             stepType: STEP_TYPES.DEEP_SEARCH,
-            appendSystemPromptFile: ensureGlobalSystemPrompt("search"),
+            appendSystemPromptFile: await ensureGlobalSystemPrompt("search"),
             onResultText: (text) => {
               resultText = text;
             },
@@ -47,14 +47,17 @@ export function buildSearchPipeline(query: string): PipelinePhase[] {
           );
 
           // Sort by last modified (most recent first), same as listWorkspaces()
-          results.sort((a, b) => {
+          const mtimes = new Map(await Promise.all(results.map(async (r) => {
             try {
-              const mtimeA = statSync(path.join(getWorkspaceDir(), a.workspaceName)).mtime.getTime();
-              const mtimeB = statSync(path.join(getWorkspaceDir(), b.workspaceName)).mtime.getTime();
-              return mtimeB - mtimeA;
+              return [r.workspaceName, (await stat(path.join(getWorkspaceDir(), r.workspaceName))).mtime.getTime()] as const;
             } catch {
-              return 0;
+              return [r.workspaceName, null] as const;
             }
+          })));
+          results.sort((a, b) => {
+            const mtimeA = mtimes.get(a.workspaceName);
+            const mtimeB = mtimes.get(b.workspaceName);
+            return mtimeA == null || mtimeB == null ? 0 : mtimeB - mtimeA;
           });
 
           ctx.emitResult(JSON.stringify({ results }));

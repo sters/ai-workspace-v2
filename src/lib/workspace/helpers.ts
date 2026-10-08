@@ -2,24 +2,21 @@
  * Workspace helpers — shared utilities used by workspace modules.
  */
 
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { getResolvedWorkspaceRoot, getWorkspaceDir } from "../config";
-import { getCleanEnv } from "../env";
+import { runProcess } from "../process/run";
 import type { StaleWorkspace, WorkspaceAgeInfo } from "@/types/workspace";
 
-export function exec(cmd: string, opts?: { cwd?: string; maxBuffer?: number }): string {
-  const result = Bun.spawnSync(["sh", "-c", cmd], {
+export async function exec(cmd: string, opts?: { cwd?: string }): Promise<string> {
+  const result = await runProcess(["sh", "-c", cmd], {
     cwd: opts?.cwd ?? getResolvedWorkspaceRoot(),
-    stdout: "pipe",
-    stderr: "pipe",
-    env: getCleanEnv(),
   });
   if (!result.success) {
-    const stderr = result.stderr.toString().trim();
-    throw new Error(stderr || `Command failed: ${cmd}`);
+    throw new Error(result.stderr.trim() || `Command failed: ${cmd}`);
   }
-  return result.stdout.toString().trim();
+  return result.stdout.trim();
 }
 
 /**
@@ -27,18 +24,14 @@ export function exec(cmd: string, opts?: { cwd?: string; maxBuffer?: number }): 
  * need to escape shell metacharacters in arguments. Prefer this over `exec`
  * when any argument originates from user-controlled input.
  */
-export function execArgs(args: string[], opts?: { cwd?: string }): string {
-  const result = Bun.spawnSync(args, {
+export async function execArgs(args: string[], opts?: { cwd?: string }): Promise<string> {
+  const result = await runProcess(args, {
     cwd: opts?.cwd ?? getResolvedWorkspaceRoot(),
-    stdout: "pipe",
-    stderr: "pipe",
-    env: getCleanEnv(),
   });
   if (!result.success) {
-    const stderr = result.stderr.toString().trim();
-    throw new Error(stderr || `Command failed: ${args.join(" ")}`);
+    throw new Error(result.stderr.trim() || `Command failed: ${args.join(" ")}`);
   }
-  return result.stdout.toString().trim();
+  return result.stdout.trim();
 }
 
 export function repoDir(): string {
@@ -56,19 +49,19 @@ export { sanitizeSlug } from "@/lib/naming";
 // Staleness utilities
 // ---------------------------------------------------------------------------
 
-export function listStaleWorkspaces(days: number): StaleWorkspace[] {
-  if (!existsSync(getWorkspaceDir())) return [];
+export async function listStaleWorkspaces(days: number): Promise<StaleWorkspace[]> {
+  if (!(await pathExists(getWorkspaceDir()))) return [];
 
   const threshold = Date.now() - days * 24 * 60 * 60 * 1000;
-  const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
+  const entries = await readdir(getWorkspaceDir(), { withFileTypes: true });
   const stale: StaleWorkspace[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const wsPath = path.join(getWorkspaceDir(), entry.name);
-    const stat = statSync(wsPath);
-    if (stat.mtime.getTime() < threshold) {
-      stale.push({ name: entry.name, lastModified: stat.mtime });
+    const st = await stat(wsPath);
+    if (st.mtime.getTime() < threshold) {
+      stale.push({ name: entry.name, lastModified: st.mtime });
     }
   }
 
@@ -84,9 +77,9 @@ export function listStaleWorkspaces(days: number): StaleWorkspace[] {
  * Used to validate a declared/override base branch before it's handed to
  * `git worktree add`, which fails hard on a missing ref.
  */
-export function remoteBranchExists(repoAbsPath: string, branch: string): boolean {
+export async function remoteBranchExists(repoAbsPath: string, branch: string): Promise<boolean> {
   try {
-    exec(
+    await exec(
       `git -C "${repoAbsPath}" show-ref --verify --quiet "refs/remotes/origin/${branch}"`,
     );
     return true;
@@ -107,26 +100,26 @@ const COMMON_BASE_BRANCHES = ["main", "master", "develop", "development"];
  * decide. Creation still goes through that one; an empty string here only
  * means the caller has nothing to show.
  */
-export function localBaseBranch(repoAbsPath: string): string {
+export async function localBaseBranch(repoAbsPath: string): Promise<string> {
   try {
-    const ref = exec(`git -C "${repoAbsPath}" symbolic-ref refs/remotes/origin/HEAD`);
+    const ref = await exec(`git -C "${repoAbsPath}" symbolic-ref refs/remotes/origin/HEAD`);
     const branch = ref.replace(/^refs\/remotes\/origin\//, "");
     if (branch) return branch;
   } catch { /* fall through to the common names */ }
 
   for (const branch of COMMON_BASE_BRANCHES) {
     try {
-      exec(`git -C "${repoAbsPath}" show-ref --verify --quiet refs/remotes/origin/${branch}`);
+      await exec(`git -C "${repoAbsPath}" show-ref --verify --quiet refs/remotes/origin/${branch}`);
       return branch;
     } catch { /* try the next one */ }
   }
   return "";
 }
 
-export function detectBaseBranch(repoAbsPath: string): string {
+export async function detectBaseBranch(repoAbsPath: string): Promise<string> {
   // 1. symbolic-ref
   try {
-    const ref = exec(
+    const ref = await exec(
       `git -C "${repoAbsPath}" symbolic-ref refs/remotes/origin/HEAD`,
     );
     const branch = ref.replace(/^refs\/remotes\/origin\//, "");
@@ -135,8 +128,8 @@ export function detectBaseBranch(repoAbsPath: string): string {
 
   // 2. set-head --auto
   try {
-    exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
-    const ref = exec(
+    await exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
+    const ref = await exec(
       `git -C "${repoAbsPath}" symbolic-ref refs/remotes/origin/HEAD`,
     );
     const branch = ref.replace(/^refs\/remotes\/origin\//, "");
@@ -146,7 +139,7 @@ export function detectBaseBranch(repoAbsPath: string): string {
   // 3. common branch names
   for (const b of ["main", "master", "develop", "development"]) {
     try {
-      exec(
+      await exec(
         `git -C "${repoAbsPath}" show-ref --verify --quiet refs/remotes/origin/${b}`,
       );
       return b;
@@ -155,28 +148,28 @@ export function detectBaseBranch(repoAbsPath: string): string {
 
   // 4. current branch
   try {
-    const current = exec(`git -C "${repoAbsPath}" rev-parse --abbrev-ref HEAD`);
+    const current = await exec(`git -C "${repoAbsPath}" rev-parse --abbrev-ref HEAD`);
     if (current && current !== "HEAD") return current;
   } catch { /* continue */ }
 
   throw new Error(`Could not determine base branch for ${repoAbsPath}`);
 }
 
-export function listAllWorkspacesWithAge(staleDays: number): WorkspaceAgeInfo[] {
-  if (!existsSync(getWorkspaceDir())) return [];
+export async function listAllWorkspacesWithAge(staleDays: number): Promise<WorkspaceAgeInfo[]> {
+  if (!(await pathExists(getWorkspaceDir()))) return [];
 
   const now = Date.now();
-  const entries = readdirSync(getWorkspaceDir(), { withFileTypes: true });
+  const entries = await readdir(getWorkspaceDir(), { withFileTypes: true });
   const result: WorkspaceAgeInfo[] = [];
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const wsPath = path.join(getWorkspaceDir(), entry.name);
-    const stat = statSync(wsPath);
-    const ageDays = Math.floor((now - stat.mtime.getTime()) / (24 * 60 * 60 * 1000));
+    const st = await stat(wsPath);
+    const ageDays = Math.floor((now - st.mtime.getTime()) / (24 * 60 * 60 * 1000));
     result.push({
       name: entry.name,
-      lastModified: stat.mtime,
+      lastModified: st.mtime,
       ageDays,
       isStale: ageDays >= staleDays,
     });

@@ -42,7 +42,7 @@ export function buildRefreshWorktreesPhase(input: {
       // Read the repos here rather than at build time: this phase runs first,
       // and a workspace whose worktrees changed since the operation was queued
       // should be refreshed as it is now.
-      const allRepos = listWorkspaceRepos(workspace);
+      const allRepos = await listWorkspaceRepos(workspace);
       const repos = repository
         ? allRepos.filter((r) => r.repoPath === repository || r.repoName === repository)
         : allRepos;
@@ -55,7 +55,7 @@ export function buildRefreshWorktreesPhase(input: {
       ctx.emitStatus(
         `Fetching and fast-forwarding ${repos.length} worktree(s) onto their tracked branches...`,
       );
-      const results = refreshWorktrees(
+      const results = await refreshWorktrees(
         repos.map((r) => ({ repoName: r.repoName, worktreePath: r.worktreePath })),
       );
 

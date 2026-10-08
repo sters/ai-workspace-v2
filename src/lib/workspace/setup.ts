@@ -2,7 +2,8 @@
  * Workspace setup — creating workspaces and parsing task analysis results.
  */
 
-import { existsSync, mkdirSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { listOperations } from "../db/operations";
@@ -81,8 +82,8 @@ export async function setupWorkspace(
   // If the directory already exists OR the name is already used in SQLite
   // (e.g. a previous workspace was deleted from disk but DB records remain),
   // append a numeric suffix to avoid inheriting old operation records.
-  const nameInUse = (name: string): boolean => {
-    if (existsSync(path.join(getWorkspaceDir(), name))) return true;
+  const nameInUse = async (name: string): Promise<boolean> => {
+    if (await pathExists(path.join(getWorkspaceDir(), name))) return true;
     try {
       const ops = listOperations(name);
       if (ops.length > 0) return true;
@@ -91,9 +92,9 @@ export async function setupWorkspace(
   };
 
   let wsPath = path.join(getWorkspaceDir(), dirName);
-  if (nameInUse(dirName)) {
+  if (await nameInUse(dirName)) {
     let suffix = 2;
-    while (nameInUse(`${dirName}-${suffix}`)) {
+    while (await nameInUse(`${dirName}-${suffix}`)) {
       suffix++;
     }
     dirName = `${dirName}-${suffix}`;
@@ -101,16 +102,16 @@ export async function setupWorkspace(
   }
 
   // Create directories
-  mkdirSync(wsPath, { recursive: true });
-  mkdirSync(path.join(wsPath, "tmp"), { recursive: true });
-  mkdirSync(path.join(wsPath, "artifacts"), { recursive: true });
+  await mkdir(wsPath, { recursive: true });
+  await mkdir(path.join(wsPath, "tmp"), { recursive: true });
+  await mkdir(path.join(wsPath, "artifacts"), { recursive: true });
   await Bun.write(path.join(wsPath, "artifacts", ".gitkeep"), "");
 
   // Write system prompt files
   await writeSystemPrompts(wsPath);
 
   // Initialize git
-  exec(`git init --quiet "${wsPath}"`);
+  await exec(`git init --quiet "${wsPath}"`);
 
   // Write .gitignore
   await Bun.write(path.join(wsPath, ".gitignore"), GITIGNORE_CONTENT);
@@ -121,8 +122,8 @@ export async function setupWorkspace(
   await Bun.write(path.join(wsPath, "README.md"), readme);
 
   // Initial commit
-  exec(`git -C "${wsPath}" add .gitignore README.md artifacts/`);
-  exec(`git -C "${wsPath}" commit --quiet -m "Initial: ${dirName} workspace created"`);
+  await exec(`git -C "${wsPath}" add .gitignore README.md artifacts/`);
+  await exec(`git -C "${wsPath}" commit --quiet -m "Initial: ${dirName} workspace created"`);
 
   return { workspaceName: dirName, workspacePath: wsPath };
 }

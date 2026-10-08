@@ -1,6 +1,9 @@
 import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
-// Mock config (needed by spawnClaude/spawnClaudeSync)
+// Mock config (needed by spawnClaude/runClaudeCommand)
 vi.mock("@/lib/config", () => ({
   getResolvedWorkspaceRoot: () => "/mock/workspace-root",
   getConfig: () => ({ claude: { path: null } }),
@@ -13,18 +16,15 @@ vi.mock("@/lib/pty", () => ({
 
 const mockWhich = vi.fn();
 const mockSpawn = vi.fn();
-const mockSpawnSync = vi.fn();
 
 // Store originals
 const originalWhich = Bun.which;
 const originalSpawn = Bun.spawn;
-const originalSpawnSync = Bun.spawnSync;
 const originalClaudePath = process.env.AIW_CLAUDE_PATH;
 
 // Override Bun globals before importing the module
 Bun.which = mockWhich as typeof Bun.which;
 Bun.spawn = mockSpawn as typeof Bun.spawn;
-Bun.spawnSync = mockSpawnSync as typeof Bun.spawnSync;
 
 const {
   getCliPath,
@@ -32,7 +32,7 @@ const {
   detectFatalApiError,
   getClaudeEnv,
   spawnClaude,
-  spawnClaudeSync,
+  runClaudeCommand,
   spawnClaudeTerminal,
   runClaude,
 } = await import("@/lib/claude/cli");
@@ -40,7 +40,6 @@ const {
 afterAll(() => {
   Bun.which = originalWhich;
   Bun.spawn = originalSpawn;
-  Bun.spawnSync = originalSpawnSync;
   if (originalClaudePath !== undefined) {
     process.env.AIW_CLAUDE_PATH = originalClaudePath;
   } else {
@@ -54,59 +53,34 @@ afterAll(() => {
 // ---------------------------------------------------------------------------
 
 describe("getCliPath", () => {
+  let tmp: string;
+
   beforeEach(() => {
     _resetCliPath();
     mockWhich.mockReset();
-    mockSpawnSync.mockReset();
     delete process.env.AIW_CLAUDE_PATH;
+    tmp = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "aiw-cli-path-")));
   });
 
-  it("resolves via Bun.which + realpath", () => {
-    mockWhich.mockReturnValue("/usr/local/bin/claude");
-    mockSpawnSync.mockReturnValueOnce({
-      success: true,
-      stdout: Buffer.from("/usr/local/lib/claude/cli.js\n"),
-      stderr: Buffer.from(""),
-    });
+  afterAll(() => {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  });
 
-    expect(getCliPath()).toBe("/usr/local/lib/claude/cli.js");
+  it("resolves the symlink Bun.which returns to the file it points at", () => {
+    const target = path.join(tmp, "cli.js");
+    fs.writeFileSync(target, "");
+    const link = path.join(tmp, "claude");
+    fs.symlinkSync(target, link);
+    mockWhich.mockReturnValue(link);
+
+    expect(getCliPath()).toBe(target);
     expect(mockWhich).toHaveBeenCalledWith("claude");
-    expect(mockSpawnSync).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back to readlink -f when realpath fails", () => {
-    mockWhich.mockReturnValue("/usr/local/bin/claude");
-    mockSpawnSync
-      .mockReturnValueOnce({
-        success: false,
-        stdout: Buffer.from(""),
-        stderr: Buffer.from("realpath failed"),
-      })
-      .mockReturnValueOnce({
-        success: true,
-        stdout: Buffer.from("/usr/local/lib/claude/cli.js\n"),
-        stderr: Buffer.from(""),
-      });
+  it("falls back to the raw bin path when it cannot be resolved", () => {
+    mockWhich.mockReturnValue(path.join(tmp, "missing", "claude"));
 
-    expect(getCliPath()).toBe("/usr/local/lib/claude/cli.js");
-    expect(mockSpawnSync).toHaveBeenCalledTimes(2);
-  });
-
-  it("falls back to raw bin path when both realpath and readlink fail", () => {
-    mockWhich.mockReturnValue("/usr/local/bin/claude");
-    mockSpawnSync
-      .mockReturnValueOnce({
-        success: false,
-        stdout: Buffer.from(""),
-        stderr: Buffer.from("realpath failed"),
-      })
-      .mockReturnValueOnce({
-        success: false,
-        stdout: Buffer.from(""),
-        stderr: Buffer.from("readlink failed"),
-      });
-
-    expect(getCliPath()).toBe("/usr/local/bin/claude");
+    expect(getCliPath()).toBe(path.join(tmp, "missing", "claude"));
   });
 
   it("returns 'claude' when Bun.which returns null", () => {
@@ -120,11 +94,6 @@ describe("getCliPath", () => {
 
   it("caches the result (lazy evaluation)", () => {
     mockWhich.mockReturnValue("/usr/local/bin/claude");
-    mockSpawnSync.mockReturnValueOnce({
-      success: true,
-      stdout: Buffer.from("/usr/local/lib/claude/cli.js\n"),
-      stderr: Buffer.from(""),
-    });
 
     const first = getCliPath();
     const second = getCliPath();
@@ -139,16 +108,10 @@ describe("getCliPath", () => {
     expect(getCliPath()).toBe("/custom/path/to/claude");
     // Should not call Bun.which when CLAUDE_PATH is set
     expect(mockWhich).not.toHaveBeenCalled();
-    expect(mockSpawnSync).not.toHaveBeenCalled();
   });
 
   it("re-resolves after _resetCliPath()", () => {
     mockWhich.mockReturnValue("/usr/local/bin/claude");
-    mockSpawnSync.mockReturnValue({
-      success: true,
-      stdout: Buffer.from("/usr/local/bin/claude\n"),
-      stderr: Buffer.from(""),
-    });
 
     getCliPath();
     _resetCliPath();
@@ -310,45 +273,44 @@ describe("spawnClaude", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spawnClaudeSync
+// runClaudeCommand
 // ---------------------------------------------------------------------------
 
-describe("spawnClaudeSync", () => {
+describe("runClaudeCommand", () => {
   beforeEach(() => {
     _resetCliPath();
     process.env.AIW_CLAUDE_PATH = "/mock/claude";
-    mockSpawnSync.mockReset();
-    mockSpawnSync.mockReturnValue({
-      success: true,
-      stdout: Buffer.from("1.0.0\n"),
-      stderr: Buffer.from(""),
-    });
+    mockSpawn.mockReset();
+    mockSpawn.mockImplementation(() => ({
+      stdout: new Response("1.0.0\n").body,
+      stderr: new Response("").body,
+      exited: Promise.resolve(0),
+      kill: vi.fn(),
+    }));
   });
 
-  it("spawns synchronously with getCliPath() prefixed to args", () => {
-    spawnClaudeSync({ args: ["--version"] });
+  it("runs getCliPath() with the args and resolves with its output", async () => {
+    const result = await runClaudeCommand({ args: ["--version"] });
 
-    expect(mockSpawnSync).toHaveBeenCalledTimes(1);
-    const [cmd, opts] = mockSpawnSync.mock.calls[0];
+    expect(result).toEqual({ exitCode: 0, success: true, stdout: "1.0.0\n", stderr: "" });
+    const [cmd, opts] = mockSpawn.mock.calls[0];
     expect(cmd).toEqual(["/mock/claude", "--version"]);
     expect(opts.cwd).toBe("/mock/workspace-root");
-    expect(opts.stdout).toBe("pipe");
-    expect(opts.stderr).toBe("pipe");
     expect(opts.env.CLAUDECODE).toBeUndefined();
   });
 
-  it("uses provided cwd", () => {
-    spawnClaudeSync({ args: ["mcp", "list"], cwd: "/custom/dir" });
+  it("uses provided cwd", async () => {
+    await runClaudeCommand({ args: ["mcp", "list"], cwd: "/custom/dir" });
 
-    const [, opts] = mockSpawnSync.mock.calls[0];
+    const [, opts] = mockSpawn.mock.calls[0];
     expect(opts.cwd).toBe("/custom/dir");
   });
 
-  it("uses custom env when provided", () => {
+  it("uses custom env when provided", async () => {
     const customEnv = { PATH: "/bin", CLAUDECODE: undefined };
-    spawnClaudeSync({ args: ["--version"], env: customEnv });
+    await runClaudeCommand({ args: ["--version"], env: customEnv });
 
-    const [, opts] = mockSpawnSync.mock.calls[0];
+    const [, opts] = mockSpawn.mock.calls[0];
     expect(opts.env).toBe(customEnv);
   });
 });

@@ -34,7 +34,7 @@ export async function buildCreatePrPipeline(input: {
   const { workspace, draft, repository } = input;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const allRepos = input.repos ?? listWorkspaceRepos(workspace);
+  const allRepos = input.repos ?? await listWorkspaceRepos(workspace);
   const repos = selectRepos(allRepos, { repository, repositories: input.repositories });
 
   const wsPath = path.join(getWorkspaceDir(), workspace);
@@ -45,11 +45,13 @@ export async function buildCreatePrPipeline(input: {
     const metaRepo = meta.repositories.find(
       (r) => r.path === repo.repoPath || r.alias === repo.repoName,
     );
-    const baseBranch = metaRepo?.baseBranch ?? detectBaseBranch(repo.worktreePath);
+    const baseBranch = metaRepo?.baseBranch ?? (await detectBaseBranch(repo.worktreePath));
 
-    const changes = getRepoChanges(workspace, repo.repoPath, baseBranch);
-    const existingPR = checkExistingPR(repo.worktreePath);
-    const prTemplate = readPRTemplate(repo.worktreePath);
+    const [changes, existingPR] = await Promise.all([
+      getRepoChanges(workspace, repo.repoPath, baseBranch),
+      checkExistingPR(repo.worktreePath),
+    ]);
+    const prTemplate = await readPRTemplate(repo.worktreePath);
 
     // Per-repo, and only reached without a task title: a sole commit's subject
     // describes that repo's whole change, but it cannot align the siblings.
@@ -58,7 +60,7 @@ export async function buildCreatePrPipeline(input: {
       ticketId: meta.ticketId,
       soleCommitSubject: taskTitle
         ? null
-        : getSoleCommitSubject(repo.worktreePath, baseBranch),
+        : await getSoleCommitSubject(repo.worktreePath, baseBranch),
     });
 
     // Review threads an earlier PR-review triage turned into TODO items. This is
@@ -94,7 +96,7 @@ export async function buildCreatePrPipeline(input: {
       prompt,
       stepType: STEP_TYPES.CREATE_PR,
       addDirs: [wsPath],
-      appendSystemPromptFile: ensureSystemPrompt(wsPath, "pr-creator"),
+      appendSystemPromptFile: await ensureSystemPrompt(wsPath, "pr-creator"),
     };
   }));
 

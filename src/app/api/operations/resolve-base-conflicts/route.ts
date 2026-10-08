@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const repository = parsed.data.repo?.trim() || undefined;
 
   try {
-    const phases = buildResolveBaseConflictsPipeline({ workspace, repository });
+    const phases = await buildResolveBaseConflictsPipeline({ workspace, repository });
     const operation = startOperationPipeline(
       "resolve-base-conflicts",
       workspace,

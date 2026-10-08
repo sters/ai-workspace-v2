@@ -17,15 +17,14 @@
  * command in it is kept until the key moves.
  */
 
+import { mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import fs from "node:fs";
 import path from "node:path";
 import { getResolvedWorkspaceRoot } from "@/lib/config/resolver";
 import { getWorkspaceConfigDir } from "@/lib/config/workspace-dir";
 import { parseConstraintLines, type RepoConstraint } from "@/lib/parsers/readme";
-import { getCleanEnv } from "../env";
 import { repoDir } from "./helpers";
-import type { GitExec } from "./worktree-refresh";
+import { runGit, type GitExec } from "./git-exec";
 
 export interface RepoConstraintsCacheEntry {
   file: string;
@@ -118,34 +117,16 @@ const SELECTED_PATHS: [string, (content: string) => string][] = [
 
 const KEY_PATTERN = /^<!-- aiw-repo-constraints key=([0-9a-f]+) -->$/m;
 
-function runGit(args: string[], cwd: string): { ok: boolean; out: string } {
+async function realpathOrSelf(p: string): Promise<string> {
   try {
-    const result = Bun.spawnSync(["git", ...args], {
-      cwd,
-      stdout: "pipe",
-      stderr: "pipe",
-      env: getCleanEnv(),
-    });
-    const out = result.success
-      ? result.stdout.toString().trim()
-      : result.stderr.toString().trim();
-    return { ok: result.success, out };
-  } catch (err) {
-    // A cwd that does not exist throws rather than failing.
-    return { ok: false, out: String(err) };
-  }
-}
-
-function realpathOrSelf(p: string): string {
-  try {
-    return fs.realpathSync(p);
+    return await realpath(p);
   } catch {
     return p;
   }
 }
 
-function fingerprint(worktreePath: string, git: GitExec): string | null {
-  const tree = git(
+async function fingerprint(worktreePath: string, git: GitExec): Promise<string | null> {
+  const tree = await git(
     ["ls-tree", "HEAD", "--", ...HASHED_PATHS, ...PRESENCE_PATHS],
     worktreePath,
   );
@@ -158,7 +139,7 @@ function fingerprint(worktreePath: string, git: GitExec): string | null {
     parts.push(PRESENCE_PATHS.has(entryPath) ? `present ${entryPath}` : `${hash} ${entryPath}`);
   }
   for (const [entryPath, select] of SELECTED_PATHS) {
-    const shown = git(["show", `HEAD:${entryPath}`], worktreePath);
+    const shown = await git(["show", `HEAD:${entryPath}`], worktreePath);
     if (shown.ok) parts.push(`${entryPath} ${select(shown.out)}`);
   }
   return createHash("sha256").update(parts.join("\n")).digest("hex");
@@ -169,18 +150,18 @@ function fingerprint(worktreePath: string, git: GitExec): string | null {
  * checkout computes. `null` when the worktree is not a worktree of a clone
  * under `repositories/`, or its HEAD cannot be read.
  */
-export function locateRepoConstraintsCache(
+export async function locateRepoConstraintsCache(
   worktreePath: string,
   git: GitExec = runGit,
-): RepoConstraintsCacheEntry | null {
-  const common = git(["rev-parse", "--path-format=absolute", "--git-common-dir"], worktreePath);
+): Promise<RepoConstraintsCacheEntry | null> {
+  const common = await git(["rev-parse", "--path-format=absolute", "--git-common-dir"], worktreePath);
   if (!common.ok || !common.out) return null;
 
-  const cloneDir = realpathOrSelf(path.dirname(common.out));
-  const rel = path.relative(realpathOrSelf(repoDir()), cloneDir);
+  const cloneDir = await realpathOrSelf(path.dirname(common.out));
+  const rel = path.relative(await realpathOrSelf(repoDir()), cloneDir);
   if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return null;
 
-  const key = fingerprint(worktreePath, git);
+  const key = await fingerprint(worktreePath, git);
   if (!key) return null;
 
   const file = path.join(
@@ -192,10 +173,10 @@ export function locateRepoConstraintsCache(
 }
 
 /** The cached constraints when the entry's key still matches, else `null`. */
-export function readRepoConstraintsCache(entry: RepoConstraintsCacheEntry): RepoConstraint[] | null {
+export async function readRepoConstraintsCache(entry: RepoConstraintsCacheEntry): Promise<RepoConstraint[] | null> {
   let content: string;
   try {
-    content = fs.readFileSync(entry.file, "utf8");
+    content = await readFile(entry.file, "utf8");
   } catch {
     return null;
   }
@@ -209,10 +190,10 @@ function formatConstraintLines(constraints: RepoConstraint[]): string {
 }
 
 /** Write via rename, since two workspaces of one repository may finish discovery together. */
-export function writeRepoConstraintsCache(
+export async function writeRepoConstraintsCache(
   entry: RepoConstraintsCacheEntry,
   constraints: RepoConstraint[],
-): void {
+): Promise<void> {
   const content = [
     `<!-- aiw-repo-constraints key=${entry.key} -->`,
     "<!-- Reused by every new workspace of this repository while the key matches its build files. Edit a command to correct it; delete this file to have the next workspace rediscover them. -->",
@@ -220,15 +201,15 @@ export function writeRepoConstraintsCache(
     formatConstraintLines(constraints),
     "",
   ].join("\n");
-  fs.mkdirSync(path.dirname(entry.file), { recursive: true });
+  await mkdir(path.dirname(entry.file), { recursive: true });
   const tmp = `${entry.file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, content);
-  fs.renameSync(tmp, entry.file);
+  await writeFile(tmp, content);
+  await rename(tmp, entry.file);
 }
 
-export function cachedRepoConstraints(worktreePath: string): RepoConstraint[] | null {
-  const entry = locateRepoConstraintsCache(worktreePath);
-  return entry ? readRepoConstraintsCache(entry) : null;
+export async function cachedRepoConstraints(worktreePath: string): Promise<RepoConstraint[] | null> {
+  const entry = await locateRepoConstraintsCache(worktreePath);
+  return entry ? await readRepoConstraintsCache(entry) : null;
 }
 
 /**

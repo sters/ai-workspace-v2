@@ -1,5 +1,5 @@
 import { collectOutput } from "@/lib/pty";
-import { spawnClaudeSync, spawnClaudeTerminal } from "@/lib/claude/cli";
+import { runClaudeCommand, spawnClaudeTerminal } from "@/lib/claude/cli";
 import type { DataListener, TerminalSubprocess } from "@/types/pty";
 import type { PipelinePhaseFunction } from "@/types/pipeline";
 
@@ -17,12 +17,12 @@ const ARROW_DOWN = "\x1b[B";
  * Run `claude mcp list` and return the 0-indexed position of the given server.
  * Returns -1 if the server is not found.
  */
-function getServerIndex(serverName: string): number {
-  const result = spawnClaudeSync({ args: ["mcp", "list"] });
+async function getServerIndex(serverName: string): Promise<number> {
+  const result = await runClaudeCommand({ args: ["mcp", "list"] });
   if (!result.success) {
-    throw new Error(`claude mcp list failed: ${result.stderr.toString()}`);
+    throw new Error(`claude mcp list failed: ${result.stderr}`);
   }
-  const output = result.stdout.toString();
+  const output = result.stdout;
   const servers: string[] = [];
   for (const line of output.split("\n")) {
     const match = line.match(/^(\S+):\s/);
@@ -45,7 +45,7 @@ export function buildMcpAuthPhase(
       emitStatus(`Looking up server index for "${serverName}"...`);
       let serverIndex: number;
       try {
-        serverIndex = getServerIndex(serverName);
+        serverIndex = await getServerIndex(serverName);
       } catch (err) {
         emitStatus(`Failed to run "claude mcp list": ${err}`);
         return false;

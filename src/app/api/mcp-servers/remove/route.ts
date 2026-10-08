@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { spawnClaudeSync } from "@/lib/claude/cli";
+import { runClaudeCommand } from "@/lib/claude/cli";
 import { mcpRemoveSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 
@@ -17,9 +17,9 @@ export async function POST(request: Request) {
   }
   args.push(name);
 
-  const result = spawnClaudeSync({ args });
-  const stdout = result.stdout.toString().trim();
-  const stderr = result.stderr.toString().trim();
+  const result = await runClaudeCommand({ args });
+  const stdout = result.stdout.trim();
+  const stderr = result.stderr.trim();
 
   if (!result.success) {
     return NextResponse.json(

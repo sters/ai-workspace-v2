@@ -51,7 +51,7 @@ export async function syncReadmeRepositories(
   } catch (err) {
     return {
       metaRepoCount: 0,
-      existingCount: listWorkspaceRepos(workspace).length,
+      existingCount: (await listWorkspaceRepos(workspace)).length,
       setUp: [],
       setUpRepos: [],
       stillMissing: [],
@@ -59,7 +59,7 @@ export async function syncReadmeRepositories(
     };
   }
 
-  const existing = listWorkspaceRepos(workspace);
+  const existing = await listWorkspaceRepos(workspace);
   const existingPaths = new Set(existing.map((r) => r.repoPath));
   const missing = metaRepos.filter((r) => !existingPaths.has(r.path));
 
@@ -80,7 +80,7 @@ export async function syncReadmeRepositories(
     if (signal?.aborted) break;
     emitStatus(`Setting up repository: ${repo.path}`);
     try {
-      setupRepository(
+      await setupRepository(
         workspace,
         denormalizeRepoPath(repo.path),
         repo.baseBranch,
@@ -91,7 +91,7 @@ export async function syncReadmeRepositories(
     }
   }
 
-  const after = listWorkspaceRepos(workspace);
+  const after = await listWorkspaceRepos(workspace);
   const afterPaths = new Set(after.map((r) => r.repoPath));
   const setUp = missing.filter((r) => afterPaths.has(r.path)).map((r) => r.path);
   const setUpPaths = new Set(setUp);

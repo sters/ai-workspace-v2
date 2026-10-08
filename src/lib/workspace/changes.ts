@@ -12,10 +12,11 @@
  * every page load would be the slow part of the page.
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
-import { getCleanEnv } from "../env";
+import { runProcess } from "../process/run";
 import { parseReadmeMeta } from "../parsers/readme";
 import { CHANGES_DIFF_MAX_BYTES } from "../constants";
 import { listWorkspaceRepos } from "./git";
@@ -30,15 +31,11 @@ import type {
 /** An untracked file past this is not read to count its lines. */
 const UNTRACKED_COUNT_MAX_BYTES = 1024 * 1024;
 
-function git(cwd: string, args: string[]): { code: number; out: string } {
-  const result = Bun.spawnSync(["git", "-C", cwd, ...args], {
-    stdout: "pipe",
-    stderr: "pipe",
-    env: getCleanEnv(),
-  });
+async function git(cwd: string, args: string[]): Promise<{ code: number; out: string }> {
+  const result = await runProcess(["git", "-C", cwd, ...args]);
   return {
-    code: result.exitCode ?? 1,
-    out: result.success ? result.stdout.toString() : result.stdout.toString() || result.stderr.toString(),
+    code: result.exitCode,
+    out: result.success ? result.stdout : result.stdout || result.stderr,
   };
 }
 
@@ -94,10 +91,10 @@ function parseNumstat(out: string): Map<string, { additions: number | null; dele
   return counts;
 }
 
-function countUntrackedLines(absPath: string): number | null {
+async function countUntrackedLines(absPath: string): Promise<number | null> {
   try {
-    if (statSync(absPath).size > UNTRACKED_COUNT_MAX_BYTES) return null;
-    const content = readFileSync(absPath);
+    if ((await stat(absPath)).size > UNTRACKED_COUNT_MAX_BYTES) return null;
+    const content = await readFile(absPath);
     if (content.includes(0)) return null;
     const text = content.toString("utf8");
     if (text === "") return 0;
@@ -107,19 +104,31 @@ function countUntrackedLines(absPath: string): number | null {
   }
 }
 
-/** The files a worktree changes against `origin/<baseBranch>`, sorted by path. */
-export function listRepoChanges(
+async function resolveMergeBase(
   worktreePath: string,
   baseBranch: string,
-): { baseSha: string; files: ChangedFile[] } | { error: string } {
-  const mergeBase = git(worktreePath, ["merge-base", `origin/${baseBranch}`, "HEAD"]);
+): Promise<{ baseSha: string } | { error: string }> {
+  const mergeBase = await git(worktreePath, ["merge-base", `origin/${baseBranch}`, "HEAD"]);
   if (mergeBase.code !== 0) {
     return { error: `origin/${baseBranch} could not be compared with HEAD: ${mergeBase.out.trim()}` };
   }
-  const baseSha = mergeBase.out.trim();
+  return { baseSha: mergeBase.out.trim() };
+}
 
-  const nameStatus = git(worktreePath, ["diff", "-z", "-M", "--name-status", baseSha]);
-  const numstat = git(worktreePath, ["diff", "-z", "-M", "--numstat", baseSha]);
+/** The files a worktree changes against `origin/<baseBranch>`, sorted by path. */
+export async function listRepoChanges(
+  worktreePath: string,
+  baseBranch: string,
+): Promise<{ baseSha: string; files: ChangedFile[] } | { error: string }> {
+  const base = await resolveMergeBase(worktreePath, baseBranch);
+  if ("error" in base) return base;
+  const { baseSha } = base;
+
+  const [nameStatus, numstat, untracked] = await Promise.all([
+    git(worktreePath, ["diff", "-z", "-M", "--name-status", baseSha]),
+    git(worktreePath, ["diff", "-z", "-M", "--numstat", baseSha]),
+    git(worktreePath, ["ls-files", "-z", "--others", "--exclude-standard"]),
+  ]);
   if (nameStatus.code !== 0 || numstat.code !== 0) {
     return { error: (nameStatus.code !== 0 ? nameStatus : numstat).out.trim() };
   }
@@ -130,16 +139,14 @@ export function listRepoChanges(
     ...(counts.get(entry.path) ?? { additions: null, deletions: null }),
   }));
 
-  const untracked = git(worktreePath, ["ls-files", "-z", "--others", "--exclude-standard"]);
   if (untracked.code === 0) {
-    for (const filePath of untracked.out.split("\0").filter(Boolean)) {
-      files.push({
-        path: filePath,
-        status: "untracked",
-        additions: countUntrackedLines(path.join(worktreePath, filePath)),
-        deletions: 0,
-      });
-    }
+    const untrackedPaths = untracked.out.split("\0").filter(Boolean);
+    const lineCounts = await Promise.all(
+      untrackedPaths.map((filePath) => countUntrackedLines(path.join(worktreePath, filePath))),
+    );
+    untrackedPaths.forEach((filePath, i) => {
+      files.push({ path: filePath, status: "untracked", additions: lineCounts[i], deletions: 0 });
+    });
   }
 
   files.sort((a, b) => a.path.localeCompare(b.path));
@@ -147,28 +154,51 @@ export function listRepoChanges(
 }
 
 /**
+ * The listing entry for one path, without the line counts the full listing
+ * reads — the diff route asks this once per file the viewer scrolls to.
+ */
+async function findChangedFile(
+  worktreePath: string,
+  baseSha: string,
+  filePath: string,
+): Promise<{ path: string; oldPath?: string; status: ChangedFileStatus } | null> {
+  // Over the whole tree rather than `-- <path>`: a pathspec of the new name
+  // alone hides the old one, and the rename then reads as an addition.
+  const nameStatus = await git(worktreePath, ["diff", "-z", "-M", "--name-status", baseSha]);
+  if (nameStatus.code !== 0) return null;
+  const tracked = parseNameStatus(nameStatus.out).find((entry) => entry.path === filePath);
+  if (tracked) return tracked;
+
+  const untracked = await git(worktreePath, [
+    "ls-files", "-z", "--others", "--exclude-standard", "--", filePath,
+  ]);
+  if (untracked.code !== 0) return null;
+  return untracked.out.split("\0").includes(filePath) ? { path: filePath, status: "untracked" } : null;
+}
+
+/**
  * One changed file's unified diff. `null` for a path that is not one of the
  * listed changes — that lookup is what keeps a caller-supplied path from
  * naming anything else, since an untracked file's diff is read off disk.
  */
-export function readRepoFileDiff(
+export async function readRepoFileDiff(
   worktreePath: string,
   baseBranch: string,
   filePath: string,
-): FileDiff | null {
-  const listing = listRepoChanges(worktreePath, baseBranch);
-  if ("error" in listing) return null;
-  const file = listing.files.find((f) => f.path === filePath);
+): Promise<FileDiff | null> {
+  const base = await resolveMergeBase(worktreePath, baseBranch);
+  if ("error" in base) return null;
+  const file = await findChangedFile(worktreePath, base.baseSha, filePath);
   if (!file) return null;
 
   const result =
     file.status === "untracked"
       ? // Exit 1 is "the files differ", which is always the case against /dev/null.
-        git(worktreePath, ["diff", "--no-index", "--", "/dev/null", file.path])
-      : git(worktreePath, [
+        await git(worktreePath, ["diff", "--no-index", "--", "/dev/null", file.path])
+      : await git(worktreePath, [
           "diff",
           "-M",
-          listing.baseSha,
+          base.baseSha,
           "--",
           ...(file.oldPath ? [file.oldPath] : []),
           file.path,
@@ -186,47 +216,47 @@ export function readRepoFileDiff(
  * README typo (`main` for a `master` repository), and an error in its place
  * would hide the one repository's changes over it.
  */
-function resolveBaseBranch(
+async function resolveBaseBranch(
   declared: { alias: string; path: string; baseBranch: string }[],
   repo: { repoPath: string; repoName: string; worktreePath: string },
-): string {
+): Promise<string> {
   const meta = declared.find((r) => r.path === repo.repoPath || r.alias === repo.repoName);
-  if (meta?.baseBranch && remoteBranchExists(repo.worktreePath, meta.baseBranch)) {
+  if (meta?.baseBranch && (await remoteBranchExists(repo.worktreePath, meta.baseBranch))) {
     return meta.baseBranch;
   }
   return localBaseBranch(repo.worktreePath);
 }
 
-function readDeclaredRepositories(workspaceName: string) {
+async function readDeclaredRepositories(workspaceName: string) {
   const readme = path.join(getWorkspaceDir(), workspaceName, "README.md");
-  if (!existsSync(readme)) return [];
-  return parseReadmeMeta(readFileSync(readme, "utf8")).repositories;
+  if (!(await pathExists(readme))) return [];
+  return parseReadmeMeta(await readFile(readme, "utf8")).repositories;
 }
 
-export function listWorkspaceChanges(workspaceName: string): RepoChangeSet[] {
-  const declared = readDeclaredRepositories(workspaceName);
-  return listWorkspaceRepos(workspaceName).map((repo) => {
-    const baseBranch = resolveBaseBranch(declared, repo);
+export async function listWorkspaceChanges(workspaceName: string): Promise<RepoChangeSet[]> {
+  const declared = await readDeclaredRepositories(workspaceName);
+  return Promise.all((await listWorkspaceRepos(workspaceName)).map(async (repo): Promise<RepoChangeSet> => {
+    const baseBranch = await resolveBaseBranch(declared, repo);
     const base = { repoPath: repo.repoPath, repoName: repo.repoName, baseBranch };
     if (!baseBranch) {
       return { ...base, baseSha: null, files: [], error: "Could not determine the base branch." };
     }
-    const listing = listRepoChanges(repo.worktreePath, baseBranch);
+    const listing = await listRepoChanges(repo.worktreePath, baseBranch);
     return "error" in listing
       ? { ...base, baseSha: null, files: [], error: listing.error }
       : { ...base, baseSha: listing.baseSha, files: listing.files };
-  });
+  }));
 }
 
 /** `null` when `repoPath` is not one of the workspace's worktrees. */
-export function readWorkspaceFileDiff(
+export async function readWorkspaceFileDiff(
   workspaceName: string,
   repoPath: string,
   filePath: string,
-): FileDiff | null {
-  const repo = listWorkspaceRepos(workspaceName).find((r) => r.repoPath === repoPath);
+): Promise<FileDiff | null> {
+  const repo = (await listWorkspaceRepos(workspaceName)).find((r) => r.repoPath === repoPath);
   if (!repo) return null;
-  const baseBranch = resolveBaseBranch(readDeclaredRepositories(workspaceName), repo);
+  const baseBranch = await resolveBaseBranch(await readDeclaredRepositories(workspaceName), repo);
   if (!baseBranch) return null;
   return readRepoFileDiff(repo.worktreePath, baseBranch, filePath);
 }

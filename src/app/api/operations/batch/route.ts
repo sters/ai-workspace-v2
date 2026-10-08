@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       );
     }
     workspace = resolveWorkspaceName(workspace);
-    const repos = listWorkspaceRepos(workspace);
+    const repos = await listWorkspaceRepos(workspace);
     if (repos.length === 0) {
       return NextResponse.json(
         { error: "No repositories found in workspace" },

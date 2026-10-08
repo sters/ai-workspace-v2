@@ -6,7 +6,8 @@
  * "Ensure TODOs" salvage phase when an existing workspace is missing TODO files.
  */
 
-import { existsSync, unlinkSync } from "node:fs";
+import { pathExists } from "@/lib/fs";
+import { unlink } from "node:fs/promises";
 import path from "node:path";
 import { readWorkspaceReadme, parseConstraints } from "@/lib/parsers/readme";
 import { startToolchainPrewarm } from "@/lib/workspace/toolchain-prewarm";
@@ -132,6 +133,7 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
         }
 
         const plannerAgent = meta.taskType === "research" ? "research-planner" : "planner";
+        const plannerPromptFile = await ensureSystemPrompt(wp, plannerAgent);
         const buildPlannerChildren = (todoOutputDir?: string, addDirsOverride?: string[]) =>
           rs.map((repo) => ({
             label: `plan-${repo.repoName}`,
@@ -148,20 +150,20 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
               instruction: input.instruction?.(),
             }),
             addDirs: addDirsOverride ?? [wp],
-            appendSystemPromptFile: ensureSystemPrompt(wp, plannerAgent),
+            appendSystemPromptFile: plannerPromptFile,
           }));
 
-        const cleanup = () => {
+        const cleanup = async () => {
           const templatePath = path.join(wp, "templates", "TODO-template.md");
-          if (existsSync(templatePath)) {
-            unlinkSync(templatePath);
+          if (await pathExists(templatePath)) {
+            await unlink(templatePath);
           }
         };
 
         if (getUseBestOfN() && bestOfN && bestOfN >= 2) {
           const todoFiles = rs.map((r) => path.join(wp, `TODO-${r.repoName}.md`));
           const templatePath = path.join(wp, "templates", "TODO-template.md");
-          const filesToCapture = existsSync(templatePath)
+          const filesToCapture = await pathExists(templatePath)
             ? [...todoFiles, templatePath]
             : todoFiles;
 
@@ -178,7 +180,7 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
             interactionLevel,
           });
 
-          cleanup();
+          await cleanup();
           return result;
         }
 
@@ -189,7 +191,7 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
         ctx.emitStatus(
           `Planning complete: ${results.filter(Boolean).length}/${results.length} succeeded`,
         );
-        cleanup();
+        await cleanup();
         return allSuccess;
       },
     },

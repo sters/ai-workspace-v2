@@ -19,9 +19,9 @@
  * report (no upstream, dirty tree), not exceptions.
  */
 
-import { getCleanEnv } from "../env";
+import { runGit, type GitExec } from "./git-exec";
 
-export type GitExec = (args: string[], cwd: string) => { ok: boolean; out: string };
+export type { GitExec };
 
 export type WorktreeRefreshStatus =
   /** Already at the tracked branch's tip. */
@@ -55,18 +55,6 @@ export interface WorktreeRefreshResult {
 /** Namespace for pre-reset heads. Outside `refs/heads` and `refs/tags`, so it shows up in neither listing. */
 const BACKUP_REF_PREFIX = "refs/aiw-refresh-backup";
 
-function runGit(args: string[], cwd: string): { ok: boolean; out: string } {
-  const result = Bun.spawnSync(["git", ...args], {
-    cwd,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: getCleanEnv(),
-  });
-  const out = result.success
-    ? result.stdout.toString().trim()
-    : result.stderr.toString().trim();
-  return { ok: result.success, out };
-}
 
 function shortSha(sha: string): string {
   return sha.slice(0, 8);
@@ -90,25 +78,25 @@ function shortSha(sha: string): string {
  *   "upstream was rewritten" and "we have local commits" are the same shape
  *   from here: both are commits on HEAD that upstream does not contain.
  */
-export function refreshWorktree(
+export async function refreshWorktree(
   repo: { repoName: string; worktreePath: string },
   git: GitExec = runGit,
-): WorktreeRefreshResult {
+): Promise<WorktreeRefreshResult> {
   const { repoName, worktreePath } = repo;
   const base = { repoName, fromSha: "", toSha: "", upstream: "" };
 
-  const head = git(["rev-parse", "HEAD"], worktreePath);
+  const head = await git(["rev-parse", "HEAD"], worktreePath);
   if (!head.ok || head.out === "") {
     return { ...base, status: "failed", detail: `${repoName}: not a readable git worktree — ${head.out || "no HEAD"}` };
   }
   const fromSha = head.out;
 
-  const fetched = git(["fetch", "--prune", "origin"], worktreePath);
+  const fetched = await git(["fetch", "--prune", "origin"], worktreePath);
   const fetchNote = fetched.ok ? "" : ` (fetch failed: ${fetched.out.split("\n")[0]})`;
 
-  const upstreamRef = git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], worktreePath);
+  const upstreamRef = await git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], worktreePath);
   const upstream = upstreamRef.ok ? upstreamRef.out : "";
-  const target = upstream === "" ? { ok: false, out: "" } : git(["rev-parse", upstream], worktreePath);
+  const target = upstream === "" ? { ok: false, out: "" } : await git(["rev-parse", upstream], worktreePath);
   if (upstream === "" || !target.ok || target.out === "") {
     // Either the branch never tracked a remote, or `--prune` just removed the
     // remote-tracking ref because the branch is gone (a merged or closed PR).
@@ -136,7 +124,7 @@ export function refreshWorktree(
   // Tracked modifications only. An untracked file survives both a fast-forward
   // and a reset, so treating one as dirty would refuse a refresh over a stray
   // log or a local `.env`.
-  const dirty = git(["status", "--porcelain", "--untracked-files=no"], worktreePath);
+  const dirty = await git(["status", "--porcelain", "--untracked-files=no"], worktreePath);
   if (dirty.ok && dirty.out !== "") {
     return {
       ...base,
@@ -150,7 +138,7 @@ export function refreshWorktree(
     };
   }
 
-  const ff = git(["merge", "--ff-only", upstream], worktreePath);
+  const ff = await git(["merge", "--ff-only", upstream], worktreePath);
   if (ff.ok) {
     return {
       ...base,
@@ -167,7 +155,7 @@ export function refreshWorktree(
   // If HEAD *is* an ancestor of upstream, git refused for some other reason —
   // an untracked file in the way, an index lock — and resetting would discard
   // working-tree state to work around a problem it does not fix.
-  const onUpstream = git(["merge-base", "--is-ancestor", fromSha, upstream], worktreePath);
+  const onUpstream = await git(["merge-base", "--is-ancestor", fromSha, upstream], worktreePath);
   if (onUpstream.ok) {
     return {
       ...base,
@@ -182,8 +170,8 @@ export function refreshWorktree(
   }
 
   const backupRef = `${BACKUP_REF_PREFIX}/${fromSha}`;
-  git(["update-ref", backupRef, fromSha], worktreePath);
-  const reset = git(["reset", "--hard", upstream], worktreePath);
+  await git(["update-ref", backupRef, fromSha], worktreePath);
+  const reset = await git(["reset", "--hard", upstream], worktreePath);
   if (!reset.ok) {
     return {
       ...base,
@@ -208,11 +196,11 @@ export function refreshWorktree(
   };
 }
 
-export function refreshWorktrees(
+export async function refreshWorktrees(
   repos: { repoName: string; worktreePath: string }[],
   git: GitExec = runGit,
-): WorktreeRefreshResult[] {
-  return repos.map((repo) => refreshWorktree(repo, git));
+): Promise<WorktreeRefreshResult[]> {
+  return Promise.all(repos.map((repo) => refreshWorktree(repo, git)));
 }
 
 /** Whether a status means the review that follows reads something other than the pushed branch. */

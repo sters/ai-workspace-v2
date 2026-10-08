@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PhaseFunctionContext } from "@/types/pipeline";
 
-const mockMkdirSync = vi.fn();
-const mockCopyFileSync = vi.fn();
-const mockExistsSync = vi.fn(() => false);
-const mockReadFileSync = vi.fn(() => "");
-const mockRmSync = vi.fn();
+const mockMkdir = vi.fn();
+const mockCopyFile = vi.fn();
+const mockPathExists = vi.fn(() => false);
+const mockReadFile = vi.fn(() => "");
+const mockRm = vi.fn();
 
 vi.mock("@/lib/templates", () => ({
   buildBestOfNFileReviewerPrompt: vi.fn(() => "reviewer-prompt"),
@@ -18,20 +18,19 @@ vi.mock("@/lib/workspace/prompts", () => ({
   ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),
 }));
 
-vi.mock("node:fs", () => ({
-  default: {
-    mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
-    copyFileSync: (...args: unknown[]) => mockCopyFileSync(...args),
-    existsSync: (...args: unknown[]) => mockExistsSync(...args),
-    readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
-    rmSync: (...args: unknown[]) => mockRmSync(...args),
-  },
-  mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
-  copyFileSync: (...args: unknown[]) => mockCopyFileSync(...args),
-  existsSync: (...args: unknown[]) => mockExistsSync(...args),
-  readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
-  rmSync: (...args: unknown[]) => mockRmSync(...args),
+vi.mock("@/lib/fs", () => ({
+  pathExists: async (...args: unknown[]) => mockPathExists(...args),
 }));
+
+vi.mock("node:fs/promises", () => {
+  const fs = {
+    mkdir: async (...args: unknown[]) => mockMkdir(...args),
+    copyFile: async (...args: unknown[]) => mockCopyFile(...args),
+    readFile: async (...args: unknown[]) => mockReadFile(...args),
+    rm: async (...args: unknown[]) => mockRm(...args),
+  };
+  return { ...fs, default: fs };
+});
 import { runBestOfNFiles } from "@/lib/pipelines/actions/best-of-n-files";
 
 function makeMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunctionContext {
@@ -286,7 +285,7 @@ describe("runBestOfNFiles", () => {
       buildChildren: () => [{ label: "child", prompt: "prompt" }],
     });
 
-    expect(mockRmSync).toHaveBeenCalled();
+    expect(mockRm).toHaveBeenCalled();
   });
 
   it("cleans up even when execution fails", async () => {
@@ -302,7 +301,7 @@ describe("runBestOfNFiles", () => {
       buildChildren: () => [{ label: "child", prompt: "prompt" }],
     });
 
-    expect(mockRmSync).toHaveBeenCalled();
+    expect(mockRm).toHaveBeenCalled();
   });
 
   it("handles multi-child candidates correctly", async () => {

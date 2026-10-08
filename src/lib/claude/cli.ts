@@ -7,7 +7,9 @@ import type { TerminalSubprocess } from "@/types/pty";
 import { getResolvedWorkspaceRoot, getConfig } from "../config";
 import type { OperationEvent } from "@/types/operation";
 import { spawnTerminal } from "../pty";
+import { realpathSync } from "node:fs";
 import { getCleanEnv } from "../env";
+import { runProcess, type ProcessResult } from "../process/run";
 import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
 
 // ---------------------------------------------------------------------------
@@ -33,22 +35,11 @@ function resolveCliPath(): string {
     return "claude";
   }
 
-  // Try realpath
-  const env = getCleanEnv();
-  const realpathResult = Bun.spawnSync(["realpath", bin], { stdout: "pipe", stderr: "pipe", env });
-  if (realpathResult.success) {
-    const resolved = realpathResult.stdout.toString().trim();
-    if (resolved) return resolved;
+  try {
+    return realpathSync(bin);
+  } catch {
+    return bin;
   }
-
-  // Try readlink -f
-  const readlinkResult = Bun.spawnSync(["readlink", "-f", bin], { stdout: "pipe", stderr: "pipe", env });
-  if (readlinkResult.success) {
-    const resolved = readlinkResult.stdout.toString().trim();
-    if (resolved) return resolved;
-  }
-
-  return bin;
 }
 
 export function getCliPath(): string {
@@ -84,15 +75,10 @@ export function spawnClaude(options: SpawnClaudeOptions) {
   });
 }
 
-/** Spawn Claude CLI synchronously via Bun.spawnSync. */
-export function spawnClaudeSync(options: Omit<SpawnClaudeOptions, "stdin">) {
+/** Run a short Claude CLI command (`--version`, `mcp list`, …) to completion. */
+export function runClaudeCommand(options: Omit<SpawnClaudeOptions, "stdin">): Promise<ProcessResult> {
   const { args, cwd = getResolvedWorkspaceRoot(), env } = options;
-  return Bun.spawnSync([getCliPath(), ...args], {
-    cwd,
-    stdout: "pipe",
-    stderr: "pipe",
-    env: env ?? getClaudeEnv(),
-  });
+  return runProcess([getCliPath(), ...args], { cwd, env: env ?? getClaudeEnv() });
 }
 
 /** Spawn Claude CLI in interactive PTY mode via spawnTerminal. */
