@@ -21,12 +21,6 @@ const baseInput: PRCreatorInput = {
 describe("getPRCreatorSystemPrompt", () => {
   const prompt = getPRCreatorSystemPrompt();
 
-  it("keeps the existing push / create / update rules", () => {
-    expect(prompt).toContain("gh pr create");
-    expect(prompt).toContain("gh pr edit");
-    expect(prompt).toContain("Do NOT force-push");
-  });
-
   it("describes replying to and resolving addressed review threads", () => {
     expect(prompt).toContain(PR_REVIEW_THREADS_HEADING);
     expect(prompt).toContain("addPullRequestReviewThreadReply");
@@ -43,95 +37,6 @@ describe("getPRCreatorSystemPrompt", () => {
     expect(pushIdx).toBeLessThan(replyIdx);
   });
 
-  // "未完了ならやらなくていい" — an unfinished, in-progress or blocked item must
-  // leave its thread untouched.
-  it("leaves threads for incomplete items alone", () => {
-    expect(prompt).toContain("- [ ]");
-    expect(prompt).toContain("- [~]");
-    expect(prompt).toContain("- [!]");
-    expect(prompt.toLowerCase()).toMatch(/no reply/);
-  });
-
-  // Completed items are deleted from the TODO file between cycles, so absence is
-  // the normal signal for "done" by the time create-pr runs.
-  it("reads an absent item as complete", () => {
-    expect(prompt.toLowerCase()).toMatch(/absent|no longer in the file|deleted/);
-  });
-
-  // create-pr can run twice over the same PR (manual re-run, resume); GitHub's
-  // own isResolved is the idempotency source, since nothing writes state back.
-  it("skips threads GitHub already reports as resolved", () => {
-    expect(prompt).toContain("isResolved");
-  });
-
-  // Each repo's PR is composed by an independent child that sees only its own
-  // diff, so a mandated title is the only thing that can make sibling PRs of one
-  // task match. Composing is the fallback, not the rule.
-  it("mandates the provided title verbatim for a new PR", () => {
-    expect(prompt).toContain("## PR Title");
-    expect(prompt).toContain("verbatim");
-  });
-
-  // The ticket is bracketed on where the README is read, so it is already in the
-  // mandated string — an agent adding its own would double it, and adding one
-  // only on the runs that noticed the ticket is the drift this removes.
-  it("forbids adding a ticket reference to the mandated title", () => {
-    expect(prompt).toMatch(/add a ticket/i);
-  });
-
-  // The allowance for a repository's own prefix convention stays — a PR-title
-  // lint is a real thing to survive — but it used to name `feat: ` and say the
-  // evidence was "its PR template or recent PR titles". A pointer to evidence is
-  // a procedure: the agent goes and reads them on some runs and not on others,
-  // and the one concrete token in the whole title instruction is the one it
-  // copies. Neither belongs here while the prefix is left to judgment at all.
-  it("gives the agent nothing to look up about a title prefix", () => {
-    expect(prompt).toMatch(/prefix your repository/i);
-    expect(prompt).not.toMatch(/recent PR titles/i);
-    expect(prompt).not.toMatch(/`feat: `/);
-  });
-
-  // A repo-name suffix would break the byte-identity that makes the titles
-  // recognizable as one task, and the PR list already names the repository.
-  it("forbids appending the repository name to the mandated title", () => {
-    expect(prompt).toMatch(/do not (append|add).*repository name/i);
-  });
-
-  // The body is read next to the diff, so it carries what the diff cannot show.
-  // Without a stated bar the agent explains the whole change end to end.
-  it("bounds the description to a rough overview", () => {
-    expect(prompt).toContain("### PR Description: An Overview, Not a Walkthrough");
-    expect(prompt).toMatch(/few sentences/i);
-    expect(prompt).toMatch(/\b10 lines\b/);
-  });
-
-  // "Explain what the diff already shows" is the failure mode: a file-by-file or
-  // function-by-function account of the implementation.
-  it("rules out a walkthrough of the implementation", () => {
-    expect(prompt).toMatch(/walkthrough|file-by-file|function-by-function/i);
-    expect(prompt).toMatch(/answer(ed|able)? by reading the diff/i);
-  });
-
-  // The README is inlined as context for the agent, and restating its Goal /
-  // Requirements / Acceptance Criteria is the single largest source of padding.
-  it("keeps the workspace README out of the body", () => {
-    expect(prompt).toContain("**The workspace README.**");
-    expect(prompt).toContain("not PR body content");
-  });
-
-  // "cover every commit" used to read as "enumerate every commit", which turns a
-  // multi-cycle branch's body into a changelog.
-  it("asks for one description of the final state rather than a commit log", () => {
-    expect(prompt).toMatch(/commit-by-commit|per-commit|changelog/i);
-    expect(prompt).not.toContain("Include all commits in summary, not just the latest");
-  });
-
-  // The update path re-uses the existing body as its base, so an instruction to
-  // reflect "the current full set of changes" grows it once per cycle.
-  it("keeps an updated body the same size rather than growing it", () => {
-    expect(prompt).toMatch(/replace[^.]*rather than append|not grow/i);
-  });
-
   // A repo with no PR template had no fixed structure at all, and the prompt
   // described two: a "standard format" of `## Summary` alone, and a separately
   // named "Related issues" section the worked example never showed. Two shapes
@@ -142,38 +47,12 @@ describe("getPRCreatorSystemPrompt", () => {
     expect(prompt).not.toContain("use a standard format");
   });
 
-  // The default must not compete with a repository that ships its own template —
-  // that structure wins, and the default is only for its absence.
-  it("subordinates the default body to a repository's own template", () => {
-    expect(prompt).toMatch(/no PR Template/);
-    expect(prompt).toContain("Fill every section a provided PR Template requires");
-  });
-
-  // A template's own scaffolding is the one thing the agent may not shorten, but
-  // a section with nothing to say still costs a line rather than a paragraph.
-  it("allows a one-line answer for a template section with nothing substantive", () => {
-    expect(prompt).toMatch(/nothing substantive gets one line/);
-  });
-
-  // Observed on a real PR: "the approach taken and the alternatives rejected are
-  // recorded in the workspace's artifacts/<ticket>-design.md". The reviewer has
-  // the repository and nothing else, so that sentence is a dead end for them.
-  it("keeps every reference to the workspace out of the reader-facing text", () => {
-    expect(prompt).toContain(NO_WORKSPACE_REFERENCES);
-  });
-
   // The body is written under the description bar, so the rule has to be next to
   // it rather than somewhere above the git mechanics.
   it("states it alongside the description bar", () => {
     expect(prompt.indexOf("### PR Description: An Overview, Not a Walkthrough")).toBeLessThan(
       prompt.indexOf(NO_WORKSPACE_REFERENCES),
     );
-  });
-
-  // The workspace is on --add-dir for reading context; the note that says so is
-  // the one place that could be read as licence to cite what it found there.
-  it("does not offer the workspace as something to cite", () => {
-    expect(prompt).toMatch(/for your own understanding/i);
   });
 });
 

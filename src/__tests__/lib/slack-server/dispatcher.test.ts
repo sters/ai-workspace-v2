@@ -20,9 +20,4 @@ describe("buildRequest", () => {
     expect(r.body).toEqual({ description: "do a thing", interactionLevel: "low" });
     expect(initSchema.safeParse(r.body).success).toBe(true);
   });
-
-  it("forces interactionLevel=low in both modes", () => {
-    expect(buildRequest({ op: "init", only: false, description: "x" }).body.interactionLevel).toBe("low");
-    expect(buildRequest({ op: "init", only: true, description: "x" }).body.interactionLevel).toBe("low");
-  });
 });

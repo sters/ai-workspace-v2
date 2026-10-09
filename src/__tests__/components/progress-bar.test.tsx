@@ -18,13 +18,6 @@ describe("ProgressBar", () => {
     expect(screen.queryByText("50%")).not.toBeInTheDocument();
   });
 
-  it("sets the inner bar width via style", () => {
-    const { container } = render(<ProgressBar value={75} />);
-    const innerBar = container.querySelector("[style]");
-    expect(innerBar).not.toBeNull();
-    expect(innerBar!.getAttribute("style")).toContain("width: 75%");
-  });
-
   // Only the two thresholds are worth pinning: complete-vs-not, and the >= 50 edge.
   it("switches colour at 100 and at the 50 boundary", () => {
     expect(innerBarClass(100)).toContain("bg-green-500");

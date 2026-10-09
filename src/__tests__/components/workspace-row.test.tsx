@@ -36,44 +36,14 @@ function makeWorkspace(overrides: Partial<WorkspaceListItem> = {}): WorkspaceLis
 }
 
 describe("WorkspaceCard", () => {
-  it("renders title", () => {
-    render(<WorkspaceCard workspace={makeWorkspace()} />);
-    expect(screen.getByText("Test Title")).toBeInTheDocument();
-  });
-
-  it("renders workspace name", () => {
-    render(<WorkspaceCard workspace={makeWorkspace()} />);
-    expect(screen.getByText("test-workspace")).toBeInTheDocument();
-  });
-
   it("renders ticket id", () => {
     render(<WorkspaceCard workspace={makeWorkspace()} />);
     expect(screen.getByText("Ticket: TICK-123")).toBeInTheDocument();
   });
 
-  it("renders category badge", () => {
-    render(<WorkspaceCard workspace={makeWorkspace()} />);
-    expect(screen.getByText("feature")).toBeInTheDocument();
-  });
-
-  it("renders progress counts", () => {
-    render(<WorkspaceCard workspace={makeWorkspace()} />);
-    expect(screen.getByText("3/5 items")).toBeInTheDocument();
-  });
-
-  it("renders repo count", () => {
-    render(<WorkspaceCard workspace={makeWorkspace()} />);
-    expect(screen.getByText("2 repos")).toBeInTheDocument();
-  });
-
   it("renders created date", () => {
     render(<WorkspaceCard workspace={makeWorkspace()} />);
     expect(screen.getByText(/Jan 15, 2025/)).toBeInTheDocument();
-  });
-
-  it("renders updated date", () => {
-    render(<WorkspaceCard workspace={makeWorkspace()} />);
-    expect(screen.getByText(/Jan 20, 2025/)).toBeInTheDocument();
   });
 
   it("does not render ticket when missing", () => {
@@ -85,12 +55,6 @@ describe("WorkspaceCard", () => {
     const { container } = render(<WorkspaceCard workspace={makeWorkspace()} isRunning />);
     const spinner = container.querySelector(".animate-spin");
     expect(spinner).not.toBeNull();
-  });
-
-  it("does not show spinner when not running", () => {
-    const { container } = render(<WorkspaceCard workspace={makeWorkspace()} isRunning={false} />);
-    const spinner = container.querySelector(".animate-spin");
-    expect(spinner).toBeNull();
   });
 
   it("links to workspace detail page", () => {

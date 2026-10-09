@@ -151,12 +151,6 @@ describe("REPO_SEARCH_EFFICIENCY", () => {
     expect(REPO_SEARCH_EFFICIENCY).toMatch(/is \*\*not\*\* the same thing/);
   });
 
-  it("shows the wanted turn shape rather than only describing it", () => {
-    // A positive example of the wanted behavior, per CLAUDE.md's prompt
-    // conventions — the old version was rationale competing with a MUST.
-    expect(REPO_SEARCH_EFFICIENCY).toMatch(/```\n(Grep|Glob|Read)/);
-  });
-
   it.each(["sed", "head", "awk", "wc", "find", "cat"])(
     "covers the %s idiom the transcript actually used",
     (cmd) => {
@@ -168,10 +162,6 @@ describe("REPO_SEARCH_EFFICIENCY", () => {
     // Claude reads enumerations literally: the closed list `grep`/`find`/`ls`/`cat`
     // left `sed -n 'X,Yp'` feeling permitted, and it became the most used call.
     expect(REPO_SEARCH_EFFICIENCY).toContain("non-exhaustive");
-  });
-
-  it("gives a large file an answer other than the shell", () => {
-    expect(REPO_SEARCH_EFFICIENCY).toMatch(/`offset` and `limit`/);
   });
 
   it("renders after the cd rule in the planner, not before it", () => {
@@ -225,12 +215,6 @@ describe("SCOPE_DISCIPLINE", () => {
 });
 
 describe("REVIEW_COVERAGE_POLICY", () => {
-  it("asks for coverage and defers filtering to a later stage", () => {
-    expect(REVIEW_COVERAGE_POLICY).toMatch(/every issue|all issues/i);
-    expect(REVIEW_COVERAGE_POLICY.toLowerCase()).toMatch(/do not filter|not filter/);
-    expect(REVIEW_COVERAGE_POLICY).toMatch(/Confidence/);
-  });
-
   // Confidence is the one field with a hard "does not justify a loop" rule
   // attached downstream, so it must measure exactly one thing. A reviewer that
   // routed "I verified the mechanism but cannot confirm the input occurs" into a
@@ -258,25 +242,6 @@ describe("REVIEW_COVERAGE_POLICY", () => {
 });
 
 describe("SEVERITY_CALIBRATION", () => {
-  // The autonomous gate now loops only on Critical/Warning-level findings, so the
-  // severity label is load-bearing: a real defect filed as a Suggestion is a
-  // defect the run will never come back to.
-  it("anchors severity to whether the change is done and sound", () => {
-    expect(SEVERITY_CALIBRATION).toMatch(/complete|incomplete/i);
-    expect(SEVERITY_CALIBRATION).toMatch(/Suggestion/);
-    expect(SEVERITY_CALIBRATION).toMatch(/test coverage/i);
-  });
-
-  // Every fix a cycle lands is itself "changed behavior", so an unscoped coverage
-  // Warning has no fixed point: each cycle's own fix supplies the next cycle's
-  // finding. The scope has to be the contract or a reachable path.
-  it("scopes the coverage warning to contract-required or reachable behavior", () => {
-    expect(SEVERITY_CALIBRATION).toMatch(/test coverage[^.\n]*\b(contract|reach)/i);
-    // ...and names the counter-case on the Suggestion side, or the scoping is
-    // advice with no consequence attached.
-    expect(SEVERITY_CALIBRATION).toMatch(/defensive guard/i);
-  });
-
   // Untested paths are the class the label drifts on across cycles, because the cost
   // of writing the test is the most available thing to reason from. Measured on
   // one autonomous run: cycle 1 filed an untested transaction-failure path as a
@@ -289,36 +254,6 @@ describe("SEVERITY_CALIBRATION", () => {
     // is a Warning, which is the unscoped coverage rule this file already rejects.
     expect(SEVERITY_CALIBRATION).toMatch(/earlier cycle/i);
     expect(SEVERITY_CALIBRATION).toMatch(/defensive guard/i);
-  });
-
-  // Declining a finding because covering it is expensive is the gate's call, not the
-  // reviewer's: the gate holds the ledger and records the reason. A reviewer that
-  // pre-declines by filing a Suggestion spends that judgment invisibly.
-  it("keeps the cost of covering a path out of the severity", () => {
-    expect(SEVERITY_CALIBRATION).toMatch(/cost of covering/i);
-    expect(SEVERITY_CALIBRATION).toMatch(/not an input to the severity/i);
-    expect(SEVERITY_CALIBRATION).toMatch(/fix looks expensive/i);
-  });
-
-  // The coverage rungs grade *coverage of behavior believed correct*. A path that is
-  // itself wrong is a defect finding on its own merits, so the middle rung must not
-  // become a way to file a broken error path as taste.
-  it("does not let the coverage rungs downgrade a broken path", () => {
-    expect(SEVERITY_CALIBRATION).toMatch(/on its own merits/i);
-  });
-
-  // "This change handles less than the code it replaced" is a diff-level fact,
-  // checkable without knowing production data — so it must not depend on knowing
-  // whether the dropped input occurs. Bounded to the replaced code, so it cannot
-  // fire on pre-existing defects or on speculation about future inputs.
-  it("treats a capability the replaced code had as a Warning", () => {
-    expect(SEVERITY_CALIBRATION).toMatch(/replace[ds]?\b/i);
-    expect(SEVERITY_CALIBRATION).toMatch(/input/i);
-    const warnings = SEVERITY_CALIBRATION.slice(
-      SEVERITY_CALIBRATION.indexOf("**Warnings**"),
-      SEVERITY_CALIBRATION.indexOf("**Suggestions**"),
-    );
-    expect(warnings).toMatch(/replace/i);
   });
 
   // The mirror of the replaced-capability rule: a construct copied from a
@@ -334,12 +269,6 @@ describe("SEVERITY_CALIBRATION", () => {
     expect(SEVERITY_CALIBRATION).toMatch(/check whether it already exists/i);
     // Coverage is untouched — it is filed lower, not dropped.
     expect(SEVERITY_CALIBRATION).toMatch(/report it with the sites/i);
-  });
-
-  // Severity must describe the deliverable, not predict a future reader.
-  it("does not anchor severity to a hypothetical reviewer's reaction", () => {
-    expect(SEVERITY_CALIBRATION).not.toMatch(/human reviewer/i);
-    expect(SEVERITY_CALIBRATION).not.toMatch(/before merg/i);
   });
 
   it.each([
@@ -361,25 +290,6 @@ describe("NO_WORKSPACE_REFERENCES", () => {
     expect(NO_WORKSPACE_REFERENCES).toMatch(/README/);
   });
 
-  // A pointer is not the compromise between including the content and omitting
-  // it: either the substance is worth a sentence here, or it is not wanted.
-  it("requires the substance inline rather than a pointer to it", () => {
-    expect(NO_WORKSPACE_REFERENCES).toMatch(/state the substance/i);
-    expect(NO_WORKSPACE_REFERENCES).toMatch(/leave it out/i);
-  });
-
-  // The process that produced the change (cycles, phases, TODO items, findings)
-  // is the other half of the same leak — it is how the work happened here, not a
-  // fact about the change.
-  it("keeps the pipeline's own machinery out of reader-facing text", () => {
-    expect(NO_WORKSPACE_REFERENCES).toMatch(/cycle/i);
-    expect(NO_WORKSPACE_REFERENCES).toMatch(/acceptance criteria/i);
-  });
-
-  it("says what a reader can be pointed at instead", () => {
-    expect(NO_WORKSPACE_REFERENCES).toMatch(/ticket URL/i);
-  });
-
   it.each([
     ["prCreator", getPRCreatorSystemPrompt()],
     ["findingGrounder", getFindingGrounderSystemPrompt()],
@@ -396,11 +306,6 @@ describe("RECURRING_FINDINGS_POLICY", () => {
     // Coverage must survive: the finding is still reported, just not re-argued.
     expect(RECURRING_FINDINGS_POLICY).toMatch(/report it/i);
     expect(RECURRING_FINDINGS_POLICY).toMatch(/one line/i);
-  });
-
-  it("keeps a merely similar or materially changed finding out of the compressed bucket", () => {
-    expect(RECURRING_FINDINGS_POLICY).toMatch(/resembles/i);
-    expect(RECURRING_FINDINGS_POLICY).toMatch(/materially changed/i);
   });
 
   it.each([

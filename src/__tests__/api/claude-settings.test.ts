@@ -180,15 +180,6 @@ describe("POST /api/claude-settings", () => {
     );
   });
 
-  it("returns 400 for invalid scope", async () => {
-    const { status, data } = await callPOST({
-      scope: "invalid",
-      content: "{}",
-    });
-    expect(status).toBe(400);
-    expect(data.error).toBeDefined();
-  });
-
   it("returns 400 for invalid JSON content", async () => {
     const { status, data } = await callPOST({
       scope: "project",

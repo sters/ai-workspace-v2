@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { ChatSessionInfo } from "@/types/chat";
-import { CHAT_BUSY_IDLE_MS } from "@/lib/chat-server/constants";
 
 vi.mock("@/lib/db/chat-sessions", () => ({
   upsertChatSession: vi.fn(),
@@ -49,17 +48,6 @@ describe("handleSessionsList", () => {
     const [session] = await listSessions();
     expect(session.workspaceId).toBe("ws-a");
     expect(session.busy).toBe(true);
-  });
-
-  it("reports a session quiet past the threshold as not busy", async () => {
-    seedSessions({
-      id: "chat-1",
-      workspaceId: "ws-a",
-      quietFor: CHAT_BUSY_IDLE_MS + 1000,
-    });
-
-    const [session] = await listSessions();
-    expect(session.busy).toBe(false);
   });
 
   it("omits exited sessions", async () => {

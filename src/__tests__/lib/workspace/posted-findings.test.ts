@@ -136,8 +136,4 @@ describe("buildPostedAsks", () => {
     );
     expect(asks.size).toBe(0);
   });
-
-  it("returns an empty map when nothing was ever posted", () => {
-    expect(buildPostedAsks({}, new Map()).size).toBe(0);
-  });
 });

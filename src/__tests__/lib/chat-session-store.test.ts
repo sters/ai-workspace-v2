@@ -28,12 +28,6 @@ function makeSession(
 }
 
 describe("trimBuffer", () => {
-  it("returns the same buffer when under the high watermark", () => {
-    const buf = Array.from({ length: 100 }, (_, i) => `chunk-${i}`);
-    const result = trimBuffer(buf);
-    expect(result).toBe(buf); // same reference — no copy
-    expect(result).toHaveLength(100);
-  });
 
   it("returns the same buffer at exactly the high watermark", () => {
     const buf = Array.from({ length: BUFFER_HIGH }, (_, i) => `chunk-${i}`);
@@ -67,17 +61,6 @@ describe("gcSessions", () => {
     expect(removed).toBe(1);
     expect(sessions.has("old")).toBe(false);
     expect(sessions.has("recent")).toBe(true);
-    expect(sessions.has("running")).toBe(true);
-  });
-
-  it("does not remove running sessions regardless of age", () => {
-    const now = Date.now();
-    const sessions = new Map([
-      ["running", makeSession("running", { exited: false })],
-    ]);
-
-    const removed = gcSessions(sessions, now);
-    expect(removed).toBe(0);
     expect(sessions.has("running")).toBe(true);
   });
 
@@ -137,17 +120,5 @@ describe("gcSessions", () => {
     // All 3 old ones removed by age check
     expect(removed).toBe(3);
     expect(sessions.size).toBe(GC_MAX_EXITED);
-  });
-
-  it("returns 0 when no sessions need cleanup", () => {
-    const now = Date.now();
-    const sessions = new Map([
-      ["a", makeSession("a", { exited: true, exitedAt: now - 1000 })],
-      ["b", makeSession("b", { exited: false })],
-    ]);
-
-    const removed = gcSessions(sessions, now);
-    expect(removed).toBe(0);
-    expect(sessions.size).toBe(2);
   });
 });

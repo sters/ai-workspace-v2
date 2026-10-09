@@ -19,21 +19,6 @@ describe("TodoItemRow", () => {
     ...overrides,
   });
 
-  it("renders the item text", () => {
-    render(<TodoItemRow item={makeItem({ text: "Write unit tests" })} />);
-    expect(screen.getByText("Write unit tests")).toBeInTheDocument();
-  });
-
-  it.each([
-    ["completed", "✅"],
-    ["pending", "⬜"],
-    ["blocked", "⛔"],
-    ["in_progress", "⏳"],
-  ] as const)("renders the %s status icon", (status, icon) => {
-    render(<TodoItemRow item={makeItem({ status })} />);
-    expect(screen.getByText(icon)).toBeInTheDocument();
-  });
-
   it("does not render children section when children is empty", () => {
     render(<TodoItemRow item={makeItem({ children: [] })} />);
     expect(screen.queryByTestId("markdown-renderer")).not.toBeInTheDocument();

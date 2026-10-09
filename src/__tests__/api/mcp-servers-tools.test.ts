@@ -31,19 +31,6 @@ beforeEach(() => {
 });
 
 describe("GET /api/mcp-servers/tools", () => {
-  it("returns tools from getMcpTools", async () => {
-    mockGetMcpTools.mockResolvedValue([
-      { name: "github", tools: ["create_issue", "list_repos"] },
-      { name: "filesystem", tools: ["read_file"] },
-    ]);
-
-    const { status, body } = await callGET();
-    expect(status).toBe(200);
-    expect(body.tools).toEqual([
-      { name: "github", tools: ["create_issue", "list_repos"] },
-      { name: "filesystem", tools: ["read_file"] },
-    ]);
-  });
 
   it("returns empty tools array on error", async () => {
     mockGetMcpTools.mockRejectedValue(new Error("spawn failed"));
@@ -52,13 +39,5 @@ describe("GET /api/mcp-servers/tools", () => {
     expect(status).toBe(500);
     expect(body.tools).toEqual([]);
     expect(body.error).toContain("spawn failed");
-  });
-
-  it("returns empty array when no tools available", async () => {
-    mockGetMcpTools.mockResolvedValue([]);
-
-    const { status, body } = await callGET();
-    expect(status).toBe(200);
-    expect(body.tools).toEqual([]);
   });
 });

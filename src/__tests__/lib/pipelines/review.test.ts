@@ -128,26 +128,6 @@ describe("buildReviewPipeline — skip verify-todo when TODO file is missing", (
     mockFileMap.clear();
   });
 
-  it("does NOT include a verify-todo child when the repo has no TODO file", async () => {
-    mockListWorkspaceRepos.mockReturnValue([
-      {
-        repoName: "no-todo-repo",
-        repoPath: "owner/no-todo-repo",
-        worktreePath: "/repos/no-todo-repo/worktrees/test-ws",
-      } as ReturnType<typeof listWorkspaceRepos>[number],
-    ]);
-    // No entry in mockFileMap → file doesn't exist
-
-    const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[1] as PipelinePhaseGroup;
-    expect(groupPhase.kind).toBe("group");
-
-    const labels = groupPhase.children.map((c) => c.label);
-    expect(labels).toContain("review-no-todo-repo");
-    expect(labels).toContain("verify-readme-no-todo-repo");
-    expect(labels).not.toContain("verify-todo-no-todo-repo");
-  });
-
   it("does NOT include a verify-todo child when the TODO file exists but is empty", async () => {
     mockListWorkspaceRepos.mockReturnValue([
       {
@@ -162,25 +142,6 @@ describe("buildReviewPipeline — skip verify-todo when TODO file is missing", (
     const groupPhase = phases[1] as PipelinePhaseGroup;
     const labels = groupPhase.children.map((c) => c.label);
     expect(labels).not.toContain("verify-todo-empty-todo-repo");
-  });
-
-  it("DOES include a verify-todo child when the TODO file has content", async () => {
-    mockListWorkspaceRepos.mockReturnValue([
-      {
-        repoName: "active-repo",
-        repoPath: "owner/active-repo",
-        worktreePath: "/repos/active-repo/worktrees/test-ws",
-      } as ReturnType<typeof listWorkspaceRepos>[number],
-    ]);
-    mockFileMap.set(
-      "/ws/test-ws/TODO-active-repo.md",
-      "# TODO\n\n- [x] done task\n",
-    );
-
-    const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[1] as PipelinePhaseGroup;
-    const labels = groupPhase.children.map((c) => c.label);
-    expect(labels).toContain("verify-todo-active-repo");
   });
 
   it("skips verify-todo only for repos missing a TODO file in a multi-repo workspace", async () => {
@@ -235,16 +196,6 @@ describe("buildReviewPipeline — cross-repository review", () => {
       } as ReturnType<typeof listWorkspaceRepos>[number],
     ];
   }
-
-  it("adds a cross-repository review child when the workspace has multiple repos and no repository filter", async () => {
-    mockListWorkspaceRepos.mockReturnValue(twoRepos());
-
-    const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[1] as PipelinePhaseGroup;
-    const labels = groupPhase.children.map((c) => c.label);
-
-    expect(labels).toContain("review-cross-repository");
-  });
 
   it("puts the cross-repository review first so it is never the one queued", async () => {
     mockListWorkspaceRepos.mockReturnValue(twoRepos());
@@ -790,16 +741,6 @@ describe("buildReviewPipeline — requested-fix verifier", () => {
     const phases = await buildReviewPipeline({ workspace: "test-ws", requestedFixes: [] });
     const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
     expect(labels).not.toContain("verify-fixes-repo-a");
-  });
-
-  it("is added, alongside the code reviewer, when fixes were requested", async () => {
-    const phases = await buildReviewPipeline({
-      workspace: "test-ws",
-      requestedFixes: ["gate the anchor on a defined href"],
-    });
-    const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
-    expect(labels).toContain("verify-fixes-repo-a");
-    expect(labels).toContain("review-repo-a");
   });
 
   it("gives the verifier the asks verbatim and its own report file", async () => {

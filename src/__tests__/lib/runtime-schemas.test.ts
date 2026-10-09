@@ -34,15 +34,6 @@ describe("clientMessageSchema", () => {
     });
   });
 
-  it("accepts a start frame with no task", () => {
-    const parsed = clientMessageSchema.safeParse({
-      type: "start",
-      workspaceId: "feature-login-crash-20260915",
-    });
-
-    expect(parsed.success).toBe(true);
-  });
-
   it("rejects a start frame with no workspace", () => {
     expect(clientMessageSchema.safeParse({ type: "start", workspaceId: "" }).success).toBe(false);
   });

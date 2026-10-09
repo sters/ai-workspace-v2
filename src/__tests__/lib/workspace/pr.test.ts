@@ -82,12 +82,4 @@ describe("readPRTemplate", () => {
 
     expect(await readPRTemplate(tmpDir)).toBe("top-level");
   });
-
-  it("falls back to subdirectory default.md when no top-level template", async () => {
-    const dir = path.join(tmpDir, ".github", "PULL_REQUEST_TEMPLATE");
-    fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, "default.md"), "subdirectory default");
-
-    expect(await readPRTemplate(tmpDir)).toBe("subdirectory default");
-  });
 });

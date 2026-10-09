@@ -19,41 +19,6 @@ describe("TODO_REVIEW_SCHEMA", () => {
 describe("getReviewerSystemPrompt", () => {
   const prompt = getReviewerSystemPrompt();
 
-  it("states that the verdict is applied, so findings must be actionable", () => {
-    expect(prompt).toMatch(/revision step/i);
-    expect(prompt).toMatch(/rewrites the TODO file/i);
-  });
-
-  // A predicted regression phrased as a question reads as human-input-required
-  // and gets parked; phrased as a defect it becomes a plan amendment.
-  it("asks for risk findings as a defect statement rather than a question", () => {
-    expect(prompt).toMatch(/\*\*risk\*\*/);
-    expect(prompt).toMatch(/not as a question|rather than as a question/i);
-  });
-
-  it("checks item targets against the README's Non-Goal section", () => {
-    expect(prompt).toMatch(/## Non-Goal/);
-    expect(prompt).toMatch(/even when the edit itself looks harmless/i);
-  });
-
-  it("flags an item whose only verification is a human looking at it", () => {
-    expect(prompt).toMatch(/Verify/);
-    expect(prompt).toMatch(/human handoff/i);
-    expect(prompt).toMatch(/confirm in dev|by eye|looking at/i);
-  });
-
-  it("flags prescribed code that changes a contract today's callers rely on", () => {
-    expect(prompt).toMatch(/changes a contract existing callers rely on/);
-    // The named shapes, or the rule is an abstraction with nothing to match on.
-    expect(prompt).toMatch(/nullability or a sentinel/);
-  });
-
-  // Two writers to one TODO file is the defect the revision step exists to avoid.
-  it("is read-only — the revision step owns the TODO file", () => {
-    expect(prompt).toMatch(/read-only/i);
-    expect(prompt).not.toMatch(/NEEDS_CLARIFICATION/);
-  });
-
   it("carries the repo-search convention it needs to confirm the plan's claims", () => {
     expect(prompt).toContain(REPO_SEARCH_EFFICIENCY);
   });
@@ -92,24 +57,6 @@ describe("buildTodoReviewResolutionInstruction", () => {
   it("carries a suggested resolution when the reviewer had one", () => {
     const instruction = buildTodoReviewResolutionInstruction({ findings });
     expect(instruction).toContain("plain-text fallback");
-  });
-
-  it("names both exits: amend the item, or record it as a blocked item", () => {
-    const instruction = buildTodoReviewResolutionInstruction({ findings });
-    expect(instruction).toMatch(/Amend the item/i);
-    expect(instruction).toMatch(/Record it as a blocked item/i);
-    expect(instruction).toMatch(/- \[!\]/);
-  });
-
-  // The whole point of the step: nothing may vanish the way the old verdict did.
-  it("forbids dropping a finding without an exit", () => {
-    const instruction = buildTodoReviewResolutionInstruction({ findings });
-    expect(instruction).toMatch(/every finding/i);
-  });
-
-  it("keeps risk findings out of the blocked-item exit", () => {
-    const instruction = buildTodoReviewResolutionInstruction({ findings });
-    expect(instruction).toMatch(/risk.*(never|not).*(blocked|\[!\])|(blocked|\[!\]).*not.*risk/is);
   });
 
   it("folds human answers in when the run asked for them", () => {

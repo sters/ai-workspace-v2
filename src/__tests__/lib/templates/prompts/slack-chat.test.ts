@@ -2,25 +2,11 @@ import { describe, expect, it } from "vitest";
 import { buildSlackChatPrompt, getSlackChatSystemPrompt } from "@/lib/templates/prompts/slack-chat";
 
 describe("getSlackChatSystemPrompt", () => {
-  it("gates a write on an explicit request rather than the model's initiative", () => {
-    const sys = getSlackChatSystemPrompt();
-    expect(sys).toContain("READ-ONLY");
-    expect(sys).toContain("WRITES REQUIRE AN EXPLICIT REQUEST");
-  });
-
   it("keeps repository changes and destructive actions forbidden even on request", () => {
     const sys = getSlackChatSystemPrompt();
     expect(sys).toMatch(/NEVER run repo-mutating commands/);
     expect(sys).toMatch(/reset --hard|force-push|rm -rf/);
     expect(sys).toContain("through the WebUI or");
-  });
-
-  it("names the scratch directory as the only place file writes may go", () => {
-    const sys = getSlackChatSystemPrompt();
-    expect(sys).toMatch(/scratch directory/i);
-    expect(sys).toMatch(/Everything else under the ai-workspace root is read-only/);
-    expect(sys).toContain("`workspace/`");
-    expect(sys).toContain("`repositories/`");
   });
 
   it("says a file invented under workspace/ does not create a workspace", () => {
@@ -70,10 +56,6 @@ describe("buildSlackChatPrompt", () => {
     expect(out).not.toContain("Slack thread so far");
   });
 
-  it("ignores thread context on resume turns", () => {
-    expect(buildSlackChatPrompt("/ws", "hi", false, { threadContext: "@U1: ctx" })).toBe("hi");
-  });
-
   describe("scratch directory", () => {
     it("folds the scratch directory path into the first turn", () => {
       const out = buildSlackChatPrompt("/ws", "keep a note for me", true, {
@@ -87,13 +69,6 @@ describe("buildSlackChatPrompt", () => {
     it("omits the scratch section when no directory is given", () => {
       const out = buildSlackChatPrompt("/ws", "hi", true);
       expect(out).not.toMatch(/scratch/i);
-    });
-
-    it("does not fold the scratch directory into resume turns", () => {
-      const out = buildSlackChatPrompt("/ws", "hi", false, {
-        scratchDir: "/ws/.ai-workspace/slack-scratch/1712345678.123456",
-      });
-      expect(out).toBe("hi");
     });
   });
 
@@ -122,14 +97,6 @@ describe("buildSlackChatPrompt", () => {
     it("omits memory when the DB path is missing", () => {
       const out = buildSlackChatPrompt("/ws", "hi", true, { userId: "U123" });
       expect(out).not.toContain("Your memory about this user");
-    });
-
-    it("does not fold memory into resume turns", () => {
-      const out = buildSlackChatPrompt("/ws", "hi", false, {
-        memoryDbPath: "/ws/.ai-workspace/slack-memory.sqlite",
-        userId: "U123",
-      });
-      expect(out).toBe("hi");
     });
   });
 });

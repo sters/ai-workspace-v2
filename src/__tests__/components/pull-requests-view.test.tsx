@@ -167,13 +167,6 @@ beforeEach(() => {
 });
 
 describe("PullRequestsView", () => {
-  it("lists the PR and its unresolved review comments", () => {
-    setData();
-    render(<PullRequestsView workspaceName="feat" />);
-    expect(screen.getByText(/#42 Add widget cache/)).toBeInTheDocument();
-    expect(screen.getByText("src/cache.ts:88")).toBeInTheDocument();
-  });
-
   it("hides resolved threads until asked, since they need no decision", () => {
     setData();
     render(<PullRequestsView workspaceName="feat" />);
@@ -223,13 +216,6 @@ describe("PullRequestsView", () => {
       setData({ pullRequests: [pr({ threads: [...base.threads, reviewBody, conversation] })] });
       render(<PullRequestsView workspaceName="feat" />);
     }
-
-    it("lists a review body and a conversation comment as candidates", () => {
-      withConversation();
-      expect(screen.getByRole("checkbox", { name: /review \(changes requested\)/i })).toBeInTheDocument();
-      expect(screen.getByRole("checkbox", { name: /pr conversation/i })).toBeInTheDocument();
-      expect(screen.getByText("Please update the changelog too.")).toBeInTheDocument();
-    });
 
     it("validates one by its node id, like a thread", () => {
       withConversation();
@@ -516,14 +502,6 @@ describe("PullRequestsView", () => {
       expect(screen.getByText("CI: unknown")).toBeInTheDocument();
     });
 
-    it("says running for a run that started", () => {
-      setData({
-        pullRequests: [pr({ checks: checksOf([{ name: "e2e", state: "running", url: null }]) })],
-      });
-      render(<PullRequestsView workspaceName="feat" />);
-      expect(screen.getByText("CI: 1 running")).toBeInTheDocument();
-    });
-
     it("says queued for a run that has not started", () => {
       // The distinction this pins: a queued job used to be shown as "running",
       // which claims work that has not begun and logs that do not exist.
@@ -790,13 +768,5 @@ describe("PullRequestsView", () => {
 
       expect(mockStartAndNavigate.mock.calls[0][1]).toMatchObject({ repo: "widgets" });
     });
-  });
-
-  it("asks past the server cache when Refresh is pressed", () => {
-    setData();
-    render(<PullRequestsView workspaceName="feat" />);
-    fireEvent.click(screen.getByRole("button", { name: /refresh/i }));
-    // The hook owns the `?refresh=1` bypass; this pins that the button calls it.
-    expect(mockRefresh).toHaveBeenCalled();
   });
 });

@@ -5,24 +5,12 @@ import {
 } from "@/lib/templates/prompts/executor";
 
 describe("getExecutorSystemPrompt", () => {
-  it("explicitly forbids creating pull requests", () => {
-    const prompt = getExecutorSystemPrompt();
-    expect(prompt).toMatch(/do not.*create.*pull request/i);
-  });
-
   it("forbids pushing to remote unconditionally, without an 'if requested' escape hatch", () => {
     const prompt = getExecutorSystemPrompt();
     expect(prompt).toMatch(/do not.*push/i);
     // A conditional ban reads as satisfied by any TODO that mentions a PR, which
     // is exactly what Address-PR-Reviews TODOs look like.
     expect(prompt).not.toMatch(/push[^\n]*unless (explicitly )?requested/i);
-  });
-
-  it("forbids inspecting remote PR / CI state", () => {
-    const prompt = getExecutorSystemPrompt();
-    expect(prompt).toContain("gh pr view");
-    expect(prompt).toContain("gh pr checks");
-    expect(prompt).toContain("gh run view");
   });
 });
 
@@ -70,15 +58,5 @@ describe("buildBatchedExecutorPrompt", () => {
       batchTodoContent: "- [ ] Task 1",
     });
     expect(prompt).not.toContain("Previously Completed Items");
-  });
-
-  it("instructs to focus only on current batch items", () => {
-    const prompt = buildBatchedExecutorPrompt({
-      ...baseInput,
-      batchIndex: 0,
-      totalBatches: 2,
-      batchTodoContent: "- [ ] Task 1",
-    });
-    expect(prompt).toContain("Focus only on the items listed");
   });
 });

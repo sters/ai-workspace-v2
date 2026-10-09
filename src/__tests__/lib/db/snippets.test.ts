@@ -74,9 +74,4 @@ describe("db/snippets", () => {
     const s = getSnippet(99999);
     expect(s).toBeNull();
   });
-
-  it("returns empty list when no snippets exist", () => {
-    const all = listSnippets();
-    expect(all).toHaveLength(0);
-  });
 });

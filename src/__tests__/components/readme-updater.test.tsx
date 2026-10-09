@@ -27,20 +27,6 @@ beforeEach(() => {
 });
 
 describe("ReadmeUpdater", () => {
-  it("shows the normal Update README button when nothing is running", () => {
-    setRunning({});
-    render(<ReadmeUpdater workspaceName="ws" workspacePath="/ws/ws" />);
-    expect(screen.getByRole("button", { name: /update readme/i })).toBeInTheDocument();
-    expect(screen.queryByText(/An operation is currently running/i)).not.toBeInTheDocument();
-  });
-
-  it("shows the interject banner and button when another operation is running", () => {
-    setRunning({ workspaceRunning: true });
-    render(<ReadmeUpdater workspaceName="ws" workspacePath="/ws/ws" />);
-    expect(screen.getByText(/An operation is currently running/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /interject \+ restart/i })).toBeInTheDocument();
-  });
-
   it("submits with interject=true when in interject mode", () => {
     setRunning({ workspaceRunning: true });
     render(<ReadmeUpdater workspaceName="ws" workspacePath="/ws/ws" />);

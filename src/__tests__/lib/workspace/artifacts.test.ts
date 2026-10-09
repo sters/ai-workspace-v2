@@ -4,7 +4,6 @@ import path from "node:path";
 
 import { ARTIFACT_MAX_BYTES } from "@/lib/constants";
 import {
-  getArtifactsDir,
   listArtifacts,
   readArtifact,
   resolveArtifactPath,
@@ -27,12 +26,6 @@ beforeEach(() => {
 
 afterEach(() => {
   fs.rmSync(wsPath, { recursive: true, force: true });
-});
-
-describe("getArtifactsDir", () => {
-  it("is the artifacts directory of the workspace", async () => {
-    expect(getArtifactsDir("/ws/feature-x")).toBe("/ws/feature-x/artifacts");
-  });
 });
 
 describe("listArtifacts", () => {

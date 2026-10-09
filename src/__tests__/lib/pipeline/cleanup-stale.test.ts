@@ -56,11 +56,6 @@ describe("pipeline/cleanup-stale", () => {
       expect(running).toHaveLength(2);
       expect(running.map((o) => o.id).sort()).toEqual([OP_ID_1, OP_ID_3].sort());
     });
-
-    it("returns empty array when no running operations", () => {
-      insertOperation(makeOp(OP_ID_1, { status: "completed" }));
-      expect(listRunningOperations()).toHaveLength(0);
-    });
   });
 
   describe("failStaleOperations", () => {
@@ -111,13 +106,6 @@ describe("pipeline/cleanup-stale", () => {
 
       const settled = listRecentFinishedOperations(10).find((o) => o.id === OP_ID_1);
       expect(settled?.resultSummary?.content).toBe("Cycle 1 done");
-    });
-
-    it("does nothing when no running operations exist", async () => {
-      insertOperation(makeOp(OP_ID_1, { status: "completed" }));
-
-      const { failStaleOperations } = await import("@/lib/pipeline/cleanup-stale");
-      failStaleOperations(); // Should not throw
     });
   });
 

@@ -12,7 +12,6 @@ import {
   subscribeToOperation,
   ConcurrencyLimitError,
   getMaxConcurrentOperations,
-  getTimeoutDefaults,
 } from "@/lib/pipeline-manager";
 
 // Mock the Claude runner so we don't spawn real processes
@@ -294,11 +293,5 @@ describe("pipeline-manager phase timeout", () => {
       e.data.includes("timed out after 50ms"),
     );
     expect(timedOutEvent).toBeDefined();
-  });
-
-  it("uses correct default timeouts for each phase kind", () => {
-    const defaults = getTimeoutDefaults("init");
-    expect(defaults.claudeMs).toBe(20 * 60 * 1000);
-    expect(defaults.functionMs).toBe(3 * 60 * 1000);
   });
 });

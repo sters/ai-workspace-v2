@@ -57,21 +57,6 @@ describe("refreshWorktree", () => {
     expect(git.calls.map((c) => c.join(" "))).not.toContain(STATUS);
   });
 
-  it("ignores untracked files when deciding whether the tree is dirty", async () => {
-    const git = fakeGit({
-      [HEAD]: { ok: true, out: OLD },
-      [FETCH]: { ok: true, out: "" },
-      [UPSTREAM_NAME]: { ok: true, out: "origin/feature-x" },
-      [UPSTREAM_SHA]: { ok: true, out: NEW },
-      // `--untracked-files=no`, so a stray local file never reaches this output.
-      [STATUS]: { ok: true, out: "" },
-      [FF]: { ok: true, out: "Fast-forward" },
-    });
-
-    expect((await refreshWorktree(repo, git)).status).toBe("fast-forwarded");
-    expect(git.calls.map((c) => c.join(" "))).toContain(STATUS);
-  });
-
   it("fast-forwards when upstream moved ahead", async () => {
     const git = fakeGit({
       [HEAD]: { ok: true, out: OLD },

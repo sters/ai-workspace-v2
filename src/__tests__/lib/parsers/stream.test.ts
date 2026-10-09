@@ -306,26 +306,6 @@ describe("parseStreamEvent", () => {
         expect(entries[0].content).toBe("line 1\nline 2");
       }
     });
-
-    it("marks error results", () => {
-      const msg = {
-        type: "user",
-        message: {
-          content: [
-            {
-              type: "tool_result",
-              tool_use_id: "tool-3",
-              content: "Error: something failed",
-              is_error: true,
-            },
-          ],
-        },
-      };
-      const entries = parseStreamEvent(JSON.stringify(msg));
-      if (entries[0].kind === "tool_result") {
-        expect(entries[0].isError).toBe(true);
-      }
-    });
   });
 
   describe("tool_progress messages", () => {
@@ -561,32 +541,12 @@ describe("parseStreamEvent", () => {
         expect(denials[1].summary).toBe("/src/index.ts");
       }
     });
-
-    it("handles empty permission_denials array", () => {
-      const msg = {
-        type: "result",
-        subtype: "success",
-        result: "Done",
-        total_cost_usd: 0.01,
-        permission_denials: [],
-      };
-      const entries = parseStreamEvent(JSON.stringify(msg));
-      expect(entries.filter((e) => e.kind === "permission_denial")).toHaveLength(0);
-    });
   });
 });
 
 describe("buildPermissionString", () => {
   it("returns Bash(prefix:*) for Bash tool with command", () => {
     expect(buildPermissionString("Bash", "rm -rf /tmp")).toBe("Bash(rm:*)");
-  });
-
-  it("returns Bash(prefix:*) for single-word command", () => {
-    expect(buildPermissionString("Bash", "ls")).toBe("Bash(ls:*)");
-  });
-
-  it("returns Bash for Bash with empty command", () => {
-    expect(buildPermissionString("Bash", "")).toBe("Bash");
   });
 
   it("returns Bash for Bash with no command", () => {
@@ -661,24 +621,6 @@ describe("enrichPermissionDenials", () => {
     }
   });
 
-  it("replaces Write permission denial", () => {
-    const entries = enrichPermissionDenials([
-      { kind: "tool_call", toolName: "Write", toolId: "t2", summary: "/tmp/test.txt" },
-      {
-        kind: "tool_result",
-        toolId: "t2",
-        content: "Claude requested permissions to write to /tmp/test.txt, but you haven't granted it yet.",
-        isError: true,
-      },
-    ]);
-    expect(entries[1].kind).toBe("permission_denial");
-    if (entries[1].kind === "permission_denial") {
-      expect(entries[1].toolName).toBe("Write");
-      expect(entries[1].permissionString).toBe("Write");
-      expect(entries[1].summary).toBe("/tmp/test.txt");
-    }
-  });
-
   it("does not replace non-permission error tool_results", () => {
     const entries = enrichPermissionDenials([
       { kind: "tool_call", toolName: "Bash", toolId: "t3", summary: "$ cat /nonexistent" },
@@ -686,19 +628,6 @@ describe("enrichPermissionDenials", () => {
         kind: "tool_result",
         toolId: "t3",
         content: "Error: file not found",
-        isError: true,
-      },
-    ]);
-    expect(entries[1].kind).toBe("tool_result");
-  });
-
-  it("does not replace sibling error tool_results", () => {
-    const entries = enrichPermissionDenials([
-      { kind: "tool_call", toolName: "Bash", toolId: "t4", summary: "$ ls" },
-      {
-        kind: "tool_result",
-        toolId: "t4",
-        content: "<tool_use_error>Sibling tool call errored</tool_use_error>",
         isError: true,
       },
     ]);

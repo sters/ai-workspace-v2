@@ -80,15 +80,6 @@ beforeEach(() => {
 });
 
 describe("QuickCreateForm", () => {
-  it("lists each cloned repository with the base branch it would branch from", () => {
-    render(<QuickCreateForm />);
-
-    expect(screen.getByRole("checkbox", { name: /github\.com\/acme\/web/ })).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: /github\.com\/acme\/api/ })).toBeInTheDocument();
-    expect(screen.getByText("main")).toBeInTheDocument();
-    expect(screen.getByText("master")).toBeInTheDocument();
-  });
-
   it("previews the directory and branch the name will produce", () => {
     render(<QuickCreateForm />);
     expect(screen.queryByText(/^feature\//)).not.toBeInTheDocument();

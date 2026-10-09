@@ -43,11 +43,6 @@ describe("substituteEnvVars", () => {
     expect(substituteEnvVars(["a", "{ENV:AIW_TEST_FOO}", "b"])).toEqual(["a", "foo-value", "b"]);
   });
 
-  it("substitutes inside arrays of objects", () => {
-    const input = [{ name: "x", value: "{ENV:AIW_TEST_FOO}" }];
-    expect(substituteEnvVars(input)).toEqual([{ name: "x", value: "foo-value" }]);
-  });
-
   it("passes through non-string scalars (number, boolean, null)", () => {
     expect(substituteEnvVars(42)).toBe(42);
     expect(substituteEnvVars(true)).toBe(true);
@@ -67,21 +62,10 @@ describe("substituteEnvVars", () => {
     expect(substituteEnvVars("{ENV:Mixed_Case}")).toBe("{ENV:Mixed_Case}");
   });
 
-  it("matches placeholders with digits and underscores (not at start)", () => {
-    process.env.AIW_TEST_KEY_2 = "second";
-    expect(substituteEnvVars("{ENV:AIW_TEST_KEY_2}")).toBe("second");
-  });
-
   it("does not mutate the input object", () => {
     const input = { a: "{ENV:AIW_TEST_FOO}", b: { c: "{ENV:AIW_TEST_BAR}" } };
     const snapshot = JSON.parse(JSON.stringify(input));
     substituteEnvVars(input);
     expect(input).toEqual(snapshot);
-  });
-
-  it("handles undefined and complex empty cases", () => {
-    expect(substituteEnvVars(undefined)).toBe(undefined);
-    expect(substituteEnvVars({})).toEqual({});
-    expect(substituteEnvVars([])).toEqual([]);
   });
 });

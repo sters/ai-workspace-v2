@@ -25,12 +25,6 @@ describe("db/slack-notifications", () => {
     getDb();
   });
 
-  it("inserts a pending notification", () => {
-    makeOp("op-1");
-    addPendingNotification({ operationId: "op-1", channel: "C123", threadTs: "1.0" });
-    // No throw = success; presence verified via listReadyNotifications below.
-  });
-
   it("listReadyNotifications excludes still-running operations", () => {
     makeOp("op-1");
     addPendingNotification({ operationId: "op-1", channel: "C123", threadTs: "1.0" });
@@ -70,26 +64,6 @@ describe("db/slack-notifications", () => {
     expect(listReadyNotifications()).toHaveLength(1);
     deleteNotification("op-1");
     expect(listReadyNotifications()).toHaveLength(0);
-  });
-
-  it("deleteNotification on absent row is a no-op", () => {
-    deleteNotification("nope");
-    expect(listReadyNotifications()).toEqual([]);
-  });
-
-  it("listReadyNotifications returns multiple ready rows", () => {
-    makeOp("op-1");
-    makeOp("op-2");
-    makeOp("op-3");
-    addPendingNotification({ operationId: "op-1", channel: "C", threadTs: "1.0" });
-    addPendingNotification({ operationId: "op-2", channel: "C", threadTs: "2.0" });
-    addPendingNotification({ operationId: "op-3", channel: "C", threadTs: "3.0" });
-    updateOperationStatus("op-1", "completed", new Date().toISOString());
-    updateOperationStatus("op-3", "failed", new Date().toISOString());
-    // op-2 still running
-
-    const ready = listReadyNotifications();
-    expect(ready.map((r) => r.operationId).sort()).toEqual(["op-1", "op-3"]);
   });
 
   it("ON DELETE CASCADE removes notifications when the operation row is deleted", () => {

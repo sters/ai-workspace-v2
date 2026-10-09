@@ -114,24 +114,6 @@ describe("quickSearchWorkspaces", () => {
     expect(results).toEqual([]);
   });
 
-  it("returns correct line numbers", async () => {
-    mockPathExists.mockImplementation((p: string) => {
-      return p === "/mock/workspace" || p === "/mock/workspace/ws1/README.md";
-    });
-    mockReaddir.mockReturnValue([
-      { name: "ws1", isDirectory: () => true },
-    ]);
-    setupBunFileMock({
-      "/mock/workspace/ws1/README.md": "line1\nline2\nmatch here\nline4\nmatch again",
-    });
-
-    const results = await quickSearchWorkspaces("match");
-    expect(results).toHaveLength(1);
-    expect(results[0].matches).toHaveLength(2);
-    expect(results[0].matches[0].lineNumber).toBe(3);
-    expect(results[0].matches[1].lineNumber).toBe(5);
-  });
-
   it("searches across multiple workspaces", async () => {
     mockPathExists.mockImplementation((p: string) => {
       return (

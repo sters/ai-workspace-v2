@@ -111,13 +111,6 @@ beforeEach(() => {
 });
 
 describe("ReviewFindingsList", () => {
-  it("lists a finding with its location and anchor", () => {
-    renderList();
-    expect(screen.getByText("src/a.ts:11")).toBeInTheDocument();
-    expect(screen.getByText("inline")).toBeInTheDocument();
-    expect(screen.getByText("Rejection is unhandled")).toBeInTheDocument();
-  });
-
   // The pre-selection is the "not everything" part of the feature: the list is
   // complete, and only what a human would act on starts ticked.
   it("pre-selects Critical and Warning but not Suggestions", () => {

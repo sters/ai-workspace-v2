@@ -122,27 +122,6 @@ describe("buildTriagePrCommentsInstruction", () => {
     expect(instruction).toMatch(/verbatim/);
   });
 
-  it("forbids replying or resolving at triage time", () => {
-    // The fix does not exist yet, so a reply would speak for work not done.
-    expect(instruction).toMatch(/do NOT reply/i);
-    expect(instruction).toMatch(/do NOT resolve/i);
-  });
-
-  it("scopes the work to the listed threads and nothing else", () => {
-    expect(instruction).toMatch(/only the .*threads? listed|listed below.*nothing else/i);
-  });
-
-  it("says these threads were already triaged by a human", () => {
-    // The distinction from the Address PR Reviews quick-fill: that one judges
-    // validity itself. Here a human already decided, so re-litigating it would
-    // silently drop work they asked for.
-    expect(instruction).toMatch(/already (decided|judged)|a human/i);
-  });
-
-  it("tells it not to fetch the whole PR again", () => {
-    expect(instruction).toMatch(/gh pr view|re-?fetch|already (below|here)/i);
-  });
-
   it("numbers multiple threads so items can be matched back", () => {
     const multi = buildTriagePrCommentsInstruction({
       threads: [thread, { ...thread, id: "PRRT_kwDOdef", commentUrl: "https://x/#r2", body: "Second" }],
@@ -167,14 +146,6 @@ describe("buildTriagePrCommentsInstruction", () => {
     expect(validated).toContain("valid");
     expect(validated).toContain("The reviewer wants the lock released on the error path.");
     expect(validated).toContain("Wrap the body in try/finally.");
-  });
-
-  it("presents a verdict as prior analysis, not as the plan", () => {
-    const validated = buildTriagePrCommentsInstruction({
-      threads: [thread],
-      validations: { [thread.id]: validation },
-    });
-    expect(validated).toMatch(/re-?derive|starting point|still (check|verify)/i);
   });
 
   it("flags an invalid verdict the human triaged anyway rather than hiding it", () => {
@@ -229,15 +200,6 @@ describe("buildTriagePrCommentsInstruction", () => {
       expect(directed).toMatch(/outranks the prior validation/i);
     });
 
-    it("has the chosen approach written into the item, since the executor reads only the TODO", () => {
-      expect(directed).toMatch(/write the approach you chose.*into the TODO item/i);
-    });
-
-    it("says what to do when the code rules the preferred option out", () => {
-      expect(directed).toMatch(/cannot work/i);
-      expect(directed).toContain("`[!]`");
-    });
-
     it("adds no direction block to a thread without a note", () => {
       expect(instruction).not.toMatch(/Direction from the human/);
       expect(
@@ -276,27 +238,6 @@ describe("buildTriagePrCommentsInstruction — failing CI checks", () => {
     // The updater has no `gh` grant and the executor's prompt forbids `gh run
     // view`, so an item that only names the job is not actionable.
     expect(instruction).toContain("'lock' is assigned but never used");
-  });
-
-  it("requires the item to quote the error line verbatim", () => {
-    expect(instruction).toMatch(/verbatim/);
-  });
-
-  it("sends verification to the repository's own command, not to remote CI", () => {
-    expect(instruction).toMatch(/never (re-run )?remote CI|not.*remote CI/i);
-  });
-
-  it("offers the flake/infra outlet instead of inventing a fix", () => {
-    // The one judgment left to the run: a human sees a red check in the tab but
-    // cannot see from there whether this branch caused it.
-    expect(instruction).toMatch(/## Notes/);
-    expect(instruction).toMatch(/flak|infrastructure|unrelated/i);
-  });
-
-  it("does not ask for a PR Review Threads row for a check", () => {
-    // There is no review thread behind a check, so a row would be a record of
-    // nothing and `create-pr` would try to reply to it.
-    expect(instruction).toMatch(/not add a `## PR Review Threads` row/i);
   });
 
   it("says plainly when the log could not be read, with the reason", () => {

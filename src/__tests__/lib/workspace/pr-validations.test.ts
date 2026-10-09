@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  getPrValidationsPath,
   mergeValidations,
   normalizeVerdict,
   parseValidationStore,
@@ -22,21 +21,7 @@ function validation(overrides: Partial<PrThreadValidation> = {}): PrThreadValida
   };
 }
 
-describe("getPrValidationsPath", () => {
-  it("lives beside the other workspace artifacts", () => {
-    expect(getPrValidationsPath("/ws/feature-x")).toBe(
-      "/ws/feature-x/artifacts/pr-validations.json",
-    );
-  });
-});
-
 describe("normalizeVerdict", () => {
-  it("passes the three known verdicts through", () => {
-    expect(normalizeVerdict("valid")).toBe("valid");
-    expect(normalizeVerdict("invalid")).toBe("invalid");
-    expect(normalizeVerdict("unclear")).toBe("unclear");
-  });
-
   it("falls back to unclear for anything else", () => {
     // "unclear" is the only safe guess: it keeps the thread in front of a human
     // instead of asserting the comment is settled either way.

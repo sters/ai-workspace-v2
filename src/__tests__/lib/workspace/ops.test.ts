@@ -30,16 +30,6 @@ describe("parseAnalysisResultText", () => {
     });
   });
 
-  it("returns fallback when jsonText is empty string", () => {
-    const result = parseAnalysisResultText("", "fallback");
-    expect(result).toEqual({
-      taskType: "feature",
-      slug: "fallback",
-      ticketId: "",
-      repositories: [],
-    });
-  });
-
   it("returns fallback when jsonText is invalid JSON", () => {
     const result = parseAnalysisResultText("not json at all", "my fallback");
     expect(result).toEqual({

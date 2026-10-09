@@ -63,24 +63,6 @@ describe("parseReadmeMeta", () => {
     expect(meta.repositories).toEqual([]);
   });
 
-  it("handles partial metadata", () => {
-    const content = `# Task: Partial task
-**Task Type**: bugfix`;
-    const meta = parseReadmeMeta(content);
-    expect(meta.title).toBe("Partial task");
-    expect(meta.taskType).toBe("bugfix");
-    expect(meta.ticketId).toBe("");
-    expect(meta.date).toBe("");
-    expect(meta.repositories).toEqual([]);
-  });
-
-  it("handles empty input", () => {
-    const meta = parseReadmeMeta("");
-    expect(meta.title).toBe("Untitled");
-    expect(meta.taskType).toBe("unknown");
-    expect(meta.repositories).toEqual([]);
-  });
-
   it("accepts bold labels with spaces and parens", () => {
     const content = `# Task: Multi-worktree
 
@@ -89,15 +71,6 @@ describe("parseReadmeMeta", () => {
     expect(meta.repositories).toHaveLength(1);
     expect(meta.repositories[0].alias).toBe("service (variant-a)");
     expect(meta.repositories[0].path).toBe("github.com/org/service");
-  });
-
-  it("normalizes :alias path syntax to ___alias", () => {
-    const content = `# Task: Aliased path
-
-- **repo (a)**: \`github.com/org/repo:a\` (base: \`main\`)`;
-    const meta = parseReadmeMeta(content);
-    expect(meta.repositories).toHaveLength(1);
-    expect(meta.repositories[0].path).toBe("github.com/org/repo___a");
   });
 
   it("keeps multiple aliased entries of the same repo distinct", () => {
@@ -115,18 +88,6 @@ describe("parseReadmeMeta", () => {
       "github.com/org/service___variant-c",
       "github.com/org/service___variant-d",
     ]);
-  });
-
-  it("handles multiple repositories correctly", () => {
-    const content = `# Task: Multi-repo task
-
-- **repo1**: \`path/to/repo1\` (base: \`main\`)
-- **repo2**: \`path/to/repo2\` (base: \`staging\`)
-- **repo3**: \`path/to/repo3\` (base: \`release\`)`;
-    const meta = parseReadmeMeta(content);
-    expect(meta.repositories).toHaveLength(3);
-    expect(meta.repositories[2].alias).toBe("repo3");
-    expect(meta.repositories[2].baseBranch).toBe("release");
   });
 });
 

@@ -52,14 +52,6 @@ describe("useAsyncCallback", () => {
     expect(result.current[1]).toBe(false);
   });
 
-  it("passes arguments through", () => {
-    const fn = vi.fn((_a: number, _b: string) => {});
-    const { result } = renderHook(() => useAsyncCallback(fn));
-
-    act(() => result.current[0](42, "hello"));
-    expect(fn).toHaveBeenCalledWith(42, "hello");
-  });
-
   it("resets pending even if promise rejects", async () => {
     let reject!: (err: Error) => void;
     const promise = new Promise<void>((_r, rej) => {

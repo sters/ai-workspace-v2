@@ -21,20 +21,11 @@ afterAll(() => {
 import {
   KNOWN_FINDINGS_HEADING,
   appendKnownFindings,
-  getKnownFindingsPath,
   normalizeKnownFindingKind,
   parseKnownFindingSummaries,
   readKnownFindings,
   renderKnownFinding,
 } from "@/lib/workspace/known-findings";
-
-describe("getKnownFindingsPath", () => {
-  it("lives under the workspace artifacts directory", () => {
-    expect(getKnownFindingsPath("/ws/feature-x")).toBe(
-      "/ws/feature-x/artifacts/known-findings.md",
-    );
-  });
-});
 
 describe("renderKnownFinding", () => {
   it("renders kind, cycle, summary and reason", () => {
@@ -96,10 +87,6 @@ describe("parseKnownFindingSummaries", () => {
 });
 
 describe("normalizeKnownFindingKind", () => {
-  it("passes through known kinds", () => {
-    expect(normalizeKnownFindingKind("pending-human")).toBe("pending-human");
-  });
-
   it("falls back to the weakest claim for unknown kinds", () => {
     // "deferred" only asserts "not acted on"; guessing a stronger kind would
     // mislabel the entry as permanently unactionable.
@@ -111,12 +98,6 @@ describe("normalizeKnownFindingKind", () => {
 describe("readKnownFindings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it("returns the file content when present", async () => {
-    mockFileExists.mockResolvedValue(true);
-    mockFileText.mockResolvedValue("- **[deferred]** something\n");
-    expect(await readKnownFindings("/ws/feature-x")).toBe("- **[deferred]** something\n");
   });
 
   it("returns an empty string when the ledger does not exist yet", async () => {

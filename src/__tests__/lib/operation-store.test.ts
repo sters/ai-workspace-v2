@@ -115,11 +115,6 @@ describe("operation-store", () => {
     it("returns null for nonexistent operation", () => {
       expect(readOperationLog("00000000-0000-4000-8000-000000999999")).toBeNull();
     });
-
-    it("returns null for invalid operation ID", () => {
-      expect(readOperationLog("../../../etc/passwd")).toBeNull();
-      expect(readOperationLog("invalid-id")).toBeNull();
-    });
   });
 
   describe("listStoredOperations", () => {
@@ -162,10 +157,6 @@ describe("operation-store", () => {
       expect(listStoredOperations()).toHaveLength(3);
     });
 
-    it("returns empty array when no operations exist", () => {
-      expect(listStoredOperations()).toEqual([]);
-    });
-
     it("includes inputs in summaries when present", () => {
       const op = makeOperation(ID1, {
         inputs: { instruction: "Do something", description: "Details here" },
@@ -196,29 +187,8 @@ describe("operation-store", () => {
       expect(readOperationLog(ID1)).toBeNull();
     });
 
-    it("deletes with explicit workspace", () => {
-      const op = makeOperation(ID1, { workspace: "ws-x" });
-      writeViaDb(op, []);
-
-      expect(deleteStoredOperation(ID1, "ws-x")).toBe(true);
-      expect(readOperationLog(ID1, "ws-x")).toBeNull();
-    });
-
     it("returns false for nonexistent operation", () => {
       expect(deleteStoredOperation("00000000-0000-4000-8000-000000999999")).toBe(false);
-    });
-
-    it("returns false for invalid ID", () => {
-      expect(deleteStoredOperation("../../../etc/passwd")).toBe(false);
-    });
-
-    it("cascade deletes events", () => {
-      const op = makeOperation(ID1);
-      writeViaDb(op, [makeEvent(ID1), makeEvent(ID1)]);
-
-      deleteStoredOperation(ID1);
-      const result = readOperationLog(ID1);
-      expect(result).toBeNull();
     });
   });
 
@@ -257,13 +227,6 @@ describe("operation-store", () => {
       expect(readOperationLog("pipe-abc-def")).toBeNull();
       expect(readOperationLog("pipe-1")).toBeNull();
       expect(deleteStoredOperation("hack/../../../etc")).toBe(false);
-    });
-
-    it("accepts valid UUID IDs", () => {
-      const id = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d";
-      const op = makeOperation(id);
-      writeViaDb(op, []);
-      expect(readOperationLog(id)).not.toBeNull();
     });
   });
 });

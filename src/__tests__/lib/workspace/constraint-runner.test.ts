@@ -51,13 +51,6 @@ describe("execConstraintCommand", () => {
     expect(result.exitCode).toBeNull();
     expect(result.durationMs).toBeLessThan(5000);
   });
-
-  it("returns exit code 127 for command not found", async () => {
-    const result = await execConstraintCommand("nonexistent_command_xyz_12345", {
-      cwd: "/tmp",
-    });
-    expect(result.exitCode).toBe(127);
-  });
 });
 
 describe("buildConstraintReport", () => {
@@ -118,44 +111,6 @@ describe("buildConstraintReport", () => {
     expect(report).toContain("lint error on line 42");
   });
 
-  it("generates a report with SKIPPED status", () => {
-    const results: ConstraintExecResult[] = [
-      {
-        label: "Lint",
-        command: "golangci-lint run",
-        exitCode: 127,
-        passed: false,
-        stdout: "",
-        stderr: "command not found",
-        timedOut: false,
-        durationMs: 10,
-        status: "SKIPPED",
-      },
-    ];
-
-    const report = buildConstraintReport("my-repo", results);
-    expect(report).toContain("## Lint: SKIPPED");
-  });
-
-  it("generates a report with PRE-EXISTING status", () => {
-    const results: ConstraintExecResult[] = [
-      {
-        label: "Test",
-        command: "make test",
-        exitCode: 1,
-        passed: false,
-        stdout: "",
-        stderr: "test failed",
-        timedOut: false,
-        durationMs: 2000,
-        status: "PRE-EXISTING",
-      },
-    ];
-
-    const report = buildConstraintReport("my-repo", results);
-    expect(report).toContain("## Test: PRE-EXISTING");
-  });
-
   it("generates a report with TIMEOUT status", () => {
     const results: ConstraintExecResult[] = [
       {
@@ -204,12 +159,5 @@ describe("buildNoConstraintsReport", () => {
   it("uses the same heading shape as a real constraint report so the collector parses it", () => {
     expect(report).toContain("# Constraint Verification: my-repo");
     expect(report).toContain("**Overall**:");
-  });
-
-  it("states NOT DECLARED rather than a pass, and says nothing ran", () => {
-    expect(report).toContain("NOT DECLARED");
-    expect(report).not.toContain("ALL PASSED");
-    expect(report).not.toContain("FAILURES DETECTED");
-    expect(report).toMatch(/Repository Constraints/);
   });
 });

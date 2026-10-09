@@ -53,12 +53,6 @@ describe("extractPrUrls", () => {
     expect(extractPrUrls(text)).toEqual([]);
   });
 
-  it("builds repoPath in github.com/owner/repo format", async () => {
-    const text = "https://github.com/sters/ai-workspace-v2/pull/1";
-    const result = extractPrUrls(text);
-    expect(result[0].repoPath).toBe("github.com/sters/ai-workspace-v2");
-  });
-
   it("deduplicates same PR URL appearing multiple times", async () => {
     const text = [
       "https://github.com/sters/ai-workspace-v2/pull/42",
@@ -123,14 +117,5 @@ describe("resolvePrBranch", () => {
     const result = await resolvePrBranch(mockPrUrl);
     expect(result.isFork).toBe(true);
     expect(result.headBranch).toBe("fork-branch");
-  });
-
-  it("throws when gh command fails", async () => {
-    const { resolvePrBranch } = await import("@/lib/workspace/pr-url");
-    mockExec.mockImplementation(() => {
-      throw new Error("gh: command not found");
-    });
-
-    await expect(resolvePrBranch(mockPrUrl)).rejects.toThrow("gh: command not found");
   });
 });

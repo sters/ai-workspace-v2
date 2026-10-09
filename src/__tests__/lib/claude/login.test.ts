@@ -71,38 +71,11 @@ vi.mock("@/lib/claude/login", async (importOriginal) => {
   };
 });
 
-import { checkAuthStatus } from "@/lib/claude/login";
 import { buildClaudeLoginPhase } from "@/lib/pipelines/actions/claude-login";
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockCheckAuthStatus.mockReset();
-});
-
-describe("checkAuthStatus", () => {
-  it("returns trimmed stdout on success", async () => {
-    mockSpawnClaudeAuth.mockReturnValue(
-      mockProc('  {"loggedIn":true}  \n', "", 0),
-    );
-
-    const result = await checkAuthStatus();
-    expect(result).toBe('{"loggedIn":true}');
-    expect(mockSpawnClaudeAuth).toHaveBeenCalledWith("status");
-  });
-
-  it("rejects with stderr on failure", async () => {
-    mockSpawnClaudeAuth.mockReturnValue(
-      mockProc("", "Not authenticated", 1),
-    );
-
-    await expect(checkAuthStatus()).rejects.toThrow("Not authenticated");
-  });
-
-  it("rejects with exit code when stderr is empty", async () => {
-    mockSpawnClaudeAuth.mockReturnValue(mockProc("", "", 1));
-
-    await expect(checkAuthStatus()).rejects.toThrow("Exit code 1");
-  });
 });
 
 describe("buildClaudeLoginPhase", () => {

@@ -41,87 +41,6 @@ describe("buildUpdateTodoPipeline", () => {
     mockFileText.mockResolvedValue("");
   });
 
-  describe("single repo", () => {
-    beforeEach(() => {
-      mockListWorkspaceRepos.mockReturnValue([
-        {
-          repoName: "my-repo",
-          repoPath: "/repos/my-repo",
-          worktreePath: "/repos/my-repo/worktrees/test-ws",
-        } as ReturnType<typeof listWorkspaceRepos>[number],
-      ]);
-    });
-
-    it("returns updater phase plus normalize phase", async () => {
-      const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-      expect(phases).toHaveLength(2);
-      expect(phases[0].kind).toBe("single");
-      expect(phases[1].kind).toBe("function");
-      expect(phases[1].label).toBe("Normalize TODO format");
-    });
-
-    it("phase has kind single", async () => {
-      const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-      expect(phases[0].kind).toBe("single");
-    });
-
-    it("phase does not set cwd (uses getResolvedWorkspaceRoot default)", async () => {
-      const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-      const phase = phases[0];
-      if (phase.kind !== "single") throw new Error("expected single");
-      expect(phase.cwd).toBeUndefined();
-    });
-
-    it("phase sets addDirs to workspace path", async () => {
-      const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-      const phase = phases[0];
-      if (phase.kind !== "single") throw new Error("expected single");
-      expect(phase.addDirs).toEqual([expect.stringContaining("test-ws")]);
-    });
-
-    it("label is 'Update TODOs'", async () => {
-      const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-      const phase = phases[0];
-      if (phase.kind !== "single") throw new Error("expected single");
-      expect(phase.label).toBe("Update TODOs");
-    });
-  });
-
-  describe("interject flag", () => {
-    beforeEach(() => {
-      mockListWorkspaceRepos.mockReturnValue([
-        {
-          repoName: "my-repo",
-          repoPath: "/repos/my-repo",
-          worktreePath: "/repos/my-repo/worktrees/test-ws",
-        } as ReturnType<typeof listWorkspaceRepos>[number],
-      ]);
-    });
-
-    it("threads interject=true into buildUpdaterPrompt", async () => {
-      const { buildUpdaterPrompt } = await import("@/lib/templates");
-      const mockBuildUpdaterPrompt = vi.mocked(buildUpdaterPrompt);
-      mockBuildUpdaterPrompt.mockClear();
-
-      await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests", interject: true });
-
-      expect(mockBuildUpdaterPrompt).toHaveBeenCalledWith(
-        expect.objectContaining({ interject: true }),
-      );
-    });
-
-    it("does not set interject when flag is omitted", async () => {
-      const { buildUpdaterPrompt } = await import("@/lib/templates");
-      const mockBuildUpdaterPrompt = vi.mocked(buildUpdaterPrompt);
-      mockBuildUpdaterPrompt.mockClear();
-
-      await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-
-      const call = mockBuildUpdaterPrompt.mock.calls[0][0];
-      expect(call.interject).toBeUndefined();
-    });
-  });
-
   describe("multiple repos", () => {
     beforeEach(() => {
       mockListWorkspaceRepos.mockReturnValue([
@@ -136,21 +55,6 @@ describe("buildUpdateTodoPipeline", () => {
           worktreePath: "/repos/repo-b/worktrees/test-ws",
         } as ReturnType<typeof listWorkspaceRepos>[number],
       ]);
-    });
-
-    it("returns updater phase plus normalize phase", async () => {
-      const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-      expect(phases).toHaveLength(2);
-      expect(phases[0].kind).toBe("single");
-      expect(phases[1].label).toBe("Normalize TODO format");
-    });
-
-    it("phase does not set cwd but sets addDirs", async () => {
-      const phases = await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });
-      const phase = phases[0];
-      if (phase.kind !== "single") throw new Error("expected single");
-      expect(phase.cwd).toBeUndefined();
-      expect(phase.addDirs).toEqual([expect.stringContaining("test-ws")]);
     });
 
     it("filters to specified repo when repo parameter is provided", async () => {

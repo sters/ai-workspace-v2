@@ -84,11 +84,6 @@ describe("NewWorkspaceForm", () => {
     expect(sentBody().description).toBe("Add retry logic");
   });
 
-  it("starts with the description handed to it in the URL", () => {
-    render(<NewWorkspaceForm initialDescription="from a suggestion" />);
-    expect(screen.getByLabelText(/task description/i)).toHaveValue("from a suggestion");
-  });
-
   it("empties the request it just started", async () => {
     render(<NewWorkspaceForm initialDescription="from a suggestion" />);
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));

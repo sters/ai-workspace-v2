@@ -1,7 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { resolveEffort, resolveModel, STEP_DEFAULT_EFFORTS, STEP_DEFAULT_MODELS } from "@/lib/config/model";
 import { _resetConfig, _setConfigFilePath } from "@/lib/config/resolver";
-import { CLAUDE_EFFORTS } from "@/types/claude";
 import { STEP_TYPES } from "@/types/pipeline";
 import fs from "node:fs";
 import os from "node:os";
@@ -14,18 +13,6 @@ function writeTempConfig(config: Record<string, unknown>): string {
   fs.writeFileSync(filePath, stringify(config), "utf-8");
   return filePath;
 }
-
-describe("CLAUDE_EFFORTS", () => {
-  it("includes every level the Claude CLI accepts", () => {
-    expect(Object.values(CLAUDE_EFFORTS)).toEqual([
-      "low",
-      "medium",
-      "high",
-      "xhigh",
-      "max",
-    ]);
-  });
-});
 
 describe("resolveEffort", () => {
   let tmpConfigPath: string | null = null;

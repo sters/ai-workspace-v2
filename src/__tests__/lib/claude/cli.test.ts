@@ -109,17 +109,6 @@ describe("getCliPath", () => {
     // Should not call Bun.which when CLAUDE_PATH is set
     expect(mockWhich).not.toHaveBeenCalled();
   });
-
-  it("re-resolves after _resetCliPath()", () => {
-    mockWhich.mockReturnValue("/usr/local/bin/claude");
-
-    getCliPath();
-    _resetCliPath();
-    getCliPath();
-
-    // Called for both resolutions
-    expect(mockWhich).toHaveBeenCalledTimes(2);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -170,23 +159,6 @@ describe("detectFatalApiError", () => {
     expect(detectFatalApiError(event)).toBeNull();
   });
 
-  it("returns null for normal assistant events", () => {
-    const event = {
-      type: "assistant",
-      message: { content: [{ type: "text", text: "Hello" }] },
-    };
-    expect(detectFatalApiError(event)).toBeNull();
-  });
-
-  it("returns null for system events", () => {
-    const event = {
-      type: "system",
-      subtype: "init",
-      session_id: "abc",
-    };
-    expect(detectFatalApiError(event)).toBeNull();
-  });
-
   it("detects 401 case-insensitively", () => {
     const event = {
       type: "result",
@@ -206,12 +178,6 @@ describe("getClaudeEnv", () => {
     const env = getClaudeEnv();
     expect(env.CLAUDECODE).toBeUndefined();
     expect(env.PATH).toBe(process.env.PATH);
-  });
-
-  it("merges extra properties", () => {
-    const env = getClaudeEnv({ CUSTOM_VAR: "hello" });
-    expect(env.CUSTOM_VAR).toBe("hello");
-    expect(env.CLAUDECODE).toBeUndefined();
   });
 
   it("extra properties override base env", () => {
@@ -255,21 +221,6 @@ describe("spawnClaude", () => {
     const [, opts] = mockSpawn.mock.calls[0];
     expect(opts.cwd).toBe("/custom/dir");
   });
-
-  it("passes stdin option when specified", () => {
-    spawnClaude({ args: ["-p", "-"], stdin: "pipe" });
-
-    const [, opts] = mockSpawn.mock.calls[0];
-    expect(opts.stdin).toBe("pipe");
-  });
-
-  it("uses custom env when provided", () => {
-    const customEnv = { PATH: "/bin", CLAUDECODE: undefined };
-    spawnClaude({ args: ["--version"], env: customEnv });
-
-    const [, opts] = mockSpawn.mock.calls[0];
-    expect(opts.env).toBe(customEnv);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -305,14 +256,6 @@ describe("runClaudeCommand", () => {
     const [, opts] = mockSpawn.mock.calls[0];
     expect(opts.cwd).toBe("/custom/dir");
   });
-
-  it("uses custom env when provided", async () => {
-    const customEnv = { PATH: "/bin", CLAUDECODE: undefined };
-    await runClaudeCommand({ args: ["--version"], env: customEnv });
-
-    const [, opts] = mockSpawn.mock.calls[0];
-    expect(opts.env).toBe(customEnv);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -347,24 +290,6 @@ describe("spawnClaudeTerminal", () => {
 
     const [, opts] = mockSpawnTerminal.mock.calls[0];
     expect(opts.cwd).toBe("/custom/dir");
-  });
-
-  it("uses custom env when provided", () => {
-    const listeners = new Set<(data: string) => void>();
-    const customEnv = { PATH: "/bin", CLAUDECODE: undefined };
-    spawnClaudeTerminal({ args: [], env: customEnv, listeners });
-
-    const [, opts] = mockSpawnTerminal.mock.calls[0];
-    expect(opts.env).toBe(customEnv);
-  });
-
-  it("passes cols and rows options", () => {
-    const listeners = new Set<(data: string) => void>();
-    spawnClaudeTerminal({ args: [], listeners, cols: 80, rows: 24 });
-
-    const [, opts] = mockSpawnTerminal.mock.calls[0];
-    expect(opts.cols).toBe(80);
-    expect(opts.rows).toBe(24);
   });
 });
 

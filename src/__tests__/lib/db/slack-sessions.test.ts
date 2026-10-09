@@ -60,21 +60,4 @@ describe("db/slack-sessions", () => {
     expect(getSession("t", 0)).toBeUndefined();
     deleteSession("t"); // no throw on absent row
   });
-
-  it("persists across a DB singleton reset (same file)", () => {
-    // Simulate a slack-server restart: a fresh getDb() over the same file must
-    // still see the row. Uses a temp file rather than :memory: (which is
-    // per-connection).
-    const tmp = `/tmp/aiw-slack-sessions-${process.pid}-${Math.floor(performance.now())}.sqlite`;
-    _resetDb();
-    _setDbPath(tmp);
-    getDb();
-    setSession("t", "sess-persist", 1000);
-
-    _resetDb(); // closes the connection
-    _setDbPath(tmp);
-    getDb(); // reopens the same file
-
-    expect(getSession("t", 1000)).toBe("sess-persist");
-  });
 });

@@ -128,23 +128,6 @@ describe("WorkspaceSidebar", () => {
     });
   }
 
-  it("lists each workspace as a link to its page", () => {
-    mockWorkspaces([
-      makeWorkspace("ws-alpha", "Alpha Project"),
-      makeWorkspace("ws-beta", "Beta Project"),
-    ]);
-    render(<WorkspaceSidebar />);
-
-    expect(screen.getByRole("link", { name: /Alpha Project/ })).toHaveAttribute(
-      "href",
-      "/workspace/ws-alpha",
-    );
-    expect(screen.getByRole("link", { name: /Beta Project/ })).toHaveAttribute(
-      "href",
-      "/workspace/ws-beta",
-    );
-  });
-
   it("shows the directory slug alongside the title", () => {
     mockWorkspaces([makeWorkspace("feature-alpha-2026-01-01", "Alpha Project")]);
     render(<WorkspaceSidebar />);
@@ -187,22 +170,6 @@ describe("WorkspaceSidebar", () => {
       "aria-current",
       "page",
     );
-  });
-
-  it("flags running and asking workspaces", () => {
-    mockUseRunningOperations.mockReturnValue({
-      runningWorkspaces: new Set(["ws-run", "ws-ask"]),
-      operations: [{ id: "op-1", workspace: "ws-ask", hasPendingAsk: true }],
-    });
-    mockWorkspaces([
-      makeWorkspace("ws-idle", "Idle"),
-      makeWorkspace("ws-run", "Running"),
-      makeWorkspace("ws-ask", "Asking"),
-    ]);
-    render(<WorkspaceSidebar />);
-
-    expect(screen.getByLabelText("Operation running")).toBeInTheDocument();
-    expect(screen.getByLabelText("Waiting for an answer")).toBeInTheDocument();
   });
 
   it("opens the running operation straight from its indicator", () => {

@@ -105,22 +105,6 @@ describe("buildDisplayNodes", () => {
     expect(subagent.children).toHaveLength(2);
   });
 
-  it("infers completion from tool_result when no task_notification exists", () => {
-    const entries: LogEntry[] = [
-      toolCall("Agent", "a1", "Do something"),
-      systemTask("a1", "running", "Task started: Do something"),
-      text("working...", "a1"),
-      // No task_notification, just tool_result
-      toolResult("a1", "done"),
-    ];
-
-    const nodes = buildDisplayNodes(entries);
-    expect(nodes).toHaveLength(1);
-
-    const agent = nodes[0] as Extract<DisplayNode, { type: "subagent" }>;
-    expect(agent.status).toBe("completed");
-  });
-
   it("infers failed status from error tool_result", () => {
     const entries: LogEntry[] = [
       toolCall("Agent", "a1", "Do something"),

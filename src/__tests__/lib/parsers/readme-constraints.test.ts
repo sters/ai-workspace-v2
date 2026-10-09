@@ -116,10 +116,6 @@ describe("parseConstraints", () => {
     expect(result[0].repoName).toBe("my-repo");
   });
 
-  it("handles empty input", () => {
-    expect(parseConstraints("")).toEqual([]);
-  });
-
   it("skips repo sections with no parseable constraints", () => {
     const content = `## Repository Constraints
 

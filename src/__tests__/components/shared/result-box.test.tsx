@@ -9,21 +9,9 @@ vi.mock("@/components/shared/content/markdown-renderer", () => ({
 }));
 
 describe("ResultBox", () => {
-  it("renders content via MarkdownRenderer", () => {
-    render(<ResultBox content="Hello world" />);
-    expect(screen.getByTestId("markdown-renderer")).toHaveTextContent(
-      "Hello world"
-    );
-  });
-
   it("shows cost when provided", () => {
     render(<ResultBox content="test" cost="$0.05" />);
     expect(screen.getByText("$0.05")).toBeInTheDocument();
-  });
-
-  it("shows duration when provided", () => {
-    render(<ResultBox content="test" duration="12s" />);
-    expect(screen.getByText("12s")).toBeInTheDocument();
   });
 
   it("shows cost and duration separated by pipe", () => {

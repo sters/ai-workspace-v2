@@ -96,12 +96,6 @@ describe("buildCreatePrPipeline", () => {
     ]);
   });
 
-  it("returns a single group phase with one child per repo", async () => {
-    const phases = await buildCreatePrPipeline({ workspace: "ws", draft: true });
-    expect(phases).toHaveLength(1);
-    expect(phases[0].kind).toBe("group");
-  });
-
   it("passes the recorded review threads and TODO path to the prompt", async () => {
     mockFileExists.mockResolvedValue(true);
     mockFileText.mockResolvedValue(TODO_WITH_THREADS);

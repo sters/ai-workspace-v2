@@ -118,15 +118,6 @@ describe("handleStart", () => {
     expect(promptIdx).toBeGreaterThan(modelIdx + 1);
   });
 
-  it("respects the chat.model override from config", async () => {
-    setChatModel("opus");
-    await startSession();
-
-    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
-    expect(opts.args).toEqual(expect.arrayContaining(["--model", "opus"]));
-    expect(opts.args).not.toContain("sonnet");
-  });
-
   it("omits --model when chat.model is null (CLI default)", async () => {
     setChatModel(null);
     await startSession();

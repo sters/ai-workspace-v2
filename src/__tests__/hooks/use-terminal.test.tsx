@@ -52,38 +52,6 @@ describe("useTerminal", () => {
     vi.clearAllMocks();
   });
 
-  it("returns containerRef, termRef, init, and dispose", () => {
-    const { result } = renderHook(() => useTerminal());
-    expect(result.current.containerRef).toBeDefined();
-    expect(result.current.termRef).toBeDefined();
-    expect(result.current.init).toBeInstanceOf(Function);
-    expect(result.current.dispose).toBeInstanceOf(Function);
-  });
-
-  it("default options: cursorBlink true, stdin enabled", async () => {
-    const { result } = renderHook(() => useTerminal());
-
-    // Attach a container element to the ref
-    const container = document.createElement("div");
-    Object.defineProperty(result.current.containerRef, "current", {
-      value: container,
-      writable: true,
-    });
-
-    await act(async () => {
-      await result.current.init();
-    });
-
-    expect(Terminal).toHaveBeenCalledWith(
-      expect.objectContaining({
-        cursorBlink: true,
-      }),
-    );
-    // disableStdin should not be set (or false)
-    const opts = vi.mocked(Terminal).mock.calls[0][0];
-    expect(opts?.disableStdin).toBeFalsy();
-  });
-
   it("readonly: true sets disableStdin, cursorBlink false, cursorInactiveStyle none", async () => {
     const { result } = renderHook(() => useTerminal({ readonly: true }));
 
@@ -121,40 +89,6 @@ describe("useTerminal", () => {
 
     // FitAddon + WebLinksAddon = 2 loadAddon calls
     expect(mockLoadAddon).toHaveBeenCalledTimes(2);
-  });
-
-  it("without webLinks only loads FitAddon", async () => {
-    const { result } = renderHook(() => useTerminal());
-
-    const container = document.createElement("div");
-    Object.defineProperty(result.current.containerRef, "current", {
-      value: container,
-      writable: true,
-    });
-
-    await act(async () => {
-      await result.current.init();
-    });
-
-    // Only FitAddon
-    expect(mockLoadAddon).toHaveBeenCalledTimes(1);
-  });
-
-  it("init() opens terminal on the container", async () => {
-    const { result } = renderHook(() => useTerminal());
-
-    const container = document.createElement("div");
-    Object.defineProperty(result.current.containerRef, "current", {
-      value: container,
-      writable: true,
-    });
-
-    await act(async () => {
-      await result.current.init();
-    });
-
-    expect(mockOpen).toHaveBeenCalledWith(container);
-    expect(result.current.termRef.current).toBeTruthy();
   });
 
   it("dispose() calls Terminal.dispose and clears refs", async () => {

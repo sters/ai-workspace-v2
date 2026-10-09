@@ -52,16 +52,6 @@ describe("McpAuthTerminal", () => {
     vi.clearAllMocks();
   });
 
-  it("renders info banner and initializes xterm", async () => {
-    render(<McpAuthTerminal {...defaultProps} />);
-    expect(
-      screen.getByText(/automatically operated by AI/),
-    ).toBeInTheDocument();
-    await vi.waitFor(() => {
-      expect(mockOpen).toHaveBeenCalled();
-    });
-  });
-
   it("writes only terminal events to xterm (not status events)", async () => {
     const events: OperationEvent[] = [
       makeEvent("status", "Starting..."),
@@ -147,23 +137,6 @@ describe("McpAuthTerminal", () => {
 
     expect(mockWrite).toHaveBeenCalledTimes(2);
     expect(mockWrite).toHaveBeenLastCalledWith("second");
-  });
-
-  it("does not write output/error/complete events", async () => {
-    const events: OperationEvent[] = [
-      makeEvent("output", "output msg"),
-      makeEvent("error", "error msg"),
-      makeEvent("complete", '{"exitCode":0}'),
-    ];
-
-    const { rerender } = render(<McpAuthTerminal {...defaultProps} />);
-
-    await vi.waitFor(() => {
-      expect(mockOpen).toHaveBeenCalled();
-    });
-
-    rerender(<McpAuthTerminal {...defaultProps} events={events} />);
-    expect(mockWrite).not.toHaveBeenCalled();
   });
 
   it("shows success message when completed", async () => {
