@@ -6,7 +6,7 @@ import {
   killAndAwait,
   scheduleAutonomousRekick,
 } from "@/lib/pipeline/interject";
-import { resolveWorkspaceName, getOperationConfig } from "@/lib/config";
+import { resolveWorkspaceName } from "@/lib/config";
 import { buildUpdateTodoPipeline } from "@/lib/pipelines/update-todo";
 import { updateTodoSchema } from "@/lib/schemas";
 import { parseBody, applyOperationDefaults } from "@/lib/validate";
@@ -21,9 +21,6 @@ export async function POST(request: Request) {
 
   const workspace = resolveWorkspaceName(data.workspace);
   const { instruction, repo, interactionLevel, interject } = data;
-
-  const bestOfN = data.bestOfN ?? getOperationConfig("update-todo").bestOfN;
-  const bestOfNFromConfig = data.bestOfN == null;
 
   if (interject) {
     if (!acquireInterject(workspace)) {
@@ -40,16 +37,12 @@ export async function POST(request: Request) {
         workspace,
         instruction,
         repo,
-        bestOfN: bestOfN >= 2 ? bestOfN : undefined,
-        bestOfNConfirm: bestOfNFromConfig,
-        interactionLevel,
         interject: true,
       });
       const operation = startOperationPipeline("update-todo", workspace, phases, undefined, {
         instruction,
         interactionLevel,
         ...(repo && { repo }),
-        ...(bestOfN >= 2 && { bestOfN: String(bestOfN) }),
         interject: "true",
       });
 
@@ -73,15 +66,11 @@ export async function POST(request: Request) {
       workspace,
       instruction,
       repo,
-      bestOfN: bestOfN >= 2 ? bestOfN : undefined,
-      bestOfNConfirm: bestOfNFromConfig,
-      interactionLevel,
     });
     const operation = startOperationPipeline("update-todo", workspace, phases, undefined, {
       instruction,
       interactionLevel,
       ...(repo && { repo }),
-      ...(bestOfN >= 2 && { bestOfN: String(bestOfN) }),
     });
     return NextResponse.json(operation);
   } catch (err) {

@@ -18,12 +18,12 @@ import { getWorkspaceConfigFilePath } from "./workspace-dir";
  * In the YAML file, users write:
  * ```yaml
  * operations:
- *   bestOfN: 3
+ *   batchSize: 15
  *   review:
- *     bestOfN: 0
+ *     model: sonnet
  * ```
  *
- * The YAML parser produces `{ operations: { bestOfN: 3, review: { bestOfN: 0 } } }`.
+ * The YAML parser produces `{ operations: { batchSize: 15, review: { model: "sonnet" } } }`.
  * This function moves the `review` object into `operations.typeOverrides.review`.
  */
 export function normalizeRawConfig(raw: Record<string, unknown>): Partial<AppConfig> {
@@ -263,11 +263,6 @@ export function mergeConfig(
         file.operations?.defaultInteractionLevel,
         defaults.operations.defaultInteractionLevel,
       ),
-      bestOfN: pick(
-        env.operations?.bestOfN,
-        file.operations?.bestOfN,
-        defaults.operations.bestOfN,
-      ),
       batchSize: pick(
         env.operations?.batchSize,
         file.operations?.batchSize,
@@ -336,7 +331,6 @@ export function getOperationConfig(type: OperationType): OperationTypeSettings {
     claudeTimeoutMinutes: overrides?.claudeTimeoutMinutes ?? cfg.operations.claudeTimeoutMinutes,
     functionTimeoutMinutes: overrides?.functionTimeoutMinutes ?? cfg.operations.functionTimeoutMinutes,
     defaultInteractionLevel: overrides?.defaultInteractionLevel ?? cfg.operations.defaultInteractionLevel,
-    bestOfN: overrides?.bestOfN ?? cfg.operations.bestOfN,
     batchSize: overrides?.batchSize ?? cfg.operations.batchSize,
     model: overrides?.model ?? cfg.operations.model,
     effort: overrides?.effort ?? cfg.operations.effort,

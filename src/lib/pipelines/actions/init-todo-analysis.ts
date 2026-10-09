@@ -13,7 +13,6 @@ import { readWorkspaceReadme, parseConstraints } from "@/lib/parsers/readme";
 import { startToolchainPrewarm } from "@/lib/workspace/toolchain-prewarm";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { buildPlannerPrompt } from "@/lib/templates";
-import { runBestOfNFiles } from "./best-of-n-files";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
@@ -39,10 +38,6 @@ export interface InitTodoAnalysisInput {
   /** Task type ("feature" | "review" | "research" | …). Skips planning for review/research. */
   taskType: () => string;
   interactionLevel?: InteractionLevel;
-  /** Best-of-N count. Only consulted when `getUseBestOfN()` returns true. */
-  bestOfN?: number;
-  /** Optional runtime override for whether Best-of-N is active. Defaults to bestOfN >= 2. */
-  getUseBestOfN?: () => boolean;
   /** Commit message for the final snapshot. */
   commitMessage?: string;
   /** Final result message for the commit phase. */
@@ -52,8 +47,7 @@ export interface InitTodoAnalysisInput {
 }
 
 export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): PipelinePhase[] {
-  const { wsName, wsPath, repos, taskType, interactionLevel, bestOfN } = input;
-  const getUseBestOfN = input.getUseBestOfN ?? (() => bestOfN != null && bestOfN >= 2);
+  const { wsName, wsPath, repos, taskType, interactionLevel } = input;
 
   return [
     // Phase C: Discover repo constraints (lint/test/build) and append to README
@@ -111,11 +105,11 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
         return true;
       },
     },
-    // Phase D: Plan TODOs for each repo (parallel, with optional Best-of-N)
+    // Phase D: Plan TODOs for each repo (parallel)
     {
       kind: "function",
       label: "Plan TODO items",
-      timeoutMs: 60 * 60 * 1000, // 1 hour — may wait for human when Best-of-N
+      timeoutMs: 60 * 60 * 1000, // 1 hour — an interactive planner may wait for a human
       fn: async (ctx) => {
         const tt = taskType();
         if (tt === "review" || tt === "research") {
@@ -134,24 +128,22 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
 
         const plannerAgent = meta.taskType === "research" ? "research-planner" : "planner";
         const plannerPromptFile = await ensureSystemPrompt(wp, plannerAgent);
-        const buildPlannerChildren = (todoOutputDir?: string, addDirsOverride?: string[]) =>
-          rs.map((repo) => ({
-            label: `plan-${repo.repoName}`,
-            stepType: STEP_TYPES.PLAN_TODO,
-            prompt: buildPlannerPrompt({
-              workspaceName: wsName(),
-              repoPath: repo.repoPath,
-              repoName: repo.repoName,
-              readmeContent,
-              worktreePath: repo.worktreePath,
-              taskType: meta.taskType,
-              interactive: interactionLevel === "high",
-              todoOutputDir,
-              instruction: input.instruction?.(),
-            }),
-            addDirs: addDirsOverride ?? [wp],
-            appendSystemPromptFile: plannerPromptFile,
-          }));
+        const children = rs.map((repo) => ({
+          label: `plan-${repo.repoName}`,
+          stepType: STEP_TYPES.PLAN_TODO,
+          prompt: buildPlannerPrompt({
+            workspaceName: wsName(),
+            repoPath: repo.repoPath,
+            repoName: repo.repoName,
+            readmeContent,
+            worktreePath: repo.worktreePath,
+            taskType: meta.taskType,
+            interactive: interactionLevel === "high",
+            instruction: input.instruction?.(),
+          }),
+          addDirs: [wp],
+          appendSystemPromptFile: plannerPromptFile,
+        }));
 
         const cleanup = async () => {
           const templatePath = path.join(wp, "templates", "TODO-template.md");
@@ -160,31 +152,6 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
           }
         };
 
-        if (getUseBestOfN() && bestOfN && bestOfN >= 2) {
-          const todoFiles = rs.map((r) => path.join(wp, `TODO-${r.repoName}.md`));
-          const templatePath = path.join(wp, "templates", "TODO-template.md");
-          const filesToCapture = await pathExists(templatePath)
-            ? [...todoFiles, templatePath]
-            : todoFiles;
-
-          const result = await runBestOfNFiles({
-            ctx,
-            n: bestOfN,
-            operationType: "plan-todo",
-            filesToCapture,
-            buildChildren: (candidateDir) =>
-              buildPlannerChildren(
-                candidateDir,
-                [candidateDir, ...rs.map((r) => r.worktreePath)],
-              ),
-            interactionLevel,
-          });
-
-          await cleanup();
-          return result;
-        }
-
-        const children = buildPlannerChildren();
         ctx.emitStatus(`Planning TODOs for ${children.length} repositories`);
         const results = await ctx.runChildGroup(children);
         const allSuccess = results.every(Boolean);

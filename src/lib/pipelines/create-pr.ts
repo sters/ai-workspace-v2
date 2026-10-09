@@ -28,13 +28,11 @@ export async function buildCreatePrPipeline(input: {
   repository?: string;
   /** Narrows `repository`'s selection further to these worktrees — the ones an autonomous run finished when it stops with others still open. */
   repositories?: readonly string[];
-  /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
-  repos?: WorkspaceRepo[];
 }): Promise<PipelinePhase[]> {
   const { workspace, draft, repository } = input;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const allRepos = input.repos ?? await listWorkspaceRepos(workspace);
+  const allRepos = await listWorkspaceRepos(workspace);
   const repos = selectRepos(allRepos, { repository, repositories: input.repositories });
 
   const wsPath = path.join(getWorkspaceDir(), workspace);

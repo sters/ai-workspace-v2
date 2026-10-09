@@ -41,7 +41,6 @@ import { getCleanEnv } from "@/lib/env";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
 import type { CrossRepositoryReviewerInput } from "@/types/prompts";
-import type { WorkspaceRepo } from "@/types/workspace";
 import { getTimeoutDefaults } from "@/lib/pipeline-manager";
 
 export interface ReviewPipelineInput {
@@ -54,8 +53,6 @@ export interface ReviewPipelineInput {
    * each boundary an unfinished one can move.
    */
   repositories?: readonly string[];
-  /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
-  repos?: WorkspaceRepo[];
   /**
    * Fixes the previous autonomous cycle's gate asked for. When present, a
    * verifier child checks each one against the code — the gate otherwise infers
@@ -123,7 +120,7 @@ export async function buildReviewPipeline(
   const hasRequestedFixes = requestedFixes !== undefined && requestedFixes.length > 0;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const allRepos = input.repos ?? await listWorkspaceRepos(workspace);
+  const allRepos = await listWorkspaceRepos(workspace);
   const boundaryRepos = selectRepos(allRepos, { repository });
   const repos = selectRepos(boundaryRepos, { repositories: input.repositories });
   const reviewedNames = new Set(repos.map((r) => r.repoName));

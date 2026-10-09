@@ -21,8 +21,6 @@ vi.mock("@/lib/templates", () => ({
   buildPlannerPrompt: vi.fn(() => "planner-prompt"),
   buildCoordinatorPrompt: vi.fn(() => "coordinator-prompt"),
   buildReviewerPrompt: vi.fn(() => "reviewer-prompt"),
-  buildBestOfNFileReviewerPrompt: vi.fn(() => "reviewer-prompt"),
-  BEST_OF_N_REVIEW_SCHEMA: {},
 }));
 
 vi.mock("@/lib/workspace/prompts", () => ({
@@ -58,11 +56,4 @@ describe("buildInitPipeline", () => {
     }
   });
 
-  // Best-of-N fans out inside the existing phases rather than adding any.
-  it.each([{ bestOfN: 3 }, { bestOfN: 2, bestOfNConfirm: true }])(
-    "keeps the same phases with %o",
-    (options) => {
-      expect(labelsOf(buildInitPipeline("desc", undefined, options))).toEqual(EXPECTED_LABELS);
-    },
-  );
 });

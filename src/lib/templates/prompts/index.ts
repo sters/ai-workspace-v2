@@ -36,15 +36,6 @@ export { getCreateTodoPlannerSystemPrompt, buildCreateTodoFromReviewPrompt } fro
 export { getSearchSystemPrompt, buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "./search";
 export { buildSlackChatPrompt, getSlackChatSystemPrompt } from "./slack-chat";
 export { getRepoConstraintsSystemPrompt, buildRepoConstraintsPrompt } from "./repo-constraints";
-export {
-  getBestOfNReviewerSystemPrompt,
-  buildBestOfNReviewerPrompt,
-  getBestOfNFileReviewerSystemPrompt,
-  buildBestOfNFileReviewerPrompt,
-  getBestOfNSynthesizerSystemPrompt,
-  buildBestOfNFileSynthesizerPrompt,
-  BEST_OF_N_REVIEW_SCHEMA,
-} from "./best-of-n-reviewer";
 export { getAutonomousGateSystemPrompt, buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "./autonomous-gate";
 export { getReadmeClarityGateSystemPrompt, buildReadmeClarityGatePrompt, README_CLARITY_GATE_SCHEMA } from "./readme-clarity-gate";
 export {

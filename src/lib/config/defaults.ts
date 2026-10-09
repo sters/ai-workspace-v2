@@ -25,7 +25,6 @@ export const CONFIG_DEFAULTS: AppConfig = {
     claudeTimeoutMinutes: 20,
     functionTimeoutMinutes: 3,
     defaultInteractionLevel: "mid",
-    bestOfN: 0,
     // A 10-item batch measured ~18.5min, and the tail batch of a 10+2 split cost
     // 5min to re-establish context for two items. 15 absorbs a typical review
     // follow-up round in one call; the batch boundary is still worth keeping
@@ -90,7 +89,6 @@ export const OVERRIDABLE_SETTINGS_KEYS = new Set<keyof OperationTypeSettings>([
   "claudeTimeoutMinutes",
   "functionTimeoutMinutes",
   "defaultInteractionLevel",
-  "bestOfN",
   "batchSize",
   "model",
   "effort",
@@ -124,7 +122,6 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "claudeTimeoutMinutes", section: "operations", defaultLine: "#   claudeTimeoutMinutes: 20" },
   { key: "functionTimeoutMinutes", section: "operations", defaultLine: "#   functionTimeoutMinutes: 3" },
   { key: "defaultInteractionLevel", section: "operations", defaultLine: "#   defaultInteractionLevel: mid   # low / mid / high" },
-  { key: "bestOfN", section: "operations", defaultLine: "#   bestOfN: 0                     # 0 = disabled, 2-5 = parallel candidates" },
   { key: "batchSize", section: "operations", defaultLine: "#   batchSize: 15                  # TODO groups per batch in execute operations" },
   { key: "model", section: "operations", defaultLine: "#   model: null                    # null = CLI default (opus / sonnet / haiku)" },
   { key: "effort", section: "operations", defaultLine: "#   effort: null                   # null = per-step default (low / medium / high / xhigh / max)" },

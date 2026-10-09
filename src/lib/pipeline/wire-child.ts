@@ -9,7 +9,7 @@ import { emitEvent, emitStatus } from "./events";
  * ask exists only if some AskUserQuestion tool_use has no matching tool_result
  * AND its emitting child process has not already finished. This keeps the
  * server flag (which drives the dashboard "asking" badge) consistent with what
- * the UI actually renders, including across concurrent best-of-N children.
+ * the UI actually renders, including across concurrent children.
  */
 export function recomputeHasPendingAsk(managed: ManagedOperation): void {
   const answeredIds = new Set<string>();

@@ -19,21 +19,11 @@ import {
   buildReadmeContent,
   buildInitAnalyzeAndReadmePrompt,
   INIT_ANALYSIS_SCHEMA,
-  buildBestOfNFileReviewerPrompt,
-  BEST_OF_N_REVIEW_SCHEMA,
 } from "@/lib/templates";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 import { buildInitTodoAnalysisPhases } from "./actions/init-todo-analysis";
-
-interface InitBestOfNOptions {
-  bestOfN?: number;
-  bestOfNConfirm?: boolean;
-}
-
-/** Reuse the same schema structure for reviewing README candidates. */
-const INIT_REVIEW_SCHEMA = BEST_OF_N_REVIEW_SCHEMA;
 
 /**
  * Budget for `Setup workspace`, which clones or fetches every repository and
@@ -41,48 +31,6 @@ const INIT_REVIEW_SCHEMA = BEST_OF_N_REVIEW_SCHEMA;
  * a request for a worktree per environment of many services, takes minutes.
  */
 const SETUP_WORKSPACE_TIMEOUT_MS = 15 * 60 * 1000;
-
-/** Schema for README synthesizer output. */
-const INIT_SYNTH_SCHEMA = {
-  type: "object",
-  properties: {
-    readmeContent: {
-      type: "string",
-      description: "The synthesized README content combining the best parts from multiple candidates.",
-    },
-  },
-  required: ["readmeContent"],
-  additionalProperties: false,
-} as const;
-
-/** Build a prompt for synthesizing README from multiple candidates. */
-function buildInitReadmeSynthesizerPrompt(input: {
-  candidates: { label: string; files: { name: string; content: string }[] }[];
-  baseCandidate: number;
-}): string {
-  const sections = input.candidates
-    .map((c, i) => {
-      const readme = c.files[0]?.content ?? "(no content)";
-      return `### Candidate ${i + 1}: ${c.label}\n\`\`\`markdown\n${readme}\n\`\`\``;
-    })
-    .join("\n\n---\n\n");
-
-  return `# Task: Synthesize README from Best-of-N Candidates
-
-## Base Candidate: candidate-${input.baseCandidate}
-
-## Candidates
-
-${sections}
-
-## Instructions
-
-Create a synthesized README.md that combines the best parts from all candidates. Start with candidate-${input.baseCandidate} as the base and incorporate superior sections, details, or structure from the other candidates.
-
-Output a JSON object with a single \`readmeContent\` field containing the full synthesized README.md content.
-
-Maintain the overall structure of the base candidate while integrating improvements from others.`;
-}
 
 /** Parse analysis from Claude's onResultText callback. */
 function parseAnalysis(
@@ -108,18 +56,12 @@ function parseAnalysis(
 export function buildInitPipeline(
   description: string,
   interactionLevel?: InteractionLevel,
-  bestOfNOptions?: InitBestOfNOptions,
 ): PipelinePhase[] {
-  const bestOfN = bestOfNOptions?.bestOfN;
-  const bestOfNConfirm = bestOfNOptions?.bestOfNConfirm;
-
   // Shared mutable state across pipeline phases
   let wsName = "";
   let wsPath = "";
   let analysis: (TaskAnalysis & { readmeContent?: string }) | null = null;
   const repoResults: SetupRepositoryResult[] = [];
-  // Whether user opted into Best-of-N (set in Phase A, checked in Phase D)
-  let useBestOfN = bestOfN != null && bestOfN >= 2;
 
   return [
     // Phase A: Claude analyzes the task and drafts README (merged analysis + README fill)
@@ -139,180 +81,14 @@ export function buildInitPipeline(
         });
 
         const initReadmePromptFile = await ensureGlobalSystemPrompt("init-readme");
-        const runOnce = (label?: string) =>
-          ctx.runChild(label ?? "Analyze & draft README", prompt, {
-            jsonSchema: INIT_ANALYSIS_SCHEMA,
-            stepType: STEP_TYPES.ANALYZE_README,
-            appendSystemPromptFile: initReadmePromptFile,
-            onResultText: (text) => {
-              analysis = parseAnalysis(text, description);
-            },
-          });
-
-        // Best-of-N for README
-        if (bestOfN && bestOfN >= 2) {
-          // Confirmation ask (applies to both README and TODO Best-of-N)
-          if (bestOfNConfirm) {
-            const answers = await ctx.emitAsk([{
-              question: `Best-of-N mode is enabled (${bestOfN} candidates). Use it for README creation and TODO planning?`,
-              options: [
-                { label: "Use Best-of-N", description: `Run ${bestOfN} candidates and compare results` },
-                { label: "Normal execution", description: "Run single execution without Best-of-N" },
-              ],
-            }]);
-            if (Object.values(answers)[0] !== "Use Best-of-N") {
-              useBestOfN = false;
-              ctx.emitStatus("Best-of-N skipped — running normal execution");
-              return runOnce();
-            }
-          }
-
-          ctx.emitStatus(`Running ${bestOfN} README candidates in parallel`);
-          type Candidate = { label: string; analysis: TaskAnalysis & { readmeContent?: string } };
-
-          // Collect parsed analyses per candidate via onResultText callbacks
-          const candidateAnalyses = new Map<string, (TaskAnalysis & { readmeContent?: string }) | null>();
-          const children = Array.from({ length: bestOfN }, (_, i) => {
-            const label = `candidate-${i + 1}`;
-            return {
-              label: `${label}: Analyze & draft README`,
-              prompt,
-              jsonSchema: INIT_ANALYSIS_SCHEMA as Record<string, unknown>,
-              stepType: STEP_TYPES.ANALYZE_README,
-              appendSystemPromptFile: initReadmePromptFile,
-              onResultText: (text: string) => {
-                candidateAnalyses.set(label, parseAnalysis(text, description));
-              },
-            };
-          });
-
-          const results = await ctx.runChildGroup(children);
-          const candidates: Candidate[] = [];
-          for (let i = 0; i < results.length; i++) {
-            const label = `candidate-${i + 1}`;
-            const candidateAnalysis = candidateAnalyses.get(label);
-            ctx.emitStatus(`[${label}] ${results[i] ? "Completed" : "Failed"}`);
-            if (results[i] && candidateAnalysis) {
-              candidates.push({ label, analysis: candidateAnalysis });
-            }
-          }
-
-          if (candidates.length === 0) {
-            ctx.emitResult("**Best-of-N README: All candidates failed.**");
-            return false;
-          }
-
-          if (candidates.length === 1) {
-            analysis = candidates[0].analysis;
-            ctx.emitStatus(`Only one candidate succeeded (${candidates[0].label}) — auto-selected`);
-            return true;
-          }
-
-          // Run AI reviewer to select or synthesize
-          ctx.emitStatus(`Running AI reviewer to compare ${candidates.length} README candidates`);
-          const reviewCandidates = candidates.map((c) => ({
-            label: c.label,
-            files: [{ name: "README.md", content: c.analysis.readmeContent ?? "(no content)" }],
-          }));
-          const reviewPrompt = buildBestOfNFileReviewerPrompt({
-            operationType: "init-readme",
-            candidates: reviewCandidates,
-          });
-
-          let reviewResultText: string | undefined;
-          const reviewOk = await ctx.runChild("Best-of-N README Reviewer", reviewPrompt, {
-            jsonSchema: INIT_REVIEW_SCHEMA as Record<string, unknown>,
-            appendSystemPromptFile: await ensureGlobalSystemPrompt("best-of-n-file-reviewer"),
-            onResultText: (text) => { reviewResultText = text; },
-          });
-
-          if (!reviewOk) {
-            analysis = candidates[0].analysis;
-            ctx.emitStatus("Reviewer failed — using first candidate");
-            return true;
-          }
-
-          let action: "select" | "synthesize";
-          let candidateNum: number;
-          let reasoning: string;
-          try {
-            const decision = JSON.parse(reviewResultText ?? "{}");
-            action = decision.action ?? "select";
-            candidateNum = decision.candidate ?? 1;
-            reasoning = decision.reasoning ?? "";
-          } catch {
-            analysis = candidates[0].analysis;
-            ctx.emitStatus("Failed to parse reviewer result — using first candidate");
-            return true;
-          }
-
-          ctx.emitResult(`**Best-of-N README Reviewer:** ${action} — ${reasoning}`);
-
-          // When interactionLevel is "high", let user confirm or override
-          if (interactionLevel === "high") {
-            const confirmAnswers = await ctx.emitAsk([{
-              question: `Reviewer chose to ${action} (candidate-${candidateNum}). Accept?`,
-              options: [
-                { label: "Accept", description: `Accept reviewer's ${action} decision` },
-                ...candidates.map((c) => ({
-                  label: `Override: pick ${c.label}`,
-                  description: `Use ${c.label}'s README instead`,
-                })),
-              ],
-            }]);
-            const confirmAnswer = Object.values(confirmAnswers)[0];
-            if (confirmAnswer && confirmAnswer !== "Accept") {
-              const match = confirmAnswer.match(/Override: pick candidate-(\d+)/);
-              if (match) {
-                const overrideIdx = parseInt(match[1], 10) - 1;
-                const selected = candidates[overrideIdx] ?? candidates[0];
-                analysis = selected.analysis;
-                ctx.emitStatus(`Human override: applied ${selected.label}`);
-                return true;
-              }
-            }
-          }
-
-          if (action === "select") {
-            const selected = candidates[candidateNum - 1] ?? candidates[0];
-            analysis = selected.analysis;
-            ctx.emitStatus(`Reviewer selected ${selected.label}`);
-            return true;
-          }
-
-          // Synthesize: run a synthesizer child that outputs merged README content
-          ctx.emitStatus("Running synthesizer to merge README candidates");
-          const baseAnalysis = candidates[candidateNum - 1]?.analysis ?? candidates[0].analysis;
-          const synthPrompt = buildInitReadmeSynthesizerPrompt({
-            candidates: reviewCandidates,
-            baseCandidate: candidateNum,
-          });
-
-          let synthResultText: string | undefined;
-          const synthOk = await ctx.runChild("Best-of-N README Synthesizer", synthPrompt, {
-            jsonSchema: INIT_SYNTH_SCHEMA as Record<string, unknown>,
-            appendSystemPromptFile: await ensureGlobalSystemPrompt("best-of-n-synthesizer"),
-            onResultText: (text) => { synthResultText = text; },
-          });
-
-          if (synthOk && synthResultText) {
-            try {
-              const result = JSON.parse(synthResultText);
-              analysis = { ...baseAnalysis, readmeContent: result.readmeContent };
-              ctx.emitStatus("Synthesized README applied");
-            } catch {
-              analysis = baseAnalysis;
-              ctx.emitStatus("Failed to parse synthesizer result — using base candidate");
-            }
-          } else {
-            analysis = baseAnalysis;
-            ctx.emitStatus("Synthesizer failed — using base candidate");
-          }
-          return true;
-        }
-
-        // Normal execution (no Best-of-N)
-        return runOnce();
+        return ctx.runChild("Analyze & draft README", prompt, {
+          jsonSchema: INIT_ANALYSIS_SCHEMA,
+          stepType: STEP_TYPES.ANALYZE_README,
+          appendSystemPromptFile: initReadmePromptFile,
+          onResultText: (text) => {
+            analysis = parseAnalysis(text, description);
+          },
+        });
       },
     },
     // Phase B: Read analysis result, create workspace, copy README, setup repos
@@ -465,8 +241,6 @@ export function buildInitPipeline(
       })),
       taskType: () => analysis?.taskType ?? "",
       interactionLevel,
-      bestOfN,
-      getUseBestOfN: () => useBestOfN,
     }),
   ];
 }

@@ -35,14 +35,12 @@ export async function buildExecutePipeline(input: {
   repository?: string;
   /** Narrows `repository`'s selection further to these worktrees — an autonomous cycle's unfinished set. */
   repositories?: readonly string[];
-  /** Pre-resolved repos (e.g. from Best-of-N sub-worktrees). Skips listWorkspaceRepos when provided. */
-  repos?: WorkspaceRepo[];
 }): Promise<PipelinePhase[]> {
   const { workspace, repository } = input;
   const batchSize = input.batchSize ?? getOperationConfig("execute").batchSize;
   const readmeContent = (await getReadme(workspace)) ?? "";
   const meta = parseReadmeMeta(readmeContent);
-  const allRepos = input.repos ?? await listWorkspaceRepos(workspace);
+  const allRepos = await listWorkspaceRepos(workspace);
   const repos = selectRepos(allRepos, { repository, repositories: input.repositories });
   const wsPath = path.join(getWorkspaceDir(), workspace);
 

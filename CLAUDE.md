@@ -22,7 +22,7 @@ bun --bun vitest run src/__tests__/lib/parsers/todo.test.ts  # Single file (--bu
 
 `{workspaceRoot}/.ai-workspace/config.yml`; priority env > config.yml > defaults (`src/lib/config/resolver.ts`, cached on `globalThis`). Workspace root: CLI arg > `AIW_WORKSPACE_ROOT` > cwd. Env vars: `AIW_WORKSPACE_ROOT`, `AIW_PORT` (3741), `AIW_CHAT_PORT` (3742), `AIW_CLAUDE_PATH`, `AIW_DISABLE_ACCESS_LOG`. String values may use `{ENV:VAR_NAME}` (`env-substitution.ts`).
 
-Notable keys: `operations.maxGroupConcurrency` (per parallel group, `getMaxGroupConcurrency()`), `operations.batchSize` (TODO groups per executor call), `operations.defaultInteractionLevel`, `model` / `effort` (global, per operation, per step), `bestOfN`, `openers`, `hooks.*`, `suggest.enabled`, `slack.*`. When changing per-step defaults, update `TYPE_OVERRIDE_HINT_LINES` (`src/lib/config/migration.ts`).
+Notable keys: `operations.maxGroupConcurrency` (per parallel group, `getMaxGroupConcurrency()`), `operations.batchSize` (TODO groups per executor call), `operations.defaultInteractionLevel`, `model` / `effort` (global, per operation, per step), `openers`, `hooks.*`, `suggest.enabled`, `slack.*`. When changing per-step defaults, update `TYPE_OVERRIDE_HINT_LINES` (`src/lib/config/migration.ts`).
 
 ## Architecture
 

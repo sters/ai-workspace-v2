@@ -25,7 +25,6 @@ vi.mock("@/lib/pipeline/interject", () => ({
 
 vi.mock("@/lib/config", () => ({
   resolveWorkspaceName: (name: string) => name,
-  getOperationConfig: () => ({ bestOfN: 0 }),
   getConfig: () => ({ operations: { defaultInteractionLevel: "mid" } }),
   getWorkspaceDir: () => "/ws",
 }));
