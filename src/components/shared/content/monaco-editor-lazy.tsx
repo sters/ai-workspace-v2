@@ -35,6 +35,11 @@ export function MonacoEditorLazy({
         automaticLayout: true,
         scrollBeyondLastLine: false,
         fontSize: 13,
+        // The EditContext input (Chromium's default) focuses on click without undoing
+        // the browser's reveal of it, which scrolls whatever list or page holds the
+        // editor away from where the reader clicked. The textarea input restores its
+        // scrolled ancestors after focusing.
+        editContext: false,
         ...options,
       }}
       onMount={handleMount}
