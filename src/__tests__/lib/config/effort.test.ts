@@ -96,27 +96,30 @@ describe("resolveEffort", () => {
   // re-asserting each membership here only mirrors STEP_DEFAULT_*. What the tests
   // below hold is the shape of the ladder, which a new step type cannot violate
   // by accident.
-  it("uses exactly four rungs of one model+effort ladder", () => {
+  it("uses exactly five rungs of one model+effort ladder", () => {
     // The two tables are not tuned independently — together they form a single
     // ordered ladder, cheapest first:
-    //   sonnet/low  → purely mechanical work
-    //   opus/low    → a bit harder than mechanical
-    //   opus/medium → the default
-    //   opus/high   → needs real thought
-    // Any other pairing is a tier that has to justify itself, and the two that
-    // tempt you are both bad deals: sonnet/high pays extra to make the weaker
-    // model think hard, and sonnet/medium is a rung this ladder deliberately
-    // does not have — work above "mechanical" goes to opus instead.
+    //   haiku-5.5/low  → reshaping text already handed over
+    //   sonnet-5.5/low → mechanical, or bounded work with nothing to judge
+    //   opus/low       → a bit harder than mechanical
+    //   opus/medium    → the default
+    //   opus/high      → needs real thought
+    // Any other pairing is a tier that has to justify itself: paying for a
+    // smaller model to think harder is the wrong trade, so work above the bottom
+    // rungs goes to opus instead. The smaller models are pinned to full IDs
+    // because the CLI's bare `sonnet` / `haiku` aliases resolve to a previous
+    // generation.
     const rungs = new Set(
       Object.values(STEP_TYPES).map(
         (step) => `${STEP_DEFAULT_MODELS[step]}/${STEP_DEFAULT_EFFORTS[step]}`,
       ),
     );
     expect([...rungs].sort()).toEqual([
+      "claude-haiku-5-5/low",
+      "claude-sonnet-5-5/low",
       "opus/high",
       "opus/low",
       "opus/medium",
-      "sonnet/low",
     ]);
   });
 

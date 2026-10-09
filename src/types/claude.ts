@@ -1,11 +1,17 @@
 import type { OperationEvent, OperationStatus } from "./operation";
 import type { DataListener } from "./pty";
 
-/** Known Claude model short aliases accepted by the CLI --model flag. */
+/**
+ * Known values for the CLI --model flag: the short aliases, plus full IDs for
+ * models an alias does not reach (the CLI resolves `sonnet` and `haiku` to a
+ * previous generation).
+ */
 export const CLAUDE_MODELS = {
   OPUS: "opus",
   SONNET: "sonnet",
   HAIKU: "haiku",
+  SONNET_5_5: "claude-sonnet-5-5",
+  HAIKU_5_5: "claude-haiku-5-5",
 } as const;
 
 export type ClaudeModel = (typeof CLAUDE_MODELS)[keyof typeof CLAUDE_MODELS];

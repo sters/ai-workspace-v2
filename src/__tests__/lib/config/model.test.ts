@@ -93,16 +93,15 @@ describe("resolveModel", () => {
     expect(resolveModel("review", "code-review", "haiku")).toBe("haiku");
   });
 
-  it("reserves sonnet for the purely mechanical rung", () => {
-    // Sonnet is the bottom rung of the ladder and pairs only with `low` effort;
-    // see the ladder invariant in `effort.test.ts`. Anything above mechanical
-    // work goes to opus, so a sonnet step here is a claim that the work needs no
-    // thought at all.
-    const sonnetSteps = Object.keys(STEP_DEFAULT_MODELS).filter(
-      (step) => STEP_DEFAULT_MODELS[step as StepType] === "sonnet",
+  it("reserves the smaller models for the low-effort bottom rungs", () => {
+    // Sonnet and haiku pair only with `low` effort; see the ladder invariant in
+    // `effort.test.ts`. Anything that needs thought goes to opus, so a smaller
+    // model here is a claim that the work needs no thought at all.
+    const smallerModelSteps = Object.keys(STEP_DEFAULT_MODELS).filter(
+      (step) => STEP_DEFAULT_MODELS[step as StepType] !== "opus",
     );
-    expect(sonnetSteps.length).toBeGreaterThan(0);
-    for (const step of sonnetSteps) {
+    expect(smallerModelSteps.length).toBeGreaterThan(0);
+    for (const step of smallerModelSteps) {
       expect(STEP_DEFAULT_EFFORTS[step as StepType]).toBe("low");
     }
   });

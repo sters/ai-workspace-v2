@@ -157,20 +157,21 @@ describe("migration: model support", () => {
     expect(result).toContain("#   #       effort: low");
   });
 
-  it("documents the four rungs of the model+effort ladder", () => {
+  it("documents the five rungs of the model+effort ladder", () => {
     const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
     expect(result).toContain("#   # Built-in step defaults");
-    expect(result).toContain("four rungs");
+    expect(result).toContain("five rungs");
     expect(result).toMatch(/# {3}# {3}opus \/ high {3}—/);
     expect(result).toMatch(/# {3}# {3}opus \/ medium —/);
     expect(result).toMatch(/# {3}# {3}opus \/ low {4}—/);
-    expect(result).toMatch(/# {3}# {3}sonnet \/ low {2}—/);
-    // A fifth rung in the docs would mean the ladder drifted from the code.
-    expect(result).not.toMatch(/sonnet \/ (medium|high)/);
+    expect(result).toMatch(/# {3}# {3}claude-sonnet-5-5 \/ low —/);
+    expect(result).toMatch(/# {3}# {3}claude-haiku-5-5 \/ low {2}—/);
+    // A smaller model above `low` in the docs would mean the ladder drifted from the code.
+    expect(result).not.toMatch(/(sonnet|haiku)[-\d]* \/ (medium|high)/);
     // xhigh/max are config-only escape hatches, never advertised as defaults.
     expect(result).not.toMatch(/opus \/ (xhigh|max)/);
-    // The haiku tier is gone from the defaults entirely.
-    expect(result).not.toMatch(/# {3}# {3}haiku/);
+    // The bare aliases resolve to a previous generation, so no rung names them.
+    expect(result).not.toMatch(/# {3}# {3}(sonnet|haiku) \//);
   });
 
   it("lists each step under exactly one rung", () => {
@@ -179,12 +180,11 @@ describe("migration: model support", () => {
     const topRung = rungLines.findIndex((l) => l.includes("opus / high"));
     const nextRung = rungLines.findIndex((l) => l.includes("opus / medium"));
     const topBlock = rungLines.slice(topRung, nextRung).join("\n");
-    // plan-todo earns the top rung; the mechanical steps must not appear there.
-    expect(topBlock).toContain("plan-todo");
-    expect(topBlock).not.toContain("collect-reviews");
-    expect(topBlock).not.toContain("verify-todo");
-    // code-review sits a rung down by budget, not by shape — see model.ts.
+    // Only the gate is tiered by payoff; open-ended steps sit on the default rung.
+    expect(topBlock).toContain("autonomous-gate");
+    expect(topBlock).not.toContain("plan-todo");
     expect(topBlock).not.toContain("code-review");
+    expect(topBlock).not.toContain("collect-reviews");
   });
 });
 
@@ -245,7 +245,7 @@ describe("migration: old config upgrade", () => {
     const result = migrateConfigContent(input);
     // New hint lines should be present
     expect(result).toContain("#   # Built-in step defaults");
-    expect(result).toContain("four rungs");
+    expect(result).toContain("five rungs");
     expect(result).toContain("#   #   model: sonnet");
     expect(result).toContain("#   #   effort: high");
     expect(result).toContain("#   #       effort: low");
