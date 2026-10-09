@@ -39,6 +39,15 @@ export async function buildCreatePrPipeline(input: {
 
   const wsPath = path.join(getWorkspaceDir(), workspace);
   const taskTitle = resolveTaskTitle(meta.title);
+  // Read from every worktree, not the selection: a run narrowed to one worktree
+  // still opens its PR next to the siblings' PRs.
+  const cloneOf = (repo: WorkspaceRepo) => repo.repoPath.split("___")[0];
+  const sameRepoSiblings = (repo: WorkspaceRepo) => {
+    const names = allRepos
+      .filter((r) => r !== repo && cloneOf(r) === cloneOf(repo))
+      .map((r) => r.repoName);
+    return names.length > 0 ? names : undefined;
+  };
 
   const children = await Promise.all(repos.map(async (repo) => {
     // Detect base branch from README metadata or repo itself
@@ -88,6 +97,7 @@ export async function buildCreatePrPipeline(input: {
       // Only a new PR gets the mandated title: the update path retitles only when
       // scope shifted, and the existing title may be the user's own wording.
       ...(!existingPR.exists && title && { sharedTitle: title }),
+      ...(!existingPR.exists && { sameRepoSiblings: sameRepoSiblings(repo) }),
       ...(prReviewThreads && { prReviewThreads, todoFilePath }),
     });
 

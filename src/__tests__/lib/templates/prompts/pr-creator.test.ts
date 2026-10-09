@@ -197,6 +197,31 @@ describe("buildPRCreatorPrompt", () => {
     expect(prompt).toContain("Add pagination to user search API");
   });
 
+  it("asks for a distinguishing qualifier when other worktrees share the repository", () => {
+    const prompt = buildPRCreatorPrompt({
+      ...baseInput,
+      sharedTitle: "Add pagination to user search API",
+      sameRepoSiblings: ["my-repo___admin"],
+    });
+    expect(prompt).toContain("## PR Title");
+    expect(prompt).toContain("my-repo___admin");
+    expect(prompt).toContain("Add pagination to user search API — <");
+  });
+
+  it("asks for a distinguishing title from siblings even with no shared title", () => {
+    const prompt = buildPRCreatorPrompt({ ...baseInput, sameRepoSiblings: ["my-repo___admin"] });
+    expect(prompt).toContain("my-repo___admin");
+  });
+
+  it("says nothing about siblings when updating an existing PR", () => {
+    const prompt = buildPRCreatorPrompt({
+      ...baseInput,
+      existingPR: { url: "u", title: "t", body: "b" },
+      sameRepoSiblings: ["my-repo___admin"],
+    });
+    expect(prompt).not.toContain("my-repo___admin");
+  });
+
   it("renders the recorded threads and the TODO file path", () => {
     const prompt = buildPRCreatorPrompt({
       ...baseInput,
