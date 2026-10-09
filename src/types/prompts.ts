@@ -237,6 +237,12 @@ export interface PRCreatorInput extends RepoPromptInput {
    * title alone, and an unfilled heading (`TBD`) is worse than a composed title.
    */
   sharedTitle?: string;
+  /**
+   * Worktree names of the other worktrees of this repository's clone in the
+   * workspace (`repo:alias`). Their PRs land in the same repository, so a new
+   * PR's title must say which part of the task this one is.
+   */
+  sameRepoSiblings?: string[];
   /** Body of the TODO file's `## PR Review Threads` section, when it has one. */
   prReviewThreads?: string;
   /** Absolute TODO file path — only set alongside `prReviewThreads`, which is what needs it. */

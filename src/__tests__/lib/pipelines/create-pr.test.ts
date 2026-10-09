@@ -205,6 +205,27 @@ describe("buildCreatePrPipeline", () => {
     expect(mockSoleCommit).not.toHaveBeenCalled();
   });
 
+  // Worktrees of one clone open PRs in one repository, where an identical title
+  // leaves the PR list unreadable. Siblings are found across the whole workspace,
+  // so a run narrowed to one worktree still knows about the others.
+  it("names the other worktrees of the same clone, even when narrowed to one", async () => {
+    mockListWorkspaceRepos.mockReturnValue([
+      { repoName: "api", repoPath: "github.com/acme/api", worktreePath: "/ws/ws/github.com/acme/api" },
+      { repoName: "web", repoPath: "github.com/acme/web", worktreePath: "/ws/ws/github.com/acme/web" },
+      { repoName: "web___admin", repoPath: "github.com/acme/web___admin", worktreePath: "/ws/ws/github.com/acme/web___admin" },
+    ] as ReturnType<typeof listWorkspaceRepos>);
+
+    await buildCreatePrPipeline({ workspace: "ws", draft: true });
+    const siblings = Object.fromEntries(
+      mockBuildPrompt.mock.calls.map((c) => [c[0].repoName, c[0].sameRepoSiblings]),
+    );
+    expect(siblings).toEqual({ api: undefined, web: ["web___admin"], web___admin: ["web"] });
+
+    mockBuildPrompt.mockClear();
+    await buildCreatePrPipeline({ workspace: "ws", draft: true, repository: "web___admin" });
+    expect(mockBuildPrompt.mock.calls.map((c) => c[0].sameRepoSiblings)).toEqual([["web"]]);
+  });
+
   // An existing PR's title is the user's to keep; the update path only retitles
   // when scope shifted, so it must not receive a mandated title at all.
   it("withholds the shared title from a repo that already has a PR", async () => {
