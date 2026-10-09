@@ -6,10 +6,8 @@ import { selectRepos } from "@/lib/workspace/select-repos";
 import { normalizeTodoCheckboxes } from "@/lib/parsers/todo";
 import { buildUpdaterPrompt } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
-import { runBestOfNFiles } from "./actions/best-of-n-files";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
-import type { InteractionLevel } from "@/types/prompts";
 
 export async function buildUpdateTodoPipeline(input: {
   workspace: string;
@@ -17,12 +15,9 @@ export async function buildUpdateTodoPipeline(input: {
   repo?: string;
   /** Narrows `repo`'s selection further to these worktrees — an autonomous cycle's unfinished set. */
   repositories?: readonly string[];
-  bestOfN?: number;
-  bestOfNConfirm?: boolean;
-  interactionLevel?: InteractionLevel;
   interject?: boolean;
 }): Promise<PipelinePhase[]> {
-  const { workspace, instruction, repo, repositories, bestOfN, bestOfNConfirm, interactionLevel, interject } = input;
+  const { workspace, instruction, repo, repositories, interject } = input;
   const workspacePath = path.join(getWorkspaceDir(), workspace);
 
   const readmeFile = Bun.file(path.join(workspacePath, "README.md"));
@@ -32,32 +27,26 @@ export async function buildUpdateTodoPipeline(input: {
 
   const repos = selectRepos(await listWorkspaceRepos(workspace), { repository: repo, repositories });
 
-  // Read TODO content once (shared across all candidates)
   const todoContents = await Promise.all(repos.map(async (r) => {
     const todoFile = Bun.file(path.join(workspacePath, `TODO-${r.repoName}.md`));
     return (await todoFile.exists()) ? await todoFile.text() : "";
   }));
 
-  /** Build the combined updater prompt pointing at a given workspace directory. */
-  const buildPromptForDir = (wsDir: string) => {
-    const prompts = repos.map((r, i) =>
-      buildUpdaterPrompt({
-        workspaceName: workspace,
-        repoName: r.repoName,
-        readmeContent,
-        todoContent: todoContents[i],
-        worktreePath: r.worktreePath,
-        workspacePath: wsDir,
-        instruction,
-        ...(interject && { interject: true }),
-      }),
-    );
-    return prompts.length === 1
-      ? prompts[0]
-      : prompts.map((p, i) => `# Repo ${i + 1} of ${prompts.length}\n\n${p}`).join("\n\n---\n\n");
-  };
-
-  const prompt = buildPromptForDir(workspacePath);
+  const prompts = repos.map((r, i) =>
+    buildUpdaterPrompt({
+      workspaceName: workspace,
+      repoName: r.repoName,
+      readmeContent,
+      todoContent: todoContents[i],
+      worktreePath: r.worktreePath,
+      workspacePath,
+      instruction,
+      ...(interject && { interject: true }),
+    }),
+  );
+  const prompt = prompts.length === 1
+    ? prompts[0]
+    : prompts.map((p, i) => `# Repo ${i + 1} of ${prompts.length}\n\n${p}`).join("\n\n---\n\n");
 
   // Restrict Edit/Write to TODO files only — prevent the updater agent from
   // modifying source code even though it has read access to the full workspace.
@@ -110,45 +99,6 @@ export async function buildUpdateTodoPipeline(input: {
       return true;
     },
   };
-
-  if (bestOfN && bestOfN >= 2) {
-    const todoFiles = repos.map((r) => path.join(workspacePath, `TODO-${r.repoName}.md`));
-
-    return [{
-      kind: "function",
-      label: "Update TODOs (Best-of-N)",
-      timeoutMs: 60 * 60 * 1000,
-      fn: async (ctx) => {
-        const updaterPromptFile = await ensureSystemPrompt(workspacePath, "updater");
-        return runBestOfNFiles({
-          ctx,
-          n: bestOfN,
-          operationType: "update-todo",
-          filesToCapture: todoFiles,
-          buildChildren: (candidateDir) => {
-            const candidatePrefix = candidateDir.startsWith("/") ? "/" : "//";
-            return [{
-              label: "Update TODOs",
-              prompt: buildPromptForDir(candidateDir),
-              stepType: STEP_TYPES.UPDATE_TODO,
-              addDirs: [candidateDir, ...repos.map((r) => r.worktreePath)],
-              allowedTools: [
-                `Edit(${candidatePrefix}${candidateDir}/TODO-*.md)`,
-                `Write(${candidatePrefix}${candidateDir}/TODO-*.md)`,
-                "Bash(git:*)",
-              ],
-              appendSystemPromptFile: updaterPromptFile,
-            }];
-          },
-          confirm: bestOfNConfirm,
-          interactionLevel,
-          runNormal: async (innerCtx) => {
-            return innerCtx.runChild("Update TODOs", prompt, { addDirs: [workspacePath], allowedTools: todoAllowedTools, stepType: STEP_TYPES.UPDATE_TODO, appendSystemPromptFile: await ensureSystemPrompt(workspacePath, "updater") });
-          },
-        });
-      },
-    }, normalizePhase];
-  }
 
   return [
     { kind: "single", label: "Update TODOs", prompt, stepType: STEP_TYPES.UPDATE_TODO, addDirs: [workspacePath], allowedTools: todoAllowedTools, appendSystemPromptFile: await ensureSystemPrompt(workspacePath, "updater") },

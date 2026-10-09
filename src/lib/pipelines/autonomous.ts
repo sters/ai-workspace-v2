@@ -59,7 +59,7 @@ const CYCLE_BUDGETS_MS = {
   review: 45 * 60 * 1000,
   /** One `autonomous-gate` child over the review summary; measured well under a minute. */
   gate: 10 * 60 * 1000,
-  /** `update-todo.ts`: one updater child, plus up to 60min on the best-of-N path. */
+  /** `update-todo.ts`: one updater child. */
   updateTodo: 30 * 60 * 1000,
 } as const;
 
@@ -473,7 +473,6 @@ export function buildAutonomousPipeline(input: {
           workspace: ws,
           instruction: instruction || DEFAULT_UPDATE_TODO_INSTRUCTION,
           repo,
-          interactionLevel,
         });
         return runSubPhases(ctx, subPhases, skip);
       },
@@ -704,7 +703,6 @@ export function buildAutonomousPipeline(input: {
           instruction: updateInstruction,
           repo,
           repositories: unfinished,
-          interactionLevel,
         });
         return runSubPhases(ctx, updatePhases, skip);
       },

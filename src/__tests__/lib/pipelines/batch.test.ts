@@ -8,10 +8,9 @@ vi.mock("@/lib/config", () => ({
   getResolvedWorkspaceRoot: () => "/mock/workspace-root",
   getWorkspaceDir: () => "/mock/workspace-root/workspace",
   getConfig: vi.fn(() => ({
-    operations: { bestOfN: 0, defaultInteractionLevel: "mid", typeOverrides: {} },
+    operations: { defaultInteractionLevel: "mid", typeOverrides: {} },
   })),
   getOperationConfig: vi.fn(() => ({
-    bestOfN: 0,
     claudeTimeoutMinutes: 20,
     functionTimeoutMinutes: 3,
     defaultInteractionLevel: "mid",

@@ -103,17 +103,17 @@ describe("buildPhaseFunctionContext — childLabel attachment", () => {
     const { managed, events } = makeManaged();
     const ctx = buildPhaseFunctionContext(managed, "op-1", 1, {
       phaseIndex: 1,
-      phaseLabel: "Best-of-N: Setup",
+      phaseLabel: "Setup workspace",
     });
 
     // Don't await — we just want to inspect the emitted assistant message
     void ctx.emitAsk([
-      { question: "Use Best-of-N?", options: [{ label: "Yes" }, { label: "No" }] },
+      { question: "Proceed?", options: [{ label: "Yes" }, { label: "No" }] },
     ]);
 
     const outputs = events.filter((e) => e.type === "output");
     expect(outputs.length).toBeGreaterThan(0);
-    expect(outputs[0].childLabel).toBe("Best-of-N: Setup");
+    expect(outputs[0].childLabel).toBe("Setup workspace");
   });
 
   it("setWorkspace status event also carries childLabel", () => {

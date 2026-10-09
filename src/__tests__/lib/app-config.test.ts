@@ -63,9 +63,9 @@ describe("loadConfigFile", () => {
     const fs = await import("node:fs");
     const yaml = [
       "operations:",
-      "  bestOfN: 3",
+      "  batchSize: 3",
       "  review:",
-      "    bestOfN: 0",
+      "    batchSize: 0",
       "  execute:",
       "    claudeTimeoutMinutes: 30",
       "",
@@ -74,8 +74,8 @@ describe("loadConfigFile", () => {
     try {
       const result = loadConfigFile(tmpPath);
       expect(result).not.toBeNull();
-      expect(result!.operations?.bestOfN).toBe(3);
-      expect(result!.operations?.typeOverrides?.review).toEqual({ bestOfN: 0 });
+      expect(result!.operations?.batchSize).toBe(3);
+      expect(result!.operations?.typeOverrides?.review).toEqual({ batchSize: 0 });
       expect(result!.operations?.typeOverrides?.execute).toEqual({ claudeTimeoutMinutes: 30 });
     } finally {
       fs.unlinkSync(tmpPath);
@@ -87,18 +87,18 @@ describe("normalizeRawConfig", () => {
   it("extracts operation type keys into typeOverrides", () => {
     const raw = {
       operations: {
-        bestOfN: 3,
+        batchSize: 3,
         maxConcurrent: 5,
-        review: { bestOfN: 0 },
-        execute: { claudeTimeoutMinutes: 30, bestOfN: 5 },
+        review: { batchSize: 0 },
+        execute: { claudeTimeoutMinutes: 30, batchSize: 5 },
       },
     };
     const result = normalizeRawConfig(raw);
-    expect(result.operations?.bestOfN).toBe(3);
+    expect(result.operations?.batchSize).toBe(3);
     expect(result.operations?.maxConcurrent).toBe(5);
     expect(result.operations?.typeOverrides).toEqual({
-      review: { bestOfN: 0 },
-      execute: { claudeTimeoutMinutes: 30, bestOfN: 5 },
+      review: { batchSize: 0 },
+      execute: { claudeTimeoutMinutes: 30, batchSize: 5 },
     });
     // Original operation type keys should be removed from operations root
     expect((result.operations as Record<string, unknown>).review).toBeUndefined();
@@ -108,13 +108,13 @@ describe("normalizeRawConfig", () => {
   it("handles hyphenated operation type names", () => {
     const raw = {
       operations: {
-        bestOfN: 2,
-        "create-pr": { bestOfN: 0 },
+        batchSize: 2,
+        "create-pr": { batchSize: 0 },
         "update-todo": { claudeTimeoutMinutes: 10 },
       },
     };
     const result = normalizeRawConfig(raw);
-    expect(result.operations?.typeOverrides?.["create-pr"]).toEqual({ bestOfN: 0 });
+    expect(result.operations?.typeOverrides?.["create-pr"]).toEqual({ batchSize: 0 });
     expect(result.operations?.typeOverrides?.["update-todo"]).toEqual({ claudeTimeoutMinutes: 10 });
   });
 
@@ -195,23 +195,23 @@ describe("validateOpeners", () => {
 
   it("returns config unchanged when no type overrides present", () => {
     const raw = {
-      operations: { bestOfN: 3, maxConcurrent: 2 },
+      operations: { batchSize: 3, maxConcurrent: 2 },
     };
     const result = normalizeRawConfig(raw);
-    expect(result.operations?.bestOfN).toBe(3);
+    expect(result.operations?.batchSize).toBe(3);
     expect(result.operations?.typeOverrides).toBeUndefined();
   });
 
   it("ignores non-operation-type object keys", () => {
     const raw = {
       operations: {
-        bestOfN: 3,
-        notAnOpType: { bestOfN: 0 },
+        batchSize: 3,
+        notAnOpType: { batchSize: 0 },
       },
     };
     const result = normalizeRawConfig(raw);
     // notAnOpType is not an operation type, should remain as-is
-    expect((result.operations as Record<string, unknown>).notAnOpType).toEqual({ bestOfN: 0 });
+    expect((result.operations as Record<string, unknown>).notAnOpType).toEqual({ batchSize: 0 });
     expect(result.operations?.typeOverrides).toBeUndefined();
   });
 });
@@ -281,16 +281,16 @@ describe("mergeConfig", () => {
   it("merges typeOverrides from file config", () => {
     const fileConfig: Partial<AppConfig> = {
       operations: {
-        bestOfN: 3,
+        batchSize: 3,
         typeOverrides: {
-          review: { bestOfN: 0 },
+          review: { batchSize: 0 },
           execute: { claudeTimeoutMinutes: 30 },
         },
       } as AppConfig["operations"],
     };
     const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, {});
-    expect(result.operations.bestOfN).toBe(3);
-    expect(result.operations.typeOverrides.review).toEqual({ bestOfN: 0 });
+    expect(result.operations.batchSize).toBe(3);
+    expect(result.operations.typeOverrides.review).toEqual({ batchSize: 0 });
     expect(result.operations.typeOverrides.execute).toEqual({ claudeTimeoutMinutes: 30 });
   });
 });
@@ -401,7 +401,7 @@ describe("getOperationConfig", () => {
 
   it("returns global defaults when no per-type overrides", () => {
     const result = getOperationConfig("execute");
-    expect(result.bestOfN).toBe(0);
+    expect(result.batchSize).toBe(15);
     expect(result.claudeTimeoutMinutes).toBe(20);
     expect(result.functionTimeoutMinutes).toBe(3);
     expect(result.defaultInteractionLevel).toBe("mid");
@@ -412,30 +412,30 @@ describe("getOperationConfig", () => {
     const tmpPath = `/tmp/test-aiw-opconfig-${Date.now()}.yml`;
     const yaml = [
       "operations:",
-      "  bestOfN: 3",
+      "  batchSize: 3",
       "  review:",
-      "    bestOfN: 0",
+      "    batchSize: 0",
       "  execute:",
       "    claudeTimeoutMinutes: 30",
-      "    bestOfN: 5",
+      "    batchSize: 5",
       "",
     ].join("\n");
     fs.writeFileSync(tmpPath, yaml);
     _setConfigFilePath(tmpPath);
     try {
-      // Review: bestOfN overridden to 0, others inherit global
+      // Review: batchSize overridden to 0, others inherit global
       const reviewCfg = getOperationConfig("review");
-      expect(reviewCfg.bestOfN).toBe(0);
+      expect(reviewCfg.batchSize).toBe(0);
       expect(reviewCfg.claudeTimeoutMinutes).toBe(20); // global default
 
-      // Execute: both bestOfN and claudeTimeoutMinutes overridden
+      // Execute: both batchSize and claudeTimeoutMinutes overridden
       const execCfg = getOperationConfig("execute");
-      expect(execCfg.bestOfN).toBe(5);
+      expect(execCfg.batchSize).toBe(5);
       expect(execCfg.claudeTimeoutMinutes).toBe(30);
 
-      // Init: no per-type override, uses global bestOfN=3
+      // Init: no per-type override, uses global batchSize=3
       const initCfg = getOperationConfig("init");
-      expect(initCfg.bestOfN).toBe(3);
+      expect(initCfg.batchSize).toBe(3);
       expect(initCfg.claudeTimeoutMinutes).toBe(20);
     } finally {
       fs.unlinkSync(tmpPath);
@@ -505,7 +505,7 @@ describe("generateDefaultConfigContent", () => {
     expect(content).toContain("#   #   claudeTimeoutMinutes:");
     expect(content).toContain("#   #   functionTimeoutMinutes:");
     expect(content).toContain("#   #   defaultInteractionLevel:");
-    expect(content).toContain("#   #   bestOfN:");
+    expect(content).toContain("#   #   batchSize:");
   });
 });
 
@@ -522,16 +522,16 @@ describe("migrateConfigContent", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
-    // bestOfN and other missing ops keys should be added in the operations section
-    expect(result).toContain("#   bestOfN:");
+    // batchSize and other missing ops keys should be added in the operations section
+    expect(result).toContain("#   batchSize:");
     expect(result).toContain("#   claudeTimeoutMinutes:");
     // maxConcurrent should remain active
     expect(result).toContain("  maxConcurrent: 3");
     // The missing ops keys should appear between maxConcurrent and the blank line (or after)
     const lines = result.split("\n");
     const maxConcIdx = lines.findIndex((l) => l.includes("maxConcurrent: 3"));
-    const bestOfNIdx = lines.findIndex((l) => l.includes("bestOfN:"));
-    expect(bestOfNIdx).toBeGreaterThan(maxConcIdx);
+    const batchSizeIdx = lines.findIndex((l) => l.includes("batchSize:"));
+    expect(batchSizeIdx).toBeGreaterThan(maxConcIdx);
   });
 
   it("comments out unknown active top-level key", () => {
@@ -589,7 +589,7 @@ describe("migrateConfigContent", () => {
     // operations section should be added
     expect(result).toContain("# operations:");
     expect(result).toContain("#   maxConcurrent:");
-    expect(result).toContain("#   bestOfN:");
+    expect(result).toContain("#   batchSize:");
     // server and claude sections too
     expect(result).toContain("# server:");
     expect(result).toContain("#   port:");
@@ -608,7 +608,7 @@ describe("migrateConfigContent", () => {
     // Unknown key commented out
     expect(result).toContain("#   deprecatedKey: old");
     // Missing keys added
-    expect(result).toContain("#   bestOfN:");
+    expect(result).toContain("#   batchSize:");
     expect(result).toContain("#   claudeTimeoutMinutes:");
     // Active known key preserved
     expect(result).toContain("  maxConcurrent: 3");
@@ -659,7 +659,6 @@ describe("migrateConfigContent", () => {
       "  claudeTimeoutMinutes: 20",
       "  functionTimeoutMinutes: 3",
       "  defaultInteractionLevel: mid",
-      "  bestOfN: 0",
       "  batchSize: 10",
       "  model: null",
       "  effort: null",
@@ -669,15 +668,14 @@ describe("migrateConfigContent", () => {
       "#   #           autonomous-gate",
       "#   #   opus / medium — the default rung, open-ended work included:",
       "#   #           analyze-readme, plan-todo, research, coordinate-todos,",
-      "#   #           best-of-n-reviewer, update-todo, execute, code-review,",
-      "#   #           verify-readme, criteria-feasibility, validate-pr-comment,",
-      "#   #           ground-finding, resolve-conflicts, update-readme,",
-      "#   #           plan-todo-from-review, review-todos, suggest-workspace",
+      "#   #           update-todo, execute, code-review, verify-readme,",
+      "#   #           criteria-feasibility, validate-pr-comment, ground-finding,",
+      "#   #           resolve-conflicts, update-readme, plan-todo-from-review,",
+      "#   #           review-todos, suggest-workspace",
       "#   #   opus / low    — a step above mechanical:",
       "#   #           discover-constraints, readme-clarity-gate, verify-fixes",
       "#   #   claude-sonnet-5-5 / low — mechanical, or bounded with nothing to judge:",
-      "#   #           verify-todo, deep-search, create-pr,",
-      "#   #           best-of-n-file-reviewer, best-of-n-synthesizer",
+      "#   #           verify-todo, deep-search, create-pr",
       "#   #   claude-haiku-5-5 / low  — reshaping text already handed over:",
       "#   #           prune-suggestions, collect-reviews, aggregate-suggestions",
       "#   # Per-operation-type overrides (any setting above except the two concurrency caps):",
@@ -685,7 +683,6 @@ describe("migrateConfigContent", () => {
       "#   #   claudeTimeoutMinutes: 20",
       "#   #   functionTimeoutMinutes: 3",
       "#   #   defaultInteractionLevel: mid",
-      "#   #   bestOfN: 0",
       "#   #   batchSize: 15",
       "#   #   model: sonnet",
       "#   #   effort: high",
@@ -751,9 +748,9 @@ describe("migrateConfigContent", () => {
   it("preserves per-operation-type override sections", () => {
     const content = [
       "operations:",
-      "  bestOfN: 3",
+      "  batchSize: 3",
       "  review:",
-      "    bestOfN: 0",
+      "    batchSize: 0",
       "  execute:",
       "    claudeTimeoutMinutes: 30",
       "",
@@ -761,25 +758,25 @@ describe("migrateConfigContent", () => {
     const result = migrateConfigContent(content);
     // Per-type override sections should be preserved
     expect(result).toContain("  review:");
-    expect(result).toContain("    bestOfN: 0");
+    expect(result).toContain("    batchSize: 0");
     expect(result).toContain("  execute:");
     expect(result).toContain("    claudeTimeoutMinutes: 30");
     // Global settings still present
-    expect(result).toContain("  bestOfN: 3");
+    expect(result).toContain("  batchSize: 3");
   });
 
   it("comments out unknown keys inside per-type override sections", () => {
     const content = [
       "operations:",
-      "  bestOfN: 3",
+      "  batchSize: 3",
       "  review:",
-      "    bestOfN: 0",
+      "    batchSize: 0",
       "    unknownSetting: true",
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
     // Valid key preserved
-    expect(result).toContain("    bestOfN: 0");
+    expect(result).toContain("    batchSize: 0");
     // Unknown key commented out
     expect(result).toContain("#     unknownSetting: true");
   });
@@ -802,27 +799,26 @@ describe("migrateConfigContent", () => {
       "  claudeTimeoutMinutes: 20",
       "  functionTimeoutMinutes: 3",
       "  defaultInteractionLevel: mid",
-      "  bestOfN: 3",
+      "  batchSize: 3",
       "  batchSize: 10",
       "  model: null",
       "  effort: null",
       "  review:",
-      "    bestOfN: 0",
+      "    batchSize: 0",
       "#   # Built-in step defaults. Model and effort form one ladder with exactly",
       "#   # five rungs; override either via steps.<step-type>.{model,effort}:",
       "#   #   opus / high   — a short call whose wrong answer costs a cycle:",
       "#   #           autonomous-gate",
       "#   #   opus / medium — the default rung, open-ended work included:",
       "#   #           analyze-readme, plan-todo, research, coordinate-todos,",
-      "#   #           best-of-n-reviewer, update-todo, execute, code-review,",
-      "#   #           verify-readme, criteria-feasibility, validate-pr-comment,",
-      "#   #           ground-finding, resolve-conflicts, update-readme,",
-      "#   #           plan-todo-from-review, review-todos, suggest-workspace",
+      "#   #           update-todo, execute, code-review, verify-readme,",
+      "#   #           criteria-feasibility, validate-pr-comment, ground-finding,",
+      "#   #           resolve-conflicts, update-readme, plan-todo-from-review,",
+      "#   #           review-todos, suggest-workspace",
       "#   #   opus / low    — a step above mechanical:",
       "#   #           discover-constraints, readme-clarity-gate, verify-fixes",
       "#   #   claude-sonnet-5-5 / low — mechanical, or bounded with nothing to judge:",
-      "#   #           verify-todo, deep-search, create-pr,",
-      "#   #           best-of-n-file-reviewer, best-of-n-synthesizer",
+      "#   #           verify-todo, deep-search, create-pr",
       "#   #   claude-haiku-5-5 / low  — reshaping text already handed over:",
       "#   #           prune-suggestions, collect-reviews, aggregate-suggestions",
       "#   # Per-operation-type overrides (any setting above except the two concurrency caps):",
@@ -830,7 +826,6 @@ describe("migrateConfigContent", () => {
       "#   #   claudeTimeoutMinutes: 20",
       "#   #   functionTimeoutMinutes: 3",
       "#   #   defaultInteractionLevel: mid",
-      "#   #   bestOfN: 0",
       "#   #   batchSize: 15",
       "#   #   model: sonnet",
       "#   #   effort: high",
@@ -876,16 +871,16 @@ describe("migrateConfigContent", () => {
   it("preserves hyphenated operation type names in overrides", () => {
     const content = [
       "operations:",
-      "  bestOfN: 3",
+      "  batchSize: 3",
       "  create-pr:",
-      "    bestOfN: 0",
+      "    batchSize: 0",
       "  update-todo:",
       "    claudeTimeoutMinutes: 10",
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
     expect(result).toContain("  create-pr:");
-    expect(result).toContain("    bestOfN: 0");
+    expect(result).toContain("    batchSize: 0");
     expect(result).toContain("  update-todo:");
     expect(result).toContain("    claudeTimeoutMinutes: 10");
   });

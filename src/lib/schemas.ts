@@ -8,7 +8,6 @@ export const interactionLevelEnum = z.enum(["low", "mid", "high"]);
 export const initSchema = z.object({
   description: z.string().min(1, "description is required"),
   interactionLevel: interactionLevelEnum.optional(),
-  bestOfN: z.coerce.number().min(0).max(5).optional(),
 });
 
 export const workspaceSchema = z.object({
@@ -49,14 +48,12 @@ export const executeSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   repository: z.string().optional(),
   interactionLevel: interactionLevelEnum.optional(),
-  bestOfN: z.coerce.number().min(0).max(5).optional(),
 });
 
 export const reviewSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   repository: z.string().optional(),
   interactionLevel: interactionLevelEnum.optional(),
-  bestOfN: z.coerce.number().min(0).max(5).optional(),
   /**
    * Fast-forward each worktree onto the branch it tracks before reviewing — the
    * re-review path, for a PR that moved since it was checked out.
@@ -69,7 +66,6 @@ export const createPrSchema = z.object({
   draft: z.coerce.boolean().optional(),
   repository: z.string().optional(),
   interactionLevel: interactionLevelEnum.optional(),
-  bestOfN: z.coerce.number().min(0).max(5).optional(),
 });
 
 export const updateReadmeSchema = z.object({
@@ -84,7 +80,6 @@ export const updateTodoSchema = z.object({
   instruction: z.string().min(1, "instruction is required"),
   repo: z.string().optional(),
   interactionLevel: interactionLevelEnum.optional(),
-  bestOfN: z.coerce.number().min(0).max(5).optional(),
   interject: z.coerce.boolean().optional(),
 });
 
@@ -198,8 +193,6 @@ export const batchSchema = z.object({
   draft: z.coerce.boolean().optional(),
   interactionLevel: interactionLevelEnum.optional(),
   repo: z.string().optional(),
-  bestOfN: z.coerce.number().min(0).max(5).optional(),
-  bestOfNPhases: z.array(z.enum(["execute", "review", "create-pr", "update-todo"])).optional(),
 });
 
 export const autonomousSchema = z.object({

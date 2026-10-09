@@ -31,8 +31,6 @@ export interface PlannerInput extends RepoPromptInput {
   readmeContent: string;
   taskType: string;
   interactive?: boolean;
-  /** Override directory for TODO file output. When set, uses this absolute path instead of the default relative path. */
-  todoOutputDir?: string;
   /** Optional free-text instruction from the user to focus/guide TODO planning. */
   instruction?: string;
 }
@@ -347,18 +345,6 @@ export interface CreateTodoPlannerInput extends RepoPromptInput {
   instruction?: string;
 }
 
-export interface BestOfNReviewerInput {
-  workspaceName: string;
-  operationType: string;
-  candidates: { label: string; diff: string; resultText?: string }[];
-  readmeContent: string;
-}
-
-export interface BestOfNFileReviewerInput {
-  operationType: string;
-  candidates: { label: string; files: { name: string; content: string }[] }[];
-}
-
 export interface AutonomousGateInput {
   workspaceName: string;
   reviewSummary: string;
@@ -448,17 +434,4 @@ export interface SuggestionAggregatorInput {
     title: string;
     description: string;
   }[];
-}
-
-export interface BestOfNFileSynthesizerInput {
-  operationType: string;
-  candidates: { label: string; files: { name: string; content: string }[] }[];
-  /** Base candidate index (1-indexed) to start from. */
-  baseCandidate: number;
-  /** Source candidates (1-indexed) to draw from. */
-  sources: number[];
-  /** Directory where synthesized files should be written. */
-  outputDir: string;
-  /** File names to synthesize. */
-  fileNames: string[];
 }

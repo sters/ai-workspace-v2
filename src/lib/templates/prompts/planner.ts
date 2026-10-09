@@ -239,11 +239,8 @@ Each TODO item MUST follow this structured format:
 }
 
 export function buildPlannerPrompt(input: PlannerInput): string {
-  const todoDir = input.todoOutputDir ?? `workspace/${input.workspaceName}`;
-
-  const templatePath = input.todoOutputDir
-    ? `${input.todoOutputDir}/templates/TODO-template.md`
-    : `workspace/${input.workspaceName}/templates/TODO-template.md`;
+  const todoDir = `workspace/${input.workspaceName}`;
+  const templatePath = `${todoDir}/templates/TODO-template.md`;
 
   const instructionSection = input.instruction?.trim()
     ? `\n## User Instruction\n\nThe user provided the following instruction to focus TODO planning. Use your judgment to interpret it and prioritize TODO items accordingly, while still respecting the workspace README:\n\n> ${input.instruction.trim().replace(/\n/g, "\n> ")}\n`

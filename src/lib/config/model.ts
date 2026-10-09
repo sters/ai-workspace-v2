@@ -49,10 +49,6 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   // done-contract the verifier and gate enforce.
   [STEP_TYPES.UPDATE_TODO]: "opus",
   [STEP_TYPES.UPDATE_README]: "opus",
-  // Not just a decision: on `synthesize` this same call merges the candidates'
-  // implementations into the original worktree, and everything downstream
-  // builds on the result.
-  [STEP_TYPES.BEST_OF_N_REVIEWER]: "opus",
   // Decides whether to run another cycle. Not open-ended work — it reads an
   // already-structured review summary — but it is the only step tiered by
   // payoff: one short call, and a wrong answer either burns a whole cycle or
@@ -71,18 +67,13 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   // mechanical goes to opus instead (`model.test.ts` enforces this).
   //
   // Sonnet takes the steps that still act like an agent — search the
-  // workspaces, check items against the code, drive gh/git, or splice whole
-  // documents. At `low` it can report done without checking and stop to ask
+  // workspaces, check items against the code, or drive gh/git. At `low` it can report done without checking and stop to ask
   // partway, which is why the executor and every step that writes code stay on
   // opus.
   [STEP_TYPES.VERIFY_TODO]: CLAUDE_MODELS.SONNET_5_5,
   [STEP_TYPES.DEEP_SEARCH]: CLAUDE_MODELS.SONNET_5_5,
   // Fills a PR template from the diff and README, plus the gh/git mechanics.
   [STEP_TYPES.CREATE_PR]: CLAUDE_MODELS.SONNET_5_5,
-  // The markdown best-of-N pair (`best-of-n-files.ts`): pick a winner, then
-  // splice documents together. No code is involved in either.
-  [STEP_TYPES.BEST_OF_N_FILE_REVIEWER]: CLAUDE_MODELS.SONNET_5_5,
-  [STEP_TYPES.BEST_OF_N_SYNTHESIZER]: CLAUDE_MODELS.SONNET_5_5,
   // Haiku takes the steps whose input is a named set of files in one place:
   // read them, merge or filter by the prompt's rules, write the result. Nothing
   // to explore keeps the prompt short, which is where haiku holds up — a long
@@ -134,7 +125,6 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   [STEP_TYPES.PLAN_TODO]: "medium",
   [STEP_TYPES.RESEARCH]: "medium",
   [STEP_TYPES.COORDINATE_TODOS]: "medium",
-  [STEP_TYPES.BEST_OF_N_REVIEWER]: "medium",
   // Reads like translation — the gate's numbered asks become items — but the two
   // things it must derive are enumerated nowhere: which sites *state* a contract an
   // ask changes, and which of the sites its own items touch need coverage. It hands
@@ -215,9 +205,6 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // sonnet/low and haiku/low — nothing to decide: extraction, aggregation, rule
   // application. See `STEP_DEFAULT_MODELS` for which model takes which.
   [STEP_TYPES.CREATE_PR]: "low",
-  // Comparative judgment, but over prose, with no code and nothing to merge.
-  [STEP_TYPES.BEST_OF_N_FILE_REVIEWER]: "low",
-  [STEP_TYPES.BEST_OF_N_SYNTHESIZER]: "low",
   [STEP_TYPES.VERIFY_TODO]: "low",
   [STEP_TYPES.DEEP_SEARCH]: "low",
   // Applies the prompt's documented rules to an existing suggestion list.

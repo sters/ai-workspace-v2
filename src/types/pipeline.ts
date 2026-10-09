@@ -26,11 +26,6 @@ export const STEP_TYPES = {
   VALIDATE_PR_COMMENT: "validate-pr-comment",
   GROUND_FINDING: "ground-finding",
   RESOLVE_CONFLICTS: "resolve-conflicts",
-  /** Code candidates: picks a winner AND merges implementations in the worktree. */
-  BEST_OF_N_REVIEWER: "best-of-n-reviewer",
-  /** Markdown candidates: picks a winner / decides to synthesize, writes nothing. */
-  BEST_OF_N_FILE_REVIEWER: "best-of-n-file-reviewer",
-  BEST_OF_N_SYNTHESIZER: "best-of-n-synthesizer",
   AGGREGATE_SUGGESTIONS: "aggregate-suggestions",
   PRUNE_SUGGESTIONS: "prune-suggestions",
   SUGGEST_WORKSPACE: "suggest-workspace",
@@ -164,8 +159,6 @@ export interface PipelineOptions {
     phase: PipelinePhase,
     success: boolean,
   ) => "continue" | "skip" | "abort";
-  /** When set, wraps the pipeline in Best-of-N mode with N parallel candidates. */
-  bestOfN?: number;
 }
 
 export interface SetupRepositoryResult extends WorkspaceRepo {
