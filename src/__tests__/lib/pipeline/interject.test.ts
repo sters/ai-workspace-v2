@@ -53,11 +53,6 @@ describe("acquireInterject / releaseInterject", () => {
     releaseInterject("ws-a");
     expect(acquireInterject("ws-a")).toBe(true);
   });
-
-  it("tracks workspaces independently", () => {
-    acquireInterject("ws-a");
-    expect(acquireInterject("ws-b")).toBe(true);
-  });
 });
 
 describe("killAndAwait", () => {

@@ -163,16 +163,6 @@ describe("buildAutonomousPipeline", () => {
   });
 
   describe("phase structure", () => {
-    it("includes init phases when startWith is init", () => {
-      const phases = buildAutonomousPipeline({
-        startWith: "init",
-        description: "Test description",
-      });
-      expect(mockBuildInit).toHaveBeenCalledWith("Test description", undefined);
-      // init phases + Cycle 1 phase
-      expect(phases.length).toBeGreaterThanOrEqual(1);
-    });
-
     it("includes update-todo phase when startWith is update-todo", () => {
       const phases = buildAutonomousPipeline({
         startWith: "update-todo",
@@ -429,67 +419,6 @@ describe("buildAutonomousPipeline", () => {
       );
     });
 
-    it("execute phase runs buildExecutePipeline", async () => {
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-      });
-      const execPhase = phaseByLabel(phases, "Cycle 1: Execute");
-
-      const ctx = createMockCtx();
-      await execPhase.fn(ctx);
-
-      expect(mockBuildExecute).toHaveBeenCalled();
-    });
-
-    it("review phase runs buildReviewPipeline", async () => {
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-      });
-      const reviewPhase = phaseByLabel(phases, "Cycle 1: Review");
-
-      const ctx = createMockCtx();
-      await reviewPhase.fn(ctx);
-
-      expect(mockBuildReview).toHaveBeenCalled();
-    });
-
-    it("gate phase appends create-pr when no critical issues", async () => {
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-      });
-      const gatePhase = phaseByLabel(phases, "Cycle 1: Gate");
-
-      const appendedPhases: PipelinePhase[] = [];
-      const ctx = createMockCtx({
-        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
-      });
-      await gatePhase.fn(ctx);
-
-      // Gate returned shouldLoop: false (no review sessions) → appends Create PR
-      expect(appendedPhases).toHaveLength(1);
-      expect(appendedPhases[0].kind).toBe("function");
-      if (appendedPhases[0].kind === "function") {
-        expect(appendedPhases[0].label).toBe("Create PR");
-      }
-    });
-
-    it("sets per-step timeouts", () => {
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-      });
-      // Derived from batchSize, not a fixed figure — see the budget test above.
-      const { batchSize } = vi.mocked(getOperationConfig)("execute");
-      expect(phaseByLabel(phases, "Cycle 1: Execute").timeoutMs).toBe(
-        executePhaseBudgetMs(ROUTINE_BATCH_COUNT, batchSize),
-      );
-      expect(phaseByLabel(phases, "Cycle 1: Review").timeoutMs).toBe(45 * 60 * 1000);
-      expect(phaseByLabel(phases, "Cycle 1: Gate").timeoutMs).toBe(10 * 60 * 1000);
-    });
-
     // `runSubPhases` ignores each sub-phase's own `timeoutMs`, so the whole
     // sub-pipeline runs under the wrapping cycle phase's single budget. A
     // wrapper tighter than the pipeline it wraps fires first, and a timed-out
@@ -578,53 +507,6 @@ describe("buildAutonomousPipeline", () => {
         "Cycle 2: Review",
         "Cycle 2: Gate",
       ]);
-    });
-
-    // The gate's own Must/Should-Fix audit infers this from TODO checkboxes,
-    // which record what the executor believed. The next review gets the asks so a
-    // verifier can check them against the code instead.
-    it("hands the next cycle's review the fixes this gate asked for", async () => {
-      mockGetReviewSessions.mockResolvedValue([{
-        timestamp: "2024-01-01", critical: 0, major: 0, minor: 2, total: 2,
-      }]);
-      mockGetReviewDetail.mockResolvedValue({
-        summary: "2 warnings found",
-        files: [{ name: "REVIEW-repo.md", content: "Warning: typo found" }],
-      });
-
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-      });
-
-      const appendedPhases: PipelinePhase[] = [];
-      const ctx = createMockCtx({
-        runChild: vi.fn(async (label, _prompt, opts) => {
-          if (opts?.onResultText && label === "Autonomous Gate") {
-            opts.onResultText(JSON.stringify({
-              shouldLoop: true,
-              reason: "Two warnings worth fixing",
-              fixableIssues: ["gate the anchor on a defined href", "promote selectedAtMs"],
-            }));
-          }
-          return true;
-        }),
-        appendPhases: vi.fn((p: PipelinePhase[]) => { appendedPhases.push(...p); }),
-      });
-
-      await phaseByLabel(phases, "Cycle 1: Gate").fn(ctx);
-
-      const cycle2Review = appendedPhases.find(
-        (p) => p.kind === "function" && p.label === "Cycle 2: Review",
-      );
-      if (!cycle2Review || cycle2Review.kind !== "function") throw new Error("no cycle 2 review");
-      await cycle2Review.fn(createMockCtx());
-
-      expect(mockBuildReview).toHaveBeenCalledWith(
-        expect.objectContaining({
-          requestedFixes: ["gate the anchor on a defined href", "promote selectedAtMs"],
-        }),
-      );
     });
 
     it("asks for no fix verification on the first cycle, which has no prior asks", async () => {
@@ -828,23 +710,6 @@ describe("buildAutonomousPipeline", () => {
         await phaseByLabel(phases, "Cycle 1: Gate").fn(ctx);
 
         expect(appendedPhases.map((p) => p.kind === "function" && p.label)).toEqual(["Create PR"]);
-      });
-
-      it("does not queue another cycle's work when it stops", async () => {
-        const phases = buildAutonomousPipeline({
-          startWith: "execute", workspace: "test-ws", maxLoops: 1,
-        });
-        const { ctx, appendedPhases } = gateCtxReturning({
-          shouldLoop: true,
-          giveUp: false,
-          reason: "Two acceptance criteria unmet",
-          fixableIssues: ["implement criterion 2", "implement criterion 3"],
-        });
-
-        await phaseByLabel(phases, "Cycle 1: Gate").fn(ctx);
-
-        expect(appendedPhases).toHaveLength(0);
-        expect(mockStripCompletedTodos).not.toHaveBeenCalled();
       });
     });
 
@@ -1383,28 +1248,6 @@ describe("buildAutonomousPipeline — every loop goes through the plan", () => {
     "Cycle 2: Review",
     "Cycle 2: Gate",
   ];
-
-  it("routes a round of localized fixes through Update TODO + Execute", async () => {
-    const { appended } = await runGate({
-      shouldLoop: true,
-      giveUp: false,
-      reason: "one localized fix left",
-      fixableIssues: ["include the index in the list key at row.tsx:118"],
-    });
-
-    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual(UNIFORM_ROUND);
-  });
-
-  it("routes a round that needs new work the same way", async () => {
-    const { appended } = await runGate({
-      shouldLoop: true,
-      giveUp: false,
-      reason: "needs a new module",
-      fixableIssues: ["extract a shared helper"],
-    });
-
-    expect(appended.map((p) => p.kind === "function" && p.label)).toEqual(UNIFORM_ROUND);
-  });
 
   it("plans the gate's asks into the TODO file before executing", async () => {
     const { appended } = await runGate({

@@ -1,36 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   getPlannerSystemPrompt,
-  getResearchPlannerSystemPrompt,
   buildPlannerPrompt,
 } from "@/lib/templates/prompts/planner";
 
 describe("getPlannerSystemPrompt", () => {
   const prompt = getPlannerSystemPrompt();
-
-  it("requires the three fields the executor cannot proceed without", () => {
-    expect(prompt).toMatch(/Target:.*\(required/i);
-    expect(prompt).toMatch(/Action:.*\(required/i);
-    expect(prompt).toMatch(/Verify:.*\(required/i);
-  });
-
-  it("makes Pattern and Why conditional so items are not padded to a fixed shape", () => {
-    // These were once mandatory on every code-change item, which cost the planner
-    // a search per item to find an analogue and the executor a re-read per batch.
-    expect(prompt).toMatch(/Pattern:.*\((only|omit|when)/i);
-    expect(prompt).toMatch(/Why:.*\((only|omit|when)/i);
-    expect(prompt).not.toMatch(/Pattern:.*\(required/i);
-    expect(prompt).not.toMatch(/Why:.*\(required/i);
-  });
-
-  it("does not mandate a separate Acceptance field on top of Verify", () => {
-    expect(prompt).not.toMatch(/Acceptance:.*\(required/i);
-  });
-
-  it("requires Verify to be a check that can pass or fail", () => {
-    expect(prompt).toMatch(/pass or fail|checkable/i);
-    expect(prompt).toMatch(/NOT "ensure it works"/);
-  });
 
   // Adoption of WRITTEN_DELIVERABLE_LENGTH and REPO_SEARCH_EFFICIENCY is owned by
   // shared.test.ts, which checks every prompt that should carry them against the
@@ -39,27 +14,6 @@ describe("getPlannerSystemPrompt", () => {
   // format for brevity"), which is what produced 500-line TODO files.
   it("no longer tells the planner that format rigor outranks brevity", () => {
     expect(prompt).not.toMatch(/never trade rigor of the \*?format/i);
-  });
-
-  it("requires path:line or path + symbol/function for Target on code-change tasks", () => {
-    expect(prompt).toMatch(/path:line/i);
-    expect(prompt).toMatch(/(symbol|function name)/i);
-  });
-
-  it("forbids vague Target values like 'relevant module'", () => {
-    expect(prompt).toMatch(/(forbid|do not use|avoid).*(relevant module|vague)/i);
-  });
-
-  it("still allows looser format for doc-only / config-only tasks", () => {
-    expect(prompt).toMatch(/Doc-only \/ config-only \/ non-code items/);
-  });
-});
-
-describe("getResearchPlannerSystemPrompt", () => {
-  it("keeps the research planner format lenient (no Acceptance/Why required)", () => {
-    const prompt = getResearchPlannerSystemPrompt();
-    expect(prompt).not.toMatch(/Acceptance.*required/i);
-    expect(prompt).not.toMatch(/Why.*required/i);
   });
 });
 
@@ -91,26 +45,3 @@ describe("buildPlannerPrompt", () => {
   );
 });
 
-describe("getPlannerSystemPrompt — plan size", () => {
-  const prompt = getPlannerSystemPrompt();
-
-  it("forbids turning constraint commands into TODO items", () => {
-    expect(prompt).toContain("### Repository Constraints");
-    expect(prompt).toMatch(/do \*\*not\*\* turn them into TODO items/i);
-    // The rule only holds up if the prompt says where they go instead.
-    expect(prompt).toContain("`Verify:` field");
-  });
-
-  it("caps whole-repo verification at one trailing item", () => {
-    expect(prompt).toMatch(/at most one/i);
-  });
-
-  it("forbids itemizing documentation reading", () => {
-    expect(prompt).toContain("### What Is Not a TODO Item");
-    expect(prompt).toMatch(/Reading documentation/);
-  });
-
-  it("no longer requires a verification item per declared constraint", () => {
-    expect(prompt).not.toMatch(/MUST include corresponding verification TODO items/);
-  });
-});

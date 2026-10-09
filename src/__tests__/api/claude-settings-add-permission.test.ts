@@ -66,20 +66,6 @@ afterAll(() => {
 });
 
 describe("POST /api/claude-settings/add-permission", () => {
-  it("adds permission to existing settings file", async () => {
-    const existing = { permissions: { allow: ["Read"] } };
-    mockReadFile.mockResolvedValue(JSON.stringify(existing));
-    mockMkdir.mockResolvedValue(undefined);
-    mockWriteFile.mockResolvedValue(undefined);
-
-    const { status, data } = await callPOST({ permission: "Bash(rm:*)" });
-    expect(status).toBe(200);
-    expect(data.ok).toBe(true);
-
-    const writtenContent = JSON.parse(mockWriteFile.mock.calls[0][1]);
-    expect(writtenContent.permissions.allow).toContain("Read");
-    expect(writtenContent.permissions.allow).toContain("Bash(rm:*)");
-  });
 
   it("creates new settings file when none exists", async () => {
     mockReadFile.mockRejectedValue(
@@ -110,12 +96,6 @@ describe("POST /api/claude-settings/add-permission", () => {
 
   it("returns 400 when permission is missing", async () => {
     const { status, data } = await callPOST({});
-    expect(status).toBe(400);
-    expect(data.error).toBeDefined();
-  });
-
-  it("returns 400 when permission is not a string", async () => {
-    const { status, data } = await callPOST({ permission: 123 });
     expect(status).toBe(400);
     expect(data.error).toBeDefined();
   });

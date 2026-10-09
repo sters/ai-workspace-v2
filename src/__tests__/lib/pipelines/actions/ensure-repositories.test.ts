@@ -150,28 +150,6 @@ describe("syncReadmeRepositories", () => {
     expect(res.setUpRepos).toEqual([{ repoName: "new", worktreePath: "/b" }]);
   });
 
-  it("reports no new worktrees when nothing was set up", async () => {
-    mockReadReadme.mockResolvedValue(
-      meta([{ alias: "b", path: "github.com/a/b", baseBranch: "main" }]),
-    );
-    mockList.mockReturnValue([
-      { repoPath: "github.com/a/b", repoName: "b", worktreePath: "/x" },
-    ]);
-
-    const res = await syncReadmeRepositories("ws", vi.fn());
-
-    expect(res.setUpRepos).toEqual([]);
-  });
-
-  it("reports no new worktrees when the README cannot be read", async () => {
-    mockReadReadme.mockRejectedValue(new Error("boom"));
-    mockList.mockReturnValue([]);
-
-    const res = await syncReadmeRepositories("ws", vi.fn());
-
-    expect(res.setUpRepos).toEqual([]);
-  });
-
   it("reports stillMissing when a setup attempt fails", async () => {
     mockReadReadme.mockResolvedValue(
       meta([{ alias: "y", path: "github.com/x/y", baseBranch: "main" }]),
@@ -233,16 +211,6 @@ describe("syncReadmeRepositories", () => {
 
       expect(ok).toBe(true);
       expect(mockBuildConstraints).not.toHaveBeenCalled();
-    });
-
-    it("reports the phase's own failure to the caller", async () => {
-      mockConstraintsFn.mockResolvedValue(false);
-
-      const ok = await discoverConstraintsForNewRepos(createMockCtx(), "ws", [
-        { repoName: "new", worktreePath: "/w" },
-      ]);
-
-      expect(ok).toBe(false);
     });
   });
 

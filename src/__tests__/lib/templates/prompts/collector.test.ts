@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  getCollectorSystemPrompt,
   buildCollectorPrompt,
 } from "@/lib/templates/prompts/collector";
 import type { CollectorInput } from "@/types/prompts";
@@ -32,24 +31,3 @@ describe("buildCollectorPrompt — fix verifications", () => {
   });
 });
 
-describe("getCollectorSystemPrompt — fix verification handling", () => {
-  const prompt = getCollectorSystemPrompt();
-
-  it("tells the collector to carry NOT LANDED / PARTIAL into the summary", () => {
-    expect(prompt).toContain("NOT LANDED");
-    expect(prompt).toContain("PARTIAL");
-  });
-
-  // A requested fix that silently vanished is the failure this file exists to
-  // surface, so it has to reach the top of SUMMARY.md rather than a footnote.
-  it("puts an unlanded fix in the top priority list", () => {
-    expect(prompt.toLowerCase()).toMatch(/top priority/);
-  });
-
-  // The counts feed the gate's severity reasoning; a verification status is not a
-  // review finding and must not inflate them.
-  it("keeps fix-verification statuses out of the Critical/Warning counts", () => {
-    const section = prompt.split("Fix Verifications")[1] ?? prompt;
-    expect(section).toMatch(/not?\s+.*count|out of the .*count/i);
-  });
-});

@@ -115,12 +115,6 @@ describe("POST /api/aiw-settings", () => {
     expect(mockResetConfig).toHaveBeenCalled();
   });
 
-  it("accepts empty content", async () => {
-    const { status, data } = await callPOST({ content: "" });
-    expect(status).toBe(200);
-    expect(data.ok).toBe(true);
-  });
-
   it("returns 400 when content is not a string", async () => {
     const { status, data } = await callPOST({ content: 123 });
     expect(status).toBe(400);

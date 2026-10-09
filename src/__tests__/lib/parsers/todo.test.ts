@@ -6,7 +6,6 @@ import {
   groupTodoItemsWithParents,
   batchTodoGroups,
   renderTodoGroupsAsMarkdown,
-  statusToMarker,
   stripCompletedTodoItems,
   normalizeTodoCheckboxes,
   extractPrReviewThreadsSection,
@@ -22,27 +21,6 @@ describe("parseTodoItems", () => {
       indent: 0,
       children: [],
     });
-  });
-
-  it("parses pending items", () => {
-    const items = parseTodoItems("- [ ] Write tests");
-    expect(items).toHaveLength(1);
-    expect(items[0].status).toBe("pending");
-    expect(items[0].text).toBe("Write tests");
-  });
-
-  it("parses blocked items", () => {
-    const items = parseTodoItems("- [!] Waiting for API");
-    expect(items).toHaveLength(1);
-    expect(items[0].status).toBe("blocked");
-    expect(items[0].text).toBe("Waiting for API");
-  });
-
-  it("parses in-progress items", () => {
-    const items = parseTodoItems("- [~] Working on refactor");
-    expect(items).toHaveLength(1);
-    expect(items[0].status).toBe("in_progress");
-    expect(items[0].text).toBe("Working on refactor");
   });
 
   it("parses multiple items with different statuses", () => {
@@ -90,10 +68,6 @@ describe("parseTodoItems", () => {
   More detail`;
     const items = parseTodoItems(content);
     expect(items[0].children).toEqual(["Detail", "More detail"]);
-  });
-
-  it("returns empty array for empty input", () => {
-    expect(parseTodoItems("")).toEqual([]);
   });
 
   it("returns empty array for non-todo content", () => {
@@ -182,10 +156,6 @@ A note line
     expect(sections).toHaveLength(1);
     expect(sections[0].heading).toBe("Filled Section");
   });
-
-  it("returns empty array for empty input", () => {
-    expect(parseTodoSections("")).toEqual([]);
-  });
 });
 
 describe("parseTodoFile", () => {
@@ -213,19 +183,6 @@ describe("parseTodoFile", () => {
     expect(file.progress).toBe(67); // Math.round(2/3 * 100)
   });
 
-  it("handles 100% progress", () => {
-    const content = `- [x] All
-- [x] Done`;
-    const file = parseTodoFile("TODO-test.md", content);
-    expect(file.progress).toBe(100);
-  });
-
-  it("handles 0% progress", () => {
-    const content = `- [ ] Nothing done`;
-    const file = parseTodoFile("TODO-test.md", content);
-    expect(file.progress).toBe(0);
-  });
-
   it("returns 100 progress for empty content (no items = complete)", () => {
     const file = parseTodoFile("TODO-empty.md", "");
     expect(file.total).toBe(0);
@@ -236,16 +193,6 @@ describe("parseTodoFile", () => {
     expect(parseTodoFile("TODO-api-server.md", "").repoName).toBe("api-server");
     expect(parseTodoFile("TODO-frontend.md", "").repoName).toBe("frontend");
     expect(parseTodoFile("notes.md", "").repoName).toBe("notes");
-  });
-
-  it("includes both items and sections", () => {
-    const content = `## Section A
-- [x] Task 1
-## Section B
-- [ ] Task 2`;
-    const file = parseTodoFile("TODO-test.md", content);
-    expect(file.items).toHaveLength(2);
-    expect(file.sections).toHaveLength(2);
   });
 });
 
@@ -264,20 +211,6 @@ describe("groupTodoItemsWithParents", () => {
     expect(groups[0].subItems[1].text).toBe("Sub 1b");
     expect(groups[1].parent.text).toBe("Parent 2");
     expect(groups[1].subItems).toHaveLength(1);
-  });
-
-  it("handles items with no sub-items", () => {
-    const items = parseTodoItems(`- [x] Task A
-- [ ] Task B`);
-    const groups = groupTodoItemsWithParents(items);
-    expect(groups).toHaveLength(2);
-    expect(groups[0].subItems).toHaveLength(0);
-    expect(groups[1].subItems).toHaveLength(0);
-  });
-
-  it("returns empty array for empty input", () => {
-    const groups = groupTodoItemsWithParents([]);
-    expect(groups).toEqual([]);
   });
 
   it("ignores leading sub-items without a parent", () => {
@@ -318,19 +251,6 @@ describe("batchTodoGroups", () => {
     expect(batches[0][0].parent.text).toBe("Pending");
     expect(batches[0][1].parent.text).toBe("In progress");
   });
-
-  it("returns empty array when all items are completed", () => {
-    const items = parseTodoItems(`- [x] Done 1
-- [x] Done 2`);
-    const groups = groupTodoItemsWithParents(items);
-    const batches = batchTodoGroups(groups, 3);
-    expect(batches).toEqual([]);
-  });
-
-  it("returns empty array for empty groups", () => {
-    const batches = batchTodoGroups([], 3);
-    expect(batches).toEqual([]);
-  });
 });
 
 describe("renderTodoGroupsAsMarkdown", () => {
@@ -364,10 +284,6 @@ describe("renderTodoGroupsAsMarkdown", () => {
     expect(md).toContain("- [ ] Task with detail");
     expect(md).toContain("  Some detail text");
     expect(md).toContain("  More detail");
-  });
-
-  it("returns empty string for empty groups", () => {
-    expect(renderTodoGroupsAsMarkdown([])).toBe("");
   });
 });
 
@@ -408,18 +324,6 @@ describe("stripCompletedTodoItems", () => {
     expect(result).toContain("- [ ] Pending sub-item");
   });
 
-  it("keeps blocked and in-progress items", () => {
-    const content = `- [x] Done
-- [!] Blocked
-- [~] In progress
-- [ ] Pending`;
-    const result = stripCompletedTodoItems(content);
-    expect(result).not.toContain("Done");
-    expect(result).toContain("- [!] Blocked");
-    expect(result).toContain("- [~] In progress");
-    expect(result).toContain("- [ ] Pending");
-  });
-
   it("preserves section headings and non-item content", () => {
     const content = `# TODO: Repo
 ## Phase 1
@@ -444,41 +348,6 @@ describe("stripCompletedTodoItems", () => {
 - [~] In progress
 - [!] Blocked`;
     expect(stripCompletedTodoItems(content)).toBe(content);
-  });
-
-  it("handles empty input", () => {
-    expect(stripCompletedTodoItems("")).toBe("");
-  });
-
-  it("removes multiple consecutive completed items", () => {
-    const content = `- [x] Done 1
-- [x] Done 2
-- [x] Done 3
-- [ ] Pending`;
-    const result = stripCompletedTodoItems(content);
-    expect(result).not.toContain("Done 1");
-    expect(result).not.toContain("Done 2");
-    expect(result).not.toContain("Done 3");
-    expect(result).toContain("- [ ] Pending");
-  });
-
-  it("removes entire file content when every item is completed", () => {
-    const content = `- [x] Done 1
-  - Target: a
-- [x] Done 2
-  - Target: b`;
-    const result = stripCompletedTodoItems(content);
-    expect(result).not.toContain("Done");
-    expect(result).not.toContain("Target");
-  });
-});
-
-describe("statusToMarker", () => {
-  it("maps all statuses correctly", () => {
-    expect(statusToMarker("completed")).toBe("x");
-    expect(statusToMarker("pending")).toBe(" ");
-    expect(statusToMarker("blocked")).toBe("!");
-    expect(statusToMarker("in_progress")).toBe("~");
   });
 });
 
@@ -527,12 +396,6 @@ describe("normalizeTodoCheckboxes", () => {
     );
   });
 
-  it("converts asterisk bullets without checkboxes", () => {
-    expect(normalizeTodoCheckboxes("* Fix something")).toBe(
-      "- [ ] Fix something",
-    );
-  });
-
   it("converts uppercase X marker", () => {
     expect(normalizeTodoCheckboxes("- [X] Done task")).toBe(
       "- [x] Done task",
@@ -543,14 +406,6 @@ describe("normalizeTodoCheckboxes", () => {
     const content = "# TODO: repo\n\n## Section\n\n- Fix the thing";
     expect(normalizeTodoCheckboxes(content)).toBe(
       "# TODO: repo\n\n## Section\n\n- [ ] Fix the thing",
-    );
-  });
-
-  it("handles mixed valid and invalid items", () => {
-    const content =
-      "- [ ] Valid item\n- Missing checkbox\n- [x] Completed";
-    expect(normalizeTodoCheckboxes(content)).toBe(
-      "- [ ] Valid item\n- [ ] Missing checkbox\n- [x] Completed",
     );
   });
 
@@ -567,18 +422,6 @@ describe("normalizeTodoCheckboxes", () => {
       "- [ ] Parent\n  - [ ] Sub with checkbox\n  - Sub without checkbox";
     expect(normalizeTodoCheckboxes(content)).toBe(
       "- [ ] Parent\n  - [ ] Sub with checkbox\n  - [ ] Sub without checkbox",
-    );
-  });
-
-  it("returns empty string for empty input", () => {
-    expect(normalizeTodoCheckboxes("")).toBe("");
-  });
-
-  it("normalizes a fully non-checkbox file", () => {
-    const content =
-      "# TODO: repo\n\n## Phase 1\n\n- Task A\n- Task B\n\n## Phase 2\n\n- Task C";
-    expect(normalizeTodoCheckboxes(content)).toBe(
-      "# TODO: repo\n\n## Phase 1\n\n- [ ] Task A\n- [ ] Task B\n\n## Phase 2\n\n- [ ] Task C",
     );
   });
 

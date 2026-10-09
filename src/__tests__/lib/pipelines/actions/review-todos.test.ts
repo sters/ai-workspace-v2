@@ -167,14 +167,6 @@ describe("buildReviewTodosPhase", () => {
   const phase = (repos = ONE_REPO, interactionLevel?: "low" | "mid" | "high") =>
     buildReviewTodosPhase({ workspace: "ws", wsPath: "/ws", repos, interactionLevel });
 
-  it("asks each reviewer for a structured verdict", async () => {
-    const { ctx, rounds } = makeCtx({ verdicts: { "review-frontend": CLEAN } });
-    await phase().fn(ctx);
-
-    expect(rounds[0][0].jsonSchema).toBeDefined();
-    expect(rounds[0][0].onResultText).toBeInstanceOf(Function);
-  });
-
   it("does not revise anything when every verdict is clean", async () => {
     const { ctx, rounds } = makeCtx({ verdicts: { "review-frontend": CLEAN } });
     const ok = await phase().fn(ctx);

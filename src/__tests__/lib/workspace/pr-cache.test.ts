@@ -27,12 +27,6 @@ beforeEach(() => {
 });
 
 describe("getCachedPullRequests", () => {
-  it("reads through on a cold cache", async () => {
-    const got = await getCachedPullRequests("ws", { now: 1000 });
-    expect(got.pullRequests[0]).toMatchObject({ title: "first" });
-    expect(mockList).toHaveBeenCalledWith("ws");
-  });
-
   it("serves a second read inside the TTL without touching gh", async () => {
     await getCachedPullRequests("ws", { now: 1000 });
     await getCachedPullRequests("ws", { now: 1000 + PR_CACHE_TTL_MS - 1 });

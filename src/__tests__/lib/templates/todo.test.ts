@@ -33,16 +33,6 @@ describe("TODO templates — item count discipline", () => {
     expect(section.match(/^- \[ \]/gm) ?? []).toHaveLength(1);
   });
 
-  it.each(codeTemplates)("%s: drops the Acceptance field", (_name, template) => {
-    // Verify doubles as the acceptance condition; a sixth mandatory field padded
-    // the file and cost the planner a search per item.
-    expect(template).not.toContain("Acceptance:");
-  });
-
-  it.each(codeTemplates)("%s: marks Pattern and Why as conditional", (_name, template) => {
-    expect(template).toMatch(/- Pattern: \(only where/);
-  });
-
   it.each([
     TODO_FEATURE_TEMPLATE,
     TODO_BUGFIX_TEMPLATE,

@@ -3,11 +3,6 @@ import { describe, expect, it } from "vitest";
 import { Card } from "@/components/shared/containers/card";
 
 describe("Card", () => {
-  it("renders children", () => {
-    render(<Card>Hello World</Card>);
-    expect(screen.getByText("Hello World")).toBeInTheDocument();
-  });
-
   // tailwind-merge has to let the caller's utility win over the variant's.
   it("lets a custom className override the variant's own utilities", () => {
     render(

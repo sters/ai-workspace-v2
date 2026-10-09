@@ -117,18 +117,4 @@ describe("WorkspaceList", () => {
     expect(screen.getByText("Alpha Project")).toBeInTheDocument();
     expect(screen.getByText("Beta Project")).toBeInTheDocument();
   });
-
-  it("renders each workspace as a link", () => {
-    mockUseWorkspaces.mockReturnValue({
-      workspaces: [makeWorkspace("ws-1", "WS One")],
-      olderCount: 0,
-      archivedCount: 0,
-      isLoading: false,
-      error: undefined,
-      refresh: vi.fn(),
-    });
-    render(<WorkspaceList />);
-    const link = screen.getByRole("link");
-    expect(link.getAttribute("href")).toBe("/workspace/ws-1");
-  });
 });

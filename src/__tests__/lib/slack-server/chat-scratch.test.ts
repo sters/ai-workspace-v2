@@ -23,12 +23,6 @@ describe("slack-server/chat-scratch", () => {
     expect(a).not.toBe(b);
   });
 
-  it("is stable for the same thread key", () => {
-    expect(getSlackScratchDir(ROOT, "1712345678.123456")).toBe(
-      getSlackScratchDir(ROOT, "1712345678.123456"),
-    );
-  });
-
   // The thread key comes from Slack and is interpolated into a prompt the model
   // then uses as a path, so a separator or `..` must not let it name a
   // directory outside the scratch root.

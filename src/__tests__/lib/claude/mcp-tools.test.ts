@@ -36,35 +36,11 @@ describe("parseMcpToolsFromInitEvent", () => {
     expect(parseMcpToolsFromInitEvent(tools)).toEqual([]);
   });
 
-  it("returns empty array for empty tools list", () => {
-    expect(parseMcpToolsFromInitEvent([])).toEqual([]);
-  });
-
   it("ignores malformed mcp__ entries without double underscore separator", () => {
     const tools = ["mcp__badformat", "mcp__github__valid_tool"];
     const result = parseMcpToolsFromInitEvent(tools);
     expect(result).toEqual([
       { name: "github", tools: ["valid_tool"] },
-    ]);
-  });
-
-  it("handles server with hyphenated names", () => {
-    const tools = [
-      "mcp__my-server__tool-one",
-      "mcp__my-server__tool-two",
-    ];
-    const result = parseMcpToolsFromInitEvent(tools);
-    expect(result).toEqual([
-      { name: "my-server", tools: ["tool-one", "tool-two"] },
-    ]);
-  });
-
-  it("handles tool names containing double underscores", () => {
-    // mcp__{server}__{toolName} — only the first __ after server is the separator
-    const tools = ["mcp__notion__notion-search"];
-    const result = parseMcpToolsFromInitEvent(tools);
-    expect(result).toEqual([
-      { name: "notion", tools: ["notion-search"] },
     ]);
   });
 

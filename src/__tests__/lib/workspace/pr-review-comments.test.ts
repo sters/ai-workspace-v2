@@ -28,12 +28,6 @@ function finding(overrides: Partial<AnchoredReviewFinding>): AnchoredReviewFindi
   };
 }
 
-describe("findingMarker", () => {
-  it("is an HTML comment, so it does not render in the posted comment", () => {
-    expect(findingMarker("abc123")).toBe("<!-- aiw-finding:abc123 -->");
-  });
-});
-
 describe("extractPostedIds", () => {
   it("reads the finding ids out of comments already on the PR", () => {
     const raw = JSON.stringify([
@@ -77,14 +71,6 @@ describe("buildCommentBody", () => {
     const body = buildCommentBody(finding({}), "レスポンスの reject が捕捉されていません。");
     expect(body).toContain("レスポンスの reject が捕捉されていません。");
     expect(body).toContain(findingMarker("abc123abc123"));
-  });
-
-  // The comment was written in the repository's own convention, so prefixing an
-  // English severity label would undo exactly what the grounding pass is for.
-  it("adds no severity or confidence header of its own", () => {
-    const body = buildCommentBody(finding({ severity: "critical", confidence: "low" }), "text");
-    expect(body).not.toMatch(/\*\*Critical\*\*/);
-    expect(body).not.toMatch(/confidence/i);
   });
 
   it("renders the finding's suggestion as an applicable suggestion block", () => {

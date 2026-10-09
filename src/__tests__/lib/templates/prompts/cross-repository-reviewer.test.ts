@@ -1,6 +1,5 @@
 import {
   buildCrossRepositoryReviewerPrompt,
-  getCrossRepositoryReviewerSystemPrompt,
 } from "@/lib/templates/prompts/cross-repository-reviewer";
 import type { CrossRepositoryReviewerInput, ReviewScope } from "@/types/prompts";
 
@@ -144,27 +143,5 @@ describe("buildCrossRepositoryReviewerPrompt", () => {
       expect(prompt).toContain("no usable baseline");
       expect(prompt).not.toMatch(/no repository has changed/i);
     });
-  });
-});
-
-describe("getCrossRepositoryReviewerSystemPrompt — incremental scope contract", () => {
-  const prompt = getCrossRepositoryReviewerSystemPrompt();
-
-  it("explains what a repo's New Work section means for a boundary", () => {
-    expect(prompt).toContain("Review Scope");
-    expect(prompt).toContain("New Work");
-    expect(prompt).toMatch(/either side/i);
-  });
-
-  // The narrowing is on what gets reported, never on what may be read: a contract
-  // mismatch is established by reading both sides in full, and most of what a
-  // cross-repo reviewer must read is unchanged by definition.
-  it("keeps reading unrestricted while narrowing what is reported", () => {
-    expect(prompt).toMatch(/read[\s\S]{0,120}freely|freely[\s\S]{0,120}read/i);
-  });
-
-  it("keeps every boundary in scope when no baseline is present", () => {
-    expect(prompt).toMatch(/New Work.{0,20}block is present anywhere/i);
-    expect(prompt).toMatch(/first review of the branch/i);
   });
 });

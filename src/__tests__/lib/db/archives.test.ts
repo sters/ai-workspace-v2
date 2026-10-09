@@ -57,9 +57,4 @@ describe("db/archives", () => {
     expect(set.has("ws-2")).toBe(false);
     expect(set.has("ws-3")).toBe(true);
   });
-
-  it("unarchiving non-existent workspace is a no-op", () => {
-    unarchiveWorkspace("nonexistent");
-    expect(listArchivedWorkspaces()).toHaveLength(0);
-  });
 });

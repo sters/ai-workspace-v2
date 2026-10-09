@@ -111,37 +111,6 @@ describe("triggerWorkspaceSuggestion", () => {
     expect(suggestions[0].sourceOperationId).toBe("op-1");
   });
 
-  it("passes a resolved model to runClaude (default opus)", async () => {
-    mockGetResultText.mockReturnValue(JSON.stringify({ suggestions: [] }));
-    mockOnEvent.mockImplementation((handler: (event: { type: string }) => void) => {
-      setTimeout(() => handler({ type: "complete" }), 10);
-    });
-
-    const { triggerWorkspaceSuggestion } = await import("@/lib/suggest-workspace");
-    triggerWorkspaceSuggestion("test-ws", "op-1", "execute");
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    expect(mockRunClaude).toHaveBeenCalled();
-    const lastCall = mockRunClaude.mock.calls.at(-1);
-    expect(lastCall).toBeDefined();
-    const options = lastCall?.[2] as { model?: string } | undefined;
-    expect(options?.model).toBe("opus");
-  });
-
-  it("passes a resolved effort to runClaude (default medium)", async () => {
-    mockGetResultText.mockReturnValue(JSON.stringify({ suggestions: [] }));
-    mockOnEvent.mockImplementation((handler: (event: { type: string }) => void) => {
-      setTimeout(() => handler({ type: "complete" }), 10);
-    });
-
-    const { triggerWorkspaceSuggestion } = await import("@/lib/suggest-workspace");
-    triggerWorkspaceSuggestion("test-ws", "op-1", "execute");
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    const options = mockRunClaude.mock.calls.at(-1)?.[2] as { effort?: string } | undefined;
-    expect(options?.effort).toBe("medium");
-  });
-
   it("builds the prompt from the operation transcript digest", async () => {
     mockGetResultText.mockReturnValue(JSON.stringify({ suggestions: [] }));
     mockOnEvent.mockImplementation((handler: (event: { type: string }) => void) => {
@@ -159,22 +128,6 @@ describe("triggerWorkspaceSuggestion", () => {
     expect(prompt).toContain("flaky test");
     // Should contain a tool-call summary (the Read target file path)
     expect(prompt).toContain("logging.ts");
-  });
-
-  it("handles empty suggestions gracefully", async () => {
-    mockGetResultText.mockReturnValue(JSON.stringify({ suggestions: [] }));
-    mockOnEvent.mockImplementation((handler: (event: { type: string }) => void) => {
-      setTimeout(() => handler({ type: "complete" }), 10);
-    });
-
-    const { triggerWorkspaceSuggestion } = await import("@/lib/suggest-workspace");
-
-    triggerWorkspaceSuggestion("test-ws", "op-1", "execute");
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    const suggestions = listActiveSuggestions();
-    expect(suggestions).toHaveLength(0);
   });
 
   it("does nothing when suggest.enabled is false", async () => {

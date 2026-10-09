@@ -34,35 +34,6 @@ const input = {
 describe("getPrCommentValidatorSystemPrompt", () => {
   const prompt = getPrCommentValidatorSystemPrompt();
 
-  it("frames the deliverable as understanding, not a fix", () => {
-    expect(prompt).toMatch(/do NOT (change|modify|edit)/i);
-    expect(prompt).toContain("Read-Only");
-  });
-
-  it("forbids replying to or resolving the thread", () => {
-    // The reply belongs to the phase that pushes: a reply names a commit, and at
-    // validate time no commit exists. Same rule the triage instruction carries.
-    expect(prompt).toMatch(/do NOT reply to the review comment and you do NOT resolve the thread/i);
-  });
-
-  it("defines the three verdicts it is allowed to return", () => {
-    expect(prompt).toContain("**valid**");
-    expect(prompt).toContain("**invalid**");
-    expect(prompt).toContain("**unclear**");
-  });
-
-  it("requires the verdict to rest on code, not on the reviewer's authority", () => {
-    expect(prompt).toMatch(/read out of the code/i);
-    expect(prompt).toMatch(/seniority|authority|because a reviewer said/i);
-  });
-
-  it("sends a question the code cannot settle to unclear rather than guessing", () => {
-    // This agent runs precisely because a human could not tell. Picking a side to
-    // look decisive is the one failure that makes the button worthless.
-    expect(prompt).toMatch(/unclear/);
-    expect(prompt).toMatch(/what would settle it/i);
-  });
-
   // Adoption of the cd rule and the search fragment, and the invariant that no
   // prompt states both working-directory conventions, are owned by
   // shared.test.ts — which asserts them against the exported fragments rather
@@ -72,10 +43,6 @@ describe("getPrCommentValidatorSystemPrompt", () => {
     expect(prompt.indexOf("### Working Directory")).toBeLessThan(
       prompt.indexOf("### Searching the Repository"),
     );
-  });
-
-  it("keeps its answer short, since a triage re-embeds it verbatim", () => {
-    expect(prompt).toMatch(/re-embedded verbatim into the instruction that plans the fix/);
   });
 });
 

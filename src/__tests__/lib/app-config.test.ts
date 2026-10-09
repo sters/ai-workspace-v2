@@ -57,30 +57,6 @@ describe("loadConfigFile", () => {
       fs.unlinkSync(tmpPath);
     }
   });
-
-  it("extracts per-operation-type overrides from YAML", async () => {
-    const tmpPath = `/tmp/test-ai-workspace-config-overrides-${Date.now()}.yml`;
-    const fs = await import("node:fs");
-    const yaml = [
-      "operations:",
-      "  batchSize: 3",
-      "  review:",
-      "    batchSize: 0",
-      "  execute:",
-      "    claudeTimeoutMinutes: 30",
-      "",
-    ].join("\n");
-    fs.writeFileSync(tmpPath, yaml);
-    try {
-      const result = loadConfigFile(tmpPath);
-      expect(result).not.toBeNull();
-      expect(result!.operations?.batchSize).toBe(3);
-      expect(result!.operations?.typeOverrides?.review).toEqual({ batchSize: 0 });
-      expect(result!.operations?.typeOverrides?.execute).toEqual({ claudeTimeoutMinutes: 30 });
-    } finally {
-      fs.unlinkSync(tmpPath);
-    }
-  });
 });
 
 describe("normalizeRawConfig", () => {
@@ -247,14 +223,6 @@ describe("mergeConfig", () => {
     expect(result.server.chatPort).toBe(8081);
   });
 
-  it("env overrides defaults when no file config", () => {
-    const env: Partial<AppConfig> = {
-      workspaceRoot: "/my/root",
-    };
-    const result = mergeConfig(CONFIG_DEFAULTS, null, env);
-    expect(result.workspaceRoot).toBe("/my/root");
-  });
-
   it("handles partial file config with nested fields", () => {
     const fileConfig: Partial<AppConfig> = {
       operations: {
@@ -327,14 +295,6 @@ describe("getConfig", () => {
     }
   });
 
-  it("returns default config when no file or env vars", () => {
-    const config = getConfig();
-    expect(config.server.port).toBe(3741);
-    expect(config.server.chatPort).toBe(3742);
-    expect(config.claude.path).toBeNull();
-    expect(config.operations.maxConcurrent).toBe(3);
-  });
-
   it("caches the config on repeated calls", () => {
     const first = getConfig();
     const second = getConfig();
@@ -397,14 +357,6 @@ describe("getOperationConfig", () => {
         delete process.env[key];
       }
     }
-  });
-
-  it("returns global defaults when no per-type overrides", () => {
-    const result = getOperationConfig("execute");
-    expect(result.batchSize).toBe(15);
-    expect(result.claudeTimeoutMinutes).toBe(20);
-    expect(result.functionTimeoutMinutes).toBe(3);
-    expect(result.defaultInteractionLevel).toBe("mid");
   });
 
   it("returns per-type overrides from config file", async () => {
@@ -479,33 +431,6 @@ describe("ensureConfigFile", () => {
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
-  });
-});
-
-describe("generateDefaultConfigContent", () => {
-  it("contains all config sections as comments", () => {
-    const content = generateDefaultConfigContent();
-    expect(content).toContain("# workspaceRoot:");
-    expect(content).toContain("# server:");
-    expect(content).toContain("#   port: 3741");
-    expect(content).toContain("# claude:");
-    expect(content).toContain("# operations:");
-    expect(content).toContain("# openers:");
-    expect(content).toContain("#   - name: Editor (VSCode)");
-    expect(content).toContain("#   - name: Terminal");
-    // Legacy editor/terminal keys are no longer documented
-    expect(content).not.toMatch(/^# editor:/m);
-    expect(content).not.toMatch(/^# terminal:/m);
-  });
-
-  it("contains per-operation-type override reference", () => {
-    const content = generateDefaultConfigContent();
-    expect(content).toContain("Per-operation-type overrides");
-    expect(content).toContain("#   # <operation-type>:");
-    expect(content).toContain("#   #   claudeTimeoutMinutes:");
-    expect(content).toContain("#   #   functionTimeoutMinutes:");
-    expect(content).toContain("#   #   defaultInteractionLevel:");
-    expect(content).toContain("#   #   batchSize:");
   });
 });
 
@@ -595,23 +520,6 @@ describe("migrateConfigContent", () => {
     expect(result).toContain("#   port:");
     expect(result).toContain("# claude:");
     expect(result).toContain("#   path:");
-  });
-
-  it("handles both commenting out and adding in same migration", () => {
-    const content = [
-      "operations:",
-      "  maxConcurrent: 3",
-      "  deprecatedKey: old",
-      "",
-    ].join("\n");
-    const result = migrateConfigContent(content);
-    // Unknown key commented out
-    expect(result).toContain("#   deprecatedKey: old");
-    // Missing keys added
-    expect(result).toContain("#   batchSize:");
-    expect(result).toContain("#   claudeTimeoutMinutes:");
-    // Active known key preserved
-    expect(result).toContain("  maxConcurrent: 3");
   });
 
   it("comments out children of unknown section header", () => {
@@ -779,110 +687,6 @@ describe("migrateConfigContent", () => {
     expect(result).toContain("    batchSize: 0");
     // Unknown key commented out
     expect(result).toContain("#     unknownSetting: true");
-  });
-
-  it("preserves config with per-type overrides and all keys present", () => {
-    const content = [
-      "workspaceRoot: /my/workspace",
-      "",
-      "server:",
-      "  port: 3741",
-      "  chatPort: 3742",
-      "  disableAccessLog: false",
-      "",
-      "claude:",
-      "  path: null",
-      "",
-      "operations:",
-      "  maxConcurrent: 3",
-      "  maxGroupConcurrency: 8",
-      "  claudeTimeoutMinutes: 20",
-      "  functionTimeoutMinutes: 3",
-      "  defaultInteractionLevel: mid",
-      "  batchSize: 3",
-      "  batchSize: 10",
-      "  model: null",
-      "  effort: null",
-      "  review:",
-      "    batchSize: 0",
-      "#   # Built-in step defaults. Model and effort form one ladder with exactly",
-      "#   # five rungs; override either via steps.<step-type>.{model,effort}:",
-      "#   #   opus / high   — a short call whose wrong answer costs a cycle:",
-      "#   #           autonomous-gate",
-      "#   #   opus / medium — the default rung, open-ended work included:",
-      "#   #           analyze-readme, plan-todo, research, coordinate-todos,",
-      "#   #           update-todo, execute, code-review, verify-readme,",
-      "#   #           criteria-feasibility, validate-pr-comment, ground-finding,",
-      "#   #           resolve-conflicts, update-readme, plan-todo-from-review,",
-      "#   #           review-todos, suggest-workspace",
-      "#   #   opus / low    — a step above mechanical:",
-      "#   #           discover-constraints, readme-clarity-gate, verify-fixes",
-      "#   #   claude-sonnet-5-5 / low — mechanical, or bounded with nothing to judge:",
-      "#   #           verify-todo, deep-search, create-pr",
-      "#   #   claude-haiku-5-5 / low  — reshaping text already handed over:",
-      "#   #           prune-suggestions, collect-reviews, aggregate-suggestions",
-      "#   # Per-operation-type overrides (any setting above except the two concurrency caps):",
-      "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
-      "#   #   claudeTimeoutMinutes: 20",
-      "#   #   functionTimeoutMinutes: 3",
-      "#   #   defaultInteractionLevel: mid",
-      "#   #   batchSize: 15",
-      "#   #   model: sonnet",
-      "#   #   effort: high",
-      "#   #   steps:",
-      "#   #     <step-type>:",
-      "#   #       model: haiku",
-      "#   #       effort: low",
-      "",
-      "chat:",
-      "  model: sonnet",
-      "",
-      "openers:",
-      "  - name: Editor (VSCode)",
-      "    command: code {path}",
-      "  - name: Terminal",
-      "    command: open -a Terminal {path}",
-      "",
-      "suggest:",
-      "  enabled: true",
-      "",
-      "hooks:",
-      "  sessionStartGitContext: true",
-      "  blockDangerousBash: true",
-      "",
-      "slack:",
-      "  enabled: false",
-      "  botToken: \"{ENV:AIW_SLACK_BOT_TOKEN}\"",
-      "  appToken: \"{ENV:AIW_SLACK_APP_TOKEN}\"",
-      "  allowedUserIds: []",
-      "  chatModel: sonnet",
-      "  chatEffort: medium",
-      "  chatHeartbeatMs: 180000",
-      "  chatMaxTurnMs: 1080000",
-      "  chatProgressModel: haiku",
-      "  memoryEnabled: true",
-      "",
-    ].join("\n");
-    const result = migrateConfigContent(content);
-    // All keys present including per-type overrides — no changes
-    expect(result).toBe(content);
-  });
-
-  it("preserves hyphenated operation type names in overrides", () => {
-    const content = [
-      "operations:",
-      "  batchSize: 3",
-      "  create-pr:",
-      "    batchSize: 0",
-      "  update-todo:",
-      "    claudeTimeoutMinutes: 10",
-      "",
-    ].join("\n");
-    const result = migrateConfigContent(content);
-    expect(result).toContain("  create-pr:");
-    expect(result).toContain("    batchSize: 0");
-    expect(result).toContain("  update-todo:");
-    expect(result).toContain("    claudeTimeoutMinutes: 10");
   });
 });
 

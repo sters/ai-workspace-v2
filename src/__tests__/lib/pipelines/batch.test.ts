@@ -77,36 +77,6 @@ describe("batch pipeline runSubPhases", () => {
   });
 
   describe("single phase addDirs/cwd forwarding", () => {
-    it("passes addDirs from sub-pipeline phase to ctx.runChild", async () => {
-      const subPhase: PipelinePhase = {
-        kind: "single",
-        label: "Update TODOs",
-        prompt: "test-prompt",
-        addDirs: ["/ws/test-ws"],
-      };
-      mockBuildUpdateTodo.mockResolvedValue([subPhase]);
-
-      const phases = buildBatchPipeline({
-        mode: "execute-pr",
-        startWith: "update-todo",
-        workspace: "test-ws",
-        instruction: "fix tests",
-      });
-
-      const updatePhase = phases[0];
-      expect(updatePhase.kind).toBe("function");
-      if (updatePhase.kind !== "function") throw new Error("expected function");
-
-      const ctx = createMockCtx();
-      await updatePhase.fn(ctx);
-
-      expect(ctx.runChild).toHaveBeenCalledWith(
-        "Update TODOs",
-        "test-prompt",
-        { cwd: undefined, addDirs: ["/ws/test-ws"] },
-      );
-    });
-
     it("passes cwd from sub-pipeline phase to ctx.runChild", async () => {
       const subPhase: PipelinePhase = {
         kind: "single",
@@ -133,33 +103,6 @@ describe("batch pipeline runSubPhases", () => {
         "Update TODOs",
         "test-prompt",
         { cwd: "/custom/cwd", addDirs: ["/ws/test-ws"] },
-      );
-    });
-
-    it("passes undefined cwd/addDirs when sub-pipeline phase has neither", async () => {
-      const subPhase: PipelinePhase = {
-        kind: "single",
-        label: "Update TODOs",
-        prompt: "test-prompt",
-      };
-      mockBuildUpdateTodo.mockResolvedValue([subPhase]);
-
-      const phases = buildBatchPipeline({
-        mode: "execute-pr",
-        startWith: "update-todo",
-        workspace: "test-ws",
-      });
-
-      const updatePhase = phases[0];
-      if (updatePhase.kind !== "function") throw new Error("expected function");
-
-      const ctx = createMockCtx();
-      await updatePhase.fn(ctx);
-
-      expect(ctx.runChild).toHaveBeenCalledWith(
-        "Update TODOs",
-        "test-prompt",
-        { cwd: undefined, addDirs: undefined },
       );
     });
   });

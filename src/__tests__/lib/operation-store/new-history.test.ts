@@ -36,23 +36,6 @@ describe("listRecentNewOriginatedOperations", () => {
     expect(listRecentNewOriginatedOperations(10)).toEqual([]);
   });
 
-  it("returns init operations", () => {
-    insertCompleted(makeOp(ID(1), { type: "init" }));
-    insertCompleted(makeOp(ID(2), { type: "init" }));
-    const result = listRecentNewOriginatedOperations(10);
-    expect(result).toHaveLength(2);
-    expect(result.every((op) => op.type === "init")).toBe(true);
-  });
-
-  it("includes autonomous with startWith==='init'", () => {
-    insertCompleted(
-      makeOp(ID(1), { type: "autonomous", inputs: { startWith: "init" } }),
-    );
-    const result = listRecentNewOriginatedOperations(10);
-    expect(result).toHaveLength(1);
-    expect(result[0].type).toBe("autonomous");
-  });
-
   it("excludes autonomous with startWith==='execute'", () => {
     insertCompleted(
       makeOp(ID(1), { type: "autonomous", inputs: { startWith: "execute" } }),

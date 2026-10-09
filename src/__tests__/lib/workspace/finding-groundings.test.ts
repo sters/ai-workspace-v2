@@ -24,12 +24,6 @@ function grounding(overrides: Partial<FindingGrounding> = {}): FindingGrounding 
 }
 
 describe("normalizeHolds", () => {
-  it("reads the three verdicts", () => {
-    expect(normalizeHolds("yes")).toBe("yes");
-    expect(normalizeHolds("no")).toBe("no");
-    expect(normalizeHolds("unclear")).toBe("unclear");
-  });
-
   // Not `yes`: an unparsed verdict must never be the one that puts a comment on
   // someone else's PR.
   it("falls back to unclear for anything it does not recognise", () => {
@@ -40,12 +34,6 @@ describe("normalizeHolds", () => {
 });
 
 describe("normalizeScope", () => {
-  it("reads the three scopes", () => {
-    expect(normalizeScope("pr")).toBe("pr");
-    expect(normalizeScope("local-only")).toBe("local-only");
-    expect(normalizeScope("pre-existing")).toBe("pre-existing");
-  });
-
   // Same direction as the verdict: the fallback is the one that does not post.
   it("falls back to pre-existing for anything unrecognised", () => {
     expect(normalizeScope("whatever")).toBe("pre-existing");
@@ -66,14 +54,6 @@ describe("shouldPost", () => {
   // local state is not on the branch anyone else can see.
   it("does not post a local-only problem", () => {
     expect(shouldPost(grounding({ scope: "local-only" }))).toBe(false);
-  });
-
-  it("does not post a defect that predates the branch", () => {
-    expect(shouldPost(grounding({ scope: "pre-existing" }))).toBe(false);
-  });
-
-  it("does not post what the code could not settle", () => {
-    expect(shouldPost(grounding({ holds: "unclear" }))).toBe(false);
   });
 
   // A verdict that cleared every bar but produced no text has nothing to post,

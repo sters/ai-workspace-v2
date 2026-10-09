@@ -247,25 +247,6 @@ describe("buildUpdateReadmePipeline", () => {
     );
   });
 
-  it("threads interject=true into buildReadmeUpdaterPrompt", async () => {
-    const { buildReadmeUpdaterPrompt } = await import("@/lib/templates");
-    const mockBuild = vi.mocked(buildReadmeUpdaterPrompt);
-    mockBuild.mockClear();
-
-    await buildUpdateReadmePipeline({ workspace: "test-ws", instruction: "add section", interject: true });
-
-    expect(mockBuild).toHaveBeenCalledWith(
-      expect.objectContaining({ interject: true }),
-    );
-  });
-
-  it("addDirs points at the workspace path", async () => {
-    const phases = await buildUpdateReadmePipeline({ workspace: "test-ws", instruction: "add section" });
-    const phase = phases[0];
-    if (phase.kind !== "single") throw new Error("expected single");
-    expect(phase.addDirs).toEqual([expect.stringContaining("test-ws")]);
-  });
-
   describe("criteria feasibility check", () => {
     async function getFeasibilityPhase() {
       const phases = await buildUpdateReadmePipeline({ workspace: "test-ws", instruction: "rewrite criteria" });

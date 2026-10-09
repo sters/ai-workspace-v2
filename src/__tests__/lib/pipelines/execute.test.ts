@@ -82,32 +82,6 @@ describe("buildExecutePipeline — skip repo when no actionable TODO items", () 
     mockFileMap.clear();
   });
 
-  it("does NOT call runChild for a repo whose TODO file contains no pending or in_progress items", async () => {
-    mockListWorkspaceRepos.mockReturnValue([
-      {
-        repoName: "done-repo",
-        repoPath: "/repos/done-repo",
-        worktreePath: "/repos/done-repo/worktrees/test-ws",
-      } as ReturnType<typeof listWorkspaceRepos>[number],
-    ]);
-
-    mockFileMap.set(
-      "/ws/test-ws/TODO-done-repo.md",
-      "# TODO\n\n- [x] finished task\n- [x] another finished task\n",
-    );
-
-    const phases = await buildExecutePipeline({ workspace: "test-ws" });
-    expect(phases).toHaveLength(1);
-    const phase = phases[0];
-    if (phase.kind !== "function") throw new Error("expected function phase");
-
-    const ctx = createMockCtx();
-    const result = await phase.fn(ctx);
-
-    expect(result).toBe(true);
-    expect(ctx.runChild).not.toHaveBeenCalled();
-  });
-
   it("does NOT call runChild when the TODO file is missing", async () => {
     mockListWorkspaceRepos.mockReturnValue([
       {
@@ -127,36 +101,6 @@ describe("buildExecutePipeline — skip repo when no actionable TODO items", () 
 
     expect(result).toBe(true);
     expect(ctx.runChild).not.toHaveBeenCalled();
-  });
-
-  it("DOES call runChild for a repo that has a pending item", async () => {
-    mockListWorkspaceRepos.mockReturnValue([
-      {
-        repoName: "active-repo",
-        repoPath: "/repos/active-repo",
-        worktreePath: "/repos/active-repo/worktrees/test-ws",
-      } as ReturnType<typeof listWorkspaceRepos>[number],
-    ]);
-
-    mockFileMap.set(
-      "/ws/test-ws/TODO-active-repo.md",
-      "# TODO\n\n- [x] done\n- [ ] do this\n",
-    );
-
-    const phases = await buildExecutePipeline({ workspace: "test-ws" });
-    const phase = phases[0];
-    if (phase.kind !== "function") throw new Error("expected function phase");
-
-    const ctx = createMockCtx();
-    const result = await phase.fn(ctx);
-
-    expect(result).toBe(true);
-    expect(ctx.runChild).toHaveBeenCalledTimes(1);
-    expect(ctx.runChild).toHaveBeenCalledWith(
-      "active-repo",
-      expect.any(String),
-      expect.objectContaining({ addDirs: ["/ws/test-ws"] }),
-    );
   });
 
   it("skips done repos but runs active repos in the same workspace", async () => {

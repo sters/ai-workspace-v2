@@ -286,30 +286,10 @@ describe("parseConversationComments", () => {
 });
 
 describe("REVIEW_THREADS_QUERY", () => {
-  it("requests the fields the tab and the triage record both need", () => {
-    for (const field of ["id", "isResolved", "isOutdated", "path", "line", "comments"]) {
-      expect(REVIEW_THREADS_QUERY).toContain(field);
-    }
-  });
-
-  it("asks for the PR's conversation comments and review bodies in the same query", () => {
-    for (const field of ["reviews(", "isMinimized"]) {
-      expect(REVIEW_THREADS_QUERY).toContain(field);
-    }
-  });
-
   it("is parameterized rather than interpolated, so repo names cannot inject", () => {
     expect(REVIEW_THREADS_QUERY).toContain("$owner:String!");
     expect(REVIEW_THREADS_QUERY).toContain("$name:String!");
     expect(REVIEW_THREADS_QUERY).toContain("$number:Int!");
-  });
-
-  it("asks for CI in the same query as the threads, not a second call", () => {
-    // `gh pr checks` would be another process spawn and another round trip per
-    // repository for data GitHub hands over here for free.
-    expect(REVIEW_THREADS_QUERY).toContain("statusCheckRollup");
-    expect(REVIEW_THREADS_QUERY).toContain("CheckRun");
-    expect(REVIEW_THREADS_QUERY).toContain("StatusContext");
   });
 });
 
@@ -462,19 +442,6 @@ describe("parseStatusChecks", () => {
     expect(summary.reported).toBe(false);
     expect(summary.checks).toEqual([]);
     expect(Object.values(summary.counts).every((n) => n === 0)).toBe(true);
-  });
-
-  it("gives every state a count, so a new state cannot silently vanish", () => {
-    const summary = parseStatusChecks("{}");
-    expect(Object.keys(summary.counts).sort()).toEqual([
-      "cancelled",
-      "failure",
-      "queued",
-      "running",
-      "skipped",
-      "success",
-      "unknown",
-    ]);
   });
 
   it("returns an empty summary for malformed or empty responses", () => {

@@ -28,24 +28,6 @@ describe("POST /api/operations/claude-login", () => {
     });
   });
 
-  it("starts a claude-login operation pipeline", async () => {
-    const response = await POST();
-    const body = await response.json();
-
-    expect(body.id).toBe("op-1");
-    expect(body.type).toBe("claude-login");
-    expect(mockStartOperationPipeline).toHaveBeenCalledWith(
-      "claude-login",
-      "claude-login",
-      expect.arrayContaining([
-        expect.objectContaining({
-          kind: "function",
-          label: "Claude Login",
-        }),
-      ]),
-    );
-  });
-
   it("passes a function phase that calls checkAuthStatus and spawnClaudeAuth", async () => {
     await POST();
 

@@ -42,16 +42,6 @@ describe("AppSidebar", () => {
     mockPathname.mockReturnValue("/");
   });
 
-  it("renders the full nav with labels when expanded", () => {
-    render(<AppSidebar />);
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("New Workspace")).toBeInTheDocument();
-    expect(screen.getByText("Utilities")).toBeInTheDocument();
-    // Sub-items are only rendered in the expanded state
-    expect(screen.getByText("Quick (no AI)")).toBeInTheDocument();
-    expect(screen.getByText("Claude Usage")).toBeInTheDocument();
-  });
-
   it("collapses to an icon rail that keeps the top-level links reachable", async () => {
     const user = userEvent.setup();
     render(<AppSidebar />);

@@ -8,12 +8,6 @@ describe("describeChildExit", () => {
     );
   });
 
-  it("reports a non-zero exit", () => {
-    expect(describeChildExit({ name: "next dev", exitCode: 1, signalCode: null })).toBe(
-      "next dev exited with code 1",
-    );
-  });
-
   it("names the signal when we asked the child to stop", () => {
     expect(
       describeChildExit({

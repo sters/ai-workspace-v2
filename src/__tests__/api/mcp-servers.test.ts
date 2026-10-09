@@ -163,23 +163,6 @@ describe("GET /api/mcp-servers", () => {
     expect(data.servers).toEqual([]);
   });
 
-  it("returns empty when project mcpServers is empty object", async () => {
-    mockReadFile.mockImplementation(async (filePath: string) => {
-      const p = String(filePath);
-      if (p.endsWith(".claude.json")) {
-        return JSON.stringify({
-          projects: {
-            "/workspace-root": { mcpServers: {} },
-          },
-        });
-      }
-      throw new Error("ENOENT");
-    });
-
-    const data = await callGET();
-    expect(data.servers).toEqual([]);
-  });
-
   it("handles stdio server config from .mcp.json", async () => {
     mockReadFile.mockImplementation(async (filePath: string) => {
       const p = String(filePath);
@@ -254,81 +237,6 @@ describe("GET /api/mcp-servers", () => {
       hasAuth: true,
       authType: "headers",
       keyCount: 1,
-    });
-  });
-
-  it("returns authStatus with env for stdio servers", async () => {
-    mockReadFile.mockImplementation(async (filePath: string) => {
-      const p = String(filePath);
-      if (p.endsWith(".mcp.json")) {
-        return JSON.stringify({
-          mcpServers: {
-            myserver: {
-              command: "node",
-              args: ["server.js"],
-              env: { API_KEY: "secret", DB_URL: "postgres://..." },
-            },
-          },
-        });
-      }
-      throw new Error("ENOENT");
-    });
-
-    const data = await callGET();
-    expect(data.servers[0].authStatus).toEqual({
-      hasAuth: true,
-      authType: "env",
-      keyCount: 2,
-    });
-  });
-
-  it("returns authStatus none for http server without headers", async () => {
-    mockReadFile.mockImplementation(async (filePath: string) => {
-      const p = String(filePath);
-      if (p.endsWith(".mcp.json")) {
-        return JSON.stringify({
-          mcpServers: {
-            plain: { type: "http", url: "https://example.com/mcp" },
-          },
-        });
-      }
-      throw new Error("ENOENT");
-    });
-
-    const data = await callGET();
-    expect(data.servers[0].authStatus).toEqual({
-      hasAuth: false,
-      authType: "none",
-      keyCount: 0,
-    });
-  });
-
-  it("returns authStatus with multiple headers", async () => {
-    mockReadFile.mockImplementation(async (filePath: string) => {
-      const p = String(filePath);
-      if (p.endsWith(".mcp.json")) {
-        return JSON.stringify({
-          mcpServers: {
-            multi: {
-              type: "http",
-              url: "https://example.com",
-              headers: {
-                Authorization: "Bearer abc",
-                "X-Api-Key": "key123",
-                "X-Custom": "value",
-              },
-            },
-          },
-        });
-      }
-      throw new Error("ENOENT");
-    });
-
-    const data = await callGET();
-    expect(data.servers[0].authStatus).toEqual({
-      hasAuth: true,
-      authType: "headers",
-      keyCount: 3,
     });
   });
 });

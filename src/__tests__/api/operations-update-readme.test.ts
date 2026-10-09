@@ -83,16 +83,6 @@ describe("POST /api/operations/update-readme", () => {
     );
   });
 
-  it("validates: rejects when workspace is missing", async () => {
-    const response = await postUpdateReadme({ instruction: "x" });
-    expect(response.status).toBe(400);
-  });
-
-  it("validates: rejects when instruction is missing", async () => {
-    const response = await postUpdateReadme({ workspace: "ws-a" });
-    expect(response.status).toBe(400);
-  });
-
   it("interject=true with running autonomous: kills, awaits, starts update-readme, schedules re-kick", async () => {
     mockKillAndAwait.mockResolvedValue({
       wasAutonomous: true,

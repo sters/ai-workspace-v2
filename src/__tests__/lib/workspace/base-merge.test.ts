@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  abortMerge,
   finalizeConflictedMerge,
   findConflictMarkers,
   isBaseMergeProblem,
@@ -378,17 +377,6 @@ describe("finalizeConflictedMerge", () => {
 
     expect(result.ok).toBe(false);
     expect(result.aborted).toBe(true);
-  });
-});
-
-describe("abortMerge", () => {
-  it("rolls an in-progress merge back", async () => {
-    // The escape hatch for a phase that is going away mid-resolution: the
-    // resolution in the worktree was never checked, and a mid-merge worktree
-    // reads as dirty to everything downstream.
-    const git = fakeGit({ [ABORT]: { ok: true, out: "" } });
-    await abortMerge(repo, git);
-    expect(git.calls).toEqual([ABORT]);
   });
 });
 

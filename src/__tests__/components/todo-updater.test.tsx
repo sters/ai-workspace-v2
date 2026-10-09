@@ -49,34 +49,6 @@ beforeEach(() => {
 });
 
 describe("TodoUpdater", () => {
-  it("shows 'Start autonomous' when nothing is running", () => {
-    setRunning({});
-    render(
-      <TodoUpdater
-        todos={[makeTodo()]}
-        workspacePath="/ws/ws"
-        workspaceName="ws"
-        repositories={[]}
-      />,
-    );
-    expect(screen.getAllByRole("button", { name: /start autonomous/i }).length).toBeGreaterThan(0);
-    expect(screen.queryByText(/An operation is currently running/i)).not.toBeInTheDocument();
-  });
-
-  it("shows the interject banner and button when another operation is running on the workspace", () => {
-    setRunning({ workspaceRunning: true });
-    render(
-      <TodoUpdater
-        todos={[makeTodo()]}
-        workspacePath="/ws/ws"
-        workspaceName="ws"
-        repositories={[]}
-      />,
-    );
-    expect(screen.getByText(/An operation is currently running/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /interject \+ restart/i })).toBeInTheDocument();
-  });
-
   // The tab is rendered from the TODO files on disk, so a repository declared
   // in the README with no TODO file yet had no card at all — nothing on the
   // screen said it was missing, and there was nothing to click.

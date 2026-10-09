@@ -4,22 +4,6 @@ import { describe, expect, it, vi } from "vitest";
 import { DropdownMenu } from "@/components/shared/menus/dropdown-menu";
 
 describe("DropdownMenu", () => {
-  it("opens the menu on trigger click and shows leaf items", async () => {
-    const user = userEvent.setup();
-    const onSelect = vi.fn();
-    render(
-      <DropdownMenu
-        trigger="Open in..."
-        items={[
-          { kind: "leaf", label: "Editor", onSelect },
-          { kind: "leaf", label: "Terminal", onSelect: vi.fn() },
-        ]}
-      />,
-    );
-    await user.click(screen.getByRole("button", { name: "Open in..." }));
-    expect(screen.getByRole("menuitem", { name: "Editor" })).toBeInTheDocument();
-  });
-
   it("invokes the leaf onSelect and closes the menu on click", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();

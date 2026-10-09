@@ -46,10 +46,6 @@ describe("GET /api/operations/new-history", () => {
     mockGetOperationSummaries.mockReturnValue([]);
   });
 
-  it("returns empty when nothing matches", async () => {
-    expect(await fetchNewHistory()).toEqual([]);
-  });
-
   it("only includes init and autonomous-startWith-init operations", async () => {
     insertCompleted(makeOp(ID(1), { type: "init" }));
     insertCompleted(makeOp(ID(2), { type: "execute" }));

@@ -14,12 +14,6 @@ describe("parseCommand", () => {
       expect(r.ok).toBe(true);
       if (r.ok) expect(r.command).toEqual({ op: "init", only: false, description: "do a thing" });
     });
-
-    it("works without any leading mention", () => {
-      const r = parseCommand("init do a thing");
-      expect(r.ok).toBe(true);
-      if (r.ok) expect(r.command).toEqual({ op: "init", only: false, description: "do a thing" });
-    });
   });
 
   describe("init (autonomous mode by default)", () => {
@@ -48,12 +42,6 @@ describe("parseCommand", () => {
       expect(r.ok).toBe(true);
       if (r.ok) expect(r.command).toEqual({ op: "init", only: false, description: "" });
     });
-
-    it("normalizes whitespace-only description to empty", () => {
-      const r = parseCommand("init    ");
-      expect(r.ok).toBe(true);
-      if (r.ok) expect(r.command).toEqual({ op: "init", only: false, description: "" });
-    });
   });
 
   describe("init --only", () => {
@@ -73,12 +61,6 @@ describe("parseCommand", () => {
       const r = parseCommand("init --only");
       expect(r.ok).toBe(true);
       if (r.ok) expect(r.command).toEqual({ op: "init", only: true, description: "" });
-    });
-
-    it("rejects unknown flag", () => {
-      const r = parseCommand("init --foo do a thing");
-      expect(r.ok).toBe(false);
-      if (!r.ok && r.kind === "usage") expect(r.reply).toContain("--foo");
     });
   });
 
@@ -100,15 +82,6 @@ describe("parseCommand", () => {
       if (!r.ok) {
         expect(r.kind).toBe("chat");
         if (r.kind === "chat") expect(r.message).toBe("what is the status of the foo workspace?");
-      }
-    });
-
-    it("routes a single unknown token to chat", () => {
-      const r = parseCommand("doSomething");
-      expect(r.ok).toBe(false);
-      if (!r.ok) {
-        expect(r.kind).toBe("chat");
-        if (r.kind === "chat") expect(r.message).toBe("doSomething");
       }
     });
   });

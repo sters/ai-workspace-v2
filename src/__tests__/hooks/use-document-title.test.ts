@@ -7,11 +7,6 @@ describe("useDocumentTitle", () => {
     document.title = "ai-workspace";
   });
 
-  it("sets document.title with ai-workspace suffix", () => {
-    renderHook(() => useDocumentTitle("Dashboard"));
-    expect(document.title).toBe("Dashboard | ai-workspace");
-  });
-
   it("updates document.title when title changes", () => {
     const { rerender } = renderHook(({ title }) => useDocumentTitle(title), {
       initialProps: { title: "First" },

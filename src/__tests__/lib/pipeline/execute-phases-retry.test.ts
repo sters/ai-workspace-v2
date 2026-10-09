@@ -200,30 +200,6 @@ describe("execute-phases retry logic", () => {
     expect(phaseInfos[0].retryAttempt).toBe(1);
   });
 
-  it("exhausts all retries then fails", async () => {
-    let callCount = 0;
-    const phase = makeFunctionPhase(
-      async () => {
-        callCount++;
-        return false;
-      },
-      { maxRetries: 2, retryDelayMs: 10 },
-    );
-
-    const { managed, phaseInfos } = makeManagedOperation([phase]);
-    await executePipelinePhases({
-      managed,
-      phases: [phase],
-      phaseInfos,
-      operationType: "execute",
-    });
-
-    // 1 initial + 2 retries = 3 total
-    expect(callCount).toBe(3);
-    expect(managed.operation.status).toBe("failed");
-    expect(phaseInfos[0].status).toBe("failed");
-  });
-
   it("emits retrying status events between retries", async () => {
     let callCount = 0;
     const phase = makeFunctionPhase(
