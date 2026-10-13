@@ -10,21 +10,33 @@ vi.mock("@/lib/workspace/helpers", () => ({
   remoteBranchExists: vi.fn(() => true),
 }));
 vi.mock("@/lib/fs", () => ({ pathExists: vi.fn() }));
+const files = vi.hoisted(() => new Map<string, string>());
 vi.mock("node:fs/promises", () => {
-  const fs = { mkdir: vi.fn(async () => {}), rm: vi.fn(async () => {}) };
+  const fs = {
+    mkdir: vi.fn(async () => {}),
+    rm: vi.fn(async () => {}),
+    readFile: vi.fn(async (p: string) => {
+      const text = files.get(p);
+      if (text === undefined) throw Object.assign(new Error(`ENOENT: ${p}`), { code: "ENOENT" });
+      return text;
+    }),
+    writeFile: vi.fn(async (p: string, text: string) => { files.set(p, text); }),
+  };
   return { ...fs, default: fs };
 });
 
 import { pathExists } from "@/lib/fs";
-import { exec } from "@/lib/workspace/helpers";
+import { exec, remoteBranchExists } from "@/lib/workspace/helpers";
 import { setupRepositories, setupRepository } from "@/lib/pipelines/actions/setup-repository";
 
 const mockExec = vi.mocked(exec);
 const mockExists = vi.mocked(pathExists);
+const mockRemoteBranchExists = vi.mocked(remoteBranchExists);
 
 const WORKSPACE = "feature-ABC-1-thing-20260101";
 const REPO_ABS = "/repos/github.com/acme/repo";
 const WS_ABS = `/ws/${WORKSPACE}`;
+const README_ABS = `${WS_ABS}/README.md`;
 
 /** Fetch stderr shaped like git's: the reason comes last, after the ref updates. */
 const FETCH_ERROR = [
@@ -275,5 +287,64 @@ describe("setupRepositories", () => {
 
     expect(outcomes.every((o) => !o.ok)).toBe(true);
     expect(mockExec.mock.calls.some((c) => String(c[0]).includes("worktree add"))).toBe(false);
+  });
+});
+
+describe("recording the base branch in the README", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    files.clear();
+    mockExec.mockImplementation(defaultExec);
+    mockRemoteBranchExists.mockImplementation(async (_repo, branch) => branch === "master");
+    mockExists.mockImplementation(async (p) => {
+      const s = String(p);
+      if (s.endsWith("/.git")) return true;
+      return s === REPO_ABS || s === "/repos/github.com/acme/other" || s === WS_ABS;
+    });
+  });
+
+  it("replaces a declared base the repository does not have with the one the worktree was cut from", async () => {
+    files.set(README_ABS, [
+      "## Repositories",
+      "- **dev**: `github.com/acme/repo:dev` (base: `main`)",
+      "- **prod**: `github.com/acme/repo:prod` (base: `main`)",
+      "- **other**: `github.com/acme/other` (base: `develop`)",
+    ].join("\n"));
+
+    const outcomes = await setupRepositories(
+      WORKSPACE,
+      [
+        { repoPath: "github.com/acme/repo:dev", baseBranchOverride: "main" },
+        { repoPath: "github.com/acme/repo:prod" },
+      ],
+      vi.fn(),
+    );
+
+    expect(outcomes.every((o) => o.ok)).toBe(true);
+    expect(files.get(README_ABS)).toBe([
+      "## Repositories",
+      "- **dev**: `github.com/acme/repo:dev` (base: `master`)",
+      "- **prod**: `github.com/acme/repo:prod` (base: `master`)",
+      "- **other**: `github.com/acme/other` (base: `develop`)",
+    ].join("\n"));
+  });
+
+  it("does not take a path that merely starts with the set-up one for its line", async () => {
+    files.set(README_ABS, [
+      "- **repo-tools**: `github.com/acme/repo-tools` (base: `main`)",
+      "- **repo**: `github.com/acme/repo` (base: `main`)",
+    ].join("\n"));
+
+    await setupRepository(WORKSPACE, "github.com/acme/repo", undefined, vi.fn());
+
+    expect(files.get(README_ABS)).toBe([
+      "- **repo-tools**: `github.com/acme/repo-tools` (base: `main`)",
+      "- **repo**: `github.com/acme/repo` (base: `master`)",
+    ].join("\n"));
+  });
+
+  it("sets up the worktree when the workspace has no README", async () => {
+    await expect(setupRepository(WORKSPACE, "github.com/acme/repo", undefined, vi.fn()))
+      .resolves.toMatchObject({ baseBranch: "master" });
   });
 });

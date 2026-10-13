@@ -1,5 +1,3 @@
-import { pathExists } from "@/lib/fs";
-import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { readWorkspaceReadme, denormalizeRepoPath } from "@/lib/parsers/readme";
 import {
@@ -197,26 +195,6 @@ export function buildInitPipeline(
             } catch (err) {
               ctx.emitStatus(`Warning: Failed to setup ${metaRepo.path}: ${err}`);
             }
-          }
-        }
-
-        // Update README base branch info from resolved PR data
-        if (prUrlMap.size > 0) {
-          const readmePath = path.join(wsPath, "README.md");
-          if (await pathExists(readmePath)) {
-            let readmeText = await readFile(readmePath, "utf-8");
-            for (const [_repoPath, prInfo] of prUrlMap) {
-              // Update (base: `main`) → (base: `actual-branch`) for matching repos
-              const repoName = _repoPath.split("/").pop() ?? "";
-              if (repoName) {
-                const bt = "`";
-                const basePattern = new RegExp(
-                  "(\\*\\*" + repoName + "\\*\\*:.*?\\(base:\\s*" + bt + ")([^" + bt + "]+)(" + bt + "\\))",
-                );
-                readmeText = readmeText.replace(basePattern, "$1" + prInfo.baseBranch + "$3");
-              }
-            }
-            await writeFile(readmePath, readmeText, "utf-8");
           }
         }
 

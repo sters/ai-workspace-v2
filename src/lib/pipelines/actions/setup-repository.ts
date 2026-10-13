@@ -4,7 +4,7 @@
  */
 
 import { pathExists } from "@/lib/fs";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { dateStamp, deriveBranchName } from "@/lib/naming";
@@ -117,6 +117,47 @@ function parseRepoArg(repositoryPathArg: string): ParsedRepoArg {
   const actualRepoPath = repositoryPathArg.split(":")[0];
   const repoAlias = repositoryPathArg.split(":").slice(1).join(":");
   return { actualRepoPath, repoAlias, repoPathInput: `${actualRepoPath}___${repoAlias}` };
+}
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Write the base branch each worktree was actually cut from into the README's
+ * `(base: ...)` rows, keyed by the repository path as written in the README
+ * (`repo:alias` form). The README is what later phases read the base from —
+ * create-pr targets it — so a declared base the repository does not have, or
+ * a placeholder written before the repository was set up, must not survive
+ * setup. A workspace without a README, or without a row for the path, is left
+ * as is.
+ */
+async function recordBaseBranches(
+  wsPath: string,
+  entries: { repositoryPathArg: string; baseBranch: string }[],
+  emitStatus: (message: string) => void,
+): Promise<void> {
+  const readmePath = path.join(wsPath, "README.md");
+  let text: string;
+  try {
+    text = await readFile(readmePath, "utf-8");
+  } catch {
+    return;
+  }
+  let updated = text;
+  for (const { repositoryPathArg, baseBranch } of entries) {
+    const row = new RegExp(
+      "(- \\*\\*[^*]+?\\*\\*:\\s*`" + escapeRegExp(repositoryPathArg) + "`\\s*\\(base:\\s*`)([^`]+)(`\\))",
+      "g",
+    );
+    updated = updated.replace(row, (_m, head: string, declared: string, tail: string) => {
+      if (declared !== baseBranch) {
+        emitStatus(`README: base branch of ${repositoryPathArg} ${declared} → ${baseBranch}`);
+      }
+      return head + baseBranch + tail;
+    });
+  }
+  if (updated !== text) await writeFile(readmePath, updated, "utf-8");
 }
 
 async function requireWorkspaceDir(workspaceName: string): Promise<string> {
@@ -315,7 +356,9 @@ export async function setupRepository(
 ): Promise<SetupRepositoryResult> {
   const wsPath = await requireWorkspaceDir(workspaceName);
   await ensureLocalClone(parseRepoArg(repositoryPathArg).actualRepoPath, emitStatus);
-  return createWorktree(workspaceName, wsPath, repositoryPathArg, baseBranchOverride, emitStatus, checkoutBranch);
+  const result = await createWorktree(workspaceName, wsPath, repositoryPathArg, baseBranchOverride, emitStatus, checkoutBranch);
+  await recordBaseBranches(wsPath, [{ repositoryPathArg, baseBranch: result.baseBranch }], emitStatus);
+  return result;
 }
 
 export interface RepositorySetupRequest {
@@ -356,7 +399,7 @@ export async function setupRepositories(
   );
 
   const semaphore = new Semaphore(WORKTREE_CHECKOUT_CONCURRENCY);
-  return Promise.all(
+  const outcomes = await Promise.all(
     requests.map((req) =>
       semaphore.run(async (): Promise<RepositorySetupOutcome> => {
         const { repoPath } = req;
@@ -384,4 +427,11 @@ export async function setupRepositories(
       }),
     ),
   );
+  // After every worktree, not inside each: the rows share one file.
+  await recordBaseBranches(
+    wsPath,
+    outcomes.flatMap((o) => (o.ok ? [{ repositoryPathArg: o.repoPath, baseBranch: o.result.baseBranch }] : [])),
+    emitStatus,
+  );
+  return outcomes;
 }
