@@ -46,3 +46,6 @@ export type { ArchivedWorkspace } from "./archives";
 
 // Snippets
 export { insertSnippet, updateSnippet, deleteSnippet, getSnippet, listSnippets, _resetSnippetStatements } from "./snippets";
+
+// Chat start prompts
+export { insertChatStartPrompt, updateChatStartPrompt, deleteChatStartPrompt, listChatStartPrompts, _resetChatStartPromptStatements } from "./chat-start-prompts";

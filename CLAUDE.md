@@ -59,7 +59,7 @@ Next.js 16 App Router, React 19, TypeScript strict, Tailwind CSS 4, SWR, Bun run
 
 ### Chat and Slack
 
-- **Chat** — `src/lib/chat-server/`; opening prompts in `templates/prompts/chat.ts` (variants `chat` / `review-chat` / `research-chat` / `task` / `discussion`, chosen by `buildChatOpening`). The browser terminal owns the PTY size. Start options pass via `stashChatHandoff` (`@/lib/chat-handoff`), not the URL. Busy state: `isSessionBusy` (`activity.ts`).
+- **Chat** — `src/lib/chat-server/`; opening prompts in `templates/prompts/chat.ts` (variants `chat` / `review-chat` / `research-chat` / `task` / `discussion` / `start-prompt`, chosen by `buildChatOpening`; saved start prompts live in the `chat_start_prompts` table, edited at Utilities → Chat Start Prompts). The browser terminal owns the PTY size. Start options pass via `stashChatHandoff` (`@/lib/chat-handoff`), not the URL. Busy state: `isSessionBusy` (`activity.ts`).
 - **Slack bot** — `src/lib/slack-server/`: `init <desc>` starts autonomous, `init --only` starts init, anything else is a read-only-by-default conversation whose write policy is prompt-only (`templates/prompts/slack-chat.ts`); keep that prompt precise.
 
 ### Directories

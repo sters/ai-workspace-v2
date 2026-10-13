@@ -38,6 +38,8 @@ vi.mock("@/lib/templates", () => ({
   buildTaskChatPrompt: (_id: string, _path: string, task: string) => `task-prompt-body:${task}`,
   buildDiscussionChatPrompt: (_id: string, _path: string, topic: string) =>
     `discussion-prompt-body:${topic}`,
+  buildStartPromptChatPrompt: (_id: string, _path: string, content: string) =>
+    `start-prompt-body:${content}`,
 }));
 
 vi.mock("@/lib/workspace/prompts", () => ({
@@ -338,6 +340,32 @@ describe("handleStart discussion", () => {
 
     await handleStart(ws, { type: "start", workspaceId: WITH_README, discussion: " \n" });
 
+    const [, agentName] = mockEnsureSessionSystemPrompt.mock.calls[0];
+    expect(agentName).toBe("chat");
+  });
+});
+
+describe("handleStart startPrompt", () => {
+  it("opens the session on the start prompt, under the prompt that carries it out", async () => {
+    const { handleStart } = await import("@/lib/chat-server/handlers");
+    const ws = makeWs();
+
+    await handleStart(ws, { type: "start", workspaceId: WITH_README, startPrompt: "check CI" });
+
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    expect(opts.args).toContain("start-prompt-body:check CI");
+    const [, agentName] = mockEnsureSessionSystemPrompt.mock.calls[0];
+    expect(agentName).toBe("start-prompt-chat");
+  });
+
+  it("falls back to the plain chat when the start prompt is only whitespace", async () => {
+    const { handleStart } = await import("@/lib/chat-server/handlers");
+    const ws = makeWs();
+
+    await handleStart(ws, { type: "start", workspaceId: WITH_README, startPrompt: " \n" });
+
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    expect(opts.args).toContain("init-prompt-body");
     const [, agentName] = mockEnsureSessionSystemPrompt.mock.calls[0];
     expect(agentName).toBe("chat");
   });

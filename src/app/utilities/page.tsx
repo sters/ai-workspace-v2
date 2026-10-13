@@ -74,6 +74,12 @@ const tools = [
     description:
       "Save and manage reusable text snippets for workspace descriptions.",
   },
+  {
+    href: "/utilities/chat-start-prompts",
+    name: "Chat Start Prompts",
+    description:
+      "Save instructions to start an Interactive Chat with, selectable from the Start Chat menu.",
+  },
 ];
 
 export default function UtilitiesPage() {

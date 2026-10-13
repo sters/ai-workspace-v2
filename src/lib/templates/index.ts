@@ -58,6 +58,8 @@ export {
   buildTaskChatPrompt,
   getDiscussionChatSystemPrompt,
   buildDiscussionChatPrompt,
+  getStartPromptChatSystemPrompt,
+  buildStartPromptChatPrompt,
   getCreateTodoPlannerSystemPrompt,
   buildCreateTodoFromReviewPrompt,
   getSearchSystemPrompt,

@@ -3,7 +3,7 @@ import path from "node:path";
 import { spawnClaudeTerminal } from "../claude/cli";
 import { clampPtySize, resizeTerminal, DEFAULT_PTY_COLS, DEFAULT_PTY_ROWS } from "../pty";
 import type { DataListener } from "@/types/pty";
-import { buildInitPrompt, buildReviewChatPrompt, buildResearchChatPrompt, buildTaskChatPrompt, buildDiscussionChatPrompt } from "@/lib/templates";
+import { buildInitPrompt, buildReviewChatPrompt, buildResearchChatPrompt, buildTaskChatPrompt, buildDiscussionChatPrompt, buildStartPromptChatPrompt } from "@/lib/templates";
 import { ensureSessionSystemPrompt, cleanupSessionSystemPrompt } from "@/lib/workspace/prompts";
 import type { ChatSession, ClientMessage, ServerMessage, WsData } from "@/types/chat-server";
 import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
@@ -57,6 +57,13 @@ function buildChatOpening(
     return {
       prompt: buildTaskChatPrompt(msg.workspaceId, workspacePath, task),
       agentName: "task-chat",
+    };
+  }
+  const startPrompt = msg.startPrompt?.trim();
+  if (startPrompt) {
+    return {
+      prompt: buildStartPromptChatPrompt(msg.workspaceId, workspacePath, startPrompt),
+      agentName: "start-prompt-chat",
     };
   }
   return { prompt: buildInitPrompt(msg.workspaceId, workspacePath), agentName: "chat" };

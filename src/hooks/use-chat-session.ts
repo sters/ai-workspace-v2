@@ -288,7 +288,7 @@ export function useChatSession(
     [workspaceId, cleanup, init, dispose, termRef],
   );
 
-  const startSession = useCallback(async () => {
+  const startSession = useCallback(async (startPrompt?: string) => {
     const replaces = sessionIdRef.current ?? loadChatSession(workspaceId);
     cleanup();
     const gen = ++generationRef.current;
@@ -335,7 +335,7 @@ export function useChatSession(
       const research = researchChatRef.current;
       const task = taskRef.current;
       const discussion = discussionRef.current;
-      ws.send(JSON.stringify({ type: "start", workspaceId, cols: term.cols, rows: term.rows, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }), ...(task && { task }), ...(discussion && { discussion }), ...(replaces && { replaces }) }));
+      ws.send(JSON.stringify({ type: "start", workspaceId, cols: term.cols, rows: term.rows, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }), ...(task && { task }), ...(discussion && { discussion }), ...(startPrompt && { startPrompt }), ...(replaces && { replaces }) }));
     };
 
     ws.onmessage = (event) => {
@@ -403,11 +403,18 @@ export function useChatSession(
    * still running — a dropped connection or a resume that gave up loses the
    * session from this tab, not from the server — and start one only when there
    * is none.
+   *
+   * A saved start prompt always starts a fresh session, replacing a live one:
+   * the session it would resume is already about something else.
    */
-  const openSession = useCallback(async () => {
+  const openSession = useCallback(async (startPrompt?: string) => {
     if (openingRef.current) return;
     openingRef.current = true;
     try {
+      if (startPrompt) {
+        await startSession(startPrompt);
+        return;
+      }
       const live = await findLiveSession(workspaceId, sessionIdRef.current ?? loadChatSession(workspaceId));
       if (live) await resumeSession(live);
       else await startSession();

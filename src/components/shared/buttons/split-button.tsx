@@ -118,7 +118,7 @@ export function SplitButton({
         >
           {items.map((item, index) => (
             <button
-              key={item.label}
+              key={index}
               ref={(el) => { menuItemsRef.current[index] = el; }}
               role="menuitem"
               onClick={() => {

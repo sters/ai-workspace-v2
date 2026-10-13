@@ -68,6 +68,11 @@ interface StartMessage {
    */
   discussion?: string;
   /**
+   * Content of a saved chat start prompt. Appended to the plain chat's opening
+   * message, under a system prompt that has the first turn carry it out.
+   */
+  startPrompt?: string;
+  /**
    * The session this start takes the place of. A new chat opens a new
    * connection, which holds no session, so without it the displaced session
    * keeps running with nothing left to reach it from the chat tab.

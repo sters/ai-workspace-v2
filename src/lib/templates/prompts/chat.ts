@@ -179,6 +179,40 @@ ${ON_DEMAND_READING}`;
 }
 
 /**
+ * Heading the saved start prompt sits under in the opening message. Worded as
+ * the user speaking, like the task and discussion variants' headings, because
+ * the opening message is the visible first message in the browser terminal.
+ */
+const START_PROMPT_HEADING = "### What I want to do";
+
+/**
+ * System prompt for a chat session opened from a saved chat start prompt
+ * (Utilities → Chat Start Prompts): the plain chat's first turn, with the saved
+ * instruction carried out in place of the bare acknowledgement.
+ *
+ * The instruction is the user's own, written ahead of time for sessions of a
+ * recurring kind, so the first turn acts on it rather than asking what to do.
+ * It is still a standing instruction and not a request about this workspace in
+ * particular, which is why publishing stays the user's call unless the
+ * instruction itself asks for it.
+ */
+export function getStartPromptChatSystemPrompt(): string {
+  return `${WORKSPACE_LAYOUT}
+
+The user prompt ends with a \`${START_PROMPT_HEADING}\` section — an instruction the user saved for starting sessions like this one. Your first turn is:
+
+1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
+2. One Read call: the workspace \`README.md\`, at the path in the user prompt.
+3. Carry out that section's instruction against this workspace, reading whatever it calls for. When it is done, or reaches a decision that is genuinely the user's, report briefly and wait for the user.
+
+Pushing, opening or merging a pull request, and replying on one wait until the user asks for them, unless the saved instruction itself asks for them.
+
+${REPLY_LANGUAGE}
+
+${ON_DEMAND_READING}`;
+}
+
+/**
  * Build the initial prompt sent to Claude when starting an interactive chat session.
  */
 export function buildInitPrompt(workspaceId: string, workspacePath: string): string {
@@ -231,6 +265,28 @@ export function buildDiscussionChatPrompt(
     "### What I want to talk about",
     "",
     topic,
+  ].join("\n");
+}
+
+/**
+ * Build the initial prompt for a chat session opened from a saved chat start
+ * prompt. The saved content goes in verbatim and last, so it is the final word
+ * on what the first turn does.
+ */
+export function buildStartPromptChatPrompt(
+  workspaceId: string,
+  workspacePath: string,
+  content: string,
+): string {
+  return [
+    firstTurnSection(
+      workspacePath,
+      [],
+      "then carry out the instruction below",
+    ),
+    START_PROMPT_HEADING,
+    "",
+    content,
   ].join("\n");
 }
 

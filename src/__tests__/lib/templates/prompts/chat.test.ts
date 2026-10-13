@@ -10,6 +10,8 @@ import {
   buildTaskChatPrompt,
   getDiscussionChatSystemPrompt,
   buildDiscussionChatPrompt,
+  getStartPromptChatSystemPrompt,
+  buildStartPromptChatPrompt,
 } from "@/lib/templates/prompts/chat";
 import { DERIVED_NAME_MAX_CHARS } from "@/lib/naming";
 
@@ -36,6 +38,7 @@ describe("chat system prompts", () => {
     "review-chat": getReviewChatSystemPrompt(),
     "task-chat": getTaskChatSystemPrompt(),
     "discussion-chat": getDiscussionChatSystemPrompt(),
+    "start-prompt-chat": getStartPromptChatSystemPrompt(),
   };
 
   it("closes every variant with the same on-demand-reading fragment", () => {
@@ -62,7 +65,7 @@ describe("chat system prompts", () => {
     const waiting = Object.entries(variants)
       .filter(([, prompt]) => /wait for the user/i.test(prompt))
       .map(([name]) => name);
-    expect(waiting).toEqual(["chat", "research-chat", "review-chat", "discussion-chat"]);
+    expect(waiting).toEqual(["chat", "research-chat", "review-chat", "discussion-chat", "start-prompt-chat"]);
   });
 
   it("keeps the plain chat's negative guidance to a minimum", () => {
@@ -116,12 +119,24 @@ describe("built opening prompts", () => {
     expect(prompt).toContain(`${workspacePath}/README.md`);
   });
 
+  it("appends the start prompt verbatim after the shared first-turn block", () => {
+    // The saved content is what the user wants this session to begin with, so
+    // it is the last word of the opening message — nothing after it can
+    // override it.
+    const content = "Check the failing CI checks first.\nThen propose a fix.";
+    const prompt = buildStartPromptChatPrompt(workspaceId, workspacePath, content);
+    expect(prompt.endsWith(content)).toBe(true);
+    expect(prompt).toContain(`cd ${workspacePath}`);
+    expect(prompt).toContain(`${workspacePath}/README.md`);
+  });
+
   it.each([
     ["init", () => buildInitPrompt(workspaceId, workspacePath)],
     ["review", () => buildReviewChatPrompt(workspaceId, workspacePath, reviewTimestamp)],
     ["research", () => buildResearchChatPrompt(workspaceId, workspacePath)],
     ["task", () => buildTaskChatPrompt(workspaceId, workspacePath, "fix the login crash")],
     ["discussion", () => buildDiscussionChatPrompt(workspaceId, workspacePath, "this comment")],
+    ["start-prompt", () => buildStartPromptChatPrompt(workspaceId, workspacePath, "check CI")],
   ])("keeps the %s prompt a set of pointers rather than an embedded corpus", (_name, build) => {
     // The README body and a computed TODO progress table used to be inlined
     // here, which both dumped the README into the browser terminal and pinned a

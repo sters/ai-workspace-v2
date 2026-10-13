@@ -158,6 +158,20 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 9,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE chat_start_prompts (
+          id         INTEGER PRIMARY KEY AUTOINCREMENT,
+          title      TEXT NOT NULL,
+          content    TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+      `);
+    },
+  },
 ];
 
 /**

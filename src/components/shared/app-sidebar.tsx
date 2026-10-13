@@ -31,6 +31,7 @@ const UTILITY_ITEMS = [
   { label: "Running Operations", href: "/utilities/running" },
   { label: "Notification Logs", href: "/utilities/notification-logs" },
   { label: "Snippets", href: "/utilities/snippets" },
+  { label: "Chat Start Prompts", href: "/utilities/chat-start-prompts" },
   { label: "Check Update", href: "/utilities/check-update" },
 ];
 

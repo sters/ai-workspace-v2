@@ -300,3 +300,16 @@ export const snippetUpdateSchema = z.object({
 export const snippetDeleteSchema = z.object({
   id: z.coerce.number().int().positive("id is required"),
 });
+
+export const chatStartPromptCreateSchema = z.object({
+  title: z.string().trim().min(1, "title is required"),
+  content: z.string().trim().min(1, "content is required"),
+});
+
+export const chatStartPromptUpdateSchema = chatStartPromptCreateSchema.extend({
+  id: z.coerce.number().int().positive("id is required"),
+});
+
+export const chatStartPromptDeleteSchema = z.object({
+  id: z.coerce.number().int().positive("id is required"),
+});
