@@ -227,14 +227,15 @@ describe("PullRequestsView", () => {
       });
     });
 
-    it("triages one without recording it as a thread to reply in", () => {
+    it("triages one and records it for create-pr to answer", () => {
       withConversation();
       fireEvent.click(screen.getByRole("checkbox", { name: /review \(changes requested\)/i }));
       fireEvent.click(screen.getByRole("button", { name: "Triage" }));
 
       const { instruction } = mockStartAndNavigate.mock.calls[0][1];
       expect(instruction).toContain("The cache never evicts. Needs a bound.");
-      expect(instruction).not.toContain("| Thread ID |");
+      expect(instruction).toContain("| Thread ID |");
+      expect(instruction).toContain("`PRR_summary`");
     });
 
     it("hides a minimized comment with the resolved threads", () => {

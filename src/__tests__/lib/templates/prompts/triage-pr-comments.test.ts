@@ -58,21 +58,21 @@ describe("buildTriagePrCommentsInstruction for comments outside the diff", () =>
     expect(instruction).toMatch(/review summary \(CHANGES_REQUESTED\)/i);
   });
 
-  it("asks for no PR Review Threads row, since there is no thread to reply in or resolve", () => {
-    // `create-pr` replies with addPullRequestReviewThreadReply and resolves with
-    // resolveReviewThread — both reject an IssueComment or a review id.
+  // create-pr closes the loop on every recorded row, so an item left out of the
+  // table is one nobody ever answers on the PR.
+  it("records a conversation comment's id so create-pr can answer it once done", () => {
     const instruction = buildTriagePrCommentsInstruction({ threads: [conversationComment] });
-    expect(instruction).not.toContain("| Thread ID | Comment URL | Summary | TODO item |");
-    expect(instruction).not.toMatch(/Thread ID: `IC_/);
-    expect(instruction).toMatch(/no `## PR Review Threads` row/);
+    expect(instruction).toContain("| Thread ID | Comment URL | Summary | TODO item |");
+    expect(instruction).toContain("`IC_kwDOxyz`");
+    expect(instruction).not.toMatch(/no `## PR Review Threads` row/);
     expect(instruction).toMatch(/do NOT reply/i);
   });
 
-  it("keeps the row for the review threads selected alongside one", () => {
+  it("records review threads and conversation comments in one table", () => {
     const instruction = buildTriagePrCommentsInstruction({ threads: [thread, conversationComment] });
-    expect(instruction).toContain("| Thread ID | Comment URL | Summary | TODO item |");
+    expect(instruction.match(/\| Thread ID \| Comment URL \| Summary \| TODO item \|/g)).toHaveLength(1);
     expect(instruction).toContain("Thread ID: `PRRT_kwDOabc`");
-    expect(instruction).toMatch(/no `## PR Review Threads` row/);
+    expect(instruction).toContain("`IC_kwDOxyz`");
   });
 });
 

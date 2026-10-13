@@ -91,29 +91,40 @@ ${NO_WORKSPACE_REFERENCES}
 
 ### Responding to Addressed Review Threads
 
-Only when the user prompt contains a \`## ${PR_REVIEW_THREADS_HEADING}\` section. Each row there is a review thread that an earlier phase judged valid and turned into a TODO item. You are the phase that closes the loop on those threads, because you are the one that pushes: a reply names a commit, so it must not exist before that commit is on the remote.
+Only when the user prompt contains a \`## ${PR_REVIEW_THREADS_HEADING}\` section. Each row there is a review comment that an earlier phase judged valid and turned into a TODO item. You are the phase that closes the loop on them, because you are the one that pushes: a reply names a commit, so it must not exist before that commit is on the remote.
 
-Do this **only after the push has succeeded** and the PR has been created or edited. If the push failed, skip this section entirely — leave every thread open.
+Do this **only after the push has succeeded** and the PR has been created or edited. If the push failed, skip this section entirely — leave every comment open.
+
+The row's \`Thread ID\` prefix says what it is, and so which calls answer it:
+
+- \`PRRT_…\` — an inline review thread: reply in the thread, then resolve it.
+- \`IC_…\` (a PR conversation comment) or \`PRR_…\` (a review summary) — there is no thread to reply in or resolve, so post a PR comment that answers it, then hide the original as resolved.
 
 For each row:
 
-1. **Skip threads GitHub already considers settled.** Check the current state:
+1. **Skip items GitHub already considers settled.** Check the current state:
    \`\`\`
-   gh api graphql -f query='query($id:ID!){node(id:$id){... on PullRequestReviewThread{isResolved}}}' -f id=<thread-id>
+   gh api graphql -f query='query($id:ID!){node(id:$id){... on PullRequestReviewThread{isResolved} ... on Minimizable{isMinimized}}}' -f id=<id>
    \`\`\`
-   If \`isResolved\` is true, a previous run already handled it — do not reply again.
+   If \`isResolved\` or \`isMinimized\` is true, a previous run already handled it — do not reply again.
 2. **Decide whether the work is complete** by looking up the row's TODO item in the TODO file whose path the section gives:
    - The item is marked \`- [x]\`, **or is absent from the file** → complete. Completed items are deleted from the TODO file between cycles, so absence is the normal signal by the time you run.
-   - The item is still \`- [ ]\` (pending), \`- [~]\` (in progress) or \`- [!]\` (blocked) → **not** complete. Leave that thread exactly as it is: no reply, no resolve, no comment explaining the delay. A human will see the open thread on the PR.
-3. **For complete items only**, reply and then resolve:
+   - The item is still \`- [ ]\` (pending), \`- [~]\` (in progress) or \`- [!]\` (blocked) → **not** complete. Leave that comment exactly as it is: no reply, no resolve, no comment explaining the delay. A human will see it open on the PR.
+3. **For complete items only**, reply and then settle it.
+   For a \`PRRT_\` thread:
    \`\`\`
    gh api graphql -f query='mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{url}}}' -f id=<thread-id> -f body=<reply>
    gh api graphql -f query='mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{isResolved}}}' -f id=<thread-id>
    \`\`\`
-   Resolve only after the reply succeeded. If the reply fails, leave the thread unresolved.
+   For an \`IC_\` / \`PRR_\` comment — the reply opens with \`@<author>\` and the row's comment URL, so a reader can tell which comment it answers:
+   \`\`\`
+   gh pr comment <pr-url> --body <reply>
+   gh api graphql -f query='mutation($id:ID!){minimizeComment(input:{subjectId:$id,classifier:RESOLVED}){minimizedComment{isMinimized}}}' -f id=<comment-id>
+   \`\`\`
+   Settle only after the reply succeeded. If the reply fails, leave the original open. Hide only the original comment, never your reply.
 4. **Write the reply from the pushed code**, not from the TODO item's wording: one or two sentences naming what changed, where (file, and function or symbol), and the commit SHA that carries it (\`git log -1 --format=%H\` or the SHA from the item's commit). Do not paste diffs, do not restate the reviewer's comment back at them, and never describe a change that is not in the pushed commits.
 
-Finally, report which threads you replied to and resolved, and which you left open together with the status of their TODO item.
+Finally, report which items you replied to and resolved or hid, and which you left open together with the status of their TODO item.
 
 ${worktreeCdRules({
   examples: "`git push`, `gh pr create`, etc.",

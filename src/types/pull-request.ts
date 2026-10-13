@@ -23,9 +23,9 @@ export interface PrReviewComment {
  *
  * `review-thread` is an inline thread anchored to a diff line. `comment` (a
  * top-level comment on the PR's conversation) and `review` (the summary body a
- * reviewer wrote when submitting a review) are anchored to no line, and have no
- * thread to reply in or resolve — which is why a triage records only
- * `review-thread`s for `create-pr` to answer.
+ * reviewer wrote when submitting a review) are anchored to no line and have no
+ * thread to reply in or resolve, so `create-pr` answers them with a PR comment
+ * and hides them as resolved instead.
  */
 export type PrThreadKind = "review-thread" | "comment" | "review";
 
@@ -34,8 +34,8 @@ export interface PrReviewThread {
    * GraphQL node id — `PRRT_…` for a review thread, `IC_…` / `PRR_…` for a
    * conversation comment or review body — not the comment's numeric id. This is
    * the key everything downstream joins on: the validation store, the `## PR
-   * Review Threads` rows a triage writes, and the reply/resolve call `create-pr`
-   * makes (review threads only).
+   * Review Threads` rows a triage writes, and the reply/resolve (or hide) call
+   * `create-pr` makes.
    */
   id: string;
   kind: PrThreadKind;

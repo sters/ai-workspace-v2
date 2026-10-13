@@ -27,6 +27,15 @@ describe("getPRCreatorSystemPrompt", () => {
     expect(prompt).toContain("resolveReviewThread");
   });
 
+  // A conversation comment or review summary has no thread: it is answered with a
+  // PR comment and settled by hiding it as resolved, the closest GitHub offers.
+  it("answers a recorded conversation comment and hides it as resolved", () => {
+    expect(prompt).toContain("gh pr comment");
+    expect(prompt).toContain("minimizeComment");
+    expect(prompt).toContain("classifier:RESOLVED");
+    expect(prompt.indexOf("gh pr comment")).toBeLessThan(prompt.indexOf("minimizeComment"));
+  });
+
   // The reply names a commit, so it must not be posted before that commit is on
   // the remote — nor at all if the push failed.
   it("orders the reply after a successful push", () => {

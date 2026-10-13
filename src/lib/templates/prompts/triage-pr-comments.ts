@@ -15,9 +15,11 @@
  * resolve, or widen past the listed threads).
  *
  * The `## PR Review Threads` rows are the load-bearing part. `create-pr` reads
- * that section back after a successful push to reply to and resolve each thread
- * whose item is done, and non-checkbox table rows are what survives
- * `stripCompletedTodoItems` deleting the `[x]` items worth replying about.
+ * that section back after a successful push to answer each recorded item whose
+ * TODO item is done — replying to and resolving a review thread, or replying to a
+ * conversation comment / review summary and hiding it as resolved — and
+ * non-checkbox table rows are what survives `stripCompletedTodoItems` deleting
+ * the `[x]` items worth replying about.
  */
 
 import { fenceFor } from "@/lib/change-comments";
@@ -48,8 +50,9 @@ export function renderValidationForPrompt(validation: PrThreadValidation): strin
 /** One selected review thread or PR comment, flattened to what a triage needs to see. */
 export interface TriageThread {
   /**
-   * GraphQL node id. For a `review-thread` (`PRRT_…`) it is the key `create-pr`
-   * replies by; a conversation comment or review body has no thread to reply in.
+   * GraphQL node id — `PRRT_…` for a review thread, `IC_…` / `PRR_…` for a
+   * conversation comment or review body. `create-pr` picks how to answer the
+   * recorded row by this prefix.
    */
   id: string;
   kind: PrThreadKind;
@@ -119,7 +122,7 @@ function renderThread(
   const idLine =
     !isConversation(thread)
       ? `- Thread ID: \`${thread.id}\``
-      : `- Comment ID: \`${thread.id}\` (not a review thread — no \`## ${PR_REVIEW_THREADS_HEADING}\` row)`;
+      : `- Comment ID: \`${thread.id}\` (record it in the \`Thread ID\` column of its \`## ${PR_REVIEW_THREADS_HEADING}\` row)`;
 
   const validationBlock = validation
     ? `\n**Prior validation** (an agent already looked at this comment):
@@ -203,8 +206,7 @@ export function buildTriagePrCommentsInstruction(input: {
     .join(" and ");
 
   const repoNames = [...new Set(threads.map((t) => t.repoName))];
-  const reviewThreads = threads.filter((t) => !isConversation(t));
-  const hasConversation = threads.length > reviewThreads.length;
+  const hasConversation = threads.some(isConversation);
   const ciRepoNames = [...new Set(ciFailures.map((f) => f.repoName))];
 
   const threadSection =
@@ -238,7 +240,7 @@ Where a thread's fix is genuinely more than one unit of work, write more than on
 ${
   hasConversation
     ? `
-A PR conversation comment or review summary is attached to no line, so work out from the code which files it is about and name them in the item. It gets no \`## ${PR_REVIEW_THREADS_HEADING}\` row: it has no thread for a later phase to reply in or resolve, so answering it on the PR is left to the human. **Do NOT reply to it now either.**
+A PR conversation comment or review summary is attached to no line, so work out from the code which files it is about and name them in the item. It is recorded in \`## ${PR_REVIEW_THREADS_HEADING}\` like a review thread, under its \`IC_\` / \`PRR_\` comment ID.
 `
     : ""
 }`;
@@ -263,11 +265,11 @@ Do not add a \`## PR Review Threads\` row for a CI failure — there is no revie
 `;
 
   const recordSection =
-    reviewThreads.length === 0
+    threads.length === 0
       ? ""
       : `## Recording the threads
 
-Append (or extend) a \`## ${PR_REVIEW_THREADS_HEADING}\` section at the end of each TODO file you touch, with one row per review thread (an item listed with a \`Thread ID\`) you turned into an item in that file:
+Append (or extend) a \`## ${PR_REVIEW_THREADS_HEADING}\` section at the end of each TODO file you touch, with one row per listed thread or comment you turned into an item in that file:
 
 \`\`\`markdown
 ## ${PR_REVIEW_THREADS_HEADING}
@@ -277,12 +279,12 @@ Append (or extend) a \`## ${PR_REVIEW_THREADS_HEADING}\` section at the end of e
 | PRRT_kwDO... | https://github.com/o/r/pull/12#discussion_r123 | Missing nil check before deref | **[api/handler.go]** Add nil check before deref |
 \`\`\`
 
-- **Thread ID** is the \`PRRT_\`-prefixed id given for each thread above.
+- **Thread ID** is the \`Thread ID\` (\`PRRT_…\`) or \`Comment ID\` (\`IC_…\` / \`PRR_…\`) given for the item above, verbatim — its prefix is what tells the later phase how to answer it.
 - **TODO item** must repeat the TODO item's first line **verbatim**, so it can be matched against the file after the work is done.
 - Use table rows, not checkboxes — this section is a record, not work to do.
 - Keep any rows already in the section and add yours to the same table.
 
-**Do NOT reply to any review comment and do NOT resolve any thread now.** The fix does not exist yet, so a reply would speak for work that has not happened. A later phase replies and resolves after the fix is committed and pushed, using the rows above — a thread whose item is complete gets a reply and is resolved, and a thread whose item is still pending, in progress or blocked is left open for the human.`;
+**Do NOT reply to any comment, and do NOT resolve or hide anything now.** The fix does not exist yet, so a reply would speak for work that has not happened. A later phase answers each row after the fix is committed and pushed — an item that is complete gets a reply and is resolved (a review thread) or hidden as resolved (a conversation comment or review summary), and one still pending, in progress or blocked is left open for the human.`;
 
   return [
     `Turn the following ${subject} into TODO items.
