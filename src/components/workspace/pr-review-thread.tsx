@@ -121,7 +121,7 @@ export function PrReviewThreadRow({
                     {i > 0 && " (reply)"}
                   </span>
                   <div className="mt-0.5 text-sm">
-                    <MarkdownRenderer content={comment.body} />
+                    <MarkdownRenderer content={comment.body} allowHtml />
                   </div>
                 </div>
               ))}
