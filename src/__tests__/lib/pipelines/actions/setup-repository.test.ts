@@ -155,6 +155,27 @@ describe("setupRepository", () => {
     expect(warning).toMatch(/reported as taken/);
   });
 
+  it("checks a PR branch out under the first local name no branch holds, in a worktree or not", async () => {
+    // `pr-head` is checked out by another workspace's worktree; `pr-head-2` is
+    // left over from a workspace that was deleted, so no worktree lists it.
+    const taken = new Set(["refs/heads/pr-head", "refs/heads/pr-head-2"]);
+    mockExec.mockImplementation((cmd) => {
+      const ref = String(cmd).match(/rev-parse --verify "([^"]+)"/)?.[1];
+      if (ref !== undefined) {
+        if (taken.has(ref)) return "";
+        throw new Error("fatal: not a valid object name");
+      }
+      return "";
+    });
+
+    const result = await setupRepository(WORKSPACE, "github.com/acme/repo", "master", vi.fn(), "pr-head");
+
+    expect(result.branchName).toBe("pr-head-3");
+    const add = mockExec.mock.calls.map((c) => String(c[0])).find((c) => c.includes("worktree add"));
+    expect(add).toContain(`-b "pr-head-3"`);
+    expect(add).toContain(`"origin/pr-head"`);
+  });
+
   it("still fails when the repository cannot be cloned", async () => {
     mockExists.mockImplementation(async (p) => String(p) === WS_ABS);
     mockExec.mockImplementation((cmd) => {

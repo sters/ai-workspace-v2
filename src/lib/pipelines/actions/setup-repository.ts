@@ -238,25 +238,23 @@ async function createWorktree(
         try { await exec(`git -C "${repoAbsPath}" worktree prune`); } catch { /* ignore */ }
       }
 
-      // Check if the local branch is already used by another worktree.
-      // If so, create a worktree with a suffixed local branch name that tracks the same remote.
+      // `worktree add -b` refuses any local branch that exists, whether another
+      // worktree has it checked out or a deleted workspace left it behind, so
+      // take the first suffixed name that tracks the same remote branch.
+      const localBranchExists = async (name: string): Promise<boolean> => {
+        try { await exec(`git -C "${repoAbsPath}" rev-parse --verify "refs/heads/${name}"`); return true; } catch { return false; }
+      };
       let localBranchName = checkoutBranch;
-      try {
-        const worktreeList = await exec(`git -C "${repoAbsPath}" worktree list --porcelain`);
-        const isInUse = worktreeList
-          .split("\n")
-          .some((line) => line === `branch refs/heads/${checkoutBranch}`);
-        if (isInUse) {
-          let suffix = 2;
-          while (
-            worktreeList.split("\n").some((line) => line === `branch refs/heads/${checkoutBranch}-${suffix}`)
-          ) {
-            suffix++;
-          }
-          localBranchName = `${checkoutBranch}-${suffix}`;
-          emitStatus(`Branch ${checkoutBranch} in use by another worktree, using local name ${localBranchName}`);
+      if (await localBranchExists(checkoutBranch)) {
+        let suffix = 2;
+        while (suffix <= MAX_BRANCH_NAME_ATTEMPTS && (await localBranchExists(`${checkoutBranch}-${suffix}`))) {
+          suffix++;
         }
-      } catch { /* worktree list failed — proceed and let git error if needed */ }
+        localBranchName = suffix > MAX_BRANCH_NAME_ATTEMPTS
+          ? `${checkoutBranch}-${new Date().toISOString().replace(/\D/g, "").slice(0, 14)}`
+          : `${checkoutBranch}-${suffix}`;
+        emitStatus(`Local branch ${checkoutBranch} already exists, using local name ${localBranchName}`);
+      }
 
       emitStatus(`Creating worktree: checking out existing branch ${checkoutBranch}`);
       await exec(
