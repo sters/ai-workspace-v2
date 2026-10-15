@@ -67,6 +67,8 @@ export {
   DEEP_SEARCH_SCHEMA,
   getRepoConstraintsSystemPrompt,
   buildRepoConstraintsPrompt,
+  getRepoGuidanceSystemPrompt,
+  buildRepoGuidancePrompt,
   getAutonomousGateSystemPrompt,
   buildAutonomousGatePrompt,
   AUTONOMOUS_GATE_SCHEMA,

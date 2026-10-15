@@ -17,13 +17,10 @@
  * command in it is kept until the key moves.
  */
 
-import { mkdir, readFile, realpath, rename, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import path from "node:path";
-import { getResolvedWorkspaceRoot } from "@/lib/config/resolver";
-import { getWorkspaceConfigDir } from "@/lib/config/workspace-dir";
 import { parseConstraintLines, type RepoConstraint } from "@/lib/parsers/readme";
-import { repoDir } from "./helpers";
+import { cloneCacheFile, writeCacheFile } from "./clone-cache";
 import { runGit, type GitExec } from "./git-exec";
 
 export interface RepoConstraintsCacheEntry {
@@ -117,14 +114,6 @@ const SELECTED_PATHS: [string, (content: string) => string][] = [
 
 const KEY_PATTERN = /^<!-- aiw-repo-constraints key=([0-9a-f]+) -->$/m;
 
-async function realpathOrSelf(p: string): Promise<string> {
-  try {
-    return await realpath(p);
-  } catch {
-    return p;
-  }
-}
-
 async function fingerprint(worktreePath: string, git: GitExec): Promise<string | null> {
   const tree = await git(
     ["ls-tree", "HEAD", "--", ...HASHED_PATHS, ...PRESENCE_PATHS],
@@ -154,21 +143,11 @@ export async function locateRepoConstraintsCache(
   worktreePath: string,
   git: GitExec = runGit,
 ): Promise<RepoConstraintsCacheEntry | null> {
-  const common = await git(["rev-parse", "--path-format=absolute", "--git-common-dir"], worktreePath);
-  if (!common.ok || !common.out) return null;
-
-  const cloneDir = await realpathOrSelf(path.dirname(common.out));
-  const rel = path.relative(await realpathOrSelf(repoDir()), cloneDir);
-  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) return null;
+  const file = await cloneCacheFile(worktreePath, "repo-constraints", git);
+  if (!file) return null;
 
   const key = await fingerprint(worktreePath, git);
   if (!key) return null;
-
-  const file = path.join(
-    getWorkspaceConfigDir(getResolvedWorkspaceRoot()),
-    "repo-constraints",
-    `${rel}.md`,
-  );
   return { file, key };
 }
 
@@ -189,7 +168,6 @@ function formatConstraintLines(constraints: RepoConstraint[]): string {
   return constraints.map((c) => `- ${c.label}: \`${c.command}\``).join("\n");
 }
 
-/** Write via rename, since two workspaces of one repository may finish discovery together. */
 export async function writeRepoConstraintsCache(
   entry: RepoConstraintsCacheEntry,
   constraints: RepoConstraint[],
@@ -201,10 +179,7 @@ export async function writeRepoConstraintsCache(
     formatConstraintLines(constraints),
     "",
   ].join("\n");
-  await mkdir(path.dirname(entry.file), { recursive: true });
-  const tmp = `${entry.file}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(tmp, content);
-  await rename(tmp, entry.file);
+  await writeCacheFile(entry.file, content);
 }
 
 export async function cachedRepoConstraints(worktreePath: string): Promise<RepoConstraint[] | null> {

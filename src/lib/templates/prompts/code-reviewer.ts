@@ -12,6 +12,7 @@ import {
   WRITTEN_DELIVERABLE_LENGTH,
   knownFindingsSection,
   worktreeCdRules,
+  repoGuidanceSection,
 } from "./shared";
 
 export function getCodeReviewerSystemPrompt(): string {
@@ -164,7 +165,7 @@ export function buildCodeReviewerPrompt(input: CodeReviewerInput): string {
 ## Workspace README
 
 ${input.readmeContent}
-${knownFindingsSection(input.knownFindings)}
+${knownFindingsSection(input.knownFindings)}${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "review" })}
 ${changesSection(input)}
 
 ## Review Report Template

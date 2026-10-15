@@ -17,9 +17,11 @@ import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 import { getTimeoutDefaults } from "@/lib/pipeline-manager";
+import { readRepoGuidance } from "@/lib/workspace/repo-guidance";
 import { buildCommitSnapshotPhase } from "./commit-snapshot";
 import { buildCoordinateTodosPhase } from "./coordinate-todos";
 import { buildDiscoverConstraintsPhase } from "./discover-constraints";
+import { buildDiscoverGuidancePhase } from "./discover-guidance";
 import { buildReviewTodosPhase } from "./review-todos";
 
 export interface InitTodoAnalysisRepo {
@@ -50,17 +52,25 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
   const { wsName, wsPath, repos, taskType, interactionLevel } = input;
 
   return [
-    // Phase C: Discover repo constraints (lint/test/build) and append to README
+    // Phase C: Discover repo constraints (lint/test/build) and append to README,
+    // and, alongside, each repo's implementation / review guidance into
+    // artifacts/repo-guidance/ for the planner, executor and reviewers.
     {
       kind: "function",
       label: "Discover repo constraints",
       timeoutMs: getTimeoutDefaults("init").claudeMs,
-      fn: (ctx) =>
-        buildDiscoverConstraintsPhase({
+      fn: async (ctx) => {
+        const discoverInput = {
           workspace: wsName(),
           wsPath: wsPath(),
           repos: repos().map((r) => ({ repoName: r.repoName, worktreePath: r.worktreePath })),
-        }).fn(ctx),
+        };
+        const [constraints] = await Promise.all([
+          buildDiscoverConstraintsPhase(discoverInput).fn(ctx),
+          buildDiscoverGuidancePhase(discoverInput).fn(ctx),
+        ]);
+        return constraints;
+      },
     },
     // Phase C2: Start the toolchain prep in the background.
     //
@@ -128,7 +138,8 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
 
         const plannerAgent = meta.taskType === "research" ? "research-planner" : "planner";
         const plannerPromptFile = await ensureSystemPrompt(wp, plannerAgent);
-        const children = rs.map((repo) => ({
+        const guidance = await Promise.all(rs.map((repo) => readRepoGuidance(wp, repo.repoName)));
+        const children = rs.map((repo, i) => ({
           label: `plan-${repo.repoName}`,
           stepType: STEP_TYPES.PLAN_TODO,
           prompt: buildPlannerPrompt({
@@ -140,6 +151,7 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
             taskType: meta.taskType,
             interactive: interactionLevel === "high",
             instruction: input.instruction?.(),
+            repoGuidance: guidance[i]?.implementation,
           }),
           addDirs: [wp],
           appendSystemPromptFile: plannerPromptFile,

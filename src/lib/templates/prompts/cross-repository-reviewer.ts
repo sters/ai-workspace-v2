@@ -12,6 +12,7 @@ import {
   SEVERITY_CALIBRATION,
   WRITTEN_DELIVERABLE_LENGTH,
   knownFindingsSection,
+  repoGuidanceSection,
 } from "./shared";
 
 export function getCrossRepositoryReviewerSystemPrompt(): string {
@@ -140,7 +141,7 @@ export function buildCrossRepositoryReviewerPrompt(input: CrossRepositoryReviewe
 
 Changes${anyScope ? " (whole branch)" : ""}:
 
-${r.repoChanges}${anyScope ? `\n\n${newWorkBlock(r.reviewScope)}` : ""}`,
+${r.repoChanges}${anyScope ? `\n\n${newWorkBlock(r.reviewScope)}` : ""}${repoGuidanceSection({ worktreePath: r.worktreePath, guidance: r.repoGuidance, use: "review", heading: "####" })}`,
     )
     .join("\n\n---\n\n");
 

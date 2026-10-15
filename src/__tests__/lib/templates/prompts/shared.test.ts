@@ -8,8 +8,13 @@ import {
   SEVERITY_CALIBRATION,
   SUBAGENT_DELEGATION_POLICY,
   WRITTEN_DELIVERABLE_LENGTH,
+  repoGuidanceSection,
   worktreeCdRules,
 } from "@/lib/templates/prompts/shared";
+import { buildCodeReviewerPrompt } from "@/lib/templates/prompts/code-reviewer";
+import { buildCrossRepositoryReviewerPrompt } from "@/lib/templates/prompts/cross-repository-reviewer";
+import { buildBatchedExecutorPrompt, buildExecutorPrompt } from "@/lib/templates/prompts/executor";
+import { buildPlannerPrompt } from "@/lib/templates/prompts/planner";
 import { getFindingGrounderSystemPrompt } from "@/lib/templates/prompts/finding-grounder";
 import { getExecutorSystemPrompt } from "@/lib/templates/prompts/executor";
 import { getPlannerSystemPrompt, getResearchPlannerSystemPrompt } from "@/lib/templates/prompts/planner";
@@ -314,5 +319,52 @@ describe("RECURRING_FINDINGS_POLICY", () => {
   ])("%s carries the recurring-findings policy alongside coverage", (_name, prompt) => {
     expect(prompt).toContain(RECURRING_FINDINGS_POLICY);
     expect(prompt).toContain(REVIEW_COVERAGE_POLICY);
+  });
+});
+
+describe("repoGuidanceSection", () => {
+  const GUIDANCE = "- `.claude/skills/pr-review/references/lens-prompts.md` — the four review lenses";
+
+  it("anchors the repository-relative paths at the worktree", () => {
+    const section = repoGuidanceSection({ worktreePath: "/wt/web", guidance: GUIDANCE, use: "review" });
+    expect(section).toContain("`/wt/web`");
+    expect(section).toContain(GUIDANCE);
+  });
+
+  // The listed files include skills written for an interactive session: they
+  // set up their own worktree, post PR comments and approve.
+  it("takes the criteria from a skill and leaves its procedure unrun", () => {
+    const section = repoGuidanceSection({ worktreePath: "/wt/web", guidance: GUIDANCE, use: "review" });
+    expect(section).toMatch(/leave their steps and scripts unrun/);
+    expect(section).toMatch(/post nothing/);
+  });
+
+  it.each([undefined, "", "  \n"])("renders nothing for guidance %p", (guidance) => {
+    expect(repoGuidanceSection({ worktreePath: "/wt/web", guidance, use: "review" })).toBe("");
+  });
+
+  const repo = { workspaceName: "ws", repoName: "web", repoPath: "github.com/acme/web", worktreePath: "/wt/web" };
+  const consumers: Record<string, (repoGuidance?: string) => string> = {
+    codeReviewer: (repoGuidance) => buildCodeReviewerPrompt({
+      ...repo, baseBranch: "main", reviewTimestamp: "t", readmeContent: "# r", repoChanges: "d",
+      reviewFilePath: "/r.md", repoGuidance,
+    }),
+    crossRepositoryReviewer: (repoGuidance) => buildCrossRepositoryReviewerPrompt({
+      workspaceName: "ws", reviewTimestamp: "t", readmeContent: "# r", reviewFilePath: "/r.md",
+      repos: [{ repoName: "web", repoPath: "github.com/acme/web", baseBranch: "main", worktreePath: "/wt/web", repoChanges: "d", repoGuidance }],
+    }),
+    planner: (repoGuidance) => buildPlannerPrompt({ ...repo, readmeContent: "# r", taskType: "feature", repoGuidance }),
+    executor: (repoGuidance) => buildExecutorPrompt({
+      ...repo, readmeContent: "# r", todoContent: "- [ ] a", workspacePath: "/ws", repoGuidance,
+    }),
+    batchedExecutor: (repoGuidance) => buildBatchedExecutorPrompt({
+      ...repo, readmeContent: "# r", todoContent: "- [ ] a", workspacePath: "/ws", repoGuidance,
+      batchIndex: 0, totalBatches: 2, batchTodoContent: "- [ ] a",
+    }),
+  };
+
+  it.each(Object.entries(consumers))("%s carries the guidance it is given", (_name, build) => {
+    expect(build(GUIDANCE)).toContain(GUIDANCE);
+    expect(build(undefined)).not.toContain("Repository Guidance");
   });
 });

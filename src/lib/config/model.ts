@@ -32,6 +32,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.PLAN_TODO_FROM_REVIEW]: "opus",
   [STEP_TYPES.EXECUTE]: "opus",
   [STEP_TYPES.DISCOVER_CONSTRAINTS]: "opus",
+  [STEP_TYPES.DISCOVER_GUIDANCE]: "opus",
   [STEP_TYPES.VERIFY_README]: "opus",
   [STEP_TYPES.CRITERIA_FEASIBILITY]: "opus",
   [STEP_TYPES.VALIDATE_PR_COMMENT]: "opus",
@@ -192,6 +193,10 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // lint/test/build commands into a fixed one-per-line format, but has to decide
   // *which* package manager and activation command apply.
   [STEP_TYPES.DISCOVER_CONSTRAINTS]: "low",
+  // Reads a repository's agent docs and skills and lists the files that bear on
+  // implementing or reviewing in it, which takes telling a skill's criteria from
+  // its interactive procedure.
+  [STEP_TYPES.DISCOVER_GUIDANCE]: "low",
   // A single yes/no against documented criteria, and deliberately biased toward
   // proceeding — it is a safety valve, not a quality bar.
   [STEP_TYPES.README_CLARITY_GATE]: "low",

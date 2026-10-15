@@ -12,6 +12,7 @@ export const STEP_TYPES = {
   RESEARCH: "research",
   ANALYZE_README: "analyze-readme",
   DISCOVER_CONSTRAINTS: "discover-constraints",
+  DISCOVER_GUIDANCE: "discover-guidance",
   PLAN_TODO: "plan-todo",
   COORDINATE_TODOS: "coordinate-todos",
   REVIEW_TODOS: "review-todos",

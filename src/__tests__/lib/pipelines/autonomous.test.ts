@@ -846,9 +846,8 @@ describe("buildAutonomousPipeline", () => {
       const ctx = createMockCtx();
       expect(await ensurePhase.fn(ctx)).toBe(true);
 
-      const groupCalls = vi.mocked(ctx.runChildGroup).mock.calls;
-      expect(groupCalls).toHaveLength(1);
-      expect(groupCalls[0][0].map((c) => c.label)).toEqual(["constraints-new"]);
+      const labels = vi.mocked(ctx.runChildGroup).mock.calls.flatMap(([children]) => children.map((c) => c.label));
+      expect(labels.sort()).toEqual(["constraints-new", "guidance-new"]);
     });
 
     it("does not fail the run when constraint discovery does not complete", async () => {

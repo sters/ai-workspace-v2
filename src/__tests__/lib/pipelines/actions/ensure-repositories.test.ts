@@ -22,6 +22,14 @@ vi.mock("@/lib/pipelines/actions/discover-constraints", () => ({
     fn: mockConstraintsFn,
   })),
 }));
+const mockGuidanceFn = vi.fn(async () => true);
+vi.mock("@/lib/pipelines/actions/discover-guidance", () => ({
+  buildDiscoverGuidancePhase: vi.fn(() => ({
+    kind: "function",
+    label: "Discover repo guidance",
+    fn: mockGuidanceFn,
+  })),
+}));
 
 import {
   syncReadmeRepositories,
@@ -204,6 +212,28 @@ describe("syncReadmeRepositories", () => {
         repos: [{ repoName: "new", worktreePath: "/ws/ws/github.com/a/new" }],
       });
       expect(mockConstraintsFn).toHaveBeenCalledWith(ctx);
+    });
+
+    it("finds the new worktrees' guidance alongside their constraints", async () => {
+      // Both start before either finishes: guidance must not wait on constraints.
+      let release!: () => void;
+      mockConstraintsFn.mockImplementation(() => new Promise<boolean>((r) => { release = () => r(true); }));
+      const ctx = createMockCtx();
+
+      const done = discoverConstraintsForNewRepos(ctx, "ws", [
+        { repoName: "new", worktreePath: "/ws/ws/github.com/a/new" },
+      ]);
+      await Promise.resolve();
+      expect(mockGuidanceFn).toHaveBeenCalledWith(ctx);
+      release();
+      expect(await done).toBe(true);
+    });
+
+    it("reports the constraints result, not the guidance one", async () => {
+      mockGuidanceFn.mockResolvedValueOnce(false);
+      expect(await discoverConstraintsForNewRepos(createMockCtx(), "ws", [
+        { repoName: "new", worktreePath: "/w/new" },
+      ])).toBe(true);
     });
 
     it("does nothing when no repository was set up", async () => {

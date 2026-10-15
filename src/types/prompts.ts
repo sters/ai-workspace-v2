@@ -16,6 +16,8 @@ export interface ExecutorInput extends RepoPromptInput {
   readmeContent: string;
   todoContent: string;
   workspacePath: string;
+  /** This repository's discovered guidance section (`artifacts/repo-guidance/`), bullets only. */
+  repoGuidance?: string;
 }
 
 export interface BatchedExecutorInput extends ExecutorInput {
@@ -33,6 +35,8 @@ export interface PlannerInput extends RepoPromptInput {
   interactive?: boolean;
   /** Optional free-text instruction from the user to focus/guide TODO planning. */
   instruction?: string;
+  /** This repository's discovered guidance section (`artifacts/repo-guidance/`), bullets only. */
+  repoGuidance?: string;
 }
 
 export interface CoordinatorInput {
@@ -102,6 +106,8 @@ export interface CodeReviewerInput extends RepoPromptInput {
    * means no usable baseline, and the whole branch is the review target.
    */
   reviewScope?: ReviewScope;
+  /** This repository's discovered guidance section (`artifacts/repo-guidance/`), bullets only. */
+  repoGuidance?: string;
 }
 
 /**
@@ -192,6 +198,8 @@ export interface CrossRepositoryReviewerInput {
      * when *either* side has a scope naming it — see `buildCrossRepositoryReviewerPrompt`.
      */
     reviewScope?: ReviewScope;
+    /** This repository's discovered guidance section (`artifacts/repo-guidance/`), bullets only. */
+    repoGuidance?: string;
   }[];
 }
 

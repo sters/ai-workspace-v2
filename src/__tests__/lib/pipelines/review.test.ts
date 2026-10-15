@@ -46,6 +46,10 @@ vi.mock("@/lib/workspace/posted-findings", () => ({
   collectPostedAsks: vi.fn(async () => new Map<string, string[]>()),
 }));
 
+vi.mock("@/lib/workspace/repo-guidance", () => ({
+  readRepoGuidance: vi.fn(async () => null),
+}));
+
 vi.mock("@/lib/workspace/prompts", () => ({
   ensureSystemPrompt: vi.fn(() => "/mock/prompts/agent.md"),
 }));
@@ -89,6 +93,7 @@ import { buildReviewPipeline } from "@/lib/pipelines/review";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { prepareReviewDir } from "@/lib/workspace";
 import { collectPostedAsks } from "@/lib/workspace/posted-findings";
+import { readRepoGuidance } from "@/lib/workspace/repo-guidance";
 import { parseConstraints } from "@/lib/parsers/readme";
 import {
   execConstraintCommand,
@@ -211,6 +216,24 @@ describe("buildReviewPipeline — cross-repository review", () => {
     // path at the back of the queue.
     expect(labels[0]).toBe("review-cross-repository");
     expect(labels.length).toBeGreaterThan(1);
+  });
+
+  it("hands both reviewers each repository's review guidance, not its implementation guidance", async () => {
+    mockListWorkspaceRepos.mockReturnValue(twoRepos());
+    vi.mocked(readRepoGuidance).mockImplementation(async (_ws, repoName) => ({
+      implementation: `${repoName}-implementation`,
+      review: `${repoName}-review`,
+    }));
+
+    await buildReviewPipeline({ workspace: "test-ws" });
+
+    expect(mockBuildCodeReviewerPrompt.mock.calls.map(([input]) => input.repoGuidance)).toEqual([
+      "api-review",
+      "web-review",
+    ]);
+    const [crossInput] = mockBuildCrossRepoPrompt.mock.calls[0];
+    expect(crossInput.repos.map((r) => r.repoGuidance)).toEqual(["api-review", "web-review"]);
+    expect(vi.mocked(readRepoGuidance)).toHaveBeenCalledWith("/ws/test-ws", "api");
   });
 
   it("does NOT add a cross-repository review child for a single-repo workspace", async () => {

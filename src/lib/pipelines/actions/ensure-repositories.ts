@@ -11,6 +11,7 @@ import { listWorkspaceRepos } from "@/lib/workspace/git";
 import { readWorkspaceReadme, denormalizeRepoPath } from "@/lib/parsers/readme";
 import { setupRepository } from "./setup-repository";
 import { buildDiscoverConstraintsPhase } from "./discover-constraints";
+import { buildDiscoverGuidancePhase } from "./discover-guidance";
 import type { PhaseFunctionContext } from "@/types/pipeline";
 
 export interface SyncReadmeReposResult {
@@ -107,7 +108,8 @@ export async function syncReadmeRepositories(
 }
 
 /**
- * Discover lint/test/build constraints for worktrees that were just created.
+ * Discover lint/test/build constraints, and implementation / review guidance,
+ * for worktrees that were just created.
  *
  * The discovery phase itself only runs on the init path, so a repository added
  * to an existing workspace reached review with its commands undeclared — which
@@ -121,9 +123,10 @@ export async function discoverConstraintsForNewRepos(
   repos: { repoName: string; worktreePath: string }[],
 ): Promise<boolean> {
   if (repos.length === 0) return true;
-  return buildDiscoverConstraintsPhase({
-    workspace,
-    wsPath: path.join(getWorkspaceDir(), workspace),
-    repos,
-  }).fn(ctx);
+  const input = { workspace, wsPath: path.join(getWorkspaceDir(), workspace), repos };
+  const [constraints] = await Promise.all([
+    buildDiscoverConstraintsPhase(input).fn(ctx),
+    buildDiscoverGuidancePhase(input).fn(ctx),
+  ]);
+  return constraints;
 }

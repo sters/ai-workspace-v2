@@ -9,6 +9,7 @@ import {
   SUBAGENT_DELEGATION_POLICY,
   WRITTEN_DELIVERABLE_LENGTH,
   worktreeCdRules,
+  repoGuidanceSection,
 } from "./shared";
 
 const PLANNER_CD_RULES = worktreeCdRules({ examples: "`git status`, `git diff`, etc." });
@@ -257,7 +258,7 @@ ${input.interactive ? "## Mode: interactive" : ""}
 ## Workspace README
 
 ${input.readmeContent}
-${instructionSection}
+${instructionSection}${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "implementation" })}
 
 ## TODO Template
 

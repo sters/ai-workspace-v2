@@ -11,6 +11,7 @@ import {
   SUBAGENT_DELEGATION_POLICY,
   TOOLCHAIN_RESOLUTION,
   worktreeCdRules,
+  repoGuidanceSection,
 } from "./shared";
 
 export function getExecutorSystemPrompt(): string {
@@ -169,7 +170,7 @@ export function buildExecutorPrompt(input: ExecutorInput): string {
 ## Workspace README
 
 ${input.readmeContent}
-
+${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "implementation" })}
 ## TODO File (TODO-${input.repoName}.md)
 
 ${input.todoContent}
@@ -206,7 +207,7 @@ export function buildBatchedExecutorPrompt(input: BatchedExecutorInput): string 
 ## Workspace README
 
 ${input.readmeContent}
-
+${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "implementation" })}
 ## Current Batch (${input.batchIndex + 1} of ${input.totalBatches})
 
 ${input.batchTodoContent}

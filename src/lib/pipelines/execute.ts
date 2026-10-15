@@ -21,6 +21,7 @@ import {
 } from "@/lib/templates";
 import { writeReportTemplates, writeResearchTemplates } from "@/lib/workspace";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
+import { readRepoGuidance } from "@/lib/workspace/repo-guidance";
 import { awaitToolchainPrewarm } from "@/lib/workspace/toolchain-prewarm";
 import { triggerWorkspaceSuggestion } from "@/lib/suggest-workspace";
 import { executePhaseBudgetMs } from "@/lib/pipeline/constants";
@@ -366,6 +367,8 @@ async function executeRepoLane(
   // Fits in one batch (batchSize or fewer actionable top-level items) → single
   // call over the whole TODO file, with no per-batch focus instruction and no
   // re-read between batches to resume from.
+  const repoGuidance = (await readRepoGuidance(wsPath, repo.repoName))?.implementation;
+
   if (batches.length === 1) {
     ctx.emitStatus(`[${repo.repoName}] Executing (no batching needed)`);
     const prompt = buildExecutorPrompt({
@@ -376,6 +379,7 @@ async function executeRepoLane(
       todoContent,
       worktreePath: repo.worktreePath,
       workspacePath: wsPath,
+      repoGuidance,
     });
     return ctx.runChild(repo.repoName, prompt, {
       addDirs: [wsPath],
@@ -428,6 +432,7 @@ async function executeRepoLane(
       todoContent: currentTodoContent,
       worktreePath: repo.worktreePath,
       workspacePath: wsPath,
+      repoGuidance,
       batchIndex: i,
       totalBatches,
       batchTodoContent: batchContent,
