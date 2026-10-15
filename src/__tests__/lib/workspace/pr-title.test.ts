@@ -46,13 +46,27 @@ describe("applyTicketPrefix", () => {
     expect(applyTicketPrefix("Add pagination", undefined)).toBe("Add pagination");
   });
 
-  // The heading, or the commit subject, may already name the ticket.
-  it("does not name the ticket twice", async () => {
-    expect(applyTicketPrefix("[ABC-123] Add pagination", "ABC-123")).toBe(
-      "[ABC-123] Add pagination",
+  // Every titled PR opens with `[ID] `, so a subject that already leads with the
+  // ticket in another shape has it rewritten rather than bracketed on a second time.
+  it.each([
+    "[ABC-123] Add pagination",
+    "ABC-123: Add pagination",
+    "abc-123 - Add pagination",
+    "(ABC-123) Add pagination",
+    "ABC-123 Add pagination",
+  ])("rewrites the leading ticket in %p", (title) => {
+    expect(applyTicketPrefix(title, "ABC-123")).toBe("[ABC-123] Add pagination");
+  });
+
+  it("brackets the ticket on even when the title names it further in", () => {
+    expect(applyTicketPrefix("Fix ABC-123 crash on retry", "ABC-123")).toBe(
+      "[ABC-123] Fix ABC-123 crash on retry",
     );
-    expect(applyTicketPrefix("Fix abc-123 crash on retry", "ABC-123")).toBe(
-      "Fix abc-123 crash on retry",
+  });
+
+  it("does not take a longer ticket for this one", () => {
+    expect(applyTicketPrefix("ABC-1234: Add pagination", "ABC-123")).toBe(
+      "[ABC-123] ABC-1234: Add pagination",
     );
   });
 

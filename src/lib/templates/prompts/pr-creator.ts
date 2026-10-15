@@ -32,7 +32,7 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 ### If Creating a New PR
 
 1. **Compose PR Content**:
-   - Title: follow the user prompt's \`## PR Title\` section. When it gives a title, use that string verbatim — it is this branch's own commit subject, with any ticket reference already bracketed on. Otherwise compose one, concise and under 70 characters, that says what **this PR** changes, read from this repository's diff and commits (e.g. \`Add cursor pagination to the user search endpoint\`). The workspace name and the README's \`# Task:\` heading name the whole task, not this PR — never use either as the title. Do not append the repository name; the PR list already says which repository it is. A prefix your repository's own convention requires may precede either kind.
+   - Title: follow the user prompt's \`## PR Title\` section. When it gives a title, use that string verbatim — it is this branch's own commit subject, with any ticket reference already bracketed on. Otherwise compose one, concise and under 70 characters, that says what **this PR** changes, read from this repository's diff and commits (e.g. \`Add cursor pagination to the user search endpoint\`). The workspace name and the README's \`# Task:\` heading name the whole task, not this PR — never use either as the title. Do not append the repository name; the PR list already says which repository it is. Every title has one shape: \`[<ticket>] <title>\` when the task has a ticket, \`<title>\` alone when it does not — nothing goes before the bracket, and the ticket is not restated in another form (\`ABC-123:\`, \`(ABC-123)\`, a trailing \`#42\`).
    - If a PR Template is provided in the user prompt, fill in each section of the template with the relevant change information. Do NOT search for a template file.
    - If no PR Template is provided, use the default body given in **PR Description: An Overview, Not a Walkthrough** below — \`## Summary\` plus \`## Related Resources\`, and nothing else
    - Do NOT include a list of changed files unless the PR Template explicitly requires it — reviewers can see the diff directly
@@ -142,13 +142,19 @@ ${worktreeCdRules({
 - For existing PRs: never change the draft/ready state — leave it as the user set it
 - Follow repository's PR template exactly if one exists
 - With no PR Template, the body is \`## Summary\` + \`## Related Resources\` and nothing else
-- A title given in \`## PR Title\` is used verbatim; otherwise compose one (under 70 characters) describing this PR's diff, not the task
+- A title given in \`## PR Title\` is used verbatim; otherwise compose one (under 70 characters) describing this PR's diff, not the task; either way the shape is \`[<ticket>] <title>\`, or \`<title>\` with no ticket
 - Cover the whole branch, not just the latest commit — as one description of the result, never a per-commit list
 - Always include full ticket URLs (not just IDs)
 - Keep the body to the overview described in **PR Description: An Overview, Not a Walkthrough** above — a few sentences, not an account of the implementation
 - Never refer a reader to the workspace — no \`artifacts/\`, no TODO file, no workspace README, no local path. State the substance in a sentence or leave it out
 `;
 }
+
+const TITLE_EXAMPLES = [
+  "Add cursor pagination to the user search endpoint",
+  "Fix duplicate charge when a payment retry times out",
+  "Remove the legacy v1 export job",
+];
 
 export function buildPRCreatorPrompt(input: PRCreatorInput): string {
   const existingPRSection = input.existingPR
@@ -178,11 +184,16 @@ ${input.prTemplate}
   const siblings = input.sameRepoSiblings?.length
     ? input.sameRepoSiblings.map((name) => `\`${name}\``).join(", ")
     : null;
+  const titlePrefix = input.ticketRef ? `[${input.ticketRef}] ` : "";
   const composeNote = [
     "Compose the title from this repository's diff: what this PR changes, not the task or workspace name.",
     input.ticketRef && `Open it with \`[${input.ticketRef}] \`.`,
     siblings && `Other worktrees of this repository (${siblings}) open their own PRs in the same repository, so name the part of the change this diff delivers, which theirs do not.`,
-  ].filter(Boolean).join(" ");
+  ].filter(Boolean).join(" ") + `
+
+Titles in this shape (examples of the form only, not of your change):
+
+${TITLE_EXAMPLES.map((example) => `- \`${titlePrefix}${example}\``).join("\n")}`;
   const titleSection = input.existingPR
     ? ""
     : `## PR Title

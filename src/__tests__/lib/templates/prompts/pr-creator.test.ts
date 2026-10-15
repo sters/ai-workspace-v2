@@ -65,6 +65,12 @@ describe("getPRCreatorSystemPrompt", () => {
   });
 });
 
+const titleSectionOf = (prompt: string) => {
+  const start = prompt.indexOf("## PR Title");
+  const end = prompt.indexOf("\n## ", start + 1);
+  return prompt.slice(start, end === -1 ? undefined : end);
+};
+
 describe("buildPRCreatorPrompt", () => {
   it("omits the review-thread section when there is no record", () => {
     const prompt = buildPRCreatorPrompt(baseInput);
@@ -87,6 +93,22 @@ describe("buildPRCreatorPrompt", () => {
   it("has a composed title open with the ticket", () => {
     const prompt = buildPRCreatorPrompt({ ...baseInput, ticketRef: "ABC-123" });
     expect(prompt).toContain("`[ABC-123] `");
+  });
+
+  // The examples are what the agent copies the shape from, so they carry the
+  // workspace's own ticket rather than a placeholder it might copy literally.
+  it("shows example titles in the `[ticket] title` shape with this task's ticket", () => {
+    const section = titleSectionOf(buildPRCreatorPrompt({ ...baseInput, ticketRef: "ABC-123" }));
+    const examples = section.match(/^- `.*`$/gm) ?? [];
+    expect(examples.length).toBeGreaterThanOrEqual(2);
+    for (const example of examples) expect(example).toMatch(/^- `\[ABC-123\] [A-Z]/);
+  });
+
+  it("shows example titles without a bracket when there is no ticket", () => {
+    const section = titleSectionOf(buildPRCreatorPrompt(baseInput));
+    const examples = section.match(/^- `.*`$/gm) ?? [];
+    expect(examples.length).toBeGreaterThanOrEqual(2);
+    for (const example of examples) expect(example).not.toContain("[");
   });
 
   it("asks a composed title to tell itself apart from sibling worktrees' PRs", () => {
