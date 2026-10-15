@@ -127,76 +127,47 @@ describe("buildCreatePrPipeline", () => {
     expect(input.prReviewThreads).toBeUndefined();
   });
 
-  // The README's `# Task:` heading is the one title the whole workspace shares,
-  // so every repo's PR gets the identical string — the children are independent
-  // and would otherwise each paraphrase their own diff.
-  it("gives every repo the README task title verbatim", async () => {
+  // The task heading names the workspace's goal, not what one repository's PR
+  // changes, so it never becomes a PR title.
+  it("does not hand the README task title to the PR as its title", async () => {
     mockListWorkspaceRepos.mockReturnValue([
-      {
-        repoName: "api",
-        repoPath: "/repos/api",
-        worktreePath: "/repos/api/worktrees/ws",
-      },
-      {
-        repoName: "web",
-        repoPath: "/repos/web",
-        worktreePath: "/repos/web/worktrees/ws",
-      },
+      { repoName: "api", repoPath: "/repos/api", worktreePath: "/repos/api/worktrees/ws" },
+      { repoName: "web", repoPath: "/repos/web", worktreePath: "/repos/web/worktrees/ws" },
     ] as ReturnType<typeof listWorkspaceRepos>);
 
     await buildCreatePrPipeline({ workspace: "ws", draft: true });
 
-    const titles = mockBuildPrompt.mock.calls.map((c) => c[0].sharedTitle);
-    expect(titles).toEqual([
-      "Add pagination to user search API",
-      "Add pagination to user search API",
-    ]);
+    expect(mockBuildPrompt.mock.calls.map((c) => c[0].givenTitle)).toEqual([undefined, undefined]);
   });
 
-  // Reachable through a hand-edited README or `init --only`, where nothing ever
-  // rewrote the heading. Mandating "TBD" as a PR title is worse than composing one.
-  it.each(["TBD", "Untitled", "  ", "Task: TBD"])(
-    "falls back to a composed title when the heading is still %j",
-    async (title) => {
-      mockParseReadmeMeta.mockReturnValue(meta(title));
-
-      await buildCreatePrPipeline({ workspace: "ws", draft: true });
-
-      expect(mockBuildPrompt.mock.calls[0][0].sharedTitle).toBeUndefined();
-    },
-  );
-
-  // The ticket is in the README and the same for every repo, so bracketing it on
-  // here is what stops it being a per-run decision inside each child.
-  it("brackets the workspace ticket onto the mandated title", async () => {
+  it("uses each branch's sole commit subject, ticket bracketed on", async () => {
     mockParseReadmeMeta.mockReturnValue(meta("Add pagination to user search API", "ABC-123"));
-
-    await buildCreatePrPipeline({ workspace: "ws", draft: true });
-
-    expect(mockBuildPrompt.mock.calls[0][0].sharedTitle).toBe(
-      "[ABC-123] Add pagination to user search API",
-    );
-  });
-
-  // With no task title to align the repos, a branch holding one commit already
-  // has a description of its whole change — composing a second one is where the
-  // wording drifted between runs.
-  it("uses the branch's sole commit subject when the heading is a placeholder", async () => {
-    mockParseReadmeMeta.mockReturnValue(meta("TBD", "ABC-123"));
     mockSoleCommit.mockReturnValueOnce("Tweak the search query");
 
     await buildCreatePrPipeline({ workspace: "ws", draft: true });
 
     expect(mockSoleCommit).toHaveBeenCalledWith("/repos/my-repo/worktrees/ws", "main");
-    expect(mockBuildPrompt.mock.calls[0][0].sharedTitle).toBe("[ABC-123] Tweak the search query");
+    expect(mockBuildPrompt.mock.calls[0][0].givenTitle).toBe("[ABC-123] Tweak the search query");
   });
 
-  // The commit read is a git call per repo, and a resolved task title outranks
-  // whatever it would return.
-  it("does not read the commits when the task title already decides the title", async () => {
+  // The agent composes the title then, and the ticket shape check stays here
+  // rather than being re-decided by every child.
+  it("passes the validated ticket for a composed title", async () => {
+    mockParseReadmeMeta.mockReturnValue(meta("Add pagination", "ABC-123."));
+
     await buildCreatePrPipeline({ workspace: "ws", draft: true });
 
-    expect(mockSoleCommit).not.toHaveBeenCalled();
+    const input = mockBuildPrompt.mock.calls[0][0];
+    expect(input.givenTitle).toBeUndefined();
+    expect(input.ticketRef).toBe("ABC-123");
+  });
+
+  it("passes no ticket when the field is not shaped like an ID", async () => {
+    mockParseReadmeMeta.mockReturnValue(meta("Add pagination", "N/A"));
+
+    await buildCreatePrPipeline({ workspace: "ws", draft: true });
+
+    expect(mockBuildPrompt.mock.calls[0][0].ticketRef).toBeUndefined();
   });
 
   // Worktrees of one clone open PRs in one repository, where an identical title
@@ -222,7 +193,7 @@ describe("buildCreatePrPipeline", () => {
 
   // An existing PR's title is the user's to keep; the update path only retitles
   // when scope shifted, so it must not receive a mandated title at all.
-  it("withholds the shared title from a repo that already has a PR", async () => {
+  it("withholds the given title from a repo that already has a PR", async () => {
     mockCheckExistingPR.mockReturnValue({
       exists: true,
       url: "https://example.com/pull/1",
@@ -230,8 +201,10 @@ describe("buildCreatePrPipeline", () => {
       body: "body",
     } as ReturnType<typeof checkExistingPR>);
 
+    mockSoleCommit.mockReturnValueOnce("Tweak the search query");
+
     await buildCreatePrPipeline({ workspace: "ws", draft: true });
 
-    expect(mockBuildPrompt.mock.calls[0][0].sharedTitle).toBeUndefined();
+    expect(mockBuildPrompt.mock.calls[0][0].givenTitle).toBeUndefined();
   });
 });

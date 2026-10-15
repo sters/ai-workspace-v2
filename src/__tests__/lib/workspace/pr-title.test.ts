@@ -3,25 +3,27 @@ import {
   applyTicketPrefix,
   getSoleCommitSubject,
   resolvePrTitle,
-  resolveTaskTitle,
+  resolveTicketRef,
   type GitExec,
 } from "@/lib/workspace/pr-title";
 
 const git = (out: string, ok = true): GitExec => vi.fn(async () => ({ ok, out }));
 
-describe("resolveTaskTitle", () => {
-  it("takes the README heading as written", async () => {
-    expect(resolveTaskTitle("Add pagination to user search API")).toBe(
-      "Add pagination to user search API",
-    );
+describe("resolveTicketRef", () => {
+  it.each(["ABC-123", "#42", "acme/web#42"])("accepts the ticket %p", (id) => {
+    expect(resolveTicketRef(id)).toBe(id);
   });
 
-  // A README `init-readme` never rewrote still carries the template's `TBD`, and
-  // `parseReadmeMeta` reports a missing heading as `Untitled`. Mandating either
-  // would put it on every PR of the task.
-  it.each(["TBD", "tbd", "Untitled", "  ", ""])("rejects the placeholder %p", (title) => {
-    expect(resolveTaskTitle(title)).toBeNull();
+  it("drops trailing punctuation", () => {
+    expect(resolveTicketRef("ABC-123,")).toBe("ABC-123");
   });
+
+  it.each(["", undefined, "N/A", "https://acme.atlassian.net/browse/ABC-123"])(
+    "rejects %p",
+    (id) => {
+      expect(resolveTicketRef(id)).toBeNull();
+    },
+  );
 });
 
 describe("applyTicketPrefix", () => {
@@ -96,30 +98,13 @@ describe("getSoleCommitSubject", () => {
 });
 
 describe("resolvePrTitle", () => {
-  it("prefers the task title over the branch's sole commit", async () => {
+  it("takes the branch's sole commit subject, ticket bracketed on", async () => {
     expect(
-      resolvePrTitle({
-        taskTitle: "Add pagination to user search API",
-        ticketId: "ABC-123",
-        soleCommitSubject: "Tweak the search query",
-      }),
-    ).toBe("[ABC-123] Add pagination to user search API");
-  });
-
-  // The task title is what makes sibling PRs match, so the commit subject is
-  // only reached when there is none — and then each repo's title is its own.
-  it("falls back to the sole commit subject", async () => {
-    expect(
-      resolvePrTitle({
-        taskTitle: null,
-        ticketId: "ABC-123",
-        soleCommitSubject: "Tweak the search query",
-      }),
+      resolvePrTitle({ ticketId: "ABC-123", soleCommitSubject: "Tweak the search query" }),
     ).toBe("[ABC-123] Tweak the search query");
   });
 
-  it("yields null when neither is available", async () => {
-    expect(resolvePrTitle({ taskTitle: null, ticketId: "ABC-123", soleCommitSubject: null }))
-      .toBeNull();
+  it("yields null without a sole commit, leaving the agent to compose from the diff", async () => {
+    expect(resolvePrTitle({ ticketId: "ABC-123", soleCommitSubject: null })).toBeNull();
   });
 });

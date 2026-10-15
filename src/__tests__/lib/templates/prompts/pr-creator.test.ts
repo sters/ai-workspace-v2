@@ -71,34 +71,35 @@ describe("buildPRCreatorPrompt", () => {
     expect(prompt).not.toContain(PR_REVIEW_THREADS_HEADING);
   });
 
-  it("omits the title section when no shared title was resolved", () => {
+  it("asks for a title composed from this PR's diff when none is given", () => {
     const prompt = buildPRCreatorPrompt(baseInput);
-    expect(prompt).not.toContain("## PR Title");
-  });
-
-  it("renders the shared title as the mandated title", () => {
-    const prompt = buildPRCreatorPrompt({
-      ...baseInput,
-      sharedTitle: "Add pagination to user search API",
-    });
     expect(prompt).toContain("## PR Title");
-    expect(prompt).toContain("Add pagination to user search API");
+    expect(prompt).not.toContain("verbatim");
   });
 
-  it("asks for a distinguishing qualifier when other worktrees share the repository", () => {
-    const prompt = buildPRCreatorPrompt({
-      ...baseInput,
-      sharedTitle: "Add pagination to user search API",
-      sameRepoSiblings: ["my-repo___admin"],
-    });
+  it("renders the given title as the mandated title", () => {
+    const prompt = buildPRCreatorPrompt({ ...baseInput, givenTitle: "Tweak the search query" });
     expect(prompt).toContain("## PR Title");
-    expect(prompt).toContain("my-repo___admin");
-    expect(prompt).toContain("Add pagination to user search API — <");
+    expect(prompt).toContain("Tweak the search query");
+    expect(prompt).toContain("verbatim");
   });
 
-  it("asks for a distinguishing title from siblings even with no shared title", () => {
+  it("has a composed title open with the ticket", () => {
+    const prompt = buildPRCreatorPrompt({ ...baseInput, ticketRef: "ABC-123" });
+    expect(prompt).toContain("`[ABC-123] `");
+  });
+
+  it("asks a composed title to tell itself apart from sibling worktrees' PRs", () => {
     const prompt = buildPRCreatorPrompt({ ...baseInput, sameRepoSiblings: ["my-repo___admin"] });
     expect(prompt).toContain("my-repo___admin");
+  });
+
+  it("has no title section when updating an existing PR", () => {
+    const prompt = buildPRCreatorPrompt({
+      ...baseInput,
+      existingPR: { url: "u", title: "t", body: "b" },
+    });
+    expect(prompt).not.toContain("## PR Title");
   });
 
   it("says nothing about siblings when updating an existing PR", () => {

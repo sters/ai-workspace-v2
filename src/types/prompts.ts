@@ -230,11 +230,12 @@ export interface PRCreatorInput extends RepoPromptInput {
     body: string;
   };
   /**
-   * Title every repo of this workspace must use verbatim, from the README's
-   * `# Task:` heading. Only set for a new PR: the update path leaves an existing
-   * title alone, and an unfilled heading (`TBD`) is worse than a composed title.
+   * Title a new PR must use verbatim: the branch's sole commit subject, ticket
+   * bracketed on. Unset, the agent composes one from this repository's diff.
    */
-  sharedTitle?: string;
+  givenTitle?: string;
+  /** Ticket reference a composed title of a new PR opens with, as `[ticketRef] `. */
+  ticketRef?: string;
   /**
    * Worktree names of the other worktrees of this repository's clone in the
    * workspace (`repo:alias`). Their PRs land in the same repository, so a new

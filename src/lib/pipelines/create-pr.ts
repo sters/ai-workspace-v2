@@ -12,7 +12,7 @@ import {
 import {
   getSoleCommitSubject,
   resolvePrTitle,
-  resolveTaskTitle,
+  resolveTicketRef,
 } from "@/lib/workspace/pr-title";
 import { getWorkspaceDir } from "@/lib/config";
 import { buildPRCreatorPrompt } from "@/lib/templates";
@@ -36,7 +36,7 @@ export async function buildCreatePrPipeline(input: {
   const repos = selectRepos(allRepos, { repository, repositories: input.repositories });
 
   const wsPath = path.join(getWorkspaceDir(), workspace);
-  const taskTitle = resolveTaskTitle(meta.title);
+  const ticketRef = resolveTicketRef(meta.ticketId);
   // Read from every worktree, not the selection: a run narrowed to one worktree
   // still opens its PR next to the siblings' PRs.
   const cloneOf = (repo: WorkspaceRepo) => repo.repoPath.split("___")[0];
@@ -60,15 +60,12 @@ export async function buildCreatePrPipeline(input: {
     ]);
     const prTemplate = await readPRTemplate(repo.worktreePath);
 
-    // Per-repo, and only reached without a task title: a sole commit's subject
-    // describes that repo's whole change, but it cannot align the siblings.
-    const title = resolvePrTitle({
-      taskTitle,
-      ticketId: meta.ticketId,
-      soleCommitSubject: taskTitle
-        ? null
-        : await getSoleCommitSubject(repo.worktreePath, baseBranch),
-    });
+    const title = existingPR.exists
+      ? null
+      : resolvePrTitle({
+        ticketId: meta.ticketId,
+        soleCommitSubject: await getSoleCommitSubject(repo.worktreePath, baseBranch),
+      });
 
     // Review threads an earlier PR-review triage turned into TODO items. This is
     // the phase that pushes, so it is the first point at which a reply can name a
@@ -92,9 +89,10 @@ export async function buildCreatePrPipeline(input: {
       existingPR: existingPR.exists
         ? { url: existingPR.url!, title: existingPR.title!, body: existingPR.body! }
         : undefined,
-      // Only a new PR gets the mandated title: the update path retitles only when
-      // scope shifted, and the existing title may be the user's own wording.
-      ...(!existingPR.exists && title && { sharedTitle: title }),
+      // Only a new PR gets a title: the update path retitles only when scope
+      // shifted, and the existing title may be the user's own wording.
+      ...(title && { givenTitle: title }),
+      ...(!existingPR.exists && ticketRef && { ticketRef }),
       ...(!existingPR.exists && { sameRepoSiblings: sameRepoSiblings(repo) }),
       ...(prReviewThreads && { prReviewThreads, todoFilePath }),
     });

@@ -32,8 +32,7 @@ Before pushing or creating a PR, **always check for uncommitted changes** — th
 ### If Creating a New PR
 
 1. **Compose PR Content**:
-   - Title: if the user prompt has a \`## PR Title\` section, **use that string verbatim** as the title. It was derived for this task before you ran: normally it is the workspace's task title, which every repository of this task is given, so a reviewer looking at several PRs sees one task rather than several — and any ticket reference it needs is already bracketed onto it. Do not rephrase it, shorten it, add a ticket ID, or retune it to your repository's diff, and do not append the repository name — the PR list already says which repository it is. The allowed additions are a prefix your repository's own convention requires, and the qualifier the \`## PR Title\` section asks for when sibling worktrees open PRs in the same repository; the given string between them stays verbatim.
-   - Only when no \`## PR Title\` section is given: compose one yourself, concise and under 70 characters
+   - Title: follow the user prompt's \`## PR Title\` section. When it gives a title, use that string verbatim — it is this branch's own commit subject, with any ticket reference already bracketed on. Otherwise compose one, concise and under 70 characters, that says what **this PR** changes, read from this repository's diff and commits (e.g. \`Add cursor pagination to the user search endpoint\`). The workspace name and the README's \`# Task:\` heading name the whole task, not this PR — never use either as the title. Do not append the repository name; the PR list already says which repository it is. A prefix your repository's own convention requires may precede either kind.
    - If a PR Template is provided in the user prompt, fill in each section of the template with the relevant change information. Do NOT search for a template file.
    - If no PR Template is provided, use the default body given in **PR Description: An Overview, Not a Walkthrough** below — \`## Summary\` plus \`## Related Resources\`, and nothing else
    - Do NOT include a list of changed files unless the PR Template explicitly requires it — reviewers can see the diff directly
@@ -143,7 +142,7 @@ ${worktreeCdRules({
 - For existing PRs: never change the draft/ready state — leave it as the user set it
 - Follow repository's PR template exactly if one exists
 - With no PR Template, the body is \`## Summary\` + \`## Related Resources\` and nothing else
-- A given \`## PR Title\` is the title; only compose one (concise, under 70 characters) when none is given
+- A title given in \`## PR Title\` is used verbatim; otherwise compose one (under 70 characters) describing this PR's diff, not the task
 - Cover the whole branch, not just the latest commit — as one description of the result, never a per-commit list
 - Always include full ticket URLs (not just IDs)
 - Keep the body to the overview described in **PR Description: An Overview, Not a Walkthrough** above — a few sentences, not an account of the implementation
@@ -176,22 +175,20 @@ ${input.prTemplate}
 `
       : "";
 
-  const siblings = !input.existingPR && input.sameRepoSiblings?.length
+  const siblings = input.sameRepoSiblings?.length
     ? input.sameRepoSiblings.map((name) => `\`${name}\``).join(", ")
     : null;
-  const siblingNote = siblings
-    ? input.sharedTitle
-      ? `
-Other worktrees of this repository (${siblings}) open their own PRs for this task in the same repository, so this title alone would be identical across them. Write the title as \`${input.sharedTitle} — <what this PR covers>\`: the given string verbatim, then a few words naming the part of the task this worktree's diff delivers (e.g. "admin UI", "backend validation"), which the sibling PRs do not.
-`
-      : `
-Other worktrees of this repository (${siblings}) open their own PRs for this task in the same repository. Compose a title that names the part of the task this diff delivers, so it is told apart from theirs in the PR list.
-`
-    : "";
-  const titleSection = input.sharedTitle || siblingNote
-    ? `## PR Title
-${input.sharedTitle ? `\n${input.sharedTitle}\n` : ""}${siblingNote}`
-    : "";
+  const composeNote = [
+    "Compose the title from this repository's diff: what this PR changes, not the task or workspace name.",
+    input.ticketRef && `Open it with \`[${input.ticketRef}] \`.`,
+    siblings && `Other worktrees of this repository (${siblings}) open their own PRs in the same repository, so name the part of the change this diff delivers, which theirs do not.`,
+  ].filter(Boolean).join(" ");
+  const titleSection = input.existingPR
+    ? ""
+    : `## PR Title
+
+${input.givenTitle ? `Use verbatim:\n\n${input.givenTitle}` : composeNote}
+`;
 
   const reviewThreadsSection = input.prReviewThreads
     ? `## ${PR_REVIEW_THREADS_HEADING}

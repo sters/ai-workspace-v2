@@ -1,14 +1,11 @@
 /**
- * The title a new pull request carries.
+ * The parts of a new pull request's title that have one right answer.
  *
- * The `create-pr` children run in parallel and each sees only its own
- * repository's diff, so nothing inside them can align the sibling PRs of one
- * task — the title has to be decided here and handed to every child verbatim.
- *
- * Each rule below has one right answer, which is why this is TypeScript rather
- * than another paragraph of the agent's prompt: an instruction to go and read
- * the ticket ID, or to count the branch's commits, is followed on some runs and
- * not on others, and that is the variance this exists to remove.
+ * A title describes what that PR changes, so it is composed per repository from
+ * its own diff — never taken from the workspace's task heading, which names the
+ * task rather than any one PR. What is derived here is only what an agent would
+ * get right on some runs and not on others: the ticket reference, and the case
+ * where the branch's single commit already states the change.
  *
  * The one git read goes through an injected seam (`GitExec`) so the rules are
  * unit-testable without a repository.
@@ -18,22 +15,6 @@ import { runGit, type GitExec } from "./git-exec";
 
 export type { GitExec };
 
-
-/** Headings that mean nobody wrote one — the template's own, and `parseReadmeMeta`'s absence marker. */
-const PLACEHOLDER_TITLE = /^(TBD|Untitled)$/i;
-
-/**
- * The workspace's task title, or `null` when the README has none worth using.
- *
- * Placeholders are rejected rather than mandated: a README that `init-readme`
- * never rewrote (hand-edited, or `init --only`) still carries the template's
- * `TBD`, and `parseReadmeMeta` reports a missing heading as `Untitled`.
- */
-export function resolveTaskTitle(title: string): string | null {
-  const trimmed = title.trim().replace(/^Task:\s*/i, "").trim();
-  if (!trimmed || PLACEHOLDER_TITLE.test(trimmed)) return null;
-  return trimmed;
-}
 
 /**
  * Ticket references that may be bracketed onto a title. `**Ticket ID**:` is read
@@ -47,10 +28,17 @@ const TICKET_ID_SHAPES = [
   /^[\w.-]+\/[\w.-]+#\d+$/, // GitHub cross-repo: acme/web#42
 ];
 
+/** The README's `**Ticket ID**` when it is shaped like one, or `null`. */
+export function resolveTicketRef(ticketId: string | undefined): string | null {
+  const id = (ticketId ?? "").trim().replace(/[.,;:]+$/, "");
+  if (!id || !TICKET_ID_SHAPES.some((shape) => shape.test(id))) return null;
+  return id;
+}
+
 /** `Summary` → `[ABC-123] Summary`, when there is a ticket and the title does not already name it. */
 export function applyTicketPrefix(title: string, ticketId: string | undefined): string {
-  const id = (ticketId ?? "").trim().replace(/[.,;:]+$/, "");
-  if (!id || !TICKET_ID_SHAPES.some((shape) => shape.test(id))) return title;
+  const id = resolveTicketRef(ticketId);
+  if (!id) return title;
   if (title.toLowerCase().includes(id.toLowerCase())) return title;
   return `[${id}] ${title}`;
 }
@@ -78,19 +66,11 @@ export async function getSoleCommitSubject(
   return CHECKPOINT_SUBJECT.test(subject) ? null : subject;
 }
 
-/**
- * The title to mandate, or `null` to leave the agent composing one.
- *
- * The task title comes first because it is the only candidate that is the same
- * for every repository of the task; a sole commit subject is per-repo, so it is
- * reached only where there is no task title to align them anyway.
- */
+/** The title to mandate, or `null` to have the agent compose one from the diff. */
 export function resolvePrTitle(input: {
-  taskTitle: string | null;
   ticketId: string | undefined;
   soleCommitSubject: string | null;
 }): string | null {
-  const base = input.taskTitle ?? input.soleCommitSubject;
-  if (!base) return null;
-  return applyTicketPrefix(base, input.ticketId);
+  if (!input.soleCommitSubject) return null;
+  return applyTicketPrefix(input.soleCommitSubject, input.ticketId);
 }
