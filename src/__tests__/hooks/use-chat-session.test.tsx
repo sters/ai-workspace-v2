@@ -113,10 +113,41 @@ describe("useChatSession task", () => {
     await waitFor(() => expect(onHandoffDelivered).toHaveBeenCalledTimes(1));
   });
 
-  it("stays idle with neither a task nor a saved session", async () => {
+  it("stays idle with neither a task, a saved session nor a live one", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [] })));
     renderHook(() => useChatSession("ws"));
 
     await new Promise<void>((r) => setTimeout(r, 20));
+    expect(sockets).toHaveLength(0);
+  });
+
+  // A session the server started on its own (quick create) is saved in no
+  // browser, and the user who asked for it may have been elsewhere since.
+  it("attaches on mount to the workspace's live session when none is saved", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ({
+      ok: true,
+      json: async () => [
+        { id: "chat-9", workspaceId: "ws", startedAt: 9 },
+        { id: "chat-10", workspaceId: "other", startedAt: 10 },
+      ],
+    })));
+    renderHook(() => useChatSession("ws"));
+
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+    expect(sockets[0].firstFrame()).toMatchObject({ type: "resume", sessionId: "chat-9" });
+  });
+
+  it("does not attach once unmounted while the live list was being read", async () => {
+    let answer: (sessions: unknown[]) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => {
+      answer = (sessions) => resolve({ ok: true, json: async () => sessions });
+    })));
+    const { unmount } = renderHook(() => useChatSession("ws"));
+
+    unmount();
+    answer([{ id: "chat-9", workspaceId: "ws", startedAt: 9 }]);
+    await new Promise<void>((r) => setTimeout(r, 20));
+
     expect(sockets).toHaveLength(0);
   });
 
@@ -239,6 +270,9 @@ describe("useChatSession openSession", () => {
   it("opens once however many times it is called while opening", async () => {
     const fetchMock = stubLiveSessions([]);
     const { result } = renderHook(() => useChatSession("ws"));
+    // Mount reads the live list once on its own.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    fetchMock.mockClear();
 
     await act(() =>
       Promise.all([result.current.openSession(), result.current.openSession(), result.current.openSession()]),

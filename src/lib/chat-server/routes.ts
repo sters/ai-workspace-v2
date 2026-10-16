@@ -1,6 +1,15 @@
 import type { ChatSessionInfo } from "@/types/chat";
 import { isSessionBusy } from "./activity";
 import { getStore, persistSessionDeleted } from "./store";
+import { refuseStart, spawnSession } from "./handlers";
+import { sessionStartRequestSchema } from "../runtime-schemas";
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
 
 export function handleHealthCheck(): Response {
   return new Response("ok");
@@ -29,6 +38,19 @@ export async function handleSessionKill(req: Request): Promise<Response> {
   return new Response(JSON.stringify({ ok: true }), {
     headers: { "Content-Type": "application/json" },
   });
+}
+
+export async function handleSessionStart(req: Request): Promise<Response> {
+  const parsed = sessionStartRequestSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return json({ error: "workspaceId is required" }, 400);
+  const msg = { type: "start" as const, ...parsed.data };
+
+  const refusal = await refuseStart(msg);
+  if (refusal) return json({ error: refusal }, 409);
+
+  const outcome = await spawnSession(msg, null);
+  if (!outcome.ok) return json({ error: outcome.error }, 500);
+  return json({ sessionId: outcome.sessionId });
 }
 
 export function handleSessionsList(): Response {

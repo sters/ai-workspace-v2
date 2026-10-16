@@ -42,7 +42,7 @@ import { getCleanEnv } from "@/lib/env";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
 import type { CrossRepositoryReviewerInput } from "@/types/prompts";
-import { getTimeoutDefaults } from "@/lib/pipeline-manager";
+import { getTimeoutDefaults, startOperationPipeline } from "@/lib/pipeline-manager";
 
 export interface ReviewPipelineInput {
   workspace: string;
@@ -587,4 +587,24 @@ async function checkPreExisting(
     // If anything goes wrong, treat as regression to be safe
     return "FAIL";
   }
+}
+
+/**
+ * Start a review a human asked for. It verifies the comments already on the
+ * PR alongside the code; an autonomous cycle's review does not, since its asks
+ * come from its own gate. Throws `ConcurrencyLimitError` when no slot is free.
+ */
+export async function startUserReview(
+  workspace: string,
+  options: { repository?: string; refreshFromRemote?: boolean } = {},
+) {
+  const phases = await buildReviewPipeline({
+    workspace,
+    repository: options.repository,
+    carryPostedFindings: true,
+    refreshFromRemote: options.refreshFromRemote,
+  });
+  return startOperationPipeline("review", workspace, phases, undefined,
+    options.refreshFromRemote ? { refreshFromRemote: "true" } : undefined,
+  );
 }

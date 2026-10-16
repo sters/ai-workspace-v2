@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/shared/buttons";
@@ -18,6 +18,7 @@ import {
   workspaceDirName,
 } from "@/lib/naming";
 import type { SetupRepositoryResult } from "@/types/pipeline";
+import type { QuickCreateStart } from "@/types/workspace";
 
 /** The default first, since it is also the dropdown's initial value. */
 const TASK_TYPES = ["feature", "bugfix", "research", "review"] as const;
@@ -29,6 +30,8 @@ interface QuickCreateResponse {
   pullRequests: { url: string; repoPath: string; headBranch: string }[];
   problems: { repository: string; error: string }[];
   log: string[];
+  /** Started by the server, so it runs whether or not this form is still open. */
+  start: QuickCreateStart;
 }
 
 /** Repository paths or PR URLs as typed: whitespace- or comma-separated. */
@@ -37,10 +40,11 @@ function parseExtraRepositories(raw: string): string[] {
 }
 
 /**
- * Hand the note to the chat as its task. It travels as a chat handoff rather
- * than in the URL, so its length is not capped by a query string, and the chat
- * page clears it once a session has it — a reload then resumes that session
- * rather than starting the work again.
+ * Hand the note to the chat as its task, for the chat started by hand when the
+ * server's start did not happen. It travels as a chat handoff rather than in
+ * the URL, so its length is not capped by a query string, and the chat page
+ * clears it once a session has it — a reload then resumes that session rather
+ * than starting the work again.
  */
 function handOverToChat(workspace: string, task: string): string {
   if (task) stashChatHandoff(workspace, { task });
@@ -60,18 +64,28 @@ export function QuickCreateForm() {
   const [extra, setExtra] = useState("");
   const [note, setNote] = useState("");
   /**
-   * A workspace whose repositories did not all set up, or whose review did not
-   * start, with the note as it read when it was sent: the textarea stays
-   * editable afterwards, and the chat link must carry the request the README
-   * was written from. A clean create never renders this — it is already on its
-   * way to the chat or the review.
+   * A workspace whose repositories did not all set up, or whose chat or review
+   * did not start, with the note as it read when it was sent: the textarea
+   * stays editable afterwards, and the chat link must carry the request the
+   * README was written from. A clean create never renders this — it is already
+   * on its way to the chat or the review.
    */
   const [created, setCreated] = useState<{
     response: QuickCreateResponse;
     task: string;
-    /** Set when the workspace exists but its review did not start. */
-    reviewError?: string;
   } | null>(null);
+  /**
+   * Whether the user is still here when the create returns. The server has
+   * already started what follows, so a user who left loses nothing by not
+   * being pulled back to it.
+   */
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const [failure, setFailure] = useState<string | null>(null);
   /**
    * `sent` is terminal, and it is what stops a second workspace being created.
@@ -159,31 +173,17 @@ export function QuickCreateForm() {
     }
 
     setStatus("sent");
-    const task = note.trim();
+    if (!mounted.current) return;
+    const { workspace, problems, start } = response.data;
     // A repository that failed is the one thing worth reading first, so that
-    // case reports instead of navigating.
-    if (response.data.problems.length > 0) {
-      setCreated({ response: response.data, task });
+    // case reports instead of navigating — and the server started nothing.
+    if (problems.length > 0 || start.kind === "failed") {
+      setCreated({ response: response.data, task: note.trim() });
       return;
     }
-
-    // A review workspace whose PR is checked out has something to review, and
-    // a review operation — not a chat — is what posts findings onto the PR.
-    // Without a PR the worktree is a fresh branch with an empty diff.
-    if (taskType === "review" && response.data.pullRequests.length > 0) {
-      const review = await postJson<{ id: string }>("/api/operations/review", {
-        workspace: response.data.workspace,
-      }).catch((err: unknown) => ({ ok: false as const, error: String(err) }));
-      if (review.ok) {
-        router.push(operationHref(response.data.workspace, review.data.id));
-      } else {
-        setCreated({ response: response.data, task, reviewError: review.error });
-      }
-      return;
-    }
-
-    // Otherwise the chat is the point of this path, so it starts on its own.
-    router.push(handOverToChat(response.data.workspace, task));
+    router.push(
+      start.kind === "review" ? operationHref(workspace, start.operationId) : chatPagePath(workspace),
+    );
   };
 
   return (
@@ -334,10 +334,10 @@ export function QuickCreateForm() {
           role="alert"
           className="space-y-2 rounded-md bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
         >
-          {created.reviewError ? (
+          {created.response.start.kind === "failed" ? (
             <p>
               Workspace <code className="font-mono">{created.response.workspace}</code> was created,
-              but its review could not start: {created.reviewError}
+              but its {created.response.start.what} could not start: {created.response.start.error}
             </p>
           ) : (
             <>

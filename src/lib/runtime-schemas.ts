@@ -145,6 +145,15 @@ const wsResumeSchema = z.object({
   rows: z.number().optional(),
 });
 
+/**
+ * The chat server's `POST /sessions/start`: a session started with no browser
+ * attached, which one resumes later. Only a task opening is offered there.
+ */
+export const sessionStartRequestSchema = z.object({
+  workspaceId: z.string().min(1),
+  task: z.string().optional(),
+});
+
 export const clientMessageSchema = z.discriminatedUnion("type", [
   wsStartSchema,
   wsInputSchema,

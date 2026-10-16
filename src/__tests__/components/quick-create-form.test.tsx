@@ -41,6 +41,7 @@ function ok(overrides: Record<string, unknown> = {}) {
       pullRequests: [],
       problems: [],
       log: [],
+      start: { kind: "chat", sessionId: "chat-1" },
       ...overrides,
     },
   };
@@ -65,9 +66,10 @@ function chooseType(value: string) {
 }
 
 /** A create whose PR entry became a worktree. */
-function okWithPr() {
+function okWithPr(start: Record<string, unknown> = { kind: "review", operationId: "op-1" }) {
   return ok({
     pullRequests: [{ url: PR_URL, repoPath: WEB.repoPath, headBranch: "feature/widget" }],
+    start,
   });
 }
 
@@ -183,7 +185,7 @@ describe("QuickCreateForm", () => {
     ]);
   });
 
-  it("opens a chat on the new workspace and hands it the note as its task", async () => {
+  it("follows the server into the chat it started on the note", async () => {
     render(<QuickCreateForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
@@ -193,14 +195,13 @@ describe("QuickCreateForm", () => {
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith("/workspace/bugfix-login-crash-20260911/chat/interactive"),
     );
-    // The note travels out of the URL, whole, so its length is not capped by
-    // a query string and a reload does not re-send it.
-    expect(peekChatHandoff("bugfix-login-crash-20260911")).toEqual({
-      task: "fix the login crash\nthe refresh path 500s",
-    });
+    expect(mockPostJson.mock.calls[0][1].note).toBe("fix the login crash\nthe refresh path 500s");
+    // The server already started the session; a handoff would start a second.
+    expect(peekChatHandoff("bugfix-login-crash-20260911")).toBeNull();
   });
 
-  it("opens the chat with no task when only a name was given", async () => {
+  it("opens the chat when nothing was started, as when only a name was given", async () => {
+    mockPostJson.mockResolvedValue(ok({ start: { kind: "none" } }));
     render(<QuickCreateForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
@@ -214,9 +215,43 @@ describe("QuickCreateForm", () => {
     expect(peekChatHandoff("bugfix-login-crash-20260911")).toBeNull();
   });
 
+  it("does not pull the user back once they have left the form", async () => {
+    let settle: (value: unknown) => void = () => {};
+    mockPostJson.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+    const { unmount } = render(<QuickCreateForm />);
+    fillName("n");
+    fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+
+    unmount();
+    settle(ok());
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("reports a chat that could not start, with a chat that carries the note one click away", async () => {
+    mockPostJson.mockResolvedValue(
+      ok({ start: { kind: "failed", what: "chat", error: "Chat server unreachable" } }),
+    );
+    render(<QuickCreateForm />);
+    fillName("n");
+    fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+    fillNote("fix the login crash");
+    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+
+    await waitFor(() => expect(screen.getByText(/chat server unreachable/i)).toBeInTheDocument());
+    expect(mockPush).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("link", { name: /start a chat/i }));
+    expect(peekChatHandoff("bugfix-login-crash-20260911")).toEqual({ task: "fix the login crash" });
+  });
+
   it("stays put and reports a repository that failed, with the chat still one click away", async () => {
     mockPostJson.mockResolvedValue(
-      ok({ problems: [{ repository: "github.com/acme/api", error: "fatal: no such remote" }] }),
+      ok({
+        problems: [{ repository: "github.com/acme/api", error: "fatal: no such remote" }],
+        start: { kind: "none" },
+      }),
     );
     render(<QuickCreateForm />);
     fillName("n");
@@ -334,10 +369,8 @@ describe("QuickCreateForm", () => {
       expect(screen.getByText(/named from the pr's title/i)).toBeInTheDocument();
     });
 
-    it("starts a review of the PR instead of a chat when the type is review", async () => {
-      mockPostJson.mockImplementation(async (url: string) =>
-        url === "/api/operations/review" ? { ok: true, data: { id: "op-1" } } : okWithPr(),
-      );
+    it("follows the server into the review it started", async () => {
+      mockPostJson.mockResolvedValue(okWithPr());
       render(<QuickCreateForm />);
       addRepository(PR_URL);
       chooseType("review");
@@ -348,47 +381,12 @@ describe("QuickCreateForm", () => {
           "/workspace/bugfix-login-crash-20260911/operations?operationId=op-1",
         ),
       );
-      expect(mockPostJson).toHaveBeenCalledWith("/api/operations/review", {
-        workspace: "bugfix-login-crash-20260911",
-      });
-    });
-
-    it("opens the chat when no PR became a worktree, whatever the type says", async () => {
-      render(<QuickCreateForm />);
-      fillName("n");
-      fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-      chooseType("review");
-      fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
-
-      await waitFor(() =>
-        expect(mockPush).toHaveBeenCalledWith(
-          "/workspace/bugfix-login-crash-20260911/chat/interactive",
-        ),
-      );
-      expect(mockPostJson).toHaveBeenCalledTimes(1);
-    });
-
-    it("opens the chat for a PR of any other type, which is continuing work on it", async () => {
-      mockPostJson.mockResolvedValue(okWithPr());
-      render(<QuickCreateForm />);
-      addRepository(PR_URL);
-      fillNote("address the review comments");
-      fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
-
-      await waitFor(() =>
-        expect(mockPush).toHaveBeenCalledWith("/workspace/bugfix-login-crash-20260911/chat/interactive"),
-      );
-      expect(peekChatHandoff("bugfix-login-crash-20260911")).toEqual({
-        task: "address the review comments",
-      });
       expect(mockPostJson).toHaveBeenCalledTimes(1);
     });
 
     it("reports a review that could not start, without offering a second create", async () => {
-      mockPostJson.mockImplementation(async (url: string) =>
-        url === "/api/operations/review"
-          ? { ok: false, error: "Too many concurrent operations" }
-          : okWithPr(),
+      mockPostJson.mockResolvedValue(
+        okWithPr({ kind: "failed", what: "review", error: "Too many concurrent operations" }),
       );
       render(<QuickCreateForm />);
       addRepository(PR_URL);

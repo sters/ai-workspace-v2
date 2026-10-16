@@ -494,3 +494,54 @@ describe("handleResume", () => {
     expect(mockPtyResize).not.toHaveBeenCalled();
   });
 });
+
+describe("handleSessionStart", () => {
+  async function postStart(body: unknown) {
+    const { handleSessionStart } = await import("@/lib/chat-server/routes");
+    return handleSessionStart(
+      new Request("http://localhost/sessions/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }),
+    );
+  }
+  const sessions = () =>
+    (globalThis as unknown as { __chatSessions: Map<string, { activeWs: unknown; outputBuffer: unknown[] }> })
+      .__chatSessions;
+
+  it("starts a task session nobody is attached to yet, and names it", async () => {
+    const res = await postStart({ workspaceId: WITH_README, task: "fix the login crash" });
+
+    expect(res.status).toBe(200);
+    const { sessionId } = (await res.json()) as { sessionId: string };
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    expect(opts.args).toContain("task-prompt-body:fix the login crash");
+    expect(sessions().get(sessionId)?.activeWs).toBeNull();
+  });
+
+  it("buffers what the session writes before a browser attaches, for the replay", async () => {
+    const res = await postStart({ workspaceId: WITH_README, task: "fix it" });
+    const { sessionId } = (await res.json()) as { sessionId: string };
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+
+    for (const listener of opts.listeners) listener("hello", new TextEncoder().encode("hello"));
+
+    expect(sessions().get(sessionId)?.outputBuffer).toHaveLength(1);
+  });
+
+  it("refuses a workspace with no README, starting nothing", async () => {
+    const res = await postStart({ workspaceId: WITHOUT_README, task: "fix it" });
+
+    expect(res.status).toBe(409);
+    await expect(res.json()).resolves.toMatchObject({ error: expect.stringMatching(/README/) });
+    expect(mockSpawnClaudeTerminal).not.toHaveBeenCalled();
+  });
+
+  it("rejects a body without a workspace", async () => {
+    const res = await postStart({ task: "fix it" });
+
+    expect(res.status).toBe(400);
+    expect(mockSpawnClaudeTerminal).not.toHaveBeenCalled();
+  });
+});

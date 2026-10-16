@@ -79,37 +79,36 @@ function endSession(sessionId: string): void {
   persistSessionDeleted(sessionId);
 }
 
-export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "start" }>): Promise<void> {
-  const store = getStore();
-  const wsData = ws.data;
+/**
+ * Why `msg` cannot start a session, or null when it can. Every built opening
+ * prompt has the session read the README on its first turn, so a workspace
+ * without one starts a session that can only go hunting for the file. A
+ * caller-supplied prompt opts out.
+ */
+export async function refuseStart(msg: StartMsg): Promise<string | null> {
+  if (msg.initialPrompt) return null;
+  const workspacePath = path.join(getResolvedWorkspaceRoot(), "workspace", msg.workspaceId);
+  if (await pathExists(path.join(workspacePath, "README.md"))) return null;
+  return `Workspace "${msg.workspaceId}" has no README.md — run init before starting a chat session.`;
+}
 
+export type SpawnOutcome = { ok: true; sessionId: string } | { ok: false; error: string };
+
+/**
+ * Spawn the session `msg` describes and register it. With `ws` it streams to
+ * that connection from the first byte; without one it runs unattended until a
+ * browser resumes it, which replays what it wrote meanwhile from the buffer.
+ */
+export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnOutcome> {
+  const store = getStore();
   const root = getResolvedWorkspaceRoot();
   const workspacePath = path.join(root, "workspace", msg.workspaceId);
-
-  // Every built init prompt has the session read the README on its first turn,
-  // so a workspace without one starts a session that can only go hunting for
-  // the file. Refuse before touching the caller's existing session — a rejected
-  // start must not cost them a live one. A caller-supplied prompt opts out.
-  if (!msg.initialPrompt && !(await pathExists(path.join(workspacePath, "README.md")))) {
-    send(ws, {
-      type: "error",
-      message: `Workspace "${msg.workspaceId}" has no README.md — run init before starting a chat session.`,
-    });
-    return;
-  }
-
-  if (wsData.sessionId) endSession(wsData.sessionId);
-  // Scoped to the workspace being started, so a stale id cannot end a chat
-  // somewhere else.
-  if (msg.replaces && store.__chatSessions!.get(msg.replaces)?.workspaceId === msg.workspaceId) {
-    endSession(msg.replaces);
-  }
 
   // Run GC opportunistically
   runGc();
 
   const sessionId = nextSessionId();
-  wsData.sessionId = sessionId;
+  if (ws) ws.data.sessionId = sessionId;
 
   const listeners = new Set<DataListener>();
 
@@ -126,7 +125,8 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
 
   // The browser's xterm is the real viewport, so the PTY is born its size.
   // Spawning at a fixed default and never correcting it is what made Claude's
-  // TUI draw boxes and status lines at a width the viewport does not have.
+  // TUI draw boxes and status lines at a width the viewport does not have. An
+  // unattended start has no viewport: the resume that attaches one resizes.
   const size = msg.cols != null && msg.rows != null ? clampPtySize(msg.cols, msg.rows) : null;
 
   let proc;
@@ -138,11 +138,7 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
       ...(size && { cols: size.cols, rows: size.rows }),
     });
   } catch (err) {
-    send(ws, {
-      type: "error",
-      message: `Failed to spawn claude: ${err}`,
-    });
-    return;
+    return { ok: false, error: `Failed to spawn claude: ${err}` };
   }
 
   const startedAt = Date.now();
@@ -191,11 +187,36 @@ export async function handleStart(ws: Ws, msg: Extract<ClientMessage, { type: "s
     void cleanupSessionSystemPrompt(systemPromptFile);
   });
 
-  send(ws, { type: "started", sessionId });
-
   console.log(
     `[chat-server] Session ${sessionId} started for workspace "${msg.workspaceId}"`,
   );
+  return { ok: true, sessionId };
+}
+
+export async function handleStart(ws: Ws, msg: StartMsg): Promise<void> {
+  const store = getStore();
+
+  // Refuse before touching the caller's existing session — a rejected start
+  // must not cost them a live one.
+  const refusal = await refuseStart(msg);
+  if (refusal) {
+    send(ws, { type: "error", message: refusal });
+    return;
+  }
+
+  if (ws.data.sessionId) endSession(ws.data.sessionId);
+  // Scoped to the workspace being started, so a stale id cannot end a chat
+  // somewhere else.
+  if (msg.replaces && store.__chatSessions!.get(msg.replaces)?.workspaceId === msg.workspaceId) {
+    endSession(msg.replaces);
+  }
+
+  const outcome = await spawnSession(msg, ws);
+  if (!outcome.ok) {
+    send(ws, { type: "error", message: outcome.error });
+    return;
+  }
+  send(ws, { type: "started", sessionId: outcome.sessionId });
 }
 
 export function handleResume(ws: Ws, msg: Extract<ClientMessage, { type: "resume" }>): void {

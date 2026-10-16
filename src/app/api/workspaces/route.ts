@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { startTaskChatSession } from "@/lib/chat-server/client";
+import { startUserReview } from "@/lib/pipelines/review";
 import { setupRepository } from "@/lib/pipelines/actions/setup-repository";
 import { quickCreateWorkspaceSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
-import { createQuickWorkspace, QuickCreateRefusal } from "@/lib/workspace/quick-create";
+import {
+  createQuickWorkspace,
+  QuickCreateRefusal,
+  type QuickCreateResult,
+} from "@/lib/workspace/quick-create";
 import { resolvePrBranch } from "@/lib/workspace/pr-url";
 import { cachedRepoConstraints } from "@/lib/workspace/repo-constraints-cache";
 import { listWorkspaceItems } from "@/lib/workspace/reader";
+import type { QuickCreateStart } from "@/types/workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +27,40 @@ export async function GET(request: NextRequest) {
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
+}
+
+/**
+ * Started here rather than by the page that asked: it may have been navigated
+ * away from by the time the create returns, and what follows must not depend
+ * on it still being there.
+ *
+ * A review workspace whose PR is checked out gets a review operation, which is
+ * what posts findings onto the PR; without a PR its worktree is a fresh branch
+ * with an empty diff, so it gets a chat like any other. A repository that
+ * failed starts nothing, since that is the thing to read first.
+ */
+async function startAfterCreate(
+  result: QuickCreateResult,
+  taskType: string,
+  note: string | undefined,
+): Promise<QuickCreateStart> {
+  if (result.problems.length > 0) return { kind: "none" };
+
+  if (taskType === "review" && result.pullRequests.length > 0) {
+    try {
+      const operation = await startUserReview(result.workspace);
+      return { kind: "review", operationId: operation.id };
+    } catch (err) {
+      return { kind: "failed", what: "review", error: String(err) };
+    }
+  }
+
+  const task = note?.trim();
+  if (!task) return { kind: "none" };
+  const chat = await startTaskChatSession(result.workspace, task);
+  return chat.ok
+    ? { kind: "chat", sessionId: chat.sessionId }
+    : { kind: "failed", what: "chat", error: chat.error };
 }
 
 /**
@@ -39,7 +80,8 @@ export async function POST(request: Request) {
       resolvePullRequest: resolvePrBranch,
       cachedConstraints: cachedRepoConstraints,
     });
-    return NextResponse.json(result);
+    const start = await startAfterCreate(result, parsed.data.taskType, parsed.data.note);
+    return NextResponse.json({ ...result, start });
   } catch (err) {
     if (err instanceof QuickCreateRefusal) {
       return NextResponse.json({ error: err.message }, { status: 400 });

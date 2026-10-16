@@ -158,3 +158,10 @@ export interface RepoChanges {
     hasChanges: boolean;
   };
 }
+
+/** What a quick create started on the new workspace, for the page to follow. */
+export type QuickCreateStart =
+  | { kind: "chat"; sessionId: string }
+  | { kind: "review"; operationId: string }
+  | { kind: "none" }
+  | { kind: "failed"; what: "chat" | "review"; error: string };

@@ -441,8 +441,11 @@ export function useChatSession(
   // Auto-resume on mount if localStorage has a saved session,
   // or auto-start if initialPrompt/reviewTimestamp is provided.
   // A review, research or discussion chat always starts a fresh session (skip resume).
+  // With nothing saved, attach to the workspace's live session: one the server
+  // started on its own (quick create) is saved in no browser.
   useEffect(() => {
     if (stateRef.current !== "idle") return;
+    let cancelled = false;
     if (initialPromptRef.current || reviewTimestampRef.current || researchChatRef.current || discussionRef.current) {
       // Custom prompt requested — start a fresh session regardless of saved
       // state. The saved one stays in localStorage so the start can name it as
@@ -457,8 +460,17 @@ export function useChatSession(
         resumeSession(savedSessionId);
       } else if (taskRef.current) {
         startSession();
+      } else {
+        void findLiveSession(workspaceId, null).then((live) => {
+          if (live && !cancelled && stateRef.current === "idle" && !openingRef.current) {
+            resumeSession(live);
+          }
+        });
       }
     }
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workspaceId]);
 

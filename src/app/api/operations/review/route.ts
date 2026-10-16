@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { resolveWorkspaceName } from "@/lib/config";
-import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
+import { ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { listWorkspaceRepos } from "@/lib/workspace";
-import { buildReviewPipeline } from "@/lib/pipelines/review";
+import { startUserReview } from "@/lib/pipelines/review";
 import { reviewSchema } from "@/lib/schemas";
 import { parseBody, applyOperationDefaults } from "@/lib/validate";
 
@@ -24,22 +24,11 @@ export async function POST(request: Request) {
     );
   }
 
-  // A review a human started verifies the comments already on the PR alongside
-  // the code. An autonomous cycle does not: its asks come from its own gate.
-  const reviewInput = {
-    workspace,
-    repository: data.repository,
-    carryPostedFindings: true,
-  };
-
   try {
-    const phases = await buildReviewPipeline({
-      ...reviewInput,
+    const operation = await startUserReview(workspace, {
+      repository: data.repository,
       refreshFromRemote: data.refreshFromRemote,
     });
-    const operation = startOperationPipeline("review", workspace, phases, undefined,
-      data.refreshFromRemote ? { refreshFromRemote: "true" } : undefined,
-    );
     return NextResponse.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {

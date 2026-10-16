@@ -15,7 +15,7 @@ import { getStore } from "./store";
 import { runGc } from "./gc";
 import { notifyWaitingSessions } from "./waiting-notifier";
 import { handleStart, handleResume, handleInput, handleResize, handleKill, handleClose } from "./handlers";
-import { handleHealthCheck, handleSessionKill, handleSessionsList } from "./routes";
+import { handleHealthCheck, handleSessionKill, handleSessionStart, handleSessionsList } from "./routes";
 
 // Re-exports for testing
 export { trimBuffer } from "./buffer";
@@ -56,6 +56,10 @@ export function startChatServer(port: number) {
       // Health check
       if (url.pathname === "/health") {
         return handleHealthCheck();
+      }
+      // Start a chat session no browser is attached to yet
+      if (url.pathname === "/sessions/start" && req.method === "POST") {
+        return handleSessionStart(req);
       }
       // Kill a chat session
       if (url.pathname === "/sessions/kill" && req.method === "POST") {
