@@ -12,10 +12,7 @@
  * does not start a session nobody asked for just now.
  *
  * Per tab by construction: the navigation that carries it happens in the tab
- * that stashed it. A stash is also announced in that tab, since the chat page it
- * is meant for can already be open — a quick create still running when its
- * workspace's chat was opened — and navigating to the URL it is on does not
- * remount it.
+ * that stashed it.
  */
 
 export interface ChatHandoff {
@@ -31,8 +28,6 @@ export interface ChatHandoff {
 
 export const CHAT_HANDOFF_TTL_MS = 10 * 60 * 1000;
 
-const STASHED_EVENT = "aiw-chat-handoff-stashed";
-
 function key(workspaceId: string): string {
   return `aiw-chat-handoff:${workspaceId}`;
 }
@@ -46,20 +41,7 @@ export function stashChatHandoff(
     sessionStorage.setItem(key(workspaceId), JSON.stringify({ handoff, at: now }));
   } catch {
     // Storage unavailable: the chat page then opens as if navigated to directly.
-    return;
   }
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent<string>(STASHED_EVENT, { detail: workspaceId }));
-  }
-}
-
-/** Call `onStashed` whenever a handoff is stashed for `workspaceId`; returns the unsubscribe. */
-export function onChatHandoffStashed(workspaceId: string, onStashed: () => void): () => void {
-  const listener = (e: Event) => {
-    if ((e as CustomEvent<string>).detail === workspaceId) onStashed();
-  };
-  window.addEventListener(STASHED_EVENT, listener);
-  return () => window.removeEventListener(STASHED_EVENT, listener);
 }
 
 export function peekChatHandoff(workspaceId: string, now: number = Date.now()): ChatHandoff | null {
