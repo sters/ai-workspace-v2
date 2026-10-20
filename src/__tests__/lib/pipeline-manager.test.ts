@@ -1,9 +1,4 @@
 // @vitest-environment node
-/**
- * Tests for pipeline-manager GC and concurrency logic.
- * We test the exported functions directly by manipulating the global store.
- */
-
 import { vi, describe, it, expect, beforeEach } from "vitest";
 import {
   startOperationPipeline,
@@ -14,7 +9,6 @@ import {
   getMaxConcurrentOperations,
 } from "@/lib/pipeline-manager";
 
-// Mock the Claude runner so we don't spawn real processes
 vi.mock("@/lib/claude", () => ({
   runClaude: vi.fn(() => ({
     id: "mock",
@@ -25,7 +19,6 @@ vi.mock("@/lib/claude", () => ({
   })),
 }));
 
-// Access globalThis store for direct manipulation
 function getGlobalOps(): Map<string, unknown> {
   const g = globalThis as unknown as { __aiWorkspaceOps?: Map<string, unknown> };
   return g.__aiWorkspaceOps!;
@@ -33,12 +26,10 @@ function getGlobalOps(): Map<string, unknown> {
 
 describe("pipeline-manager GC", () => {
   beforeEach(() => {
-    // Clear all operations before each test
     getGlobalOps().clear();
   });
 
   it("markComplete releases references", async () => {
-    // Start a simple function-phase pipeline that completes immediately
     const op = startOperationPipeline("init", "test", [
       {
         kind: "function",
@@ -47,7 +38,6 @@ describe("pipeline-manager GC", () => {
       },
     ]);
 
-    // Wait for the async pipeline to complete
     await new Promise((r) => setTimeout(r, 50));
 
     const managed = getGlobalOps().get(op.id) as {
@@ -67,7 +57,6 @@ describe("pipeline-manager GC", () => {
   });
 
   it("GC removes old completed operations on next start", async () => {
-    // Insert a fake completed operation with old completedAt
     const ops = getGlobalOps();
     ops.set("old-1", {
       operation: { id: "old-1", type: "init", workspace: "test", status: "completed", startedAt: "" },
@@ -118,7 +107,6 @@ describe("pipeline-manager concurrency", () => {
   it("throws ConcurrencyLimitError when too many operations are running", () => {
     const ops = getGlobalOps();
 
-    // Fill up with running operations
     for (let i = 0; i < getMaxConcurrentOperations(); i++) {
       ops.set(`running-${i}`, {
         operation: { id: `running-${i}`, type: "init", workspace: "test", status: "running", startedAt: "" },
@@ -155,7 +143,6 @@ describe("pipeline-manager concurrency", () => {
       });
     }
 
-    // This should succeed since there are no running operations
     expect(() => {
       startOperationPipeline("init", "ok", [
         { kind: "function", label: "test", fn: async () => true },
@@ -199,7 +186,6 @@ describe("pipeline-manager killOperation", () => {
     expect(askCalled).toBe(true);
     expect(op.status).toBe("running");
 
-    // Kill the operation
     const killed = killOperation(op.id);
     expect(killed).toBe(true);
 
@@ -261,7 +247,7 @@ describe("pipeline-manager phase timeout", () => {
       {
         kind: "function",
         label: "slow-fn",
-        timeoutMs: 50, // very short timeout
+        timeoutMs: 50,
         maxRetries: 0,
         fn: async (ctx) => {
           // Block on emitAsk which respects the abort signal
@@ -288,7 +274,6 @@ describe("pipeline-manager phase timeout", () => {
 
     expect(op.status).toBe("failed");
 
-    // Verify the timeout message was emitted
     const timedOutEvent = capturedEvents.find((e) =>
       e.data.includes("timed out after 50ms"),
     );

@@ -97,16 +97,12 @@ export async function readMcpServers(): Promise<McpServerEntry[]> {
   return [...projectServers, ...localServers];
 }
 
-// ---------------------------------------------------------------------------
-// MCP connection status (via `claude mcp list`)
-// ---------------------------------------------------------------------------
-
 /**
  * Parse `claude mcp list` output to get real connection status.
  *
  * Example output:
- *   atlassian: https://mcp.atlassian.com/v1/mcp (HTTP) - ! Needs authentication
- *   github: https://mcp.github.com/sse (SSE) - ✓ Connected
+ *   tracker: https://mcp.tracker.example.com/v1/mcp (HTTP) - ! Needs authentication
+ *   code: https://mcp.code.example.com/sse (SSE) - ✓ Connected
  *   filesystem: npx -y @modelcontextprotocol/server-filesystem (stdio) - ✓ Connected
  */
 export function parseClaudeMcpList(output: string): McpConnectionStatus[] {
@@ -142,10 +138,6 @@ export async function getMcpStatuses(): Promise<McpConnectionStatus[]> {
   }
   return parseClaudeMcpList(result.stdout);
 }
-
-// ---------------------------------------------------------------------------
-// MCP tool listing (parsed from system init event's tools array)
-// ---------------------------------------------------------------------------
 
 /**
  * Extract MCP tools from the `system` init event's `tools` array.

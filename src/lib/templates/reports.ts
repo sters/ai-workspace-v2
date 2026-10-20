@@ -1,7 +1,3 @@
-/**
- * Report template strings for review, verification, research, and summary.
- */
-
 export const REVIEW_REPORT_TEMPLATE = `# Code Review: {repository_name}
 
 - **Task**: {task_name}

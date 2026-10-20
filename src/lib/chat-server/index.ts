@@ -44,7 +44,6 @@ export function startChatServer(port: number) {
   const server = Bun.serve<WsData>({
     port,
     async fetch(req, server) {
-      // Upgrade HTTP to WebSocket
       const url = new URL(req.url);
       if (url.pathname === "/ws") {
         const upgraded = server.upgrade(req, {
@@ -53,7 +52,6 @@ export function startChatServer(port: number) {
         if (upgraded) return undefined;
         return new Response("WebSocket upgrade failed", { status: 400 });
       }
-      // Health check
       if (url.pathname === "/health") {
         return handleHealthCheck();
       }
@@ -61,11 +59,9 @@ export function startChatServer(port: number) {
       if (url.pathname === "/sessions/start" && req.method === "POST") {
         return handleSessionStart(req);
       }
-      // Kill a chat session
       if (url.pathname === "/sessions/kill" && req.method === "POST") {
         return handleSessionKill(req);
       }
-      // Active chat sessions
       if (url.pathname === "/sessions") {
         return handleSessionsList();
       }

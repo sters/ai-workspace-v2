@@ -56,7 +56,6 @@ export function ClaudeOperation({
 
   const effectiveRunning = isRunning || loading;
 
-  // Notify parent of running state changes
   const onRunningChangeRef = useRef(onRunningChange);
   onRunningChangeRef.current = onRunningChange;
   useEffect(() => {

@@ -101,8 +101,8 @@ export function OperationLog({
     });
   }, [entries, activePhaseTab, livePhases]);
 
-  // Map of phaseLabel -> status, used as a fallback for legacy operations
-  // whose function-phase child-groups lack a synthetic complete event.
+  // Map of phaseLabel -> status, used as a fallback for function-phase
+  // child-groups that lack a synthetic complete event.
   const phaseStatusByLabel = useMemo(() => {
     if (!livePhases) return undefined;
     const map = new Map<string, "running" | "completed" | "failed">();

@@ -406,7 +406,6 @@ describe("buildReviewPipeline — constraint timeout aborts remaining commands i
     // Both repo reports should still be written (partial for repo-a, full for repo-b).
     expect(mockBunWrite).toHaveBeenCalledTimes(2);
 
-    // anyFailure → "Constraint verification completed with failures"
     expect(ctx.emitResult).toHaveBeenCalledWith("Constraint verification completed with failures");
 
     // Status should mention skipping remaining constraints for the timed-out repo.
@@ -506,10 +505,10 @@ describe("buildReviewPipeline — scoped constraint commands", () => {
   });
 });
 
-// A repo with no declared constraints used to leave no CONSTRAINTS-* file at
-// all, so the collector's constraint section read "(none)" and SUMMARY.md was
-// silent — indistinguishable from "everything passed". Since the code reviewer
-// no longer runs lint/test on its own initiative, nothing else covers the gap.
+// Without a CONSTRAINTS-* file for a repo with no declared constraints, the
+// collector's constraint section reads "(none)" and SUMMARY.md is silent —
+// indistinguishable from "everything passed". The code reviewer does not run
+// lint/test on its own initiative, so nothing else covers the gap.
 describe("buildReviewPipeline — repos without declared constraints", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -732,10 +731,10 @@ describe("buildReviewPipeline — incremental review scope", () => {
   });
 });
 
-// The cross-repo reviewer used to be the one child exempt from the baseline, so it
-// re-read an unchanged contract surface every cycle. It gets the same per-repo
-// range the code reviewer does; what differs is the rule applied to it (a boundary
-// is in scope when *either* side moved), which lives in the prompt.
+// The cross-repo reviewer gets the same per-repo range the code reviewer does, so
+// it does not re-read an unchanged contract surface every cycle; what differs is
+// the rule applied to it (a boundary is in scope when *either* side moved), which
+// lives in the prompt.
 describe("buildReviewPipeline — the cross-repository reviewer is scoped too", () => {
   const repoA = {
     repoName: "repo-a",

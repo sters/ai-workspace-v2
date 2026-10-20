@@ -57,7 +57,7 @@ const DEFAULT_UPDATE_TODO_INSTRUCTION =
 const CYCLE_BUDGETS_MS = {
   /** `review.ts`: reviewer group (scales with repo count) + constraints (10min) + collect (20min). */
   review: 45 * 60 * 1000,
-  /** One `autonomous-gate` child over the review summary; measured well under a minute. */
+  /** One `autonomous-gate` child over the review summary. */
   gate: 10 * 60 * 1000,
   /** `update-todo.ts`: one updater child. */
   updateTodo: 30 * 60 * 1000,
@@ -65,9 +65,8 @@ const CYCLE_BUDGETS_MS = {
 
 /**
  * Execute's budget is derived rather than listed above, because it depends on
- * the configured `batchSize` — a hardcoded figure here silently became tighter
- * than what `execute.ts` sizes itself for when the per-item allowance moved.
- * Read at build time so a configured `batchSize` is reflected.
+ * the configured `batchSize` and must not be tighter than what `execute.ts`
+ * sizes itself for. Read at build time so a configured `batchSize` is reflected.
  */
 function executeCycleBudgetMs(): number {
   return executePhaseBudgetMs(ROUTINE_BATCH_COUNT, getOperationConfig("execute").batchSize);
@@ -149,12 +148,10 @@ async function runAutonomousGate(
   previousGateResults?: { cycle: number; reason: string; fixableIssues: string[] }[],
   repositories?: AutonomousGateInput["repositories"],
 ): Promise<AutonomousGateResult> {
-  // The final cycle is evaluated like any other. It used to short-circuit here
-  // without calling the model, which threw away the cycle's whole review — the
-  // most expensive phase of a cycle — and handed the human a PR containing the
-  // run's own leftovers, since nothing downstream reads the review either.
-  //
-  // Check review results
+  // The final cycle is evaluated like any other. Skipping the model on it would
+  // throw away the cycle's whole review — the most expensive phase of a cycle —
+  // and hand the human a PR containing the run's own leftovers, since nothing
+  // downstream reads the review either.
   const sessions = await getReviewSessions(workspace);
   if (sessions.length === 0) {
     return settled("No review sessions found");
@@ -168,7 +165,6 @@ async function runAutonomousGate(
     return settled("Could not read review details");
   }
 
-  // Get TODO files
   const todoSummaries = await getTodos(workspace);
   const todoFiles: { repoName: string; content: string }[] = [];
   for (const todo of todoSummaries) {
@@ -181,7 +177,6 @@ async function runAutonomousGate(
     }
   }
 
-  // Get README
   const readmeContent = (await getReadme(workspace)) ?? "";
   const acceptanceCriteria = parseAcceptanceCriteria(readmeContent)
     .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
@@ -189,7 +184,6 @@ async function runAutonomousGate(
 
   const wsPath = path.join(getWorkspaceDir(), workspace);
 
-  // Build gate prompt
   const prompt = buildAutonomousGatePrompt({
     workspaceName: workspace,
     reviewSummary: reviewDetail.summary,
@@ -204,7 +198,6 @@ async function runAutonomousGate(
     repositories,
   });
 
-  // Run AI gate
   let resultText = "";
   const ok = await ctx.runChild("Autonomous Gate", prompt, {
     jsonSchema: AUTONOMOUS_GATE_SCHEMA,
@@ -218,7 +211,6 @@ async function runAutonomousGate(
     return settled("Gate execution failed");
   }
 
-  // Parse result
   try {
     const parsed = JSON.parse(resultText) as Record<string, unknown>;
     if (typeof parsed.shouldLoop !== "boolean") {
@@ -306,10 +298,6 @@ export function buildAutonomousPipeline(input: {
   // instead of queueing it upfront: the check appends the cycle only when the
   // drafted README is a clear enough "done" contract to implement autonomously.
   const initClarityGated = startWith === "init" && !input.resumeCycles;
-
-  // ------------------------------------------------------------------
-  // Leading phases: init, update-todo, or skip straight to execute
-  // ------------------------------------------------------------------
 
   function buildEnsureRepositoriesPhase(): PipelinePhase {
     return {
@@ -478,10 +466,6 @@ export function buildAutonomousPipeline(input: {
       },
     });
   }
-
-  // ------------------------------------------------------------------
-  // Autonomous cycle: each step is its own top-level phase
-  // ------------------------------------------------------------------
 
   function buildCycleExecutePhase(loopNumber: number): PipelinePhase {
     return {
@@ -654,15 +638,10 @@ export function buildAutonomousPipeline(input: {
 
         // Every round has the same shape, whatever the gate is asking for: the
         // asks become TODO items, an executor works from the plan, and the diff
-        // that produces is reviewed like any other. A round that skipped the plan
-        // and handed the asks straight to a fix agent was cheaper by one Update
-        // TODO phase, but the review behind it only checked that the asks landed
-        // — so the fix diff itself, the newest and least-examined code on the
-        // branch, reached the human unreviewed. Measured over the runs after that
-        // shortcut shipped, the gate chose it on 4 of 4 loops, which made the
-        // exception the rule.
-        //
-        // Append: Update TODO for this cycle + next cycle's 3 phases
+        // that produces is reviewed like any other. Handing the asks straight to a
+        // fix agent would save one Update TODO phase, but leave the fix diff — the
+        // newest and least-examined code on the branch — checked only for whether
+        // the asks landed.
         ctx.appendPhases([
           buildCycleUpdateTodoPhase(loopNumber, gateResult.fixableIssues),
           buildCycleExecutePhase(loopNumber + 1),
@@ -803,8 +782,8 @@ export function buildAutonomousPipeline(input: {
     };
   }
 
-  // Helper to build the Create PR phase. `repositories` narrows it to the ones a
-  // stopped run finished; omitted, every repository gets its PR.
+  // `repositories` narrows the Create PR phase to the ones a stopped run
+  // finished; omitted, every repository gets its PR.
   function buildCreatePrPhase(repositories?: string[]): PipelinePhase {
     return {
       kind: "function",
@@ -836,11 +815,10 @@ export function buildAutonomousPipeline(input: {
       }
     }
   } else if (!initClarityGated) {
-    // No feasibility judge here: a run starting from execute / update-todo is
-    // re-reading a contract that was already judged where it was written (the
-    // init path's clarity gate, or an `update-readme` operation). Re-judging it
-    // cost a serial worktree-reading phase per run for a verdict already in the
-    // ledger — a PR-review turnaround paid ~3 min of it before touching code.
+    // No feasibility judge here: a run starting from execute / update-todo
+    // re-reads a contract already judged where it was written (the init path's
+    // clarity gate, or an `update-readme` operation), whose verdict is already
+    // in the ledger.
     phases.push(buildCycleExecutePhase(1));
     phases.push(buildCycleReviewPhase(1));
     phases.push(buildCycleGatePhase(1));

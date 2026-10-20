@@ -70,7 +70,7 @@ function pr(overrides: Partial<WorkspacePullRequest> = {}): WorkspacePullRequest
     isDraft: false,
     headRefName: "feature/cache",
     baseRefName: "main",
-    author: "sters",
+    author: "alice",
     updatedAt: "2026-08-05T00:00:00Z",
     checks: { checks: [], counts: zeroCounts(), reported: false },
     threads: [
@@ -504,8 +504,7 @@ describe("PullRequestsView", () => {
     });
 
     it("says queued for a run that has not started", () => {
-      // The distinction this pins: a queued job used to be shown as "running",
-      // which claims work that has not begun and logs that do not exist.
+      // "running" would claim work that has not begun and logs that do not exist.
       setData({
         pullRequests: [pr({ checks: checksOf([{ name: "e2e", state: "queued", url: null }]) })],
       });

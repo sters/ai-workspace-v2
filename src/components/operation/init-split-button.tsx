@@ -8,7 +8,7 @@ import type { OperationType } from "@/types/operation";
  * Shared between /new and /suggestions pages.
  *
  * `start` may return a Promise, which is what keeps the button disabled for the
- * length of the POST — the callers no longer disable their forms around a run.
+ * length of the POST, so callers need not disable their forms around a run.
  */
 export function InitSplitButton({
   description,

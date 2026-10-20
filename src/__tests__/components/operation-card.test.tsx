@@ -62,8 +62,8 @@ describe("OperationCard results", () => {
     expect(screen.getByText("repo-b")).toBeInTheDocument();
   });
 
-  // An operation recorded before per-child results existed stored only the
-  // headline; the loaded stream still has every child's.
+  // An older summary can hold only the headline; the loaded stream has every
+  // child's.
   it("prefers the event stream over a headline-only summary", () => {
     renderCard({ content: "opened PR for repo-b" }, [
       resultEvent("opened PR for repo-a", "repo-a"),

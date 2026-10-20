@@ -1,8 +1,3 @@
-/**
- * Prompt template for workspace-repo-todo-executor agent.
- * Executes TODO items for a specific repository within a workspace.
- */
-
 import type { ExecutorInput, BatchedExecutorInput } from "@/types/prompts";
 import { BASE_PLACEHOLDER, CHANGED_FILES_PLACEHOLDER } from "@/lib/workspace/constraint-scope";
 import {

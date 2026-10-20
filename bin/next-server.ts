@@ -27,10 +27,7 @@ const isHot = process.argv.includes("--hot");
 
 // Clear .next cache in hot mode to avoid stale route issues. Only the hot
 // path: `--dev` and production both serve a build, and deleting it without
-// building one is how `bun run dev` came to fail on a missing production
-// build. Keeping Turbopack's dev filesystem cache across restarts was
-// measured and buys nothing here — a cold sweep of every page route ran
-// 7.5-11.5s against 10.6-11.4s with the cache preserved.
+// building one leaves `next start` nothing to serve.
 if (isHot && existsSync(resolve(projectDir, ".next"))) {
   console.log("Clearing .next cache...");
   rmSync(resolve(projectDir, ".next"), { recursive: true, force: true });

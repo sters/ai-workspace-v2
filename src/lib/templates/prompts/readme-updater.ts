@@ -1,9 +1,3 @@
-/**
- * Prompt template for the README updater agent.
- * Updates the workspace README.md file based on an instruction, preserving
- * its existing structure.
- */
-
 import type { ReadmeUpdaterInput } from "@/types/prompts";
 
 export function getReadmeUpdaterSystemPrompt(): string {

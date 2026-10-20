@@ -86,7 +86,7 @@ describe("getSoleCommitSubject", () => {
   });
 
   // With several commits there is no one subject that describes the branch, so
-  // the agent composes instead — which is what it did before this existed.
+  // the agent composes instead.
   it("returns null for a branch holding more than one commit", async () => {
     expect(await getSoleCommitSubject("/wt", "main", git("Second\nFirst\n"))).toBeNull();
   });

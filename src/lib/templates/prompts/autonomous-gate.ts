@@ -1,8 +1,3 @@
-/**
- * Prompt template for Autonomous Gate agent.
- * Evaluates review results to decide whether to loop (fix issues) or proceed to PR creation.
- */
-
 import { KNOWN_FINDING_KINDS } from "@/lib/workspace/known-findings";
 import type { AutonomousGateInput } from "@/types/prompts";
 import { knownFindingsSection } from "./shared";

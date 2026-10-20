@@ -132,13 +132,12 @@ export async function buildReviewPipeline(
   const reviewedNames = new Set(repos.map((r) => r.repoName));
   const wsPath = path.join(getWorkspaceDir(), workspace);
 
-  // Write report templates (idempotent — ensures templates exist for older workspaces)
+  // Idempotent: also covers workspaces created before these templates existed.
   await writeReportTemplates(wsPath);
 
   const reviewTimestamp = await prepareReviewDir(workspace);
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);
 
-  // Parse constraints from README for programmatic verification
   const allConstraints = parseConstraints(readmeContent);
 
   // Findings earlier cycles decided not to act on. Reviewers are spawned fresh
@@ -159,7 +158,6 @@ export async function buildReviewPipeline(
     .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
     .join("\n");
 
-  // Build review + verify children for phase 1 (parallel)
   const reviewChildren: GroupChild[] = [];
   const repoBaseBranches = new Map<string, string>();
   // Collected per-repo context for the cross-repository reviewer (multi-repo only).
@@ -192,9 +190,8 @@ export async function buildReviewPipeline(
 
     // Same range the code reviewer gets. The cross-repo reviewer applies a
     // different rule to it (a boundary is in scope when *either* side moved, and
-    // it still reads both sides in full), but it is no longer exempt: it was
-    // re-deriving the whole contract surface every cycle from repos that had not
-    // moved, which is the diff-widening the baseline exists to stop.
+    // it still reads both sides in full); without the range it would re-derive
+    // the whole contract surface every cycle from repos that had not moved.
     crossRepoInputs.push({
       repoName: repo.repoName,
       repoPath: repo.repoPath,
@@ -303,7 +300,6 @@ export async function buildReviewPipeline(
       });
     }
 
-    // README verifier
     const readmeVerifyFileName = `VERIFY-README-${stem}.md`;
     reviewChildren.push({
       label: `verify-readme-${repo.repoName}`,
@@ -363,7 +359,7 @@ export async function buildReviewPipeline(
   }
 
   return [
-    // Phase 1: Run constraint commands programmatically. This is the only place
+    // Constraint commands run programmatically. This is the only place
     // lint/test/build actually run during a review — the code reviewer is told
     // to leave them alone, because only here does a failure get compared against
     // the merge-base before it can reach the gate as a blocker.
@@ -391,7 +387,7 @@ export async function buildReviewPipeline(
           const constraintFileName = `CONSTRAINTS-${repoReportStem(repo.repoPath, repo.repoName)}.md`;
 
           // Still write a report: an absent file is indistinguishable from a
-          // clean run downstream, and no other phase runs these commands now.
+          // clean run downstream, and no other phase runs these commands.
           if (!repoConstraints || repoConstraints.constraints.length === 0) {
             anyUndeclared = true;
             ctx.emitStatus(
@@ -432,7 +428,6 @@ export async function buildReviewPipeline(
               cwd: repo.worktreePath,
             });
 
-            // Determine status
             let status: ConstraintExecResult["status"];
             if (result.timedOut) {
               status = "FAIL";
@@ -499,18 +494,15 @@ export async function buildReviewPipeline(
         return true;
       },
     },
-    // Phase 2: Run the review + verify children in parallel
     {
       kind: "group",
       children: reviewChildren,
     },
-    // Phase 3: Collect results into summary
     {
       kind: "function",
       label: "Collect review results",
       timeoutMs: getTimeoutDefaults("review").claudeMs,
       fn: async (ctx) => {
-        // List actual review/verify files using Bun.Glob
         const reviewGlob = new Bun.Glob("REVIEW-*");
         const verifyGlob = new Bun.Glob("VERIFY-TODO-*");
         const readmeVerifyGlob = new Bun.Glob("VERIFY-README-*");
@@ -551,7 +543,6 @@ async function checkPreExisting(
   env: Record<string, string | undefined>,
 ): Promise<"FAIL" | "PRE-EXISTING"> {
   try {
-    // Get the merge-base commit
     const mergeBaseProc = Bun.spawn(
       ["git", "merge-base", "HEAD", `origin/${baseBranch}`],
       { cwd: worktreePath, stdout: "pipe", stderr: "pipe", env },
@@ -562,7 +553,6 @@ async function checkPreExisting(
     const mergeBase = (await new Response(mergeBaseProc.stdout).text()).trim();
     if (!mergeBase) return "FAIL";
 
-    // Check if worktree is clean; stash if needed
     const statusProc = Bun.spawn(
       ["git", "status", "--porcelain"],
       { cwd: worktreePath, stdout: "pipe", stderr: "pipe", env },
@@ -577,19 +567,16 @@ async function checkPreExisting(
       await stash.exited;
     }
 
-    // Checkout merge-base
     const checkout = Bun.spawn(["git", "checkout", mergeBase, "--quiet"], {
       cwd: worktreePath, stdout: "pipe", stderr: "pipe", env,
     });
     await checkout.exited;
 
-    // Run the same constraint command on the merge-base
     const baseResult = await execConstraintCommand(command, {
       cwd: worktreePath,
       timeoutMs: 3 * 60 * 1000, // shorter timeout for base check
     });
 
-    // Return to the original branch
     const checkoutBack = Bun.spawn(["git", "checkout", "-"], {
       cwd: worktreePath, stdout: "pipe", stderr: "pipe", env,
     });
@@ -602,7 +589,6 @@ async function checkPreExisting(
       await stashPop.exited;
     }
 
-    // If the base also fails, it's pre-existing
     if (baseResult.exitCode !== 0 || baseResult.timedOut) {
       return "PRE-EXISTING";
     }

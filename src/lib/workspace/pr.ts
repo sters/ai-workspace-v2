@@ -1,17 +1,9 @@
-/**
- * PR and repo change analysis utilities.
- */
-
 import { pathExists } from "@/lib/fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { exec, execArgs } from "./helpers";
 import type { ExistingPR, RepoChanges } from "@/types/workspace";
-
-// ---------------------------------------------------------------------------
-// readPRTemplate
-// ---------------------------------------------------------------------------
 
 const PR_TEMPLATE_PATHS = [
   ".github/PULL_REQUEST_TEMPLATE.md",
@@ -24,11 +16,6 @@ const PR_TEMPLATE_PATHS = [
   "pull_request_template.md",
 ];
 
-/**
- * Read the PR template from a repository worktree.
- * Searches standard GitHub PR template locations in priority order.
- * Returns the template content or null if not found.
- */
 export async function readPRTemplate(worktreePath: string): Promise<string | null> {
   for (const templatePath of PR_TEMPLATE_PATHS) {
     const fullPath = path.join(worktreePath, templatePath);
@@ -39,10 +26,6 @@ export async function readPRTemplate(worktreePath: string): Promise<string | nul
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// checkExistingPR
-// ---------------------------------------------------------------------------
-
 export async function checkExistingPR(worktreePath: string): Promise<ExistingPR> {
   try {
     const out = await execArgs(["gh", "pr", "view", "--json", "url,title,body"], { cwd: worktreePath });
@@ -52,10 +35,6 @@ export async function checkExistingPR(worktreePath: string): Promise<ExistingPR>
     return { exists: false };
   }
 }
-
-// ---------------------------------------------------------------------------
-// getRepoChanges
-// ---------------------------------------------------------------------------
 
 /**
  * Paths beyond which the pathspec is dropped rather than risking an argv that
@@ -74,8 +53,7 @@ const MAX_PATHSPEC_ENTRIES = 400;
  *
  * Restricted to paths the branch itself touches (`origin/<base>...HEAD`), because
  * `<sinceSha>..HEAD` also contains everything a mid-run `origin/<base>` merge
- * brought in — on the branch this was written for, 10 of 12 commits in that range
- * belonged to other teams. The restriction is an approximation in one direction:
+ * brought in. The restriction is an approximation in one direction:
  * a file both the branch and the base branch changed stays in scope, which is
  * wanted, since that is where a merge resolution lands.
  */
@@ -143,7 +121,6 @@ export async function getRepoChanges(
 ): Promise<RepoChanges> {
   const worktreePath = path.join(getWorkspaceDir(), workspaceName, repoPath);
 
-  // Fetch latest
   try {
     await exec(`git -C "${worktreePath}" fetch origin "${baseBranch}"`);
   } catch (err) {

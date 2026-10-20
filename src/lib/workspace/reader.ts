@@ -45,7 +45,6 @@ export async function listWorkspaces(
     candidates.push({ name: entry.name, wsPath, mtime });
   }
 
-  // Sort by mtime desc (most recent first)
   candidates.sort((a, b) => b.mtime - a.mtime);
 
   // When recentOnly, limit to first N items to skip expensive summary builds
@@ -66,7 +65,6 @@ export async function listWorkspaces(
     }
   }
 
-  // Sort by last modified (most recent first)
   workspaces.sort(
     (a, b) =>
       new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
@@ -104,10 +102,8 @@ export async function listWorkspaceItems(
     candidates.push({ name: entry.name, wsPath, mtime });
   }
 
-  // Sort by mtime desc (most recent first)
   candidates.sort((a, b) => b.mtime - a.mtime);
 
-  // When recentOnly, limit to first N items
   let olderCount = 0;
   let selected = candidates;
   if (options?.recentOnly && candidates.length > DEFAULT_DISPLAY_LIMIT) {
@@ -187,7 +183,6 @@ async function buildWorkspaceListItem(
 
   const meta = parseReadmeMeta(readmeContent);
 
-  // Count TODO progress without full parse
   const { completed, total } = await countTodoProgress(wsPath);
   const overallProgress =
     total > 0 ? Math.round((completed * 100) / total) : 100;
@@ -431,7 +426,6 @@ export async function quickSearchWorkspaces(query: string): Promise<QuickSearchR
     }
   }
 
-  // Sort by last modified (most recent first), same as listWorkspaces()
   results.sort(
     (a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
   );

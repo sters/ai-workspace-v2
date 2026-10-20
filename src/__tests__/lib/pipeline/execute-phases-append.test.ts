@@ -56,7 +56,7 @@ function makeManagedOperation(phases: PipelinePhase[]): {
       status: "running",
       startedAt: new Date().toISOString(),
       children: [],
-      // Mirrors orchestrator.ts:53 — same array reference as phaseInfos.
+      // Mirrors orchestrator.ts — same array reference as phaseInfos.
       phases: phaseInfos,
     },
     claudeProcess: null,
@@ -81,9 +81,9 @@ describe("execute-phases appendPhases", () => {
   });
 
   it("does not duplicate entries when operation.phases is the same array as phaseInfos", async () => {
-    // Repro of the bug: autonomous's Gate function phase appends [UpdateTodo, Exec, Review, Gate].
-    // Before the fix, each appended phase was pushed twice (once to phaseInfos, once to
-    // operation.phases which is the same array), so phaseInfos.length grew by 8 instead of 4.
+    // autonomous's Gate function phase appends [UpdateTodo, Exec, Review, Gate].
+    // operation.phases is the same array as phaseInfos, so pushing to both would
+    // grow it by 8 instead of 4.
     const initialPhase: PipelinePhase = {
       kind: "function",
       label: "Initial",
@@ -108,7 +108,6 @@ describe("execute-phases appendPhases", () => {
       operationType: "autonomous",
     });
 
-    // 1 initial + 4 appended = 5 entries. Bug would produce 1 + 8 = 9.
     expect(phaseInfos).toHaveLength(5);
     expect(phaseInfos.map((p) => p.label)).toEqual([
       "Initial",
@@ -120,9 +119,8 @@ describe("execute-phases appendPhases", () => {
   });
 
   it("tags each phase's events with the phase's own label after appendPhases", async () => {
-    // Bug symptom: after a function phase appended more phases, every subsequent
-    // phase's events were tagged with the *previous* phase's label (off-by-one
-    // shift caused by the duplicated phaseInfos entries).
+    // A duplicated phaseInfos entry shifts every later phase's events onto the
+    // previous phase's label.
     const phases: PipelinePhase[] = [
       {
         kind: "function",
@@ -177,11 +175,9 @@ describe("execute-phases appendPhases", () => {
   });
 
   it("every __phaseUpdate event's (phaseIndex, phaseLabel) matches phases[phaseIndex].label", async () => {
-    // Stronger invariant: across pending / running / completed status emissions,
-    // the label in every __phaseUpdate must match the label of the phase that
-    // actually sits at that index. Guards against any future drift between
-    // phaseInfos and the pipeline's PipelinePhase[] array, not just the
-    // duplicate-push bug above.
+    // Across pending / running / completed status emissions, the label in every
+    // __phaseUpdate must match the label of the phase that actually sits at that
+    // index, including after a nested append.
     const phases: PipelinePhase[] = [
       {
         kind: "function",

@@ -65,7 +65,6 @@ export function DropdownMenu({
   const topItemsRef = useRef<(HTMLButtonElement | null)[]>([]);
   const subItemsRef = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Close on click outside
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {

@@ -33,7 +33,6 @@ describe("migration: model support", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(input);
-    // The active "  model: sonnet" line (2-space indent, no comment) should survive
     const lines = result.split("\n");
     const activeLine = lines.find((l) => /^\s{2}model: sonnet$/.test(l));
     expect(activeLine).toBeDefined();
@@ -70,9 +69,7 @@ describe("migration: model support", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(input);
-    // unknownKey is outside steps, should be commented out
     expect(result).toContain("#     unknownKey: true");
-    // steps content should be preserved
     expect(result).toContain("      code-review:");
     expect(result).toContain("        model: sonnet");
   });
@@ -134,7 +131,6 @@ describe("migration: old config upgrade", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(input);
-    // model should be added as a commented-out entry
     expect(result).toContain("#   model:");
   });
 
@@ -177,7 +173,6 @@ describe("migration: old config upgrade", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(input);
-    // New hint lines should be present
     expect(result).toContain("#   # Built-in step defaults");
     expect(result).toContain("five rungs");
     expect(result).toContain("#   #   model: sonnet");
@@ -258,13 +253,10 @@ describe("migration: old config upgrade", () => {
     ].join("\n");
     const result = migrateConfigContent(oldConfig);
 
-    // model line should be added in operations section
     expect(result).toContain("#   model:");
-    // New hint lines should be present
     expect(result).toContain("#   #   model: sonnet");
     expect(result).toContain("#   #   steps:");
 
-    // Should be idempotent after migration
     expect(migrateConfigContent(result)).toBe(result);
   });
 });

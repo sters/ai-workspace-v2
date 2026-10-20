@@ -53,9 +53,8 @@ export async function writeReviewBaseline(
  * Newest baseline whose session timestamp the caller accepts.
  *
  * Session directory names are `YYYYMMDD-HHMMSS`, so lexical ordering is
- * chronological. Returns null when no accepted session recorded one — every
- * session predating this feature, which is what makes a full-branch review the
- * fallback rather than an error.
+ * chronological. Returns null when no accepted session recorded one, which
+ * makes a full-branch review the fallback rather than an error.
  */
 async function findBaseline(
   wsPath: string,

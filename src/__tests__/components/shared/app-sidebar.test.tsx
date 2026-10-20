@@ -28,7 +28,6 @@ vi.mock("@/components/shared/push-toggle", () => ({
   PushToggle: () => <div data-testid="push-toggle" />,
 }));
 
-// Import after mocks
 import { AppSidebar } from "@/components/shared/app-sidebar";
 import {
   SIDEBAR_COLLAPSED_STORAGE_KEY,

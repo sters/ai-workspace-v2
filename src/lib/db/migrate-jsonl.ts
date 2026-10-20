@@ -52,13 +52,11 @@ export function migrateJsonlToSqlite(): { migrated: number; errors: number } {
 
   const db = getDb();
 
-  // Check if there are already operations in SQLite
   const count = db.query("SELECT COUNT(*) as c FROM operations").get() as { c: number };
   if (count.c > 0) {
     return { migrated: 0, errors: 0 };
   }
 
-  // Count JSONL files to migrate
   let totalFiles = 0;
   for (const entry of fs.readdirSync(OPERATIONS_DIR, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -103,7 +101,6 @@ export function migrateJsonlToSqlite(): { migrated: number; errors: number } {
         const { operation, events } = log;
         const resultSummary = extractResultSummary(events);
 
-        // Insert in a transaction per operation
         db.transaction(() => {
           insertOp.run({
             $id: operation.id,
@@ -131,7 +128,6 @@ export function migrateJsonlToSqlite(): { migrated: number; errors: number } {
           }
         })();
 
-        // Delete the original file
         fs.unlinkSync(fp);
         migrated++;
       } catch (err) {

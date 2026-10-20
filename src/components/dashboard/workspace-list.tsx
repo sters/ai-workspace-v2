@@ -17,7 +17,6 @@ export function WorkspaceList() {
     });
   const { runningWorkspaces, operations } = useRunningOperations();
 
-  // Build set of workspaces that have a pending ask
   const askingWorkspaces = new Set(
     operations.filter((op) => op.hasPendingAsk).map((op) => op.workspace),
   );

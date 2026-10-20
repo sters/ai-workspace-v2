@@ -36,7 +36,6 @@ export async function GET(request: Request) {
     // Collect usage output (raw, with ANSI codes for xterm rendering)
     const rawOutput = await collectOutput(listeners, 3000, 30000);
 
-    // Clean up
     proc.kill();
 
     return NextResponse.json({ usage: rawOutput });

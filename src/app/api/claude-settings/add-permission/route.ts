@@ -16,7 +16,6 @@ export async function POST(request: NextRequest) {
 
     const filePath = getSettingsFilePath("local");
 
-    // Read existing settings or start fresh
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let settings: any;
     try {
@@ -26,16 +25,13 @@ export async function POST(request: NextRequest) {
       settings = {};
     }
 
-    // Ensure permissions.allow array exists
     if (!settings.permissions) settings.permissions = {};
     if (!Array.isArray(settings.permissions.allow)) settings.permissions.allow = [];
 
-    // Check for duplicates
     if (settings.permissions.allow.includes(permission)) {
       return NextResponse.json({ ok: true, alreadyExists: true });
     }
 
-    // Add and write
     settings.permissions.allow.push(permission);
     await mkdir(path.dirname(filePath), { recursive: true });
     await Bun.write(filePath, JSON.stringify(settings, null, 2));

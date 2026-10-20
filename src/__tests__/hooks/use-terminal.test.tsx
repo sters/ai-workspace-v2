@@ -1,7 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-// Mock xterm.js modules before importing the hook
 const mockWrite = vi.fn();
 const mockOpen = vi.fn();
 const mockDispose = vi.fn();
@@ -43,7 +42,6 @@ vi.mock("@xterm/addon-web-links", () => {
 
 vi.mock("@xterm/xterm/css/xterm.css", () => ({}));
 
-// Import after mocks
 import { useTerminal } from "@/hooks/use-terminal";
 import { Terminal } from "@xterm/xterm";
 
@@ -202,7 +200,6 @@ describe("useTerminal", () => {
     });
 
     const opts = vi.mocked(Terminal).mock.calls[0][0];
-    // For readonly, cursor color matches background to hide it
     expect(opts?.theme?.cursor).toBe(opts?.theme?.background);
   });
   describe("focusOnWindowFocus", () => {

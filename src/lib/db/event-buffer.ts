@@ -106,7 +106,6 @@ export function stopAutoFlush(operationId: string): void {
     entry.timer = null;
   }
 
-  // Final flush
   flushEvents(operationId);
   buffers.delete(operationId);
 }

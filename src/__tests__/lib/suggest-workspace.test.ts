@@ -7,7 +7,6 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-// Mock runClaude
 const mockRunClaude = vi.fn();
 const mockOnEvent = vi.fn();
 const mockGetResultText = vi.fn();
@@ -27,7 +26,6 @@ vi.mock("@/lib/claude", () => ({
   },
 }));
 
-// Mock workspace reader — only getReadme is still used
 vi.mock("@/lib/workspace/reader", () => ({
   getReadme: vi.fn().mockResolvedValue("# Test\n\nScope: fix auth"),
 }));
@@ -37,7 +35,7 @@ vi.mock("@/lib/workspace/prompts", () => ({
   ensureGlobalSystemPrompt: vi.fn(() => "/mock/prompts/global.md"),
 }));
 
-// Mock operation store — provide an event stream the digest builder can parse.
+// An event stream the digest builder can parse.
 vi.mock("@/lib/operation-store", () => ({
   readOperationLog: vi.fn(() => ({
     operation: {
@@ -66,7 +64,6 @@ vi.mock("@/lib/operation-store", () => ({
   })),
 }));
 
-// Mock event buffer flush (no-op in tests)
 vi.mock("@/lib/db/event-buffer", () => ({
   flushEvents: vi.fn(),
 }));
@@ -92,7 +89,6 @@ describe("triggerWorkspaceSuggestion", () => {
 
     mockGetResultText.mockReturnValue(resultJson);
     mockOnEvent.mockImplementation((handler: (event: { type: string }) => void) => {
-      // Simulate immediate completion
       setTimeout(() => handler({ type: "complete" }), 10);
     });
 
@@ -124,9 +120,7 @@ describe("triggerWorkspaceSuggestion", () => {
     const lastCall = mockRunClaude.mock.calls.at(-1);
     const prompt = lastCall?.[1] as string | undefined;
     expect(prompt).toBeDefined();
-    // Should contain content extracted from the mocked operation log
     expect(prompt).toContain("flaky test");
-    // Should contain a tool-call summary (the Read target file path)
     expect(prompt).toContain("logging.ts");
   });
 
@@ -159,7 +153,6 @@ describe("triggerWorkspaceSuggestion", () => {
 
     const { triggerWorkspaceSuggestion } = await import("@/lib/suggest-workspace");
 
-    // Should not throw
     expect(() => {
       triggerWorkspaceSuggestion("test-ws", "op-1", "execute");
     }).not.toThrow();

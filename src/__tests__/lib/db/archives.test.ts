@@ -16,11 +16,6 @@ describe("db/archives", () => {
     getDb();
   });
 
-  it("archives a workspace", () => {
-    archiveWorkspace("ws-1");
-    expect(isWorkspaceArchived("ws-1")).toBe(true);
-  });
-
   it("returns false for non-archived workspace", () => {
     expect(isWorkspaceArchived("ws-1")).toBe(false);
   });

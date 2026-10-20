@@ -146,8 +146,6 @@ describe("prewarmRoutes", () => {
     expect(result).toEqual({ ok: 2, failed: 0 });
   });
 
-  // A prewarm is a background nicety; one route that throws (or 500s on a page
-  // whose own code is broken) must not cost the rest of the sweep.
   it("sends the requested method, GET by default", async () => {
     const methods: string[] = [];
     const fetch = async (_url: string, init: { method: string }) => {
@@ -160,6 +158,8 @@ describe("prewarmRoutes", () => {
     expect(methods).toEqual(["GET", "OPTIONS"]);
   });
 
+  // A prewarm is a background nicety; one route that throws (or 500s on a page
+  // whose own code is broken) must not cost the rest of the sweep.
   it("keeps going past a route that throws", async () => {
     const result = await prewarmRoutes("http://127.0.0.1:3741", ["/a", "/b", "/c"], {
       fetch: async (url) => {

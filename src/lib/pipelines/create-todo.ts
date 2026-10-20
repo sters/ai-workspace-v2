@@ -20,7 +20,6 @@ export function buildCreateTodoPipeline(
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);
 
   return [
-    // Phase A: Plan TODO from review (parallel per repo)
     {
       kind: "function",
       label: "Plan TODO from review",
@@ -62,7 +61,6 @@ export function buildCreateTodoPipeline(
         return allSuccess;
       },
     },
-    // Phase B: Coordinate TODOs across repos (skip if single repo)
     {
       kind: "function",
       label: "Coordinate TODOs",
@@ -80,7 +78,6 @@ export function buildCreateTodoPipeline(
         }).fn(ctx);
       },
     },
-    // Phase C: Review TODOs (parallel per repo)
     {
       kind: "function",
       label: "Review TODOs",
@@ -97,7 +94,6 @@ export function buildCreateTodoPipeline(
         }).fn(ctx);
       },
     },
-    // Phase D: Commit snapshot
     buildCommitSnapshotPhase(
       workspace,
       `Create TODO from review: ${reviewTimestamp}`,

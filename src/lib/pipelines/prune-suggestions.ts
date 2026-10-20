@@ -1,14 +1,3 @@
-/**
- * Pipeline for suggestion pruning.
- * Checks whether each active suggestion has already been addressed in its
- * target repository and dismisses resolved ones.
- *
- *  1. Load active suggestions and match them to local repositories
- *  2. Auto-dismiss suggestions whose target repo is not found locally
- *  3. For each matched repo, spawn Claude to check resolution status
- *  4. Dismiss suggestions that Claude identifies as resolved
- */
-
 import { listActiveSuggestions, dismissSuggestion } from "@/lib/db";
 import { listAllRepositories } from "@/lib/workspace";
 import { buildSuggestionPrunerPrompt, SUGGESTION_PRUNE_SCHEMA } from "@/lib/templates";
@@ -17,14 +6,6 @@ import { STEP_TYPES } from "@/types/pipeline";
 import type { WorkspaceSuggestion } from "@/types/suggestion";
 import type { WorkspaceRepo } from "@/types/workspace";
 
-// ---------------------------------------------------------------------------
-// Repo matching helper
-// ---------------------------------------------------------------------------
-
-/**
- * Match a suggestion's targetRepository to a local repo.
- * Tries: exact repoPath match, exact repoName match, repoPath suffix match.
- */
 export function matchSuggestionToRepo(
   targetRepository: string,
   repos: WorkspaceRepo[],
@@ -48,16 +29,11 @@ export function matchSuggestionToRepo(
   return null;
 }
 
-// ---------------------------------------------------------------------------
-// Pipeline
-// ---------------------------------------------------------------------------
-
 export function buildPruneSuggestionsPipeline(): PipelinePhase[] {
   let grouped: Map<string, { repo: WorkspaceRepo; suggestions: WorkspaceSuggestion[] }>;
   let autoDismissed = 0;
 
   return [
-    // ── Phase 1: Load and match ───────────────────────────────────────
     {
       kind: "function",
       label: "Load and match repositories",
@@ -75,7 +51,6 @@ export function buildPruneSuggestionsPipeline(): PipelinePhase[] {
         const repos = await listAllRepositories();
         ctx.emitStatus(`Found ${repos.length} local repository(ies).`);
 
-        // Match and group
         grouped = new Map();
         const unmatched: WorkspaceSuggestion[] = [];
 
@@ -92,7 +67,6 @@ export function buildPruneSuggestionsPipeline(): PipelinePhase[] {
           grouped.get(key)!.suggestions.push(s);
         }
 
-        // Auto-dismiss unmatched
         for (const s of unmatched) {
           dismissSuggestion(s.id);
           autoDismissed++;
@@ -119,7 +93,6 @@ export function buildPruneSuggestionsPipeline(): PipelinePhase[] {
       },
     },
 
-    // ── Phase 2: Check with AI ────────────────────────────────────────
     {
       kind: "function",
       label: "Check resolution with AI",

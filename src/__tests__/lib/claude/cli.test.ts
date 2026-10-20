@@ -17,7 +17,6 @@ vi.mock("@/lib/pty", () => ({
 const mockWhich = vi.fn();
 const mockSpawn = vi.fn();
 
-// Store originals
 const originalWhich = Bun.which;
 const originalSpawn = Bun.spawn;
 const originalClaudePath = process.env.AIW_CLAUDE_PATH;
@@ -47,10 +46,6 @@ afterAll(() => {
   }
   _resetCliPath();
 });
-
-// ---------------------------------------------------------------------------
-// getCliPath
-// ---------------------------------------------------------------------------
 
 describe("getCliPath", () => {
   let tmp: string;
@@ -98,7 +93,6 @@ describe("getCliPath", () => {
     const first = getCliPath();
     const second = getCliPath();
     expect(first).toBe(second);
-    // Bun.which should only be called on first invocation
     expect(mockWhich).toHaveBeenCalledTimes(1);
   });
 
@@ -106,14 +100,9 @@ describe("getCliPath", () => {
     process.env.AIW_CLAUDE_PATH = "/custom/path/to/claude";
 
     expect(getCliPath()).toBe("/custom/path/to/claude");
-    // Should not call Bun.which when CLAUDE_PATH is set
     expect(mockWhich).not.toHaveBeenCalled();
   });
 });
-
-// ---------------------------------------------------------------------------
-// detectFatalApiError
-// ---------------------------------------------------------------------------
 
 describe("detectFatalApiError", () => {
   it("detects API Error: 401 in result errors", () => {
@@ -169,10 +158,6 @@ describe("detectFatalApiError", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// getClaudeEnv
-// ---------------------------------------------------------------------------
-
 describe("getClaudeEnv", () => {
   it("returns env with CLAUDECODE set to undefined", () => {
     const env = getClaudeEnv();
@@ -185,10 +170,6 @@ describe("getClaudeEnv", () => {
     expect(env.PATH).toBe("/custom/path");
   });
 });
-
-// ---------------------------------------------------------------------------
-// spawnClaude
-// ---------------------------------------------------------------------------
 
 describe("spawnClaude", () => {
   beforeEach(() => {
@@ -223,10 +204,6 @@ describe("spawnClaude", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// runClaudeCommand
-// ---------------------------------------------------------------------------
-
 describe("runClaudeCommand", () => {
   beforeEach(() => {
     _resetCliPath();
@@ -258,10 +235,6 @@ describe("runClaudeCommand", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// spawnClaudeTerminal
-// ---------------------------------------------------------------------------
-
 describe("spawnClaudeTerminal", () => {
   const mockProc = { terminal: { write: vi.fn() }, kill: vi.fn(), exited: Promise.resolve(0) };
 
@@ -292,10 +265,6 @@ describe("spawnClaudeTerminal", () => {
     expect(opts.cwd).toBe("/custom/dir");
   });
 });
-
-// ---------------------------------------------------------------------------
-// runClaude — AskUserQuestion suppression
-// ---------------------------------------------------------------------------
 
 describe("runClaude", () => {
   function createMockStdout(lines: object[]): ReadableStream<Uint8Array> {
@@ -366,17 +335,13 @@ describe("runClaude", () => {
     // Wait for async stream processing to complete
     await new Promise((resolve) => setTimeout(resolve, 50));
 
-    // proc.kill should have been called
     expect(mockKill).toHaveBeenCalled();
 
-    // Check emitted output events
     const outputEvents = events.filter((e) => e.type === "output");
     const parsedOutputs = outputEvents.map((e) => JSON.parse(e.data));
 
-    // system init should be emitted
     expect(parsedOutputs.some((p) => p.type === "system")).toBe(true);
 
-    // AskUserQuestion assistant message should be emitted
     expect(parsedOutputs.some((p) =>
       p.type === "assistant" &&
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -436,7 +401,6 @@ describe("runClaude", () => {
     const outputEvents = events.filter((e) => e.type === "output");
     const parsedOutputs = outputEvents.map((e) => JSON.parse(e.data));
 
-    // Normal tool_result should be emitted
     expect(parsedOutputs.some((p) => p.type === "user")).toBe(true);
 
     // Complete event should be emitted (no pending ask)

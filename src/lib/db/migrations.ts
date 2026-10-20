@@ -193,7 +193,6 @@ const migrations: Migration[] = [
 const LATEST_VERSION = migrations[migrations.length - 1].version;
 
 export function runMigrations(db: Database): void {
-  // Check if schema_migrations table exists
   const tableExists = db
     .query("SELECT name FROM sqlite_master WHERE type='table' AND name='schema_migrations'")
     .get();

@@ -7,7 +7,6 @@ import type { OperationType } from "@/types/operation";
 
 /**
  * Hook that starts an operation via POST and navigates to the operations page.
- * Replaces the repeated `startAndNavigate` pattern across workspace components.
  * Resolves `false` when the operation was refused, so a caller can keep what
  * the user entered.
  */

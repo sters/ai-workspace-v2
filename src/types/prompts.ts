@@ -74,8 +74,7 @@ export interface TodoReviewFinding {
  * usable baseline, and the whole branch is that repository's review target.
  *
  * Shared by the per-repo code reviewer and the cross-repository reviewer so both
- * narrow against the same range — the cross-repo reviewer was the only exempt one,
- * and re-reading an unchanged boundary every cycle is what it cost.
+ * narrow against the same range.
  */
 export interface ReviewScope {
   /** Review session the baseline came from, named so the reviewer can cite it. */

@@ -1,7 +1,3 @@
-/**
- * Workspace git operations — listing repos, committing snapshots, deleting workspaces.
- */
-
 import { globScan, pathExists } from "@/lib/fs";
 import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
@@ -10,17 +6,12 @@ import { exec, execArgs, repoDir } from "./helpers";
 import { isQuickCreateBuilding } from "./quick-create-progress";
 import type { WorkspaceRepo } from "@/types/workspace";
 
-// ---------------------------------------------------------------------------
-// listWorkspaceRepos
-// ---------------------------------------------------------------------------
-
 export async function listWorkspaceRepos(workspaceName: string): Promise<WorkspaceRepo[]> {
   const wsPath = path.join(getWorkspaceDir(), workspaceName);
   if (!(await pathExists(wsPath))) return [];
 
   const repos: WorkspaceRepo[] = [];
 
-  // Find directories containing .git (regular repos or worktrees) up to 4 levels deep
   async function walk(dir: string, depth: number): Promise<void> {
     if (depth > 4) return;
     const entries = await readdir(dir, { withFileTypes: true });
@@ -29,7 +20,7 @@ export async function listWorkspaceRepos(workspaceName: string): Promise<Workspa
       const fullPath = path.join(dir, entry.name);
       if (!entry.isDirectory()) continue;
 
-      // Check for .git (directory or file — worktrees use a file)
+      // A worktree's .git is a file, not a directory.
       const gitPath = path.join(fullPath, ".git");
       if (await pathExists(gitPath)) {
         const relPath = path.relative(wsPath, fullPath);
@@ -48,10 +39,6 @@ export async function listWorkspaceRepos(workspaceName: string): Promise<Workspa
   repos.sort((a, b) => a.repoPath.localeCompare(b.repoPath));
   return repos;
 }
-
-// ---------------------------------------------------------------------------
-// listAllRepositories
-// ---------------------------------------------------------------------------
 
 /**
  * List all git repositories under the top-level `repositories/` directory.
@@ -92,10 +79,6 @@ export async function listAllRepositories(): Promise<WorkspaceRepo[]> {
   return repos;
 }
 
-// ---------------------------------------------------------------------------
-// commitWorkspaceSnapshot
-// ---------------------------------------------------------------------------
-
 export async function commitWorkspaceSnapshot(
   workspaceName: string,
   message?: string,
@@ -103,33 +86,27 @@ export async function commitWorkspaceSnapshot(
   const wsPath = path.join(getWorkspaceDir(), workspaceName);
   if (!(await pathExists(path.join(wsPath, ".git")))) return false;
 
-  // Check for changes
   try {
     await exec(`git -C "${wsPath}" diff --quiet HEAD -- README.md`);
     await exec(`git -C "${wsPath}" diff --cached --quiet -- README.md`);
-    // Also check TODO and artifacts
     try { await exec(`git -C "${wsPath}" diff --quiet HEAD -- . -- ':!github.com' ':!gitlab.com' ':!bitbucket.org' ':!tmp'`); } catch { /* has changes */ }
   } catch { /* has changes, proceed */ }
 
-  // Stage changes
   try { await exec(`git -C "${wsPath}" add README.md`); } catch { /* no README */ }
   try { await exec(`git -C "${wsPath}" add "TODO-*.md" 2>/dev/null || true`); } catch { /* no TODOs */ }
-  // Use Bun.Glob for TODO files
   const todoGlob = new Bun.Glob("TODO-*.md");
   const todoFiles = (await globScan(todoGlob, wsPath));
   for (const f of todoFiles) {
     try { await exec(`git -C "${wsPath}" add "${f}"`); } catch { /* ignore */ }
   }
-  // Note: template files are in templates/ which is gitignored
+  // templates/ is gitignored, so only artifacts/ is staged besides README and TODOs.
   try { await exec(`git -C "${wsPath}" add artifacts/`); } catch { /* no artifacts */ }
 
-  // Check if there are staged changes
   try {
     await exec(`git -C "${wsPath}" diff --cached --quiet`);
-    return false; // no changes
+    return false;
   } catch { /* has staged changes, proceed */ }
 
-  // Auto-generate message if not provided
   let commitMsg = message;
   if (!commitMsg) {
     let completed = 0;
@@ -153,10 +130,6 @@ export async function commitWorkspaceSnapshot(
   return true;
 }
 
-// ---------------------------------------------------------------------------
-// deleteWorkspace
-// ---------------------------------------------------------------------------
-
 export async function deleteWorkspace(workspaceName: string): Promise<void> {
   const wsPath = path.join(getWorkspaceDir(), workspaceName);
   if (!(await pathExists(wsPath))) {
@@ -168,7 +141,6 @@ export async function deleteWorkspace(workspaceName: string): Promise<void> {
     );
   }
 
-  // Collect repository paths that have worktrees
   const repoPaths: string[] = [];
   const repos = await listWorkspaceRepos(workspaceName);
   for (const repo of repos) {
@@ -178,10 +150,9 @@ export async function deleteWorkspace(workspaceName: string): Promise<void> {
     }
   }
 
-  // Remove workspace directory (operation logs are kept in SQLite for history)
+  // Operation logs stay in SQLite.
   await rm(wsPath, { recursive: true, force: true });
 
-  // Prune worktree references
   for (const rp of repoPaths) {
     try {
       await exec(`git -C "${rp}" worktree prune`);

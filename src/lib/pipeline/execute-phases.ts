@@ -29,8 +29,7 @@ export interface ExecutePhasesParams {
 }
 
 /**
- * Shared pipeline execution loop used by both startOperationPipeline and
- * resumeOperationPipeline. Runs phases sequentially, handling timeouts,
+ * Pipeline execution loop for startOperationPipeline. Runs phases sequentially, handling timeouts,
  * abort signals, onPhaseComplete callbacks, and the try/finally with
  * markComplete.
  */
@@ -52,10 +51,9 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
   // picked up automatically.
   //
   // `phaseInfos` and `managed.operation.phases` share the same array reference
-  // (set by orchestrator.ts and resume.ts), so a single push covers both.
-  // Pushing to both used to silently duplicate every appended entry, which
-  // shifted phaseInfos[i] away from phases[i] and caused every subsequent
-  // phase's events to be tagged with the previous phase's label.
+  // (set by orchestrator.ts), so a single push covers both. Pushing to both
+  // would duplicate every appended entry and misalign phaseInfos[i] with
+  // phases[i], tagging later phases' events with the wrong label.
   const appendPhases = (newPhases: PipelinePhase[]) => {
     if (managed.operation.phases !== phaseInfos) {
       // Defensive: callers are expected to alias these. If they ever diverge,
@@ -95,7 +93,6 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
       const phaseLabel = phaseInfos[i].label;
       const phaseExtra = { phaseIndex: i, phaseLabel };
 
-      // Retry configuration
       const maxRetries = phase.maxRetries ?? DEFAULT_MAX_RETRIES;
       const retryDelayMs = phase.retryDelayMs ?? DEFAULT_RETRY_DELAY_MS;
       let attempt = 0;
@@ -126,7 +123,6 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
             break;
           }
 
-          // Reset start time for the new attempt
           if (phaseInfos[i]) {
             phaseInfos[i].startedAt = new Date().toISOString();
             phaseInfos[i].retryAttempt = attempt;
@@ -153,7 +149,7 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
 
         // Set up timeout timer.
         // For function phases, use a per-phase AbortController so that a timeout
-        // doesn't permanently abort the shared managed.abortController (Fix 3).
+        // doesn't permanently abort the shared managed.abortController.
         let timedOut = false;
         const phaseAbortController = phase.kind === "function"
           ? new AbortController()
@@ -201,7 +197,6 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
           phaseSuccess = await runGroupPhase(managed, phase, operationId, i, phases.length, phaseExtra);
         }
 
-        // Restore original abort controller after function phase completes
         if (phase.kind === "function" && phaseAbortController) {
           managed.abortController = originalAbortController;
         }
@@ -209,7 +204,7 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
         clearTimeout(timeoutTimer);
         if (timedOut) phaseSuccess = false;
 
-        if (phaseSuccess) break; // Success — no need to retry
+        if (phaseSuccess) break;
 
         attempt++;
       } while (attempt <= maxRetries && !managed.abortController.signal.aborted);
@@ -219,7 +214,7 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
         : undefined;
       emitPhaseUpdate(managed, i, phaseLabel, phaseSuccess ? "completed" : "failed", finalRetryInfo);
 
-      // Fix 4: Check phaseSuccess BEFORE calling onPhaseComplete.
+      // Check phaseSuccess BEFORE calling onPhaseComplete.
       // If the phase failed, break regardless of what onPhaseComplete returns.
       if (!phaseSuccess) {
         if (pipelineOptions?.onPhaseComplete) {

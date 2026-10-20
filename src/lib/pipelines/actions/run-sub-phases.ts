@@ -3,11 +3,7 @@ import type { PipelinePhase, PhaseFunctionContext, RunChildOptions } from "@/typ
 /** Options merged into every child call within runSubPhases. */
 export type SubPhaseOptions = Pick<RunChildOptions, "skipAskUserQuestion">;
 
-/**
- * Run sub-pipeline phases within a single function phase context.
- * Handles single, group, and function phase kinds.
- * When `extra` is provided, its fields are merged into every runChild/runChildGroup call.
- */
+/** Run sub-pipeline phases within a single function phase context. */
 export async function runSubPhases(
   ctx: PhaseFunctionContext,
   phases: PipelinePhase[],

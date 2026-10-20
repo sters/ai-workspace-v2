@@ -93,12 +93,9 @@ interface RepoVerdict {
 /**
  * Reviews each repository's TODO file before execution, then applies the verdict.
  *
- * The review half is old; applying it is not. The verdict used to be free text
- * that nothing parsed, so a finding predicting a regression — the plan wires a
- * nullable helper into a call site that always had a value, say — was emitted
- * into the operation log and then rediscovered by the cycle-1 code review, one
- * execute phase later. Now each finding exits as either a TODO amendment or a
- * `[!]` blocked item.
+ * Each finding exits as either a TODO amendment or a `[!]` blocked item, so a
+ * finding that predicts a regression reaches the executor instead of waiting to
+ * be rediscovered by the first code review.
  *
  * Fails open throughout: an unreadable verdict, or a reviser that dies, leaves
  * the plan executable rather than stopping init.

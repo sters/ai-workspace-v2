@@ -1,8 +1,3 @@
-/**
- * Prompt template for workspace-repo-todo-planner agent.
- * Plans and creates TODO items for a specific repository.
- */
-
 import type { PlannerInput } from "@/types/prompts";
 import {
   REPO_SEARCH_EFFICIENCY,
@@ -17,8 +12,7 @@ const PLANNER_CD_RULES = worktreeCdRules({ examples: "`git status`, `git diff`, 
 /**
  * The exploring planner gets the cd rule with a pointer out of it. Its opening
  * line is an emphatic MUST about a Bash call, which on its own reads as "Bash is
- * how you touch this repository" — measured: 54 Bash calls and zero Grep/Glob in
- * one phase. The pointer, and rendering "Searching the Repository" *after* this
+ * how you touch this repository". The pointer, and rendering "Searching the Repository" *after* this
  * section rather than before it, are what keep that from being the last word.
  */
 const EXPLORING_PLANNER_CD_RULES = worktreeCdRules({

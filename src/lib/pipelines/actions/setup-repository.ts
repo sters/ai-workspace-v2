@@ -1,8 +1,3 @@
-/**
- * Pipeline action: set up a git worktree for a repository within a workspace.
- * Handles cloning, fetching, branch creation, worktree setup, and conflict resolution.
- */
-
 import { pathExists } from "@/lib/fs";
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -254,10 +249,10 @@ async function createWorktree(
   const repoName = path.basename(repoPathInput);
   const repoAbsPath = path.join(repoDir(), actualRepoPath);
 
-  // Detect base branch. A README-declared override (e.g. `main`) may not match
-  // the repo's actual default branch (e.g. `master`); trusting it blindly makes
-  // the later `worktree add ... origin/<branch>` fail with `invalid reference`.
-  // So if the override doesn't exist on the remote, fall back to the detected default.
+  // A README-declared override (e.g. `main`) may not match the repo's actual
+  // default branch (e.g. `master`); trusting it blindly makes the later
+  // `worktree add ... origin/<branch>` fail with `invalid reference`. So if the
+  // override doesn't exist on the remote, fall back to the detected default.
   let baseBranch = baseBranchOverride ?? (await detectBaseBranch(repoAbsPath));
   if (baseBranchOverride && !(await remoteBranchExists(repoAbsPath, baseBranch))) {
     const detected = await detectBaseBranch(repoAbsPath);
@@ -280,9 +275,7 @@ async function createWorktree(
   // part and touches nothing the other worktrees share.
   const branchName = await withCloneLock(repoAbsPath, async () => {
     if (checkoutBranch) {
-      // --- Checkout existing remote branch (PR-based setup) ---
-
-      // If the target directory already exists, remove it
+      // PR-based setup: check out the existing remote branch.
       if (await pathExists(worktreePath)) {
         emitStatus(`Target directory already exists, removing: ${repoPathInput}`);
         await rm(worktreePath, { recursive: true, force: true });
@@ -317,8 +310,6 @@ async function createWorktree(
       );
       return localBranchName;
     }
-
-    // --- Create new branch (default behavior) ---
 
     let newBranch = deriveBranchName(workspaceName, repoAlias, dateStamp(new Date()));
 
@@ -372,7 +363,6 @@ async function createWorktree(
 
   // Verify the worktree was actually created
   if (!(await pathExists(path.join(worktreePath, ".git")))) {
-    // Log diagnostic info
     const list = await exec(`git -C "${repoAbsPath}" worktree list`);
     emitStatus(`Worktree list after add: ${list}`);
     throw new Error(

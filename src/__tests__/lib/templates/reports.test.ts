@@ -14,11 +14,10 @@ describe("REVIEW_REPORT_TEMPLATE", () => {
     }
   });
 
-  // The free-text verdict slots invited a ship/no-ship call the reviewer is not
-  // positioned to make (it sees no acceptance criteria, TODO files, ledger, or
-  // fix-verification), and the gate is instructed to override it — so the same
-  // file carried two contradictory answers. Observed: a review whose Conclusion
-  // read "none blocking. Merge-ready" was looped on by the gate anyway.
+  // The reviewer sees no acceptance criteria, TODO files, ledger, or
+  // fix-verification, so it is not positioned to make a ship/no-ship call, and
+  // the gate is instructed to override one — the file would carry two
+  // contradictory answers.
   it("does not invite a merge/ship verdict in its summary slots", () => {
     const idx = REVIEW_REPORT_TEMPLATE.indexOf("## Overall Assessment");
     expect(idx).toBeGreaterThan(-1);

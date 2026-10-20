@@ -96,7 +96,6 @@ export function WorkspaceLayoutContent({
 
   return (
     <div>
-      {/* Header */}
       <div className="mb-4">
         <Link
           href="/"
@@ -125,7 +124,6 @@ export function WorkspaceLayoutContent({
         </div>
       </div>
 
-      {/* Progress summary */}
       <Card className="mb-6">
         <div className="mb-2 flex items-center justify-between text-sm">
           <span>
@@ -139,7 +137,6 @@ export function WorkspaceLayoutContent({
         <ProgressBar value={workspace.overallProgress} />
       </Card>
 
-      {/* Operations */}
       <div className="mb-6">
         <OperationPanel
           workspaceName={decodedName}
@@ -150,7 +147,6 @@ export function WorkspaceLayoutContent({
         />
       </div>
 
-      {/* Tabs */}
       <div className="mb-4 flex border-b">
         {tabs.map((tab) => {
           const href =
@@ -176,7 +172,6 @@ export function WorkspaceLayoutContent({
         })}
       </div>
 
-      {/* Tab Content */}
       <div>{children}</div>
     </div>
   );

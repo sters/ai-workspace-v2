@@ -1,7 +1,3 @@
-/**
- * README template builder for new workspaces.
- */
-
 export function buildReadmeContent(description: string, taskType: string, ticketId: string, date: string): string {
   return `# Task: TBD
 

@@ -34,10 +34,8 @@ describe("POST /api/operations/claude-login", () => {
     const phases = mockStartOperationPipeline.mock.calls[0][2];
     const fnPhase = phases[0];
 
-    // Mock checkAuthStatus to return a status string
     mockCheckAuthStatus.mockResolvedValueOnce("Authenticated");
 
-    // Mock spawnClaudeAuth to return a completed login process
     const encoder = new TextEncoder();
     mockSpawnClaudeAuth.mockReturnValueOnce({
       stdout: new ReadableStream({

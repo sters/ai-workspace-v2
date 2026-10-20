@@ -1,9 +1,9 @@
 /**
  * Prompt template for the requested-fix verifier.
  *
- * The autonomous gate hands the next cycle a list of fixes to make. Whether they
- * landed was previously inferred from TODO checkboxes — a `[x]` means the executor
- * *said* it did the work. This agent answers the same question from the code.
+ * The autonomous gate hands the next cycle a list of fixes to make. A `[x]` in a
+ * TODO file only means the executor *said* it did the work; this agent answers
+ * whether each fix landed from the code.
  */
 
 import type { FixVerifierInput } from "@/types/prompts";

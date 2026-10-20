@@ -9,7 +9,6 @@ import { postJson } from "./client";
 export type KillOperationParams = z.input<typeof operationKillSchema>;
 export type OpenParams = z.input<typeof openSchema>;
 
-/** Kill a running operation by ID. */
 export async function killOperation(operationId: string): Promise<void> {
   await postJson("/api/operations/kill", { operationId } satisfies KillOperationParams);
 }

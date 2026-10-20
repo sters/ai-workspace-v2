@@ -1,7 +1,3 @@
-/**
- * TODO template strings for different task types.
- */
-
 export const TODO_FEATURE_TEMPLATE = `# TODO: {{REPOSITORY_NAME}}
 
 ## Initialize

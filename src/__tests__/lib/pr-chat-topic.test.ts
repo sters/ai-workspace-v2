@@ -10,7 +10,7 @@ const thread = {
   line: 88,
   comments: [
     { author: "reviewer", url: "https://github.com/acme/widgets/pull/42#discussion_r1", body: "This early return skips the unlock." },
-    { author: "sters", url: "https://github.com/acme/widgets/pull/42#discussion_r2", body: "Is it?" },
+    { author: "alice", url: "https://github.com/acme/widgets/pull/42#discussion_r2", body: "Is it?" },
   ],
 };
 
@@ -36,7 +36,7 @@ describe("buildPrChatTopic", () => {
   it("quotes every comment of the thread with its author, replies included", () => {
     const draft = buildPrChatTopic({ threads: [thread], checks: [] });
     expect(draft).toContain("reviewer:\nThis early return skips the unlock.");
-    expect(draft).toContain("sters:\nIs it?");
+    expect(draft).toContain("alice:\nIs it?");
   });
 
   it("falls back to the PR for a thread anchored to no line", () => {

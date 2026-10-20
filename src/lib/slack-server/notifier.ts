@@ -13,8 +13,7 @@ import { FINAL_CYCLE_STOP_PREFIX } from "@/lib/templates/prompts/autonomous-gate
  * arguments, etc.) out of the completion notification. */
 const CREATE_PR_PHASE_LABEL = "Create PR";
 
-/** Default polling interval for the notifier. 30s is a reasonable balance for
- * a kick-off-and-forget UX (latency tolerable, query overhead negligible). */
+/** A kick-off-and-forget flow tolerates this much delivery latency. */
 const DEFAULT_INTERVAL_MS = 30_000;
 
 const NO_PRS_MSG = "Done! No PRs were created. Please check details on WebUI.";

@@ -1,8 +1,3 @@
-/**
- * Prompt template for workspace-todo-coordinator agent.
- * Coordinates TODO items across multiple repositories.
- */
-
 import type { CoordinatorInput } from "@/types/prompts";
 import { NO_CD_RULES, SUBAGENT_DELEGATION_POLICY } from "./shared";
 

@@ -25,7 +25,7 @@ function loadOrCreateKeys(): VapidKeys {
     cachedKeys = JSON.parse(raw) as VapidKeys;
     return cachedKeys;
   } catch {
-    // Generate new keys
+    // No readable key file yet — generate one below.
   }
 
   const keys = webPush.generateVAPIDKeys();

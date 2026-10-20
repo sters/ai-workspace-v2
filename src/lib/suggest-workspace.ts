@@ -19,7 +19,7 @@ import { STEP_TYPES } from "@/types/pipeline";
 import type { OperationType } from "@/types/operation";
 import path from "node:path";
 
-const SUGGESTION_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const SUGGESTION_TIMEOUT_MS = 5 * 60 * 1000;
 
 /** Maximum characters to include in the transcript digest passed to Claude. */
 const MAX_DIGEST_CHARS = 40_000;
@@ -82,7 +82,7 @@ async function runSuggester(
   parentOperationType: OperationType,
 ): Promise<void> {
   const readmeContent = (await getReadme(workspace)) ?? "";
-  if (!readmeContent) return; // No README, nothing to compare against
+  if (!readmeContent) return;
 
   // Ensure any in-memory buffered events for the parent operation are
   // persisted before we read them, so the transcript digest is up to date.
@@ -93,7 +93,7 @@ async function runSuggester(
   }
 
   const operationDigest = buildOperationDigest(operationId);
-  if (!operationDigest) return; // Nothing to analyze
+  if (!operationDigest) return;
 
   const prompt = buildWorkspaceSuggesterPrompt({
     workspaceName: workspace,
@@ -115,7 +115,6 @@ async function runSuggester(
     effort,
   });
 
-  // Wait for completion with timeout
   const resultText = await Promise.race([
     new Promise<string | undefined>((resolve) => {
       proc.onEvent((event) => {
@@ -159,7 +158,6 @@ async function runSuggester(
  * Trigger workspace suggestion detection in the background.
  * Fire-and-forget: errors are logged but never propagated.
  *
- * @param workspace - Workspace name
  * @param operationId - ID of the parent operation whose transcript will be analyzed
  * @param parentOperationType - Operation type of the parent operation, used for model resolution
  */

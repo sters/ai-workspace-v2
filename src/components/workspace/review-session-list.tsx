@@ -10,7 +10,7 @@ import type { ReviewSession } from "@/types/workspace";
  *
  * One row per session rather than a wrapping row of cards: a workspace's
  * autonomous run writes a session per cycle, so the set grows down a column
- * where it used to push the report being read off the screen.
+ * instead of pushing the report being read off the screen.
  */
 export function ReviewSessionList({
   reviews,

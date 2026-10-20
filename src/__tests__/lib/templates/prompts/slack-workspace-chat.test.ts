@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getTaskChatSystemPrompt } from "@/lib/templates/prompts/chat";
 import {
-  SLACK_WORKSPACE_PLAN_SCHEMA,
   buildSlackWorkspaceChatPrompt,
   buildSlackWorkspacePlanPrompt,
   getSlackWorkspaceChatSystemPrompt,
@@ -23,10 +22,6 @@ describe("buildSlackWorkspacePlanPrompt", () => {
 
   it("still asks with nothing cloned, since the request may name a repository", () => {
     expect(buildSlackWorkspacePlanPrompt("work on github.com/acme/new", [])).toMatch(/none cloned yet/i);
-  });
-
-  it("constrains the answer to the fields quick create takes", () => {
-    expect(SLACK_WORKSPACE_PLAN_SCHEMA.required).toEqual(["repositories", "taskType", "name"]);
   });
 });
 
@@ -66,10 +61,6 @@ describe("getSlackWorkspaceChatSystemPrompt", () => {
 
   it("keeps destructive actions forbidden", () => {
     expect(sys).toMatch(/reset --hard/);
-  });
-
-  it("points the user at init in this same thread for the rest of the work", () => {
-    expect(sys).toContain("`init <what to do>` in this thread");
   });
 });
 

@@ -2,7 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { OperationEvent } from "@/types/operation";
 
-// Mock xterm.js modules before importing the component
 const mockWrite = vi.fn();
 const mockOpen = vi.fn();
 const mockDispose = vi.fn();
@@ -30,7 +29,6 @@ vi.mock("@xterm/addon-fit", () => {
 
 vi.mock("@xterm/xterm/css/xterm.css", () => ({}));
 
-// Import after mocks
 import { McpAuthTerminal } from "@/components/operation/mcp-auth-terminal";
 
 function makeEvent(
@@ -68,7 +66,6 @@ describe("McpAuthTerminal", () => {
 
     rerender(<McpAuthTerminal {...defaultProps} events={events} />);
 
-    // Only 2 terminal events are written to xterm (status goes to debug logs)
     expect(mockWrite).toHaveBeenCalledTimes(2);
     expect(mockWrite).toHaveBeenCalledWith("hello pty");
     expect(mockWrite).toHaveBeenCalledWith(" world");
@@ -88,10 +85,7 @@ describe("McpAuthTerminal", () => {
 
     rerender(<McpAuthTerminal {...defaultProps} events={events} />);
 
-    // Status events should NOT be written to xterm
     expect(mockWrite).not.toHaveBeenCalled();
-
-    // Debug logs button should show count
     expect(screen.getByText(/Debug logs \(2\)/)).toBeInTheDocument();
   });
 
@@ -110,9 +104,7 @@ describe("McpAuthTerminal", () => {
 
     rerender(<McpAuthTerminal {...defaultProps} events={events} />);
 
-    // Only 1 non-internal status event in debug logs
     expect(screen.getByText(/Debug logs \(1\)/)).toBeInTheDocument();
-    // xterm should not have any writes
     expect(mockWrite).not.toHaveBeenCalled();
   });
 

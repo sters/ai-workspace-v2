@@ -1,7 +1,3 @@
-/**
- * Workspace setup — creating workspaces and parsing task analysis results.
- */
-
 import { pathExists } from "@/lib/fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
@@ -14,15 +10,6 @@ import { writeSystemPrompts } from "./prompts";
 import type { TaskAnalysis } from "@/types/workspace";
 import type { SetupWorkspaceResult } from "@/types/operation";
 
-// ---------------------------------------------------------------------------
-// Task analysis — structured metadata extraction via Claude child process
-// ---------------------------------------------------------------------------
-
-/**
- * Parse a TaskAnalysis from structured JSON text (from --json-schema output).
- * Uses Bun.JSONL.parseChunk for non-throwing parse with error reporting.
- * Returns a fallback if the text is empty or unparseable.
- */
 export function parseAnalysisResultText(jsonText: string | undefined, fallbackDescription: string): TaskAnalysis {
   const fallback: TaskAnalysis = {
     taskType: "feature",
@@ -61,10 +48,6 @@ prompts/
 templates/
 `;
 
-// ---------------------------------------------------------------------------
-// setupWorkspace
-// ---------------------------------------------------------------------------
-
 export async function setupWorkspace(
   taskType: string,
   description: string,
@@ -101,27 +84,21 @@ export async function setupWorkspace(
     wsPath = path.join(getWorkspaceDir(), dirName);
   }
 
-  // Create directories
   await mkdir(wsPath, { recursive: true });
   await mkdir(path.join(wsPath, "tmp"), { recursive: true });
   await mkdir(path.join(wsPath, "artifacts"), { recursive: true });
   await Bun.write(path.join(wsPath, "artifacts", ".gitkeep"), "");
 
-  // Write system prompt files
   await writeSystemPrompts(wsPath);
 
-  // Initialize git
   await exec(`git init --quiet "${wsPath}"`);
 
-  // Write .gitignore
   await Bun.write(path.join(wsPath, ".gitignore"), GITIGNORE_CONTENT);
 
-  // Write README
   const dateFormatted = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
   const readme = buildReadmeContent(description, taskType, ticketId ?? "N/A", dateFormatted);
   await Bun.write(path.join(wsPath, "README.md"), readme);
 
-  // Initial commit
   await exec(`git -C "${wsPath}" add .gitignore README.md artifacts/`);
   await exec(`git -C "${wsPath}" commit --quiet -m "Initial: ${dirName} workspace created"`);
 

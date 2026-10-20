@@ -7,11 +7,8 @@ import {
 describe("getPlannerSystemPrompt", () => {
   const prompt = getPlannerSystemPrompt();
 
-  // Adoption of WRITTEN_DELIVERABLE_LENGTH and REPO_SEARCH_EFFICIENCY is owned by
-  // shared.test.ts, which checks every prompt that should carry them against the
-  // exported fragment. What is this file's own business is that the wording they
-  // replaced is gone: it pushed the opposite way ("never trade rigor of the
-  // format for brevity"), which is what produced 500-line TODO files.
+  // That wording pushes against WRITTEN_DELIVERABLE_LENGTH and produced
+  // 500-line TODO files.
   it("no longer tells the planner that format rigor outranks brevity", () => {
     expect(prompt).not.toMatch(/never trade rigor of the \*?format/i);
   });

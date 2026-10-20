@@ -46,10 +46,8 @@ describe("getPRCreatorSystemPrompt", () => {
     expect(pushIdx).toBeLessThan(replyIdx);
   });
 
-  // A repo with no PR template had no fixed structure at all, and the prompt
-  // described two: a "standard format" of `## Summary` alone, and a separately
-  // named "Related issues" section the worked example never showed. Two shapes
-  // is how the section set came out different on every run.
+  // Describing two shapes for a repo with no PR template makes the section set
+  // come out different on every run.
   it("gives the no-template case one fixed body shape", () => {
     expect(prompt).toContain("## Related Resources");
     expect(prompt).not.toContain(`"Related issues" section`);

@@ -62,7 +62,6 @@ export function parseCommand(rawText: string): ParseResult {
     return { ok: false, kind: "usage", reply: USAGE };
   }
 
-  // Split off the leading op token.
   const opMatch = stripped.match(/^(\S+)(?:\s+([\s\S]*))?$/);
   if (!opMatch) return { ok: false, kind: "usage", reply: USAGE };
   const op = opMatch[1];
@@ -97,7 +96,6 @@ function parseInit(rest: string): ParseResult {
     working = (before + (onlyMatch[1] && (after || onlyMatch[2].trim() === "") ? " " : "") + after);
   }
 
-  // Reject any unknown -- flags.
   const stray = working.match(/(?:^|\s)(--\S+)/);
   if (stray) {
     return { ok: false, kind: "usage", reply: `Unknown flag: ${stray[1]}\n\n${USAGE}` };

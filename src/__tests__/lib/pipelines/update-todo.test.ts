@@ -64,7 +64,6 @@ describe("buildUpdateTodoPipeline", () => {
 
       await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests", repo: "repo-b" });
 
-      // Should only be called once for repo-b, not for both repos
       expect(mockBuildUpdaterPrompt).toHaveBeenCalledTimes(1);
       expect(mockBuildUpdaterPrompt).toHaveBeenCalledWith(
         expect.objectContaining({ repoName: "repo-b" }),

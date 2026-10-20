@@ -1,10 +1,6 @@
 import type { Database, Statement } from "bun:sqlite";
 import { getDb, _onDbReset } from "./connection";
 
-// ---------------------------------------------------------------------------
-// Lazy prepared statements
-// ---------------------------------------------------------------------------
-
 let _insert: Statement | null = null;
 let _list: Statement | null = null;
 let _count: Statement | null = null;
@@ -35,10 +31,6 @@ export function _resetNotificationLogStatements(): void {
 
 _onDbReset(_resetNotificationLogStatements);
 
-// ---------------------------------------------------------------------------
-// Row type
-// ---------------------------------------------------------------------------
-
 interface NotificationLogRow {
   id: number;
   title: string;
@@ -62,10 +54,6 @@ export interface NotificationLog {
   errorMessage: string | null;
   createdAt: string;
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export function insertNotificationLog(entry: {
   title: string;

@@ -173,8 +173,8 @@ describe("buildExecutePipeline — phase budget scales with item count, not batc
     return phase.timeoutMs;
   }
 
-  // The bug this guards: budgeting per *batch* meant raising batchSize shrank the
-  // budget for identical work — 12 items got 45min at batchSize 10 but 25min at 20.
+  // Budgeting per *batch* would shrink the budget for identical work as
+  // batchSize rises.
   it("does not shrink the budget when a larger batchSize packs the same items into fewer batches", async () => {
     const atTen = await budgetFor(12, 10);
     const atTwenty = await budgetFor(12, 20);

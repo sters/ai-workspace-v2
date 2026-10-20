@@ -15,7 +15,7 @@
  * external MCP actions like creating a Jira ticket), and git/codebase changes
  * plus destructive operations forbidden regardless — those still go through the
  * WebUI or `init`. The one exception is a per-thread scratch directory
- * (`./chat-scratch`) handed to it as the sole place a requested file write may
+ * (`chat-scratch.ts`) handed to it as the sole place a requested file write may
  * land — without one, a request that needs a file gets answered by inventing a
  * path under `workspace/`, which the WebUI then ignores and the prompt's own
  * no-destructive-actions rule prevents it from cleaning up.
@@ -49,7 +49,6 @@ export function hasThreadSession(threadKey: string): boolean {
   return getSession(threadKey, Date.now()) !== undefined;
 }
 
-/** Options for a conversation turn. */
 export interface ConverseOptions {
   /** Slack user id of the mention author, used to scope memory. */
   userId?: string;

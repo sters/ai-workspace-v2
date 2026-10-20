@@ -152,7 +152,6 @@ export interface OperationContext {
   hasOperation: boolean;
   /** The workspace name (may be updated dynamically during the operation). */
   workspace?: string;
-  /** The operation status. */
   status?: OperationStatus;
 }
 

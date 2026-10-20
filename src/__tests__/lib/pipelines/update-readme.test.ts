@@ -20,13 +20,13 @@ vi.mock("@/lib/pipelines/actions/ensure-repositories", () => ({
   discoverConstraintsForNewRepos: (...args: unknown[]) => mockDiscoverConstraints(...args),
 }));
 
-// Dependencies of the criteria-feasibility phase this pipeline now appends.
+// Dependencies of the criteria-feasibility phase this pipeline appends.
 vi.mock("@/lib/parsers/readme", () => ({
   parseAcceptanceCriteria: vi.fn(() => []),
 }));
 vi.mock("@/lib/workspace/git", () => ({
   listWorkspaceRepos: vi.fn(() => [
-    { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+    { repoPath: "github.com/acme/repo", repoName: "repo", worktreePath: "/x" },
   ]),
 }));
 vi.mock("@/lib/workspace/reader", () => ({
@@ -108,7 +108,7 @@ describe("buildUpdateReadmePipeline", () => {
 
   it("judges feasibility on the interject path too", async () => {
     // An interject rewrites the criteria mid-run and then re-kicks autonomous,
-    // which no longer judges on that path — so this phase is the only check.
+    // which does not judge on that path — so this phase is the only check.
     const phases = await buildUpdateReadmePipeline({
       workspace: "test-ws",
       instruction: "narrow the criteria",
@@ -194,8 +194,8 @@ describe("buildUpdateReadmePipeline", () => {
     });
 
     // Constraint discovery otherwise only runs on the init path, so a
-    // repository added to an existing workspace reached review with its
-    // commands NOT DECLARED — indistinguishable from a clean run.
+    // repository added to an existing workspace would reach review with its
+    // commands NOT DECLARED.
     it("discovers constraints for the repositories it just set up", async () => {
       mockSyncReadmeRepositories.mockResolvedValue({
         metaRepoCount: 2,

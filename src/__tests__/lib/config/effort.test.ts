@@ -79,23 +79,11 @@ describe("resolveEffort", () => {
     expect(resolveEffort("review")).toBe("medium");
   });
 
-  // Which step sits on which rung is documented in CLAUDE.md's ladder table;
-  // re-asserting each membership here only mirrors STEP_DEFAULT_*. What the tests
-  // below hold is the shape of the ladder, which a new step type cannot violate
-  // by accident.
+  // Which step sits on which rung is documented on STEP_DEFAULT_MODELS
+  // (model.ts); re-asserting each membership here only mirrors STEP_DEFAULT_*.
+  // What the tests below hold is the shape of the ladder, which a new step type
+  // cannot violate by accident.
   it("uses exactly five rungs of one model+effort ladder", () => {
-    // The two tables are not tuned independently — together they form a single
-    // ordered ladder, cheapest first:
-    //   haiku-5.5/low  → reshaping text already handed over
-    //   sonnet-5.5/low → mechanical, or bounded work with nothing to judge
-    //   opus/low       → a bit harder than mechanical
-    //   opus/medium    → the default
-    //   opus/high      → needs real thought
-    // Any other pairing is a tier that has to justify itself: paying for a
-    // smaller model to think harder is the wrong trade, so work above the bottom
-    // rungs goes to opus instead. The smaller models are pinned to full IDs
-    // because the CLI's bare `sonnet` / `haiku` aliases resolve to a previous
-    // generation.
     const rungs = new Set(
       Object.values(STEP_TYPES).map(
         (step) => `${STEP_DEFAULT_MODELS[step]}/${STEP_DEFAULT_EFFORTS[step]}`,

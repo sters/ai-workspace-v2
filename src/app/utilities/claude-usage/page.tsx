@@ -46,7 +46,6 @@ export default function ClaudeUsagePage() {
     }
   }, [init, termRef]);
 
-  // Auto-fetch on mount
   useEffect(() => {
     if (!hasFetched.current) {
       hasFetched.current = true;

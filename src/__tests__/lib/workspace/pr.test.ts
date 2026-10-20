@@ -57,7 +57,6 @@ describe("readPRTemplate", () => {
   });
 
   it("prioritizes .github/ over docs/ and root", async () => {
-    // Create templates in all locations
     const githubDir = path.join(tmpDir, ".github");
     fs.mkdirSync(githubDir, { recursive: true });
     fs.writeFileSync(path.join(githubDir, "PULL_REQUEST_TEMPLATE.md"), "github template");

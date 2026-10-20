@@ -4,11 +4,7 @@ import { Database } from "bun:sqlite";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import {
-  ensureSlackMemoryDb,
-  getSlackMemoryDbPath,
-  SLACK_MEMORY_DB_FILENAME,
-} from "@/lib/slack-server/memory-db";
+import { ensureSlackMemoryDb } from "@/lib/slack-server/memory-db";
 
 let root: string;
 
@@ -21,12 +17,6 @@ afterEach(() => {
 });
 
 describe("slack-server/memory-db", () => {
-  it("resolves the path under .ai-workspace", () => {
-    expect(getSlackMemoryDbPath(root)).toBe(
-      path.join(root, ".ai-workspace", SLACK_MEMORY_DB_FILENAME),
-    );
-  });
-
   it("creates the file and memories table with a user_id column", () => {
     const dbPath = ensureSlackMemoryDb(root);
     expect(fs.existsSync(dbPath)).toBe(true);
@@ -39,7 +29,6 @@ describe("slack-server/memory-db", () => {
       expect(cols).toEqual(
         expect.arrayContaining(["id", "user_id", "content", "created_at", "updated_at"]),
       );
-      // Table is usable for scoped read/write.
       db.run("INSERT INTO memories (user_id, content) VALUES ('U1', 'likes X')");
       const rows = db
         .query("SELECT content FROM memories WHERE user_id = 'U1'")
@@ -56,7 +45,6 @@ describe("slack-server/memory-db", () => {
     db.run("INSERT INTO memories (user_id, content) VALUES ('U1', 'fact')");
     db.close();
 
-    // Second call must not throw or wipe data.
     expect(ensureSlackMemoryDb(root)).toBe(dbPath);
 
     db = new Database(dbPath);

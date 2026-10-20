@@ -1,8 +1,3 @@
-/**
- * Prompt template for workspace-repo-review-changes agent.
- * Reviews code changes in a repository.
- */
-
 import type { CodeReviewerInput } from "@/types/prompts";
 import {
   RECURRING_FINDINGS_POLICY,

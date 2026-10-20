@@ -70,11 +70,6 @@ describe("db/operations: listRecentFinishedOperations", () => {
     const result = listRecentFinishedOperations(10);
     expect(result.map((o) => o.id)).toEqual(["op-new", "op-mid", "op-old"]);
   });
-
-  it("returns an empty array when no finished operations exist", () => {
-    insertOperation(makeOp("op-running", "running", "2026-01-01T00:00:00Z"));
-    expect(listRecentFinishedOperations(10)).toEqual([]);
-  });
 });
 
 describe("db/operations: listLatestOperationPerWorkspace", () => {

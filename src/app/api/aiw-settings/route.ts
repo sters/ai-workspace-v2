@@ -75,12 +75,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Ensure parent directory exists
     const filePath = getConfigFilePath();
     const dir = path.dirname(filePath);
     await mkdir(dir, { recursive: true });
 
-    // Write config file
     await writeFile(filePath, content, "utf-8");
 
     // Invalidate cached config so the app picks up changes immediately

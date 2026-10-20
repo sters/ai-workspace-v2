@@ -48,9 +48,9 @@ describe("GET /api/mcp-servers", () => {
           projects: {
             "/workspace-root": {
               mcpServers: {
-                atlassian: {
+                tracker: {
                   type: "http",
-                  url: "https://mcp.atlassian.com/v1/mcp",
+                  url: "https://mcp.tracker.example.com/v1/mcp",
                 },
               },
             },
@@ -63,9 +63,9 @@ describe("GET /api/mcp-servers", () => {
     const data = await callGET();
     expect(data.servers).toHaveLength(1);
     expect(data.servers[0]).toEqual({
-      name: "atlassian",
+      name: "tracker",
       scope: "local",
-      config: { type: "http", url: "https://mcp.atlassian.com/v1/mcp" },
+      config: { type: "http", url: "https://mcp.tracker.example.com/v1/mcp" },
       authStatus: { hasAuth: false, authType: "none", keyCount: 0 },
     });
   });
@@ -76,7 +76,7 @@ describe("GET /api/mcp-servers", () => {
       if (p.endsWith(".mcp.json")) {
         return JSON.stringify({
           mcpServers: {
-            github: { type: "sse", url: "https://mcp.github.com/sse" },
+            code: { type: "sse", url: "https://mcp.code.example.com/sse" },
           },
         });
       }
@@ -86,9 +86,9 @@ describe("GET /api/mcp-servers", () => {
     const data = await callGET();
     expect(data.servers).toHaveLength(1);
     expect(data.servers[0]).toEqual({
-      name: "github",
+      name: "code",
       scope: "project",
-      config: { type: "sse", url: "https://mcp.github.com/sse" },
+      config: { type: "sse", url: "https://mcp.code.example.com/sse" },
       authStatus: { hasAuth: false, authType: "none", keyCount: 0 },
     });
   });
@@ -99,7 +99,7 @@ describe("GET /api/mcp-servers", () => {
       if (p.endsWith(".mcp.json")) {
         return JSON.stringify({
           mcpServers: {
-            github: { type: "sse", url: "https://mcp.github.com/sse" },
+            code: { type: "sse", url: "https://mcp.code.example.com/sse" },
           },
         });
       }
@@ -108,9 +108,9 @@ describe("GET /api/mcp-servers", () => {
           projects: {
             "/workspace-root": {
               mcpServers: {
-                atlassian: {
+                tracker: {
                   type: "http",
-                  url: "https://mcp.atlassian.com/v1/mcp",
+                  url: "https://mcp.tracker.example.com/v1/mcp",
                 },
               },
             },
@@ -123,7 +123,7 @@ describe("GET /api/mcp-servers", () => {
     const data = await callGET();
     expect(data.servers).toHaveLength(2);
     const names = data.servers.map((s: { name: string }) => s.name).sort();
-    expect(names).toEqual(["atlassian", "github"]);
+    expect(names).toEqual(["code", "tracker"]);
   });
 
   it("returns empty when no config files exist", async () => {
@@ -202,7 +202,7 @@ describe("GET /api/mcp-servers", () => {
           projects: {
             "/other-project": {
               mcpServers: {
-                slack: { type: "http", url: "https://mcp.slack.com" },
+                chat: { type: "http", url: "https://mcp.chat.example.com" },
               },
             },
           },
@@ -221,9 +221,9 @@ describe("GET /api/mcp-servers", () => {
       if (p.endsWith(".mcp.json")) {
         return JSON.stringify({
           mcpServers: {
-            github: {
+            code: {
               type: "sse",
-              url: "https://mcp.github.com/sse",
+              url: "https://mcp.code.example.com/sse",
               headers: { Authorization: "Bearer token123" },
             },
           },

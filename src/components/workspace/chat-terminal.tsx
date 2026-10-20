@@ -41,7 +41,6 @@ export function ChatTerminal({
 
   return (
     <div className="flex h-full flex-col">
-      {/* Toolbar */}
       <div className="flex items-center gap-2 border-b px-4 py-2">
         {state === "idle" && (
           <StartChatButton label="Start Chat" onStart={openSession} />
@@ -71,7 +70,6 @@ export function ChatTerminal({
         )}
       </div>
 
-      {/* Terminal container */}
       <div
         ref={containerRef}
         className="min-h-0 flex-1 bg-[#1a1b26] p-1"
@@ -80,7 +78,6 @@ export function ChatTerminal({
         }}
       />
 
-      {/* Idle state placeholder */}
       {state === "idle" && (
         <div className="flex flex-1 items-center justify-center">
           <div className="text-center">

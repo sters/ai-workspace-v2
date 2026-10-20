@@ -46,12 +46,10 @@ describe("db/event-buffer", () => {
     bufferEvent(OP_ID, makeEvent(1));
     bufferEvent(OP_ID, makeEvent(2));
 
-    // Before flush, no events in DB
     expect(getEvents(OP_ID)).toHaveLength(0);
 
     flushEvents(OP_ID);
 
-    // After flush, events are in DB
     const events = getEvents(OP_ID);
     expect(events).toHaveLength(2);
     expect(events[0].data).toBe("event-1");
@@ -64,7 +62,6 @@ describe("db/event-buffer", () => {
       bufferEvent(OP_ID, makeEvent(i));
     }
 
-    // Should have auto-flushed
     const events = getEvents(OP_ID);
     expect(events).toHaveLength(50);
   });
@@ -75,12 +72,10 @@ describe("db/event-buffer", () => {
     bufferEvent(OP_ID, makeEvent(1));
     bufferEvent(OP_ID, makeEvent(2));
 
-    // Events are buffered, not yet in DB
     expect(getEvents(OP_ID)).toHaveLength(0);
 
     stopAutoFlush(OP_ID);
 
-    // After stop, events should be flushed
     expect(getEvents(OP_ID)).toHaveLength(2);
   });
 

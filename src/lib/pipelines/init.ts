@@ -30,7 +30,6 @@ import { buildInitTodoAnalysisPhases } from "./actions/init-todo-analysis";
  */
 const SETUP_WORKSPACE_TIMEOUT_MS = 15 * 60 * 1000;
 
-/** Parse analysis from Claude's onResultText callback. */
 function parseAnalysis(
   text: string | undefined,
   description: string,
@@ -55,20 +54,17 @@ export function buildInitPipeline(
   description: string,
   interactionLevel?: InteractionLevel,
 ): PipelinePhase[] {
-  // Shared mutable state across pipeline phases
   let wsName = "";
   let wsPath = "";
   let analysis: (TaskAnalysis & { readmeContent?: string }) | null = null;
   const repoResults: SetupRepositoryResult[] = [];
 
   return [
-    // Phase A: Claude analyzes the task and drafts README (merged analysis + README fill)
     {
       kind: "function",
       label: "Analyze & draft README",
       timeoutMs: 60 * 60 * 1000, // 1 hour — may wait for human confirmation
       fn: async (ctx) => {
-        // Build README template content to include in the prompt
         const today = new Date().toISOString().slice(0, 10);
         const readmeTemplate = buildReadmeContent(description, "TBD", "TBD", today);
 
@@ -89,15 +85,13 @@ export function buildInitPipeline(
         });
       },
     },
-    // Phase B: Read analysis result, create workspace, copy README, setup repos
-    // No retries: retrying would create duplicate workspaces since Phase B is not idempotent
+    // No retries: this phase creates the workspace, so a retry would create a duplicate.
     {
       kind: "function",
       label: "Setup workspace",
       maxRetries: 0,
       timeoutMs: SETUP_WORKSPACE_TIMEOUT_MS,
       fn: async (ctx) => {
-        // Use structured output analysis; fall back to defaults if unavailable
         if (!analysis) {
           analysis = parseAnalysisResultText(undefined, description);
         }
@@ -122,7 +116,6 @@ export function buildInitPipeline(
         ctx.setWorkspace(wsName);
         ctx.emitStatus(`Workspace created: ${wsName}`);
 
-        // Overwrite template README with Claude-edited content from structured output
         if (analysis?.readmeContent) {
           await Bun.write(path.join(wsPath, "README.md"), analysis.readmeContent);
         }
@@ -133,7 +126,6 @@ export function buildInitPipeline(
         }
         await writeReportTemplates(wsPath);
 
-        // Detect PR URLs from description and README content for branch resolution
         const prUrlMap = new Map<string, PrBranchInfo>();
         const allText = [description, analysis.readmeContent ?? ""].join("\n");
         const prUrls = extractPrUrls(allText);
@@ -208,7 +200,6 @@ export function buildInitPipeline(
         return true;
       },
     },
-    // Phases C–G: constraints, plan, coordinate, review, commit
     ...buildInitTodoAnalysisPhases({
       wsName: () => wsName,
       wsPath: () => wsPath,

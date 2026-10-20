@@ -56,7 +56,6 @@ export function useRunningOperations() {
       types.add(op.type);
     }
 
-    // Track per-repo running state
     const repo = op.inputs?.repo;
     if (repo) {
       runningRepoOps.add(`${op.workspace}\0${op.type}\0${repo}`);

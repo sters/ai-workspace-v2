@@ -117,18 +117,15 @@ export function parseConstraintLines(block: string): RepoConstraint[] {
 }
 
 export function parseConstraints(content: string): RepoConstraints[] {
-  // Find the start of the ## Repository Constraints section
   const startMatch = content.match(/^## Repository Constraints\s*$/m);
   if (!startMatch) return [];
 
   const startIdx = startMatch.index! + startMatch[0].length;
-  // Find the next ## or # heading (or end of string)
   const endMatch = content.slice(startIdx).match(/\n## |\n# /);
   const section = endMatch
     ? content.slice(startIdx, startIdx + endMatch.index!)
     : content.slice(startIdx);
 
-  // Split by ### headings to get per-repo blocks
   const repoBlocks = section.split(/^### /m).slice(1); // skip text before first ###
 
   const results: RepoConstraints[] = [];

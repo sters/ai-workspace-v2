@@ -13,7 +13,6 @@ function tryPersistDeleted(id: string): void {
 export function gcSessions(sessions: Map<string, ChatSession>, now: number): number {
   let removed = 0;
 
-  // Remove sessions that exited more than GC_MAX_AGE_MS ago
   for (const [id, session] of sessions) {
     if (session.exited && session.exitedAt != null && now - session.exitedAt > GC_MAX_AGE_MS) {
       sessions.delete(id);
@@ -22,7 +21,6 @@ export function gcSessions(sessions: Map<string, ChatSession>, now: number): num
     }
   }
 
-  // If still too many exited sessions, remove oldest first
   const exitedSessions: Array<{ id: string; exitedAt: number }> = [];
   for (const [id, session] of sessions) {
     if (session.exited && session.exitedAt != null) {

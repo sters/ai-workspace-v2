@@ -15,7 +15,6 @@ export const statusTextColors: Record<StatusKey, string> = {
   retrying: "text-orange-500",
 };
 
-/** Unicode status icons. */
 export const statusIcons: Record<StatusKey, string> = {
   pending: "\u25CB",   // ○
   running: "\u25CF",   // ●

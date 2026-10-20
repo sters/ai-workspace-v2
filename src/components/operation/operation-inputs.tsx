@@ -1,6 +1,5 @@
 "use client";
 
-/** Labels for operation input keys. */
 const INPUT_LABELS: Record<string, string> = {
   instruction: "Instruction",
   description: "Description",

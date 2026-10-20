@@ -34,11 +34,7 @@ const input = {
 describe("getPrCommentValidatorSystemPrompt", () => {
   const prompt = getPrCommentValidatorSystemPrompt();
 
-  // Adoption of the cd rule and the search fragment, and the invariant that no
-  // prompt states both working-directory conventions, are owned by
-  // shared.test.ts — which asserts them against the exported fragments rather
-  // than against a heading this file would have to keep in sync. Only the
-  // ordering is this prompt's own business.
+  // Adoption of the cd rule and the search fragment is checked in shared.test.ts.
   it("renders the search fragment after the cd rule, not before it", () => {
     expect(prompt.indexOf("### Working Directory")).toBeLessThan(
       prompt.indexOf("### Searching the Repository"),

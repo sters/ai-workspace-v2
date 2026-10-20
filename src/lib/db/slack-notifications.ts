@@ -1,10 +1,6 @@
 import type { Database, Statement } from "bun:sqlite";
 import { getDb, _onDbReset } from "./connection";
 
-// ---------------------------------------------------------------------------
-// Lazy prepared statements
-// ---------------------------------------------------------------------------
-
 let _upsert: Statement | null = null;
 let _listReady: Statement | null = null;
 let _delete: Statement | null = null;
@@ -45,10 +41,6 @@ export function _resetSlackNotificationStatements(): void {
 }
 
 _onDbReset(_resetSlackNotificationStatements);
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export interface PendingNotification {
   operationId: string;

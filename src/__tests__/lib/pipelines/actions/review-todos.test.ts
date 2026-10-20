@@ -147,7 +147,6 @@ describe("formatUnresolvedFindingsSection", () => {
 
   it("renders each finding as a blocked TODO item so the executor sees it", () => {
     const section = formatUnresolvedFindingsSection(findings);
-    expect(section).toMatch(/- \[!\]/);
     expect(section.match(/- \[!\]/g)).toHaveLength(2);
     expect(section).toContain("href is lost");
     expect(section).toContain("which remote?");
@@ -205,7 +204,7 @@ describe("buildReviewTodosPhase", () => {
     expect(ctx.emitStatus).toHaveBeenCalledWith(expect.stringMatching(/could not read|no verdict/i));
   });
 
-  // Nothing may vanish the way the old text verdict did.
+  // Findings must still reach the executor when the revision step fails.
   it("writes the findings into the TODO as blocked items when the reviser fails", async () => {
     const { ctx } = makeCtx({
       verdicts: { "review-frontend": HAS_ISSUES },

@@ -27,7 +27,6 @@ export function nextSessionId(): string {
   return `chat-${++store.__chatCounter!}-${Date.now()}`;
 }
 
-/** Persist a newly created session to SQLite. */
 export function persistSessionCreated(session: ChatSession): void {
   upsertChatSession({
     id: session.id,
@@ -36,7 +35,6 @@ export function persistSessionCreated(session: ChatSession): void {
   });
 }
 
-/** Mark a session as exited in SQLite. */
 export function persistSessionExited(
   id: string,
   exitCode: number | null,
@@ -44,7 +42,6 @@ export function persistSessionExited(
   markChatSessionExited(id, exitCode);
 }
 
-/** Remove a session from SQLite. */
 export function persistSessionDeleted(id: string): void {
   deleteChatSession(id);
 }

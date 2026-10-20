@@ -62,10 +62,6 @@ async function findLiveSession(workspaceId: string, preferred: string | null): P
   }
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
-
 export function useChatSession(
   workspaceId: string,
   options?: {
@@ -120,7 +116,6 @@ export function useChatSession(
   const onHandoffDeliveredRef = useRef(options?.onHandoffDelivered);
   onHandoffDeliveredRef.current = options?.onHandoffDelivered;
 
-  // Refs for websocket (survive re-renders)
   const onDataDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -191,7 +186,6 @@ export function useChatSession(
       const ws = new WebSocket(CHAT_WS_URL);
       wsRef.current = ws;
 
-      // Track whether the resumed session had already exited
       let resumedExited = false;
       let resumedExitCode: number | undefined;
 
@@ -325,7 +319,6 @@ export function useChatSession(
       return;
     }
 
-    // Connect WebSocket
     const ws = new WebSocket(CHAT_WS_URL);
     wsRef.current = ws;
 

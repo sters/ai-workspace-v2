@@ -1,8 +1,3 @@
-/**
- * Programmatic constraint command execution and report generation.
- * Runs lint/test/build commands and captures exit codes deterministically.
- */
-
 import { getCleanEnv } from "@/lib/env";
 
 export interface ConstraintExecResult {
@@ -19,7 +14,7 @@ export interface ConstraintExecResult {
   status: "PASS" | "FAIL" | "SKIPPED" | "PRE-EXISTING";
 }
 
-const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_MAX_CHARS = 5000;
 const RAN_MAX_CHARS = 500;
 

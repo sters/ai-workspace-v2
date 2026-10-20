@@ -1,8 +1,3 @@
-/**
- * Prompt template for Suggestion Aggregator.
- * Reviews all active suggestions and merges similar ones into consolidated entries.
- */
-
 import type { SuggestionAggregatorInput } from "@/types/prompts";
 
 export const SUGGESTION_AGGREGATION_SCHEMA = {

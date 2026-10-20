@@ -41,7 +41,6 @@ export function buildMcpAuthPhase(
     fn: async (ctx) => {
       const { emitStatus, emitTerminal, signal } = ctx;
 
-      // Step 1: Get server index
       emitStatus(`Looking up server index for "${serverName}"...`);
       let serverIndex: number;
       try {
@@ -56,7 +55,6 @@ export function buildMcpAuthPhase(
       }
       emitStatus(`Server "${serverName}" is at index ${serverIndex}`);
 
-      // Step 2: Spawn PTY
       emitStatus(`Starting Claude CLI session...`);
 
       const listeners = new Set<DataListener>();
@@ -73,7 +71,6 @@ export function buildMcpAuthPhase(
 
       listeners.add((data) => emitTerminal(data));
 
-      // Kill PTY when the operation is cancelled
       signal.addEventListener("abort", () => {
         emitStatus("Operation cancelled, killing CLI process...");
         proc.kill();
@@ -90,7 +87,6 @@ export function buildMcpAuthPhase(
       const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
       try {
-        // Step 3: Wait for initial prompt
         const initOutput = await collectOutput(listeners, 2000, 15000);
         const cleaned = stripAnsi(initOutput).trim();
         emitStatus(`CLI output (${cleaned.length} chars): ${cleaned.slice(0, 500)}`);
@@ -100,7 +96,6 @@ export function buildMcpAuthPhase(
           return false;
         }
 
-        // Step 4: Send /mcp command
         emitStatus(`[debug] forceReauth=${forceReauth}, serverIndex=${serverIndex}`);
         emitStatus("Sending /mcp command...");
         proc.terminal.write("/mcp");
@@ -112,7 +107,6 @@ export function buildMcpAuthPhase(
 
         if (exited) return false;
 
-        // Step 5: Navigate to server with ARROW_DOWN
         if (serverIndex > 0) {
           emitStatus(`[debug] Sending ARROW_DOWN x${serverIndex} to reach "${serverName}"`);
           for (let i = 0; i < serverIndex; i++) {
@@ -124,7 +118,6 @@ export function buildMcpAuthPhase(
           emitStatus(`After navigation:\n${stripAnsi(output)}`);
         }
 
-        // Step 6: Enter to open server settings
         emitStatus("[debug] Sending ENTER to open server settings");
         proc.terminal.write("\r");
         await delay(300);
@@ -133,7 +126,6 @@ export function buildMcpAuthPhase(
 
         if (exited) return false;
 
-        // Step 7: Select auth action
         if (forceReauth) {
           emitStatus('[debug] forceReauth=true, sending ARROW_DOWN to reach "Re-authenticate"');
           proc.terminal.write(ARROW_DOWN);
@@ -149,7 +141,6 @@ export function buildMcpAuthPhase(
 
         if (exited) return false;
 
-        // Step 8: Poll for OAuth completion (max 60 seconds)
         emitStatus("Waiting for OAuth completion (up to 60s)...");
         const pollStart = Date.now();
         const pollTimeout = 60_000;

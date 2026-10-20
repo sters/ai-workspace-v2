@@ -169,7 +169,6 @@ export function buildDisplayNodes(entries: LogEntry[]): DisplayNode[] {
         continue;
       }
 
-      // Regular entry
       nodes.push({ type: "entry", entry: e });
     }
 
@@ -265,9 +264,8 @@ function getParentChildLabel(node: DisplayNode): string | undefined {
 export interface GroupByChildLabelOptions {
   /**
    * Fallback phase statuses keyed by phaseLabel. Used to mark function-phase
-   * child-groups completed/failed for operations logged before the
-   * runFunctionPhase synthetic complete event was added (where no kind=complete
-   * entry exists for the group). Ignored when the group has its own complete entry.
+   * child-groups completed/failed when the group has no kind=complete entry.
+   * Ignored when the group has its own complete entry.
    */
   phaseStatusByLabel?: Map<string, "running" | "completed" | "failed">;
 }
@@ -289,18 +287,15 @@ export function groupByChildLabel(
         labelNodes.set(label, []);
       }
       labelNodes.get(label)!.push(node);
-      // Record first non-empty parentChildLabel seen for this group
       if (!labelParent.has(label)) {
         const parent = getParentChildLabel(node);
         if (parent !== undefined) labelParent.set(label, parent);
       }
     } else {
-      // Non-labeled nodes go directly to result
       result.push(node);
     }
   }
 
-  // No child-label groups needed
   if (labelOrder.length === 0) return nodes;
 
   // Build each child-group node, then arrange into a hierarchy where groups
@@ -320,8 +315,7 @@ export function groupByChildLabel(
       if (child.type === "subagent" && child.status === "running") { status = "running"; }
     }
     if (!hasComplete && status !== "failed") {
-      // Fallback for legacy operations (logged before runFunctionPhase emitted
-      // its synthetic complete event): consult the phaseStatusByLabel map.
+      // No complete entry for the group: consult the phaseStatusByLabel map.
       const fallback = options?.phaseStatusByLabel?.get(label);
       if (fallback === "completed") status = "completed";
       else if (fallback === "failed") status = "failed";
@@ -419,7 +413,6 @@ export function groupByPhase(nodes: DisplayNode[]): DisplayNode[] {
     }
   }
 
-  // If no phases found, return as-is
   if (phaseOrder.length === 0) return nodes;
 
   const result: DisplayNode[] = [...ungrouped];
@@ -433,10 +426,6 @@ export function groupByPhase(nodes: DisplayNode[]): DisplayNode[] {
   }
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// Find pending ask
-// ---------------------------------------------------------------------------
 
 /** Find the latest "ask" entry that doesn't have a subsequent tool_result for the same toolId. */
 export function findPendingAsk(
@@ -464,7 +453,6 @@ export function findPendingAsk(
       continue;
     }
     if (e.kind === "ask" && !answeredIds.has(e.toolId)) {
-      // Skip asks whose child process finished later in the stream
       if (e.childLabel && finishedAfter.has(e.childLabel)) continue;
       return { toolId: e.toolId, questions: e.questions, allowFreeText: e.allowFreeText ?? true };
     }

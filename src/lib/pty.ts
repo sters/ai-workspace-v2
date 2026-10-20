@@ -1,6 +1,5 @@
 /**
  * PTY utilities for spawning terminal processes via Bun.spawn's terminal option.
- * Shared between mcp-auth.ts and chat-server.ts.
  */
 
 import type { DataListener, TerminalSubprocess, SpawnTerminalOptions } from "@/types/pty";
@@ -94,7 +93,6 @@ export function collectOutput(
 
     // If no data arrives at all, resolve after settleMs
     settleTimer = setTimeout(finish, settleMs);
-    // Absolute max timeout
     const maxTimer = setTimeout(finish, maxMs);
   });
 }

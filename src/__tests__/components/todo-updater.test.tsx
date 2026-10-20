@@ -50,8 +50,8 @@ beforeEach(() => {
 
 describe("TodoUpdater", () => {
   // The tab is rendered from the TODO files on disk, so a repository declared
-  // in the README with no TODO file yet had no card at all — nothing on the
-  // screen said it was missing, and there was nothing to click.
+  // in the README with no TODO file yet needs a card of its own to show that
+  // it is missing and give it something to click.
   describe("repositories without a TODO file", () => {
     it("lists a declared repository that has no TODO file", () => {
       setRunning({});

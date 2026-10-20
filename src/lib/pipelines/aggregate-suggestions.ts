@@ -1,15 +1,3 @@
-/**
- * Pipeline for suggestion aggregation.
- * Reads all active suggestions, calls Claude to identify similar ones,
- * and merges them into consolidated entries.
- *
- * Loops until no further aggregation is possible:
- *  1. Load suggestions from DB
- *  2. Aggregate loop: repeatedly analyze with Claude and apply merges
- *     until Claude finds no more groups to merge or fewer than 2
- *     suggestions remain
- */
-
 import { listActiveSuggestions, dismissSuggestion, insertSuggestion } from "@/lib/db";
 import { buildSuggestionAggregatorPrompt, SUGGESTION_AGGREGATION_SCHEMA } from "@/lib/templates";
 import type { PipelinePhase } from "@/types/pipeline";
@@ -23,7 +11,6 @@ export function buildAggregateSuggestionsPipeline(): PipelinePhase[] {
   let suggestions: WorkspaceSuggestion[] = [];
 
   return [
-    // ── Phase 1: Load suggestions ──────────────────────────────────────
     {
       kind: "function",
       label: "Load suggestions",
@@ -44,7 +31,6 @@ export function buildAggregateSuggestionsPipeline(): PipelinePhase[] {
       },
     },
 
-    // ── Phase 2: Aggregate loop ────────────────────────────────────────
     {
       kind: "function",
       label: "Aggregate loop",
@@ -61,7 +47,6 @@ export function buildAggregateSuggestionsPipeline(): PipelinePhase[] {
             `[Iteration ${iteration}] Analyzing ${suggestions.length} suggestions with Claude...`,
           );
 
-          // ── Call Claude ──────────────────────────────────────────────
           const prompt = buildSuggestionAggregatorPrompt({
             suggestions: suggestions.map((s) => ({
               id: s.id,
@@ -94,7 +79,6 @@ export function buildAggregateSuggestionsPipeline(): PipelinePhase[] {
             return false;
           }
 
-          // ── Parse & validate ─────────────────────────────────────────
           let parsed: { groups: AggregationGroup[]; unchangedIds: string[] };
           try {
             parsed = JSON.parse(resultText);
@@ -133,7 +117,6 @@ export function buildAggregateSuggestionsPipeline(): PipelinePhase[] {
             (g) => g.mergedIds.length >= 2,
           );
 
-          // ── No merges → converged ────────────────────────────────────
           if (mergeGroups.length === 0) {
             ctx.emitStatus(
               `[Iteration ${iteration}] No further merges found. Converged.`,
@@ -141,7 +124,6 @@ export function buildAggregateSuggestionsPipeline(): PipelinePhase[] {
             break;
           }
 
-          // ── Apply merges ─────────────────────────────────────────────
           const suggestionMap = new Map(suggestions.map((s) => [s.id, s]));
           let iterDismissed = 0;
           let iterInserted = 0;
@@ -183,7 +165,6 @@ export function buildAggregateSuggestionsPipeline(): PipelinePhase[] {
             `[Iteration ${iteration}] Merged ${iterDismissed} into ${iterInserted}. Checking if further aggregation is possible...`,
           );
 
-          // ── Reload for next iteration ────────────────────────────────
           suggestions = listActiveSuggestions();
           if (suggestions.length < 2) {
             ctx.emitStatus("Fewer than 2 suggestions remain. Done.");

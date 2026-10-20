@@ -17,14 +17,11 @@
  *
  * **Three phases, one per thing that can go wrong**, sharing a `MergeRun` object
  * from the closure: `Merge base branches` → `Resolve conflicts` → `Commit and
- * push`. It began as one phase, on the reasoning that the children are only
- * known once the merges have run and a mid-merge worktree should not outlive a
- * phase boundary. That bought nothing a reader could use: one box in the
- * operation log covered three different failures — a merge that never ran, a
- * resolution that did not hold, a push the remote rejected — and each phase's
- * own budget and result line is what tells them apart at a glance.
+ * push`. Each phase's own budget and result line tells the three failures apart
+ * at a glance: a merge that never ran, a resolution that did not hold, a push
+ * the remote rejected.
  *
- * What it costs is that a conflicted worktree is now mid-merge *between* phases,
+ * What it costs is that a conflicted worktree is mid-merge *between* phases,
  * so each phase owns a rollback: `Resolve conflicts` rolls back what it broke or
  * was interrupted in, and `Commit and push` rolls back anything that fails its
  * check. A kill landing between phases still leaves a merge in progress, and the
@@ -211,8 +208,8 @@ export async function buildResolveBaseConflictsPipeline(input: {
               baseBranch,
               expectedBranch: pr.headRefName,
               // `headRefOid` — the commit GitHub judged the PR's mergeability
-              // from. Without it the verdict is about the worktree, which is
-              // how an unpushed merge came back as "already contains".
+              // from. Without it the verdict is about the worktree, and an
+              // unpushed merge would report as "already contains".
               prHeadSha: pr.headSha,
             },
           );

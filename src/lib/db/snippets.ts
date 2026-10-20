@@ -2,10 +2,6 @@ import type { Database, Statement } from "bun:sqlite";
 import { getDb, _onDbReset } from "./connection";
 import type { Snippet } from "@/types/snippet";
 
-// ---------------------------------------------------------------------------
-// Lazy prepared statements
-// ---------------------------------------------------------------------------
-
 let _insert: Statement | null = null;
 let _update: Statement | null = null;
 let _delete: Statement | null = null;
@@ -51,10 +47,6 @@ export function _resetSnippetStatements(): void {
 
 _onDbReset(_resetSnippetStatements);
 
-// ---------------------------------------------------------------------------
-// Row type
-// ---------------------------------------------------------------------------
-
 interface SnippetRow {
   id: number;
   title: string;
@@ -72,10 +64,6 @@ function rowToDomain(row: SnippetRow): Snippet {
     updatedAt: row.updated_at,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export function insertSnippet(s: { title: string; content: string }): Snippet {
   const db = getDb();

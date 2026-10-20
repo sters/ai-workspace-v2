@@ -1,10 +1,6 @@
 import { listRunningOperations, updateOperationStatus } from "@/lib/db";
 import { backfillResultSummary } from "@/lib/operation-store";
 
-// ---------------------------------------------------------------------------
-// Stale operation cleanup on startup
-// ---------------------------------------------------------------------------
-//
 // Operations that were "running" when the server shut down can never continue
 // on their own — their in-memory pipeline state (child processes, abort
 // controllers, phase closures) is gone. We intentionally do NOT resume them:

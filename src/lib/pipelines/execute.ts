@@ -46,13 +46,13 @@ export async function buildExecutePipeline(input: {
   const wsPath = path.join(getWorkspaceDir(), workspace);
 
   if (meta.taskType === "review") {
-    return []; // Review workspaces skip execute entirely
+    return [];
   }
 
   const isResearch = meta.taskType === "research";
 
   if (isResearch) {
-    // Write report templates (idempotent — ensures templates exist for older workspaces)
+    // Idempotent: also covers workspaces created before these templates existed.
     await writeReportTemplates(wsPath);
     const reportDir = await writeResearchTemplates(wsPath);
 
@@ -77,11 +77,9 @@ export async function buildExecutePipeline(input: {
     });
   }
 
-  // Estimate max batches for timeout calculation
   const maxBatchesPerRepo = await estimateMaxBatches(repos, wsPath, batchSize);
   const timeoutMs = executePhaseBudgetMs(maxBatchesPerRepo, batchSize);
 
-  // Feature/bugfix: launch independent lanes per repository with batch splitting
   return [
     {
       kind: "function",
@@ -104,10 +102,6 @@ export async function buildExecutePipeline(input: {
   ];
 }
 
-// ---------------------------------------------------------------------------
-// Research pipeline — 3-phase parallel execution
-// ---------------------------------------------------------------------------
-
 interface ResearchPipelineInput {
   workspace: string;
   readmeContent: string;
@@ -125,7 +119,6 @@ interface ResearchPipelineInput {
 function buildResearchPipeline(input: ResearchPipelineInput): PipelinePhase[] {
   const { workspace, readmeContent, repos, wsPath, reportDir, sysPromptFiles } = input;
 
-  // Phase 1 — Findings: N parallel children per repo (+ cross-repo when N>1)
   const findingsChildren = repos.map((repo) => ({
     label: `Findings: ${repo.repoName}`,
     prompt: buildResearchFindingsRepoPrompt({
@@ -157,12 +150,10 @@ function buildResearchPipeline(input: ResearchPipelineInput): PipelinePhase[] {
     children: findingsChildren,
   };
 
-  // Phase 2 — Recommendations & Next Steps: reads findings, runs N+1 parallel
   const recommendationsPhase: PipelinePhase = {
     kind: "function",
     label: "Recommendations & Next Steps",
     fn: async (ctx: PhaseFunctionContext) => {
-      // Read findings produced by Phase 1
       const crossRepoFindings = await Bun.file(
         path.join(reportDir, "findings-cross-repository.md"),
       ).text().catch(() => "");
@@ -216,12 +207,10 @@ function buildResearchPipeline(input: ResearchPipelineInput): PipelinePhase[] {
     },
   };
 
-  // Phase 3 — Integration: reads everything, produces summary + others
   const integrationPhase: PipelinePhase = {
     kind: "function",
     label: "Integration",
     fn: async (ctx: PhaseFunctionContext) => {
-      // Read all .md files from the report directory
       const glob = new Bun.Glob("*.md");
       const mdFiles = (await globScan(glob, reportDir)).sort();
       const allFiles = await Promise.all(
@@ -345,18 +334,15 @@ async function executeRepoLane(
 ): Promise<boolean> {
   const { workspace, readmeContent, repo, wsPath, batchSize } = input;
 
-  // Read TODO file
   const todoFileName = `TODO-${repo.repoName}.md`;
   const todoFilePath = path.join(wsPath, todoFileName);
   const todoFile = Bun.file(todoFilePath);
   const todoContent = (await todoFile.exists()) ? await todoFile.text() : "";
 
-  // Parse and group TODO items
   const items = parseTodoItems(todoContent);
   const groups = groupTodoItemsWithParents(items);
   const batches = batchTodoGroups(groups, batchSize);
 
-  // Skip this repo entirely if there are no actionable (pending/in_progress) items
   if (batches.length === 0) {
     ctx.emitStatus(
       `[${repo.repoName}] No actionable TODO items — skipping execute`,
@@ -388,7 +374,6 @@ async function executeRepoLane(
     });
   }
 
-  // Batched execution loop
   const totalBatches = batches.length;
   const completedItems: string[] = [];
 
@@ -399,12 +384,10 @@ async function executeRepoLane(
       ? await currentTodoFile.text()
       : "";
 
-    // Re-parse to get fresh state
     const currentItems = parseTodoItems(currentTodoContent);
     const currentGroups = groupTodoItemsWithParents(currentItems);
     const remainingBatches = batchTodoGroups(currentGroups, batchSize);
 
-    // Early exit if all items are completed
     if (remainingBatches.length === 0) {
       ctx.emitStatus(
         `[${repo.repoName}] All items completed after batch ${i}/${totalBatches}`,
@@ -412,7 +395,6 @@ async function executeRepoLane(
       break;
     }
 
-    // Take the first batch of remaining actionable items
     const currentBatch = remainingBatches[0];
     const batchContent = renderTodoGroupsAsMarkdown(currentBatch);
     const completedSummary =
@@ -452,12 +434,10 @@ async function executeRepoLane(
       return false;
     }
 
-    // Track completed items from this batch for summary
     for (const group of currentBatch) {
       completedItems.push(group.parent.text);
     }
 
-    // Commit workspace snapshot after each batch
     await commitWorkspaceSnapshot(
       workspace,
       `Batch ${i + 1}/${totalBatches} completed for ${repo.repoName}`,

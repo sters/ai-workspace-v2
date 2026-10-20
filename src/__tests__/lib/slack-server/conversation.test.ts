@@ -58,7 +58,6 @@ const complete = (exitCode = 0): FakeEvent => ({
   data: JSON.stringify({ exitCode }),
 });
 
-/** Last prompt string passed to runClaude. */
 function lastPrompt(): string {
   return runClaudeMock.mock.calls.at(-1)![1] as string;
 }
@@ -177,8 +176,8 @@ describe("converse", () => {
 
     expect(reply).toBe("recovered");
     expect(runClaudeMock).toHaveBeenCalledTimes(2);
-    expect(callResume(0)).toBe("old-sess"); // first attempt resumed
-    expect(callResume(1)).toBeUndefined(); // retry is fresh
+    expect(callResume(0)).toBe("old-sess");
+    expect(callResume(1)).toBeUndefined();
     expect(getSession("thread-1", Date.now())).toBe("new-sess");
   });
 

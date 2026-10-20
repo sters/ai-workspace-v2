@@ -41,9 +41,8 @@ describe("buildAutonomousGatePrompt", () => {
     maxLoops: 3,
   };
 
-  // The final cycle used to be told to report `shouldLoop: false` "regardless of
-  // issues found", which handed a PR to the human with the run's own leftovers in
-  // it. Now it reports the truth and the pipeline stops instead.
+  // Forcing `shouldLoop: false` on the final cycle hands the human a PR with the
+  // run's own leftovers in it; the gate reports the truth and the pipeline stops.
   it("tells the final cycle that remaining work stops the run instead of looping", () => {
     const prompt = buildAutonomousGatePrompt({
       ...baseInput,
@@ -142,8 +141,8 @@ describe("buildAutonomousGatePrompt", () => {
   });
 
   describe("suggestion budget", () => {
-    // Cycle-independent now. When it started at cycle 2, cycle 1 looped on nits
-    // by design, so no run ever finished in one cycle.
+    // Cycle-independent: a budget that starts at cycle 2 lets cycle 1 loop on
+    // nits, so no run finishes in one cycle.
     it("keeps Suggestion-level findings out of the loop on every cycle", () => {
       const systemPrompt = getAutonomousGateSystemPrompt();
       expect(systemPrompt).toContain("### Suggestion Budget");
@@ -156,8 +155,7 @@ describe("buildAutonomousGatePrompt", () => {
 
     // The carve-out for coverage sat outside the budget with no scope, and every
     // fix a cycle lands is "changed code" — so the run's own fix supplied the next
-    // cycle's Should-Fix and no branch could ever be done. Observed: cycle 2
-    // looped solely for an untested NaN guard that cycle 1's fix had introduced.
+    // cycle's Should-Fix and no branch could ever be done.
     it("scopes the coverage carve-out so a cycle's own fix cannot re-trigger it", () => {
       const systemPrompt = getAutonomousGateSystemPrompt();
       expect(systemPrompt).toMatch(/test coverage[^.\n]*\b(contract|reach)/i);

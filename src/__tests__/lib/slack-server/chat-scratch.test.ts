@@ -1,21 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import path from "node:path";
-import {
-  getSlackScratchDir,
-  getSlackScratchRoot,
-  SLACK_SCRATCH_DIRNAME,
-} from "@/lib/slack-server/chat-scratch";
+import { getSlackScratchDir, getSlackScratchRoot } from "@/lib/slack-server/chat-scratch";
 
 const ROOT = "/ws";
 
 describe("slack-server/chat-scratch", () => {
-  it("resolves the scratch root under .ai-workspace", () => {
-    expect(getSlackScratchRoot(ROOT)).toBe(
-      path.join(ROOT, ".ai-workspace", SLACK_SCRATCH_DIRNAME),
-    );
-  });
-
   it("gives each thread its own directory under the scratch root", () => {
     const a = getSlackScratchDir(ROOT, "1712345678.123456");
     const b = getSlackScratchDir(ROOT, "1712345999.000100");

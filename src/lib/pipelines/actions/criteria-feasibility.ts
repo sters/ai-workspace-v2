@@ -23,8 +23,8 @@ import type { GroupChild, PhaseFunctionContext, PipelinePhase } from "@/types/pi
  * as a sibling of the README clarity judge on the autonomous init path, and as a
  * phase of `update-readme`. A run that merely re-reads an already-judged
  * contract (autonomous starting from execute / update-todo, e.g. a PR-review
- * turnaround) was paying a full worktree-reading judge for a verdict it already
- * had in the ledger.
+ * turnaround) relies on the verdict already in the ledger instead of paying for
+ * another worktree-reading judge.
  *
  * Split into a child spec plus the code that applies its verdict so it can run
  * either inside another phase's `runChildGroup` or as its own phase. Returns

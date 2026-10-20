@@ -141,9 +141,7 @@ Another note`;
 A note line
   This is a note, not a child of Task A`;
     const sections = parseTodoSections(content);
-    // "A note line" becomes a note and resets lastItem
     expect(sections[0].notes).toContain("A note line");
-    // "This is a note, not a child" - since lastItem was reset, this goes to notes too
     expect(sections[0].notes).toContain("This is a note, not a child of Task A");
   });
 
@@ -217,8 +215,6 @@ describe("groupTodoItemsWithParents", () => {
     const items = parseTodoItems(`  - [ ] Orphan sub
 - [ ] Parent`);
     const groups = groupTodoItemsWithParents(items);
-    // The orphan sub-item (indent=2) has no parent before it, so it's skipped
-    // Parent (indent=0) becomes a group
     expect(groups).toHaveLength(1);
     expect(groups[0].parent.text).toBe("Parent");
   });

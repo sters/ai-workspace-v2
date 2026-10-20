@@ -15,7 +15,6 @@ export function readOperationLog(operationId: string, workspace?: string): Store
   const operation = dbGetOperation(operationId);
   if (!operation) return null;
 
-  // If workspace is specified, verify it matches
   if (workspace && operation.workspace !== workspace) return null;
 
   const events = getEvents(operationId);

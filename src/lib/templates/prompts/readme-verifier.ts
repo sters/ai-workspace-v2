@@ -1,8 +1,3 @@
-/**
- * Prompt template for workspace-repo-readme-verifier agent.
- * Verifies that README requirements have been satisfied by the implementation.
- */
-
 import type { ReadmeVerifierInput } from "@/types/prompts";
 import { WRITTEN_DELIVERABLE_LENGTH, worktreeCdRules } from "./shared";
 

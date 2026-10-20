@@ -1,13 +1,9 @@
 /**
- * System prompt file management.
- * Writes static system prompt files to workspace/prompts/ directories
- * and ensures they exist and stay up-to-date at runtime.
- *
- * Auto-update mechanism: a content hash of all prompt templates is written
- * to prompts/.hash. When ensureSystemPrompt is called, the hash is compared
- * with the current templates. If they differ (e.g., after an app update),
- * all prompt files in that directory are regenerated. Each directory is
- * checked at most once per process to avoid redundant I/O.
+ * System prompt files under `<dir>/prompts/`. A content hash of all prompt
+ * templates is written to prompts/.hash; when ensureSystemPrompt is called and
+ * the hash differs from the current templates (e.g., after an app update), all
+ * prompt files in that directory are regenerated. Each directory is checked at
+ * most once per process.
  */
 
 import { pathExists } from "@/lib/fs";
@@ -58,7 +54,6 @@ import {
   getConflictResolverSystemPrompt,
 } from "@/lib/templates/prompts";
 
-/** Registry mapping file names to their content generator functions. */
 const SYSTEM_PROMPTS: Record<string, () => string> = {
   "executor.md": getExecutorSystemPrompt,
   "updater.md": getUpdaterSystemPrompt,
@@ -101,13 +96,8 @@ const SYSTEM_PROMPTS: Record<string, () => string> = {
   "slack-workspace-chat.md": getSlackWorkspaceChatSystemPrompt,
 };
 
-// ---------------------------------------------------------------------------
-// Content hash for auto-update detection
-// ---------------------------------------------------------------------------
-
 let _cachedHash: string | null = null;
 
-/** Compute a SHA-256 hash of all system prompt contents combined. */
 function computePromptsHash(): string {
   if (_cachedHash) return _cachedHash;
   const hasher = createHash("sha256");
@@ -149,12 +139,6 @@ async function removeStalePromptFiles(promptsDir: string): Promise<void> {
   }
 }
 
-/**
- * Check whether the prompts in a directory are up-to-date.
- * If not (or if the directory/hash file is missing), regenerate all files
- * and remove any stale .md files no longer in SYSTEM_PROMPTS.
- * Each directory is checked at most once per process.
- */
 function ensureUpToDate(dir: string): Promise<void> {
   const promptsDir = path.join(dir, "prompts");
   let verified = _verifiedDirs.get(promptsDir);
@@ -193,11 +177,6 @@ async function regenerateIfStale(promptsDir: string): Promise<void> {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-
-/** Write all system prompt files to {dir}/prompts/. */
 export async function writeSystemPrompts(dir: string): Promise<void> {
   const promptsDir = path.join(dir, "prompts");
   await mkdir(promptsDir, { recursive: true });
@@ -212,11 +191,6 @@ export async function writeSystemPrompts(dir: string): Promise<void> {
   _verifiedDirs.set(promptsDir, Promise.resolve());
 }
 
-/**
- * Ensure system prompt files are up-to-date in a workspace and return
- * the absolute path for the requested agent.
- * Auto-regenerates all files when the app's prompt templates have changed.
- */
 export async function ensureSystemPrompt(wsPath: string, agentName: string): Promise<string> {
   if (!SYSTEM_PROMPTS[`${agentName}.md`]) {
     throw new Error(`Unknown system prompt agent: ${agentName}`);
@@ -226,9 +200,8 @@ export async function ensureSystemPrompt(wsPath: string, agentName: string): Pro
 }
 
 /**
- * Ensure system prompt files are up-to-date at the global workspace root
- * ({workspaceRoot}/prompts/) and return the absolute path for the requested agent.
- * Used for agents that run outside a specific workspace (init-readme, search, discovery).
+ * Like `ensureSystemPrompt`, at the workspace root, for agents that run
+ * outside a specific workspace (init-readme, search, discovery).
  */
 export async function ensureGlobalSystemPrompt(agentName: string): Promise<string> {
   if (!SYSTEM_PROMPTS[`${agentName}.md`]) {
@@ -239,11 +212,7 @@ export async function ensureGlobalSystemPrompt(agentName: string): Promise<strin
   return path.join(rootPath, "prompts", `${agentName}.md`);
 }
 
-/**
- * Create a per-session system prompt file that includes the base agent prompt
- * plus dynamic workspace context. Returns the absolute path to the session file.
- * Used for chat sessions where workspace-specific info must be in the system prompt.
- */
+/** For chat sessions, whose workspace context must be in the system prompt itself. */
 export async function ensureSessionSystemPrompt(
   wsPath: string,
   agentName: string,
@@ -257,8 +226,7 @@ export async function ensureSessionSystemPrompt(
   const sessionDir = path.join(wsPath, "prompts", "sessions");
   await mkdir(sessionDir, { recursive: true });
 
-  // Clean up stale session prompt files for this agent left over from previous runs.
-  // Only removes files matching the naming convention: {agentName}-{numericSessionId}.md
+  // Session files earlier runs of this agent left behind.
   const stalePattern = new RegExp(`^${agentName}-\\d+\\.md$`);
   try {
     for (const entry of await readdir(sessionDir)) {

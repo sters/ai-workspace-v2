@@ -12,18 +12,12 @@ import { getCleanEnv } from "../env";
 import { runProcess, type ProcessResult } from "../process/run";
 import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
 
-// ---------------------------------------------------------------------------
-// CLI path resolution (moved from cli-path.ts)
-// ---------------------------------------------------------------------------
-
 let _cliPath: string | null = null;
 
 function resolveCliPath(): string {
-  // Allow explicit override via CLAUDE_PATH env var
   if (process.env.AIW_CLAUDE_PATH) {
     return process.env.AIW_CLAUDE_PATH;
   }
-  // Check config file for claude.path
   const configPath = getConfig().claude.path;
   if (configPath) {
     return configPath;
@@ -51,10 +45,6 @@ export function getCliPath(): string {
 export function _resetCliPath(): void {
   _cliPath = null;
 }
-
-// ---------------------------------------------------------------------------
-// Shared spawn utilities
-// ---------------------------------------------------------------------------
 
 /** Build a clean env object with CLAUDECODE cleared and optional extras merged. */
 export function getClaudeEnv(
@@ -155,7 +145,7 @@ export function runClaude(
   let currentProc: Subprocess | null = null;
   let killed = false;
 
-  // Fix 6: Callbacks invoked when submitAnswer spawns a new process, so
+  // Callbacks invoked when submitAnswer spawns a new process, so
   // external tracking structures (e.g., managed.childProcesses) can be
   // updated with the new subprocess reference.
   const processSpawnedCallbacks: ((proc: Subprocess) => void)[] = [];
@@ -235,7 +225,6 @@ export function runClaude(
     // Notify external tracking structures about the new subprocess
     for (const cb of processSpawnedCallbacks) cb(proc);
 
-    // Write prompt via stdin
     if (proc.stdin) {
       try {
         proc.stdin.write(promptOrAnswer);
@@ -249,7 +238,7 @@ export function runClaude(
     pendingAskToolUseId = null;
 
     (async () => {
-      // Fix 8: Start reading stderr concurrently with stdout to avoid
+      // Start reading stderr concurrently with stdout to avoid
       // pipe buffer deadlock when the CLI writes significant stderr output.
       const stderrPromise = new Response(proc.stderr).text().catch(() => "");
 
@@ -279,7 +268,6 @@ export function runClaude(
               parsed.effort = options.effort;
             }
 
-            // Record session_id from system/init event
             if (parsed.type === "system" && parsed.session_id) {
               if (sessionId !== parsed.session_id) {
                 sessionId = parsed.session_id;
@@ -383,7 +371,6 @@ export function runClaude(
           }
         }
 
-        // Flush remaining buffer
         if (buffer.trim()) {
           const final = Bun.JSONL.parseChunk(buffer);
           for (const parsed of final.values as StreamEvent[]) {
@@ -401,17 +388,17 @@ export function runClaude(
         }
       }
 
-      // Read stderr diagnostics (started concurrently before stdout loop — Fix 8)
+      // Read stderr diagnostics (started concurrently before stdout loop)
       try {
         const stderrText = await stderrPromise;
         if (stderrText.trim()) {
           log(operationId, "stderr:", stderrText.trim().slice(0, 500));
         }
       } catch {
-        // Ignore stderr read errors
+        // stderr is diagnostics only; a failed read must not fail the run.
       }
 
-      // Wait for process exit with a 30-second timeout (Fix 10).
+      // Wait for process exit with a 30-second timeout.
       // If the process doesn't exit in time, send SIGKILL and return exit code 1.
       const exitCode = await Promise.race([
         proc.exited,
@@ -453,7 +440,7 @@ export function runClaude(
       killed = true;
       if (currentProc) {
         currentProc.kill(); // SIGTERM
-        // Fix 7: SIGKILL fallback after 5 seconds if the process doesn't exit
+        // SIGKILL fallback after 5 seconds if the process doesn't exit
         const procRef = currentProc;
         setTimeout(() => {
           try { procRef.kill(9); } catch { /* already exited */ }
@@ -468,12 +455,10 @@ export function runClaude(
       if (toolUseId !== pendingAskToolUseId || !sessionId) return false;
       pendingAskToolUseId = null;
 
-      // Build answer text from the answers map
       const answerText = Object.entries(answers)
         .map(([q, a]) => `${q}: ${a}`)
         .join("\n");
 
-      // Resume with --resume
       spawnAndStream(answerText, sessionId);
       return true;
     },
@@ -484,6 +469,6 @@ export function runClaude(
 }
 
 // Interactive mode (non -p) is implemented via:
-// - src/lib/chat-server.ts — WebSocket server (port 3742) with PTY-backed Claude sessions
+// - src/lib/chat-server/ — WebSocket server (port 3742) with PTY-backed Claude sessions
 // - src/components/workspace/chat-terminal.tsx — xterm.js frontend component
 // - src/lib/pty.ts — shared PTY spawn/collect utilities

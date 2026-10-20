@@ -38,7 +38,7 @@ describe("useAsyncCallback", () => {
     const { result } = renderHook(() => useAsyncCallback(fn));
 
     act(() => result.current[0]());
-    act(() => result.current[0]()); // should be ignored
+    act(() => result.current[0]());
     expect(fn).toHaveBeenCalledOnce();
 
     await act(async () => resolve());
@@ -48,7 +48,7 @@ describe("useAsyncCallback", () => {
   it("does nothing when fn is undefined", () => {
     const { result } = renderHook(() => useAsyncCallback(undefined));
     expect(result.current[1]).toBe(false);
-    act(() => result.current[0]()); // should not throw
+    act(() => result.current[0]());
     expect(result.current[1]).toBe(false);
   });
 

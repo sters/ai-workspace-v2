@@ -15,7 +15,6 @@ export function gcCompletedOperations() {
 
   for (const [id, managed] of operations) {
     if (managed.completedAt != null) {
-      // Remove operations older than GC_MAX_AGE_MS
       if (now - managed.completedAt > GC_MAX_AGE_MS) {
         operations.delete(id);
       } else {
@@ -24,7 +23,6 @@ export function gcCompletedOperations() {
     }
   }
 
-  // If still too many completed operations, remove oldest
   if (completed.length > GC_MAX_COMPLETED) {
     completed.sort((a, b) => (a[1].completedAt ?? 0) - (b[1].completedAt ?? 0));
     const toRemove = completed.length - GC_MAX_COMPLETED;

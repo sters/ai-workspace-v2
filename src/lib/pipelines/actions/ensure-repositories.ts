@@ -111,9 +111,9 @@ export async function syncReadmeRepositories(
  * Discover lint/test/build constraints, and implementation / review guidance,
  * for worktrees that were just created.
  *
- * The discovery phase itself only runs on the init path, so a repository added
- * to an existing workspace reached review with its commands undeclared — which
- * `buildNoConstraintsReport` reports as `NOT DECLARED` and nothing else runs.
+ * The discovery phase itself only runs on the init path; without this, a
+ * repository added to an existing workspace reaches review with its commands
+ * undeclared, which `buildNoConstraintsReport` reports as `NOT DECLARED`.
  * Callers treat a `false` return as incomplete, never as fatal: the executor
  * resolves its own toolchain and runs the repo's commands regardless.
  */

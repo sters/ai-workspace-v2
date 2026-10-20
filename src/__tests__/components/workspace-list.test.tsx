@@ -35,7 +35,6 @@ vi.mock("@/hooks/use-running-operations", () => ({
   useRunningOperations: () => mockUseRunningOperations(),
 }));
 
-// Import after mocks
 import { WorkspaceList } from "@/components/dashboard/workspace-list";
 
 function makeWorkspace(name: string, title: string): WorkspaceListItem {

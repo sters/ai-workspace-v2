@@ -11,7 +11,6 @@ import type { Operation, OperationEvent } from "@/types/operation";
 import { getDb, _resetDb, _setDbPath, insertOperation, appendEvents } from "@/lib/db";
 import { extractResultSummary } from "@/lib/parsers/stream";
 
-// Deterministic UUIDs for test use
 const ID1 = "00000000-0000-4000-8000-000000000001";
 const ID2 = "00000000-0000-4000-8000-000000000002";
 const ID3 = "00000000-0000-4000-8000-000000000003";
@@ -37,25 +36,20 @@ function makeEvent(operationId: string, type: OperationEvent["type"] = "status")
   };
 }
 
-/**
- * Helper: insert an operation + events directly into SQLite,
- * simulating the full pipeline flow (insertOperation → appendEvents → writeOperationLog).
- */
+/** The pipeline's own write path: insertOperation → appendEvents → writeOperationLog. */
 function writeViaDb(op: Operation, events: OperationEvent[]) {
   insertOperation(op);
   if (events.length > 0) {
     appendEvents(events);
   }
-  // writeOperationLog updates status/meta (simulating markComplete)
   writeOperationLog(op, extractResultSummary(events));
 }
 
 describe("operation-store", () => {
   beforeEach(() => {
-    // Reset DB for each test to ensure isolation
     _resetDb();
     _setDbPath(":memory:");
-    getDb(); // re-initialize
+    getDb();
   });
 
   describe("writeOperationLog + readOperationLog roundtrip", () => {
@@ -102,11 +96,8 @@ describe("operation-store", () => {
       const op = makeOperation(ID1, { workspace: "ws-a" });
       writeViaDb(op, [makeEvent(ID1)]);
 
-      // Read with correct workspace
       expect(readOperationLog(ID1, "ws-a")).not.toBeNull();
-      // Read with wrong workspace
       expect(readOperationLog(ID1, "ws-b")).toBeNull();
-      // Read without workspace
       expect(readOperationLog(ID1)).not.toBeNull();
     });
   });
@@ -135,9 +126,9 @@ describe("operation-store", () => {
 
       const ops = listStoredOperations();
       expect(ops).toHaveLength(3);
-      expect(ops[0].id).toBe(ID2); // newest
+      expect(ops[0].id).toBe(ID2);
       expect(ops[1].id).toBe(ID3);
-      expect(ops[2].id).toBe(ID1); // oldest
+      expect(ops[2].id).toBe(ID1);
     });
 
     it("filters by workspace when provided", () => {
@@ -153,7 +144,6 @@ describe("operation-store", () => {
       expect(opsB).toHaveLength(1);
       expect(opsB[0].workspace).toBe("ws-b");
 
-      // All workspaces
       expect(listStoredOperations()).toHaveLength(3);
     });
 

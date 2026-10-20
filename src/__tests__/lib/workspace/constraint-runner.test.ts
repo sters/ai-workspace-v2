@@ -33,7 +33,6 @@ describe("execConstraintCommand", () => {
   });
 
   it("truncates long output", async () => {
-    // Generate output longer than maxChars
     const result = await execConstraintCommand(
       "python3 -c \"print('x' * 200)\"",
       { cwd: "/tmp", maxChars: 50 },

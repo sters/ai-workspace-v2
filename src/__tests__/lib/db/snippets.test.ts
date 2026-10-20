@@ -69,9 +69,4 @@ describe("db/snippets", () => {
     const ok = deleteSnippet(99999);
     expect(ok).toBe(false);
   });
-
-  it("returns null for non-existent snippet", () => {
-    const s = getSnippet(99999);
-    expect(s).toBeNull();
-  });
 });

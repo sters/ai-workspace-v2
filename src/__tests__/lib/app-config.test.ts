@@ -76,7 +76,6 @@ describe("normalizeRawConfig", () => {
       review: { batchSize: 0 },
       execute: { claudeTimeoutMinutes: 30, batchSize: 5 },
     });
-    // Original operation type keys should be removed from operations root
     expect((result.operations as Record<string, unknown>).review).toBeUndefined();
     expect((result.operations as Record<string, unknown>).execute).toBeUndefined();
   });
@@ -108,7 +107,6 @@ describe("normalizeRawConfig", () => {
       { name: "Editor (VSCode)", command: "vim {path}" },
       { name: "Terminal", command: "open -a iTerm {path}" },
     ]);
-    // Legacy keys are stripped
     expect((result as Record<string, unknown>).editor).toBeUndefined();
     expect((result as Record<string, unknown>).terminal).toBeUndefined();
   });
@@ -186,7 +184,6 @@ describe("validateOpeners", () => {
       },
     };
     const result = normalizeRawConfig(raw);
-    // notAnOpType is not an operation type, should remain as-is
     expect((result.operations as Record<string, unknown>).notAnOpType).toEqual({ batchSize: 0 });
     expect(result.operations?.typeOverrides).toBeUndefined();
   });
@@ -205,7 +202,6 @@ describe("mergeConfig", () => {
     const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, {});
     expect(result.server.port).toBe(8080);
     expect(result.server.chatPort).toBe(8081);
-    // Other defaults preserved
     expect(result.claude.path).toBeNull();
     expect(result.operations.maxConcurrent).toBe(3);
   });
@@ -219,7 +215,6 @@ describe("mergeConfig", () => {
     };
     const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, env);
     expect(result.server.port).toBe(9999);
-    // chatPort from file since env doesn't set it
     expect(result.server.chatPort).toBe(8081);
   });
 
@@ -231,7 +226,6 @@ describe("mergeConfig", () => {
     };
     const result = mergeConfig(CONFIG_DEFAULTS, fileConfig, {});
     expect(result.operations.maxConcurrent).toBe(5);
-    // Other operation defaults preserved
     expect(result.operations.claudeTimeoutMinutes).toBe(20);
     expect(result.operations.functionTimeoutMinutes).toBe(3);
     expect(result.operations.defaultInteractionLevel).toBe("mid");
@@ -275,7 +269,6 @@ describe("getConfig", () => {
 
   beforeEach(() => {
     _resetConfig();
-    // Point to a non-existent file so tests don't read the real user config
     _setConfigFilePath("/tmp/nonexistent-aiw-test-config.yml");
     for (const key of envKeys) {
       savedEnv[key] = process.env[key];
@@ -380,7 +373,6 @@ describe("getOperationConfig", () => {
       expect(reviewCfg.batchSize).toBe(0);
       expect(reviewCfg.claudeTimeoutMinutes).toBe(20); // global default
 
-      // Execute: both batchSize and claudeTimeoutMinutes overridden
       const execCfg = getOperationConfig("execute");
       expect(execCfg.batchSize).toBe(5);
       expect(execCfg.claudeTimeoutMinutes).toBe(30);
@@ -425,7 +417,6 @@ describe("ensureConfigFile", () => {
       const content = fs.readFileSync(tmpPath, "utf-8");
       // Legacy `editor:` key is left intact (runtime auto-migrates it to openers)
       expect(content).toContain("editor: vim {path}");
-      // Missing known sections are added as comments
       expect(content).toContain("# openers:");
       expect(content).toContain("# operations:");
     } finally {
@@ -447,12 +438,9 @@ describe("migrateConfigContent", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
-    // batchSize and other missing ops keys should be added in the operations section
     expect(result).toContain("#   batchSize:");
     expect(result).toContain("#   claudeTimeoutMinutes:");
-    // maxConcurrent should remain active
     expect(result).toContain("  maxConcurrent: 3");
-    // The missing ops keys should appear between maxConcurrent and the blank line (or after)
     const lines = result.split("\n");
     const maxConcIdx = lines.findIndex((l) => l.includes("maxConcurrent: 3"));
     const batchSizeIdx = lines.findIndex((l) => l.includes("batchSize:"));
@@ -467,7 +455,6 @@ describe("migrateConfigContent", () => {
     ].join("\n");
     const result = migrateConfigContent(content);
     expect(result).toContain("# unknownSetting: value");
-    // Known key preserved as active
     expect(result).toContain("editor: code {path}");
   });
 
@@ -511,11 +498,9 @@ describe("migrateConfigContent", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
-    // operations section should be added
     expect(result).toContain("# operations:");
     expect(result).toContain("#   maxConcurrent:");
     expect(result).toContain("#   batchSize:");
-    // server and claude sections too
     expect(result).toContain("# server:");
     expect(result).toContain("#   port:");
     expect(result).toContain("# claude:");
@@ -631,7 +616,6 @@ describe("migrateConfigContent", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
-    // All keys present — no changes
     expect(result).toBe(content);
   });
 
@@ -644,11 +628,8 @@ describe("migrateConfigContent", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
-    // chatPort should be added to server section
     expect(result).toContain("#   chatPort:");
-    // port stays active
     expect(result).toContain("  port: 9999");
-    // chatPort should be in the server section (before editor)
     const lines = result.split("\n");
     const chatPortIdx = lines.findIndex((l) => l.includes("chatPort:"));
     const editorIdx = lines.findIndex((l) => l.includes("editor:"));
@@ -666,12 +647,10 @@ describe("migrateConfigContent", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
-    // Per-type override sections should be preserved
     expect(result).toContain("  review:");
     expect(result).toContain("    batchSize: 0");
     expect(result).toContain("  execute:");
     expect(result).toContain("    claudeTimeoutMinutes: 30");
-    // Global settings still present
     expect(result).toContain("  batchSize: 3");
   });
 
@@ -685,9 +664,7 @@ describe("migrateConfigContent", () => {
       "",
     ].join("\n");
     const result = migrateConfigContent(content);
-    // Valid key preserved
     expect(result).toContain("    batchSize: 0");
-    // Unknown key commented out
     expect(result).toContain("#     unknownSetting: true");
   });
 });

@@ -72,7 +72,6 @@ export async function GET(request: Request) {
             // File doesn't exist yet — fallback timer will retry
             return;
           }
-          // Unexpected error
           if (!closed) {
             controller.enqueue(
               encoder.encode(
@@ -117,14 +116,12 @@ export async function GET(request: Request) {
         }
       }
 
-      // Initial read
       sendChunk();
 
       // Fallback timer ensures we catch changes even if fs.watch misses them
       // or the file hasn't been created yet
       fallbackTimer = setInterval(sendChunk, FALLBACK_POLL_MS);
 
-      // Cleanup on client disconnect
       request.signal.addEventListener("abort", cleanup);
     },
   });

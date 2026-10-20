@@ -49,7 +49,7 @@ export function TodoUpdater({
   const startAndNavigate = useStartAndNavigate(workspaceName);
 
   // Declared in the README (so `Ensure TODOs` will plan it) but with no TODO
-  // file on disk yet. Rendering the tab from `todos` alone dropped these
+  // file on disk yet. Rendering the tab from `todos` alone would drop these
   // repositories silently, which is what a repo added after init looks like.
   const unplanned = (repositories ?? []).filter((repo) => {
     const name = repoNameOf(repo);
@@ -81,7 +81,6 @@ export function TodoUpdater({
 
   return (
     <div className="space-y-6">
-      {/* Workspace-wide update form */}
       {todos.length > 0 && (
         <Card variant="dashed">
           <p className="mb-2 text-sm font-medium">Update workspace TODOs</p>
@@ -126,7 +125,6 @@ export function TodoUpdater({
         </Card>
       )}
 
-      {/* Per-repo cards */}
       {todos.map((todo) => (
         <RepoTodoCard
           key={todo.filename}

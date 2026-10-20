@@ -1,8 +1,3 @@
-/**
- * Prompt template for deep search across workspaces.
- * Uses Claude to explore workspace directories and find relevant information.
- */
-
 export function getSearchSystemPrompt(): string {
   return `Search through all workspace directories in the workspace directory specified in the user prompt. Each workspace contains:
 - README.md — workspace overview, goals, and status

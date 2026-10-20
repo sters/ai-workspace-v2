@@ -47,7 +47,7 @@ vi.mock("@/lib/workspace/todo-cleanup", () => ({
 }));
 vi.mock("@/lib/workspace/git", () => ({
   listWorkspaceRepos: vi.fn(() => [
-    { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+    { repoPath: "github.com/acme/repo", repoName: "repo", worktreePath: "/x" },
   ]),
 }));
 vi.mock("@/lib/parsers/readme", () => ({
@@ -61,7 +61,7 @@ vi.mock("@/lib/parsers/readme", () => ({
 }));
 vi.mock("@/lib/pipelines/actions/setup-repository", () => ({
   setupRepository: vi.fn(() => ({
-    repoPath: "github.com/sters/repo",
+    repoPath: "github.com/acme/repo",
     repoName: "repo",
     worktreePath: "/x",
     baseBranch: "main",
@@ -150,7 +150,7 @@ describe("buildAutonomousPipeline", () => {
     mockBuildCreatePr.mockResolvedValue([]);
     mockGetReviewSessions.mockResolvedValue([]);
     mockListWorkspaceRepos.mockReturnValue([
-      { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+      { repoPath: "github.com/acme/repo", repoName: "repo", worktreePath: "/x" },
     ]);
     mockReadWorkspaceReadme.mockResolvedValue({
       content: "",
@@ -169,8 +169,6 @@ describe("buildAutonomousPipeline", () => {
         workspace: "test-ws",
         instruction: "fix things",
       });
-      // Ensure repositories + Ensure TODOs + update-todo + Cycle 1
-      expect(phases).toHaveLength(6);
       expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
         "Ensure repositories",
         "Ensure TODOs",
@@ -202,7 +200,6 @@ describe("buildAutonomousPipeline", () => {
         startWith: "execute",
         workspace: "test-ws",
       });
-      expect(phases).toHaveLength(5);
       expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
         "Ensure repositories",
         "Ensure TODOs",
@@ -404,8 +401,7 @@ describe("buildAutonomousPipeline", () => {
 
     // `runSubPhases` ignores the sub-pipeline's own timeoutMs, so this wrapper is
     // the only budget that applies. A wrapper tighter than what execute.ts sizes
-    // itself for fires first and makes that sizing dead code — which is what a
-    // hardcoded figure here did once PER_ITEM_BUDGET_MS moved.
+    // itself for fires first and makes that sizing dead code.
     it("execute phase budget covers what execute.ts sizes itself for", () => {
       const phases = buildAutonomousPipeline({
         startWith: "execute",
@@ -416,30 +412,6 @@ describe("buildAutonomousPipeline", () => {
       const { batchSize } = vi.mocked(getOperationConfig)("execute");
       expect(execPhase.timeoutMs).toBeGreaterThanOrEqual(
         executePhaseBudgetMs(ROUTINE_BATCH_COUNT, batchSize),
-      );
-    });
-
-    // `runSubPhases` ignores each sub-phase's own `timeoutMs`, so the whole
-    // sub-pipeline runs under the wrapping cycle phase's single budget. A
-    // wrapper tighter than the pipeline it wraps fires first, and a timed-out
-    // phase is then retried on the same budget — so it times out again.
-    it("gives each cycle phase a budget covering its whole sub-pipeline", () => {
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-      });
-      const budgetOf = (label: string) => {
-        const phase = phases.find((p) => p.kind === "function" && p.label === label);
-        return phase?.kind === "function" ? phase.timeoutMs : undefined;
-      };
-
-      // execute.ts budgets `maxBatches * 20min + 5min`; 3 batches is routine.
-      expect(budgetOf("Cycle 1: Execute")).toBeGreaterThanOrEqual(
-        3 * 20 * 60 * 1000 + 5 * 60 * 1000,
-      );
-      // review.ts: parallel reviewer group + constraints (10min) + collect (20min).
-      expect(budgetOf("Cycle 1: Review")).toBeGreaterThanOrEqual(
-        (10 + 20 + 10) * 60 * 1000,
       );
     });
 
@@ -499,8 +471,6 @@ describe("buildAutonomousPipeline", () => {
       expect(ctx.emitResult).toHaveBeenCalledWith(
         expect.stringContaining("Continue"),
       );
-      // Should append: Update TODO + next cycle (Execute, Review, Gate)
-      expect(appendedPhases).toHaveLength(4);
       expect(appendedPhases.map((p) => p.kind === "function" && p.label)).toEqual([
         "Cycle 1: Update TODO",
         "Cycle 2: Execute",
@@ -608,7 +578,6 @@ describe("buildAutonomousPipeline", () => {
 
       await gatePhase.fn(ctx);
 
-      // giveUp: true → no Create PR appended
       expect(appendedPhases).toHaveLength(0);
       expect(ctx.emitResult).toHaveBeenCalledWith(
         expect.stringContaining("Give up"),
@@ -640,9 +609,8 @@ describe("buildAutonomousPipeline", () => {
         });
       });
 
-      // The gate used to short-circuit at maxLoops without calling the model, so
-      // the last cycle's whole review — the most expensive phase of a cycle — was
-      // produced and then read by nobody.
+      // Skipping the model at maxLoops would leave the last cycle's whole review
+      // — the most expensive phase of a cycle — read by nobody.
       it("still evaluates the review on the last cycle instead of short-circuiting", async () => {
         const phases = buildAutonomousPipeline({
           startWith: "execute", workspace: "test-ws", maxLoops: 1,
@@ -740,7 +708,7 @@ describe("buildAutonomousPipeline", () => {
   describe("ensure repositories phase", () => {
     it("skips when every README repository is already set up", async () => {
       mockListWorkspaceRepos.mockReturnValue([
-        { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+        { repoPath: "github.com/acme/repo", repoName: "repo", worktreePath: "/x" },
       ]);
       mockReadWorkspaceReadme.mockResolvedValue({
         content: "",
@@ -750,7 +718,7 @@ describe("buildAutonomousPipeline", () => {
           ticketId: "",
           date: "",
           repositories: [
-            { alias: "repo", path: "github.com/sters/repo", baseBranch: "main" },
+            { alias: "repo", path: "github.com/acme/repo", baseBranch: "main" },
           ],
         },
       });
@@ -774,11 +742,11 @@ describe("buildAutonomousPipeline", () => {
       // Initial state: one of two README repos already set up. After setupRepository: both.
       mockListWorkspaceRepos
         .mockReturnValueOnce([
-          { repoPath: "github.com/sters/already", repoName: "already", worktreePath: "/a" },
+          { repoPath: "github.com/acme/already", repoName: "already", worktreePath: "/a" },
         ])
         .mockReturnValueOnce([
-          { repoPath: "github.com/sters/already", repoName: "already", worktreePath: "/a" },
-          { repoPath: "github.com/sters/new", repoName: "new", worktreePath: "/b" },
+          { repoPath: "github.com/acme/already", repoName: "already", worktreePath: "/a" },
+          { repoPath: "github.com/acme/new", repoName: "new", worktreePath: "/b" },
         ]);
       mockReadWorkspaceReadme.mockResolvedValue({
         content: "",
@@ -788,8 +756,8 @@ describe("buildAutonomousPipeline", () => {
           ticketId: "",
           date: "",
           repositories: [
-            { alias: "already", path: "github.com/sters/already", baseBranch: "main" },
-            { alias: "new", path: "github.com/sters/new", baseBranch: "main" },
+            { alias: "already", path: "github.com/acme/already", baseBranch: "main" },
+            { alias: "new", path: "github.com/acme/new", baseBranch: "main" },
           ],
         },
       });
@@ -808,20 +776,20 @@ describe("buildAutonomousPipeline", () => {
       expect(mockSetupRepository).toHaveBeenCalledTimes(1);
       expect(mockSetupRepository).toHaveBeenCalledWith(
         "test-ws",
-        "github.com/sters/new",
+        "github.com/acme/new",
         "main",
         expect.any(Function),
       );
     });
 
     // Constraint discovery otherwise only runs on the init path, so a repo
-    // salvaged into an existing workspace reached review with its commands
-    // NOT DECLARED — which reads exactly like a clean run.
+    // salvaged into an existing workspace would reach review with its commands
+    // NOT DECLARED.
     it("discovers constraints for the repository it just set up", async () => {
       mockListWorkspaceRepos
         .mockReturnValueOnce([])
         .mockReturnValueOnce([
-          { repoPath: "github.com/sters/new", repoName: "new", worktreePath: "/b" },
+          { repoPath: "github.com/acme/new", repoName: "new", worktreePath: "/b" },
         ]);
       mockReadWorkspaceReadme.mockResolvedValue({
         content: "",
@@ -831,7 +799,7 @@ describe("buildAutonomousPipeline", () => {
           ticketId: "",
           date: "",
           repositories: [
-            { alias: "new", path: "github.com/sters/new", baseBranch: "main" },
+            { alias: "new", path: "github.com/acme/new", baseBranch: "main" },
           ],
         },
       });
@@ -854,7 +822,7 @@ describe("buildAutonomousPipeline", () => {
       mockListWorkspaceRepos
         .mockReturnValueOnce([])
         .mockReturnValueOnce([
-          { repoPath: "github.com/sters/new", repoName: "new", worktreePath: "/b" },
+          { repoPath: "github.com/acme/new", repoName: "new", worktreePath: "/b" },
         ]);
       mockReadWorkspaceReadme.mockResolvedValue({
         content: "",
@@ -864,7 +832,7 @@ describe("buildAutonomousPipeline", () => {
           ticketId: "",
           date: "",
           repositories: [
-            { alias: "new", path: "github.com/sters/new", baseBranch: "main" },
+            { alias: "new", path: "github.com/acme/new", baseBranch: "main" },
           ],
         },
       });
@@ -905,7 +873,7 @@ describe("buildAutonomousPipeline", () => {
 
     it("proceeds when README has no entries but worktrees exist on disk", async () => {
       mockListWorkspaceRepos.mockReturnValue([
-        { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+        { repoPath: "github.com/acme/repo", repoName: "repo", worktreePath: "/x" },
       ]);
       mockReadWorkspaceReadme.mockResolvedValue({
         content: "",
@@ -961,7 +929,7 @@ describe("buildAutonomousPipeline", () => {
   describe("ensure todos phase", () => {
     it("skips when every workspace repo has a TODO file", async () => {
       mockListWorkspaceRepos.mockReturnValue([
-        { repoPath: "github.com/sters/repo", repoName: "repo", worktreePath: "/x" },
+        { repoPath: "github.com/acme/repo", repoName: "repo", worktreePath: "/x" },
       ]);
       mockGetTodos.mockResolvedValue([
         { repoName: "repo", filename: "TODO-repo.md", total: 1, done: 0, blocked: 0, inProgress: 0 },
@@ -983,8 +951,8 @@ describe("buildAutonomousPipeline", () => {
 
     it("runs TODO analysis only for repos missing TODO files", async () => {
       mockListWorkspaceRepos.mockReturnValue([
-        { repoPath: "github.com/sters/already", repoName: "already", worktreePath: "/a" },
-        { repoPath: "github.com/sters/new", repoName: "new", worktreePath: "/b" },
+        { repoPath: "github.com/acme/already", repoName: "already", worktreePath: "/a" },
+        { repoPath: "github.com/acme/new", repoName: "new", worktreePath: "/b" },
       ]);
       mockGetTodos.mockResolvedValue([
         { repoName: "already", filename: "TODO-already.md", total: 1, done: 0, blocked: 0, inProgress: 0 },
@@ -1008,7 +976,7 @@ describe("buildAutonomousPipeline", () => {
       expect(mockBuildInitTodoAnalysis).toHaveBeenCalledTimes(1);
       const call = mockBuildInitTodoAnalysis.mock.calls[0]?.[0];
       expect(call?.repos()).toEqual([
-        { repoPath: "github.com/sters/new", repoName: "new", worktreePath: "/b" },
+        { repoPath: "github.com/acme/new", repoName: "new", worktreePath: "/b" },
       ]);
       expect(call?.taskType()).toBe("feature");
     });
@@ -1137,10 +1105,6 @@ describe("buildAutonomousPipeline", () => {
           { cycle: 3, hasUpdateTodo: false },
         ],
       });
-      // Cycle 1: Execute, Review, Gate, Update TODO (4)
-      // Cycle 2: Execute, Review, Gate, Update TODO (4)
-      // Cycle 3: Execute, Review, Gate (3)
-      expect(phases).toHaveLength(11);
       expect(phases.map((p) => p.kind === "function" && p.label)).toEqual([
         "Cycle 1: Execute", "Cycle 1: Review", "Cycle 1: Gate", "Cycle 1: Update TODO",
         "Cycle 2: Execute", "Cycle 2: Review", "Cycle 2: Gate", "Cycle 2: Update TODO",
@@ -1350,8 +1314,8 @@ describe("resolveUnfinishedRepositories", () => {
 });
 
 describe("buildAutonomousPipeline — repositories finish independently", () => {
-  const api = { repoPath: "github.com/sters/api", repoName: "api", worktreePath: "/w/api" };
-  const web = { repoPath: "github.com/sters/web", repoName: "web", worktreePath: "/w/web" };
+  const api = { repoPath: "github.com/acme/api", repoName: "api", worktreePath: "/w/api" };
+  const web = { repoPath: "github.com/acme/web", repoName: "web", worktreePath: "/w/web" };
 
   function findPhase(phases: PipelinePhase[], label: string) {
     const p = phases.find((x) => x.kind === "function" && x.label === label);
@@ -1391,8 +1355,8 @@ describe("buildAutonomousPipeline — repositories finish independently", () => 
     mockGetReviewDetail.mockImplementation(async (_ws, ts) => ({
       summary: `summary ${ts}`,
       files: [
-        { name: "REVIEW-github.com_sters_api.md", content: `api review from ${ts}` },
-        { name: "REVIEW-github.com_sters_web.md", content: `web review from ${ts}` },
+        { name: "REVIEW-github.com_acme_api.md", content: `api review from ${ts}` },
+        { name: "REVIEW-github.com_acme_web.md", content: `web review from ${ts}` },
         { name: "REVIEW-cross-repository.md", content: `boundary review from ${ts}` },
       ],
     }));

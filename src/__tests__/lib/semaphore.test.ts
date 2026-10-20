@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Semaphore } from "@/lib/semaphore";
 
 describe("Semaphore", () => {
-
   it("throws for invalid permits", () => {
     expect(() => new Semaphore(0)).toThrow();
     expect(() => new Semaphore(-1)).toThrow();
@@ -19,7 +18,6 @@ describe("Semaphore", () => {
       // expected
     }
 
-    // Should be released, so next run should work
     expect(sem.available).toBe(1);
     const result = await sem.run(async () => "ok");
     expect(result).toBe("ok");
@@ -32,7 +30,6 @@ describe("Semaphore", () => {
     await sem.acquire();
     order.push("acquired-1");
 
-    // This will wait
     const pending = sem.acquire().then(() => {
       order.push("acquired-2");
     });

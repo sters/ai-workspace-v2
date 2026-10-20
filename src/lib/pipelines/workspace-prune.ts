@@ -30,7 +30,6 @@ export function buildWorkspacePrunePipeline({ days, archivedOnly }: WorkspacePru
           return true;
         }
 
-        // Log every workspace with age and whether it will be pruned
         for (const ws of all) {
           const daysUntilStale = days - ws.ageDays;
           if (isTarget(ws.name, ws.isStale)) {
@@ -57,7 +56,6 @@ export function buildWorkspacePrunePipeline({ days, archivedOnly }: WorkspacePru
           return true;
         }
 
-        // Ask user for confirmation before deleting
         const staleList = stale.map((ws) => `${ws.name} (${ws.ageDays}d old)`).join("\n");
         const answers = await ctx.emitAsk([
           {

@@ -40,7 +40,6 @@ export function isPermissionDenialMessage(text: string): boolean {
  * to produce `permission_denial` entries with actionable information.
  */
 export function enrichPermissionDenials(entries: LogEntry[]): LogEntry[] {
-  // Build map: toolId → { toolName, summary }
   const toolCalls = new Map<string, { toolName: string; summary: string }>();
   for (const e of entries) {
     if (e.kind === "tool_call") {
@@ -143,7 +142,6 @@ export function parseStreamEvent(raw: string): LogEntry[] {
 
   // SDK assistant message: { type: "assistant", message: { content: [...] } }
   if (parsed.type === "assistant" && parsed.message?.content) {
-    // Check for authentication or API errors on the message
     if (parsed.error) {
       const hint = parsed.error === "authentication_failed"
         ? '\nRun "claude login" in your terminal to re-authenticate.'

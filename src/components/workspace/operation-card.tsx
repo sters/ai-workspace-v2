@@ -32,7 +32,6 @@ export function OperationCard({
   const sseOperationId = expanded ? operation.id : null;
   const { events, connected } = useSSE(sseOperationId);
 
-  // Derive live phases from SSE events
   const livePhases = useMemo(
     () => parsePhaseUpdatesFromEvents(events),
     [events],
@@ -57,7 +56,6 @@ export function OperationCard({
   // Detect pending ask from SSE events (lightweight check on raw events)
   const liveHasPendingAsk = useMemo(() => {
     if (liveStatus !== "running") return false;
-    // Track ask tool_use IDs and answered tool_result IDs
     const askIds = new Set<string>();
     const answeredIds = new Set<string>();
     for (const ev of events) {
@@ -104,8 +102,8 @@ export function OperationCard({
   // A phase that fanned out over the repositories has one result per repository,
   // and `resultSummary.content` alone is whichever of them finished last. The
   // stream is what carries all of them, so it wins whenever it is loaded — the
-  // list item is a collapsed card's only source, and for an operation recorded
-  // before per-child results existed it holds just the last one.
+  // list item is a collapsed card's only source, and a summary without
+  // per-child results holds just the last one.
   const results = useMemo<OperationResult[]>(() => {
     const summary = (events.length > 0 ? extractResultSummary(events) : undefined)
       ?? operation.resultSummary;
@@ -116,7 +114,6 @@ export function OperationCard({
 
   return (
     <Card variant="flush">
-      {/* Header */}
       <div className="flex items-center gap-2 p-3">
         <Button
           variant="ghost-toggle"
@@ -164,14 +161,12 @@ export function OperationCard({
         </div>
       </div>
 
-      {/* Inputs (shown when expanded) */}
       {expanded && operation.inputs && Object.keys(operation.inputs).length > 0 && (
         <div className="border-t p-3">
           <OperationInputs inputs={operation.inputs} />
         </div>
       )}
 
-      {/* Expanded body: full OperationLog */}
       {expanded && events.length > 0 && (
         <div className="border-t p-3">
           <OperationLog
@@ -182,7 +177,6 @@ export function OperationCard({
         </div>
       )}
 
-      {/* Starting indicator */}
       {expanded && effectiveIsRunning && events.length === 0 && (
         <div className="border-t p-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">

@@ -1,8 +1,3 @@
-/**
- * Prompt template for creating TODO items from review findings.
- * Reads review artifacts and generates actionable TODO items.
- */
-
 import type { CreateTodoPlannerInput } from "@/types/prompts";
 
 export function getCreateTodoPlannerSystemPrompt(): string {

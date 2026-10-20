@@ -78,8 +78,7 @@ export interface AppConfig {
 
   /**
    * Slack bot integration. When enabled, a separate Bun process opens a Socket
-   * Mode connection and accepts mention commands (`init`, `execute`, `review`,
-   * `create-pr`, `autonomous`). Token strings support `{ENV:VAR_NAME}`
+   * Mode connection and answers mentions. Token strings support `{ENV:VAR_NAME}`
    * substitution at config load time.
    */
   slack: {
@@ -96,8 +95,8 @@ export interface AppConfig {
      */
     allowedUserIds: string[];
     /**
-     * Model for the read-only conversation (mentions that aren't `init`/`help`).
-     * null = CLI default. The tool set is always read-only and not configurable.
+     * Model for the conversation (mentions that aren't a command).
+     * null = CLI default.
      */
     chatModel: ClaudeModel | null;
     /** Claude CLI --effort level for the read-only conversation. null = CLI default. */

@@ -35,11 +35,11 @@ describe("getUpdaterSystemPrompt", () => {
     expect(protectIdx).toBeGreaterThan(deleteIdx);
   });
 
-  // Both derivation rules sit after SCOPE_DISCIPLINE on purpose: that rule is what
-  // suppressed them. Handed three named sites, the updater enumerated its doc
-  // targets from the files it was already editing, so the interface doc — the one
-  // the caller actually codes against, and the only file with no code change of its
-  // own — kept stating the pre-change contract and became the next cycle's Warning.
+  // Both derivation rules sit after SCOPE_DISCIPLINE on purpose: that rule
+  // otherwise suppresses them. Doc targets taken from the files already being
+  // edited miss the interface doc — the one the caller codes against, and the
+  // only file with no code change of its own — which then keeps stating the
+  // pre-change contract and becomes the next cycle's Warning.
   it("derives doc targets from who states the contract, not from the files it edits", () => {
     const scopeIdx = prompt.indexOf("### Scope");
     const targetsIdx = prompt.indexOf("### Deriving an Item's Targets");
@@ -52,10 +52,9 @@ describe("getUpdaterSystemPrompt", () => {
     expect(section).toMatch(/not widening/i);
   });
 
-  // The asymmetry that cost one run its final cycle: the updater expanded the code
-  // items past the gate's asks (correctly, adding three doc sites nobody named) but
-  // took the test asks verbatim, so five changed return sites shipped with two
-  // covered and the other three came back as the next review's Warnings.
+  // Code items are expanded past the gate's asks; test asks taken verbatim leave
+  // the extra changed sites uncovered, and they come back as the next review's
+  // Warnings.
   it("requires test items to cover every site the code items change", () => {
     const section = prompt.slice(prompt.indexOf("### Deriving an Item's Targets"));
     expect(section).toMatch(/return sites/i);

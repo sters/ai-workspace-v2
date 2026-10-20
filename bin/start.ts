@@ -193,7 +193,6 @@ const sharedEnv = {
   ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
 };
 
-// Start Next.js server
 const nextFlags = isHot ? ["--hot"] : isDev ? ["--dev"] : [];
 const nextServer = Bun.spawn(["bun", "--bun", "run", "bin/next-server.ts", ...nextFlags], {
   cwd: packageDir,

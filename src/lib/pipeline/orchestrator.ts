@@ -18,7 +18,6 @@ export function startOperationPipeline(
 ): Operation {
   gcCompletedOperations();
 
-  // Enforce concurrency limit
   let running = 0;
   for (const managed of operations.values()) {
     if (managed.operation.status === "running") running++;
@@ -29,7 +28,6 @@ export function startOperationPipeline(
 
   const id = nextId();
 
-  // Build phase info array
   const phaseInfos: OperationPhaseInfo[] = phases.map((phase, i) => ({
     index: i,
     label: getPhaseLabel(phase, i),

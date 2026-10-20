@@ -31,7 +31,6 @@ describe("workspace prompts cleanup", () => {
 
     expect(fs.existsSync(path.join(promptsDir, "researcher.md"))).toBe(false);
     expect(fs.existsSync(path.join(promptsDir, "definitely-removed.md"))).toBe(false);
-    // A known-current prompt should be present
     expect(fs.existsSync(path.join(promptsDir, "executor.md"))).toBe(true);
   });
 

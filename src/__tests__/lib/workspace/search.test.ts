@@ -1,6 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-// Mock the config module before importing the reader
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/mock/workspace",
 }));
@@ -27,7 +26,6 @@ vi.mock("node:fs/promises", () => {
 
 import { quickSearchWorkspaces } from "@/lib/workspace/reader";
 
-// Helper to mock Bun.file().text()
 const originalBunFile = Bun.file;
 
 function setupBunFileMock(contentMap: Record<string, string>) {

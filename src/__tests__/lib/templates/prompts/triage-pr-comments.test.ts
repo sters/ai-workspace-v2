@@ -161,7 +161,6 @@ describe("buildTriagePrCommentsInstruction", () => {
   });
 
   it("works with no validations at all — triage without validate is the normal path", () => {
-    expect(() => buildTriagePrCommentsInstruction({ threads: [thread] })).not.toThrow();
     expect(instruction).not.toContain("Validation verdict");
   });
 

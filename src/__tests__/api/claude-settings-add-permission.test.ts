@@ -90,7 +90,6 @@ describe("POST /api/claude-settings/add-permission", () => {
     expect(status).toBe(200);
     expect(data.ok).toBe(true);
     expect(data.alreadyExists).toBe(true);
-    // Should NOT have written anything
     expect(mockWriteFile).not.toHaveBeenCalled();
   });
 

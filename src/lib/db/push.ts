@@ -1,10 +1,6 @@
 import type { Database, Statement } from "bun:sqlite";
 import { getDb, _onDbReset } from "./connection";
 
-// ---------------------------------------------------------------------------
-// Lazy prepared statements
-// ---------------------------------------------------------------------------
-
 let _upsert: Statement | null = null;
 let _remove: Statement | null = null;
 let _getAll: Statement | null = null;
@@ -34,19 +30,11 @@ export function _resetPushStatements(): void {
 
 _onDbReset(_resetPushStatements);
 
-// ---------------------------------------------------------------------------
-// Row type
-// ---------------------------------------------------------------------------
-
 interface PushRow {
   endpoint: string;
   p256dh: string;
   auth: string;
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export function addPushSubscription(sub: {
   endpoint: string;

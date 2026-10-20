@@ -225,7 +225,7 @@ describe("ReviewFindingsList", () => {
     });
   });
 
-  // The button no longer posts directly: each selected finding is checked against
+  // The button does not post directly: each selected finding is checked against
   // the pushed code first, and that check decides what goes out.
   describe("starting the grounding operation", () => {
     it("sends the selected ids and leaves the review pending by default", async () => {

@@ -35,7 +35,6 @@ export function MemoEditor({
   const [hasSelection, setHasSelection] = useState(false);
   const [askInstruction, setAskInstruction] = useState("");
 
-  // Save function
   const saveMemo = useCallback(async () => {
     if (!isDirty.current || isSaving.current) return;
     isSaving.current = true;
@@ -136,7 +135,6 @@ export function MemoEditor({
     editorRef.current?.setSelection({ startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1 });
   }, []);
 
-  // Update TODO button handler
   const handleUpdateTodo = useCallback(async () => {
     const text = getSelectedText();
     if (!text) return;
@@ -159,7 +157,6 @@ export function MemoEditor({
 
   return (
     <div className="flex flex-col" style={{ height: "calc(100vh - 320px)", minHeight: "400px" }}>
-      {/* Toolbar */}
       <div className="mb-2 flex items-center gap-2">
         <span className="text-xs text-muted-foreground">For selected text:</span>
         <Input
@@ -183,7 +180,6 @@ export function MemoEditor({
         </div>
       </div>
 
-      {/* Editor */}
       <div className="flex-1 rounded-md border">
         <MonacoEditorLazy
           language="markdown"

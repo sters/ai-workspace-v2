@@ -89,7 +89,6 @@ describe("stripCompletedTodosFromWorkspace", () => {
 
     const modified = await stripCompletedTodosFromWorkspace("test-ws", { repository: "repo-b" });
 
-    // Only repo-b should be read — file mock is only called once
     expect(mockFileText).toHaveBeenCalledTimes(1);
     expect(modified).toEqual(["TODO-repo-b.md"]);
     expect(mockBunWrite).toHaveBeenCalledWith(

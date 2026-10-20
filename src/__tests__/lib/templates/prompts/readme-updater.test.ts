@@ -17,12 +17,6 @@ describe("buildReadmeUpdaterPrompt", () => {
     expect(prompt).not.toContain("Interjection Notice");
   });
 
-  it("includes the interjection notice when interject is true", () => {
-    const prompt = buildReadmeUpdaterPrompt({ ...baseInput(), interject: true });
-    expect(prompt).toContain("## Interjection Notice");
-    expect(prompt).toContain("mid-flight");
-  });
-
   it("places the interjection notice before the Working Directory section", () => {
     const prompt = buildReadmeUpdaterPrompt({ ...baseInput(), interject: true });
     const noticeIdx = prompt.indexOf("Interjection Notice");

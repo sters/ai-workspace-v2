@@ -1,10 +1,6 @@
 import type { AppConfig, OperationTypeSettings } from "@/types/config";
 import type { OperationType } from "@/types/operation";
 
-// ---------------------------------------------------------------------------
-// Defaults
-// ---------------------------------------------------------------------------
-
 export const CONFIG_DEFAULTS: AppConfig = {
   workspaceRoot: null,
   server: {
@@ -25,11 +21,10 @@ export const CONFIG_DEFAULTS: AppConfig = {
     claudeTimeoutMinutes: 20,
     functionTimeoutMinutes: 3,
     defaultInteractionLevel: "mid",
-    // A 10-item batch measured ~18.5min, and the tail batch of a 10+2 split cost
-    // 5min to re-establish context for two items. 15 absorbs a typical review
-    // follow-up round in one call; the batch boundary is still worth keeping
-    // beyond that, since it is where the executor gets fresh context and the
-    // remaining-work re-read (see execute.ts) resumes a batch that ran long.
+    // 15 absorbs a typical review follow-up round in one call; the batch
+    // boundary is still worth keeping beyond that, since it is where the
+    // executor gets fresh context and the remaining-work re-read (see
+    // execute.ts) resumes a batch that ran long.
     batchSize: 15,
     fetchIntervalMinutes: 10,
     typeOverrides: {},
@@ -62,10 +57,6 @@ export const CONFIG_DEFAULTS: AppConfig = {
   },
 };
 
-// ---------------------------------------------------------------------------
-// Operation type names (for config validation and migration)
-// ---------------------------------------------------------------------------
-
 /** All valid OperationType values. Used by migration to recognize sub-sections. */
 export const OPERATION_TYPE_NAMES: ReadonlySet<string> = new Set<OperationType>([
   "init",
@@ -95,10 +86,6 @@ export const OVERRIDABLE_SETTINGS_KEYS = new Set<keyof OperationTypeSettings>([
   "effort",
   "steps",
 ]);
-
-// ---------------------------------------------------------------------------
-// Known config key registry
-// ---------------------------------------------------------------------------
 
 export interface ConfigKeyDef {
   key: string;

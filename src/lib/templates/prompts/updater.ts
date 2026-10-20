@@ -1,8 +1,3 @@
-/**
- * Prompt template for workspace-repo-todo-updater agent.
- * Updates TODO items in a workspace repository.
- */
-
 import { SCOPE_DISCIPLINE } from "./shared";
 import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
 import type { UpdaterInput } from "@/types/prompts";

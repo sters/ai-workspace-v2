@@ -1,8 +1,3 @@
-/**
- * Prompt template for workspace-collect-reviews agent.
- * Collects review results and generates a summary report.
- */
-
 import type { CollectorInput } from "@/types/prompts";
 import { NO_CD_RULES, WRITTEN_DELIVERABLE_LENGTH } from "./shared";
 

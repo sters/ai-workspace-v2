@@ -86,10 +86,8 @@ describe("mergeBaseIntoBranch", () => {
     expect(git.calls).not.toContain(MERGE);
   });
 
-  // The bug this exists for: the first version answered from `--is-ancestor
-  // origin/<base> HEAD` alone, so a merge sitting unpushed in the worktree came
-  // back as "already contains origin/master" while GitHub went on showing the
-  // pull request as conflicting — GitHub judges the pushed head.
+  // `--is-ancestor origin/<base> HEAD` alone would call this current, while
+  // GitHub, which judges the pushed head, still shows the PR as conflicting.
   it("calls a locally-merged, unpushed branch unpushed rather than current", async () => {
     const git = upToMerge({
       [IS_ANCESTOR]: { ok: true, out: "" },
@@ -109,8 +107,6 @@ describe("mergeBaseIntoBranch", () => {
   });
 
   it("names the shas every verdict rests on", async () => {
-    // The report that was wrong named none, so it could not be checked after
-    // the fact.
     const git = upToMerge({ [IS_ANCESTOR]: { ok: true, out: "" } });
 
     const attempt = await mergeBaseIntoBranch(
@@ -472,8 +468,8 @@ describe("isBaseMergeProblem", () => {
 describe("summarizeBaseMerges", () => {
   it("says nothing was pending when every pull request already had its base", async () => {
     const text = summarizeBaseMerges([outcome({ status: "already-current" })]);
-    // The headline says whose state it describes — the pull request's, not the
-    // worktree's, which is the distinction the wrong report collapsed.
+    // The headline says whose state it describes: the pull request's, not the
+    // worktree's.
     expect(text).toContain("Every pull request already holds its base branch");
     // No merge was pushed, so the CI caveat would be about nothing.
     expect(text).not.toContain("lint / test / build");

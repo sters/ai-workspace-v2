@@ -123,10 +123,10 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
   const chatModel = getConfig().chat.model;
   const modelArgs = chatModel ? ["--model", chatModel] : [];
 
-  // The browser's xterm is the real viewport, so the PTY is born its size.
-  // Spawning at a fixed default and never correcting it is what made Claude's
-  // TUI draw boxes and status lines at a width the viewport does not have. An
-  // unattended start has no viewport: the resume that attaches one resizes.
+  // The browser's xterm is the real viewport, so the PTY is born its size;
+  // at any other size Claude's TUI draws boxes and status lines at a width the
+  // viewport does not have. An unattended start has no viewport: the resume
+  // that attaches one resizes.
   const size = msg.cols != null && msg.rows != null ? clampPtySize(msg.cols, msg.rows) : null;
 
   let proc;
@@ -227,11 +227,9 @@ export function handleResume(ws: Ws, msg: Extract<ClientMessage, { type: "resume
     return;
   }
 
-  // Update session's active WebSocket
   session.activeWs = ws;
   ws.data.sessionId = msg.sessionId;
 
-  // Send resumed notification with buffer size
   send(ws, {
     type: "resumed",
     sessionId: session.id,
@@ -255,7 +253,6 @@ export function handleResume(ws: Ws, msg: Extract<ClientMessage, { type: "resume
     send(ws, { type: "output", data: trailing });
   }
 
-  // Signal replay complete
   send(ws, { type: "replay_done" });
 
   // Only now resize, and only if the reconnecting browser is a different size:

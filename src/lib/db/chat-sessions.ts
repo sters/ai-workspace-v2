@@ -1,10 +1,6 @@
 import type { Database, Statement } from "bun:sqlite";
 import { getDb, _onDbReset } from "./connection";
 
-// ---------------------------------------------------------------------------
-// Lazy prepared statements
-// ---------------------------------------------------------------------------
-
 let _upsert: Statement | null = null;
 let _markExited: Statement | null = null;
 let _getById: Statement | null = null;
@@ -55,10 +51,6 @@ export function _resetChatStatements(): void {
 
 _onDbReset(_resetChatStatements);
 
-// ---------------------------------------------------------------------------
-// Row type
-// ---------------------------------------------------------------------------
-
 interface ChatSessionRow {
   id: string;
   workspace_id: string;
@@ -67,10 +59,6 @@ interface ChatSessionRow {
   exit_code: number | null;
   exited_at: number | null;
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export function upsertChatSession(meta: {
   id: string;

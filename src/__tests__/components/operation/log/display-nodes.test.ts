@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { LogEntry, DisplayNode } from "@/types/claude";
 import { buildDisplayNodes, groupByChildLabel, findPendingAsk } from "@/components/operation/log/display-nodes";
 
-// Helper to create LogEntry objects concisely
 function text(content: string, parentToolUseId?: string): LogEntry {
   return { kind: "text", content, parentToolUseId };
 }
@@ -383,9 +382,8 @@ describe("buildDisplayNodes", () => {
   });
 
   it("marks a child-group as completed via phaseStatusByLabel fallback when no complete entry exists", () => {
-    // Simulates an older operation (logged before the runFunctionPhase synthetic
-    // complete fix) where a function-phase's child-group has status events but
-    // no kind=complete entry. Without the fallback, the group would render as
+    // A function-phase child-group can have status events but no kind=complete
+    // entry. Without the fallback, the group would render as
     // "running" forever even though the phase has finished.
     const entries: LogEntry[] = [
       { kind: "system", content: "Constraint discovery complete: 3/3 succeeded", childLabel: "Discover repo constraints", phaseIndex: 2, phaseLabel: "Discover repo constraints" } as LogEntry,
@@ -466,13 +464,11 @@ describe("buildDisplayNodes", () => {
     const subagentNodes = nodes.filter(n => n.type === "subagent") as Extract<DisplayNode, { type: "subagent" }>[];
     expect(subagentNodes).toHaveLength(2);
 
-    // Both subagent nodes must have childLabel even though children are empty
     expect(subagentNodes[0].childLabel).toBe("Update TODOs");
     expect(subagentNodes[0].children).toHaveLength(0);
     expect(subagentNodes[1].childLabel).toBe("Update TODOs");
     expect(subagentNodes[1].children).toHaveLength(0);
 
-    // groupByChildLabel must group them inside the child-group
     const grouped = groupByChildLabel(nodes);
     const childGroups = grouped.filter(n => n.type === "child-group") as Extract<DisplayNode, { type: "child-group" }>[];
     expect(childGroups).toHaveLength(1);
@@ -482,7 +478,6 @@ describe("buildDisplayNodes", () => {
     const topLevelEntries = grouped.filter(n => n.type === "entry");
     expect(topLevelEntries).toHaveLength(0);
 
-    // Both subagents should be inside the child-group
     const innerSubagents = childGroups[0].children.filter(n => n.type === "subagent");
     expect(innerSubagents).toHaveLength(2);
   });

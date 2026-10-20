@@ -2,10 +2,6 @@ import type { Database, Statement } from "bun:sqlite";
 import { getDb, _onDbReset } from "./connection";
 import type { WorkspaceSuggestion } from "@/types/suggestion";
 
-// ---------------------------------------------------------------------------
-// Lazy prepared statements
-// ---------------------------------------------------------------------------
-
 let _insert: Statement | null = null;
 let _listActive: Statement | null = null;
 let _dismiss: Statement | null = null;
@@ -43,10 +39,6 @@ export function _resetSuggestionStatements(): void {
 
 _onDbReset(_resetSuggestionStatements);
 
-// ---------------------------------------------------------------------------
-// Row type
-// ---------------------------------------------------------------------------
-
 interface SuggestionRow {
   id: string;
   source_workspace: string;
@@ -70,10 +62,6 @@ function rowToDomain(row: SuggestionRow): WorkspaceSuggestion {
     createdAt: row.created_at,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export function insertSuggestion(s: {
   id: string;

@@ -1,8 +1,3 @@
-/**
- * Prompt template for Suggestion Pruner.
- * Checks whether each suggestion has already been addressed in its target repository.
- */
-
 import type { SuggestionPrunerInput } from "@/types/prompts";
 
 export const SUGGESTION_PRUNE_SCHEMA = {

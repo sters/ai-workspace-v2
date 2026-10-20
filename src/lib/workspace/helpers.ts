@@ -1,7 +1,3 @@
-/**
- * Workspace helpers — shared utilities used by workspace modules.
- */
-
 import { pathExists } from "@/lib/fs";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
@@ -45,10 +41,6 @@ export function repoDir(): string {
  */
 export { sanitizeSlug } from "@/lib/naming";
 
-// ---------------------------------------------------------------------------
-// Staleness utilities
-// ---------------------------------------------------------------------------
-
 export async function listStaleWorkspaces(days: number): Promise<StaleWorkspace[]> {
   if (!(await pathExists(getWorkspaceDir()))) return [];
 
@@ -67,10 +59,6 @@ export async function listStaleWorkspaces(days: number): Promise<StaleWorkspace[
 
   return stale.sort((a, b) => a.lastModified.getTime() - b.lastModified.getTime());
 }
-
-// ---------------------------------------------------------------------------
-// Git branch detection
-// ---------------------------------------------------------------------------
 
 /**
  * Whether `origin/<branch>` exists as a remote-tracking ref in the repo.
@@ -117,7 +105,6 @@ export async function localBaseBranch(repoAbsPath: string): Promise<string> {
 }
 
 export async function detectBaseBranch(repoAbsPath: string): Promise<string> {
-  // 1. symbolic-ref
   try {
     const ref = await exec(
       `git -C "${repoAbsPath}" symbolic-ref refs/remotes/origin/HEAD`,
@@ -126,7 +113,6 @@ export async function detectBaseBranch(repoAbsPath: string): Promise<string> {
     if (branch) return branch;
   } catch { /* continue */ }
 
-  // 2. set-head --auto
   try {
     await exec(`git -C "${repoAbsPath}" remote set-head origin --auto`);
     const ref = await exec(
@@ -136,7 +122,6 @@ export async function detectBaseBranch(repoAbsPath: string): Promise<string> {
     if (branch) return branch;
   } catch { /* continue */ }
 
-  // 3. common branch names
   for (const b of ["main", "master", "develop", "development"]) {
     try {
       await exec(
@@ -146,7 +131,6 @@ export async function detectBaseBranch(repoAbsPath: string): Promise<string> {
     } catch { /* continue */ }
   }
 
-  // 4. current branch
   try {
     const current = await exec(`git -C "${repoAbsPath}" rev-parse --abbrev-ref HEAD`);
     if (current && current !== "HEAD") return current;

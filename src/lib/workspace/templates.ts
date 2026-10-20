@@ -9,17 +9,12 @@ import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { selectTodoTemplate, REPORT_TEMPLATES, RESEARCH_REPORT_TEMPLATES } from "../templates";
 
-/** Ensure the templates/ subdirectory exists and return its path. */
 async function ensureTemplatesDir(wsPath: string): Promise<string> {
   const dir = path.join(wsPath, "templates");
   await mkdir(dir, { recursive: true });
   return dir;
 }
 
-/**
- * Write the appropriate TODO template to {wsPath}/templates/TODO-template.md
- * based on the task type.
- */
 export async function writeTodoTemplate(wsPath: string, taskType: string): Promise<void> {
   const dir = await ensureTemplatesDir(wsPath);
   const template = selectTodoTemplate(taskType);
@@ -54,10 +49,6 @@ export async function writeResearchTemplates(wsPath: string): Promise<string> {
   );
   return researchDir;
 }
-
-// ---------------------------------------------------------------------------
-// prepareReviewDir
-// ---------------------------------------------------------------------------
 
 export async function prepareReviewDir(workspaceName: string): Promise<string> {
   const wsPath = path.join(getWorkspaceDir(), workspaceName);

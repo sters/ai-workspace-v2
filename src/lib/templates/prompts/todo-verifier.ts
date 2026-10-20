@@ -1,8 +1,3 @@
-/**
- * Prompt template for workspace-repo-todo-verifier agent.
- * Verifies TODO items have been properly completed.
- */
-
 import type { TodoVerifierInput } from "@/types/prompts";
 import { WRITTEN_DELIVERABLE_LENGTH, worktreeCdRules } from "./shared";
 

@@ -671,7 +671,6 @@ describe("enrichPermissionDenials", () => {
         isError: true,
       },
     ]);
-    // No matching tool_call, so stays as tool_result
     expect(entries[0].kind).toBe("tool_result");
   });
 

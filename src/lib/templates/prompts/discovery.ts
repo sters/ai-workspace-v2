@@ -1,8 +1,3 @@
-/**
- * Prompt template for workspace discovery agent.
- * Analyzes a single workspace's meta + operations to discover new workspace candidates.
- */
-
 import type { DiscoveryInput } from "@/types/prompts";
 
 export const DISCOVERY_SCHEMA = {

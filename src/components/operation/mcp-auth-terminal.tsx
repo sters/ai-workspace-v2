@@ -15,7 +15,6 @@ export function McpAuthTerminal({
   const [logsOpen, setLogsOpen] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  // Initialize xterm on mount
   useEffect(() => {
     init();
     return () => {
@@ -38,7 +37,6 @@ export function McpAuthTerminal({
     writtenCountRef.current = terminalEvents.length;
   }, [events, termRef]);
 
-  // Status log messages (debug info)
   const statusLogs = useMemo(
     () =>
       events
@@ -47,7 +45,6 @@ export function McpAuthTerminal({
     [events],
   );
 
-  // Auto-scroll logs when open
   useEffect(() => {
     if (logsOpen && logEndRef.current) {
       logEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -62,7 +59,6 @@ export function McpAuthTerminal({
 
   return (
     <div>
-      {/* Info banner */}
       <div className="mb-1 flex items-center gap-1.5 rounded-t bg-muted/60 px-3 py-1.5 text-xs text-muted-foreground">
         {isRunning && (
           <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-blue-500" />
@@ -74,14 +70,12 @@ export function McpAuthTerminal({
         </span>
       </div>
 
-      {/* Terminal */}
       <style>{`.mcp-auth-term, .mcp-auth-term * { cursor: default !important; }`}</style>
       <div
         ref={containerRef}
         className="mcp-auth-term min-h-[200px] bg-[#1a1b26] p-1"
       />
 
-      {/* Completion status */}
       {finished && (
         <div
           className={`mt-1 px-3 py-1.5 text-xs font-medium ${
@@ -96,7 +90,6 @@ export function McpAuthTerminal({
         </div>
       )}
 
-      {/* Debug logs */}
       {statusLogs.length > 0 && (
         <div className="mt-1 rounded-b border border-t-0">
           <Button

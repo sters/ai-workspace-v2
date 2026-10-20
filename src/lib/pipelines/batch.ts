@@ -31,15 +31,10 @@ export function buildBatchPipeline(input: {
   const { mode, startWith, description, workspace, instruction, draft, interactionLevel, repo } = input;
   const phases: PipelinePhase[] = [];
 
-  // ------------------------------------------------------------------
-  // Leading phases: init, update-todo, or skip straight to execute
-  // ------------------------------------------------------------------
-
   if (startWith === "init") {
     // Inline all init phases — they share closures for wsName etc.
     phases.push(...buildInitPipeline(description ?? "", interactionLevel));
   } else if (startWith === "update-todo") {
-    // update-todo: single phase built upfront
     phases.push({
       kind: "function",
       label: "Update TODOs",
@@ -55,11 +50,6 @@ export function buildBatchPipeline(input: {
       },
     });
   }
-  // startWith === "execute": no leading phase, jump straight to execute
-
-  // ------------------------------------------------------------------
-  // Execute phase (always present)
-  // ------------------------------------------------------------------
 
   phases.push({
     kind: "function",
@@ -79,10 +69,6 @@ export function buildBatchPipeline(input: {
     },
   });
 
-  // ------------------------------------------------------------------
-  // Review phase (unless mode is execute-pr)
-  // ------------------------------------------------------------------
-
   const includeReview = mode !== "execute-pr";
   if (includeReview) {
     phases.push({
@@ -99,10 +85,6 @@ export function buildBatchPipeline(input: {
       },
     });
   }
-
-  // ------------------------------------------------------------------
-  // Gate check (only for execute-review-pr-gated)
-  // ------------------------------------------------------------------
 
   let skipPr = false;
 
@@ -134,10 +116,6 @@ export function buildBatchPipeline(input: {
       },
     });
   }
-
-  // ------------------------------------------------------------------
-  // Create PR phase (unless mode is execute-review)
-  // ------------------------------------------------------------------
 
   const includePr = mode !== "execute-review";
   if (includePr) {

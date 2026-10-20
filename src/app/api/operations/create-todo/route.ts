@@ -20,7 +20,6 @@ export async function POST(request: Request) {
   const { reviewTimestamp, instruction, interactionLevel } = data;
   const wsPath = path.join(getWorkspaceDir(), workspace);
 
-  // Validate review directory exists
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);
   if (!(await pathExists(reviewDir))) {
     return NextResponse.json(

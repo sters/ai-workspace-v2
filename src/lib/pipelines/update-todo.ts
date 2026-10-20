@@ -57,9 +57,8 @@ export async function buildUpdateTodoPipeline(input: {
     "Bash(git:*)",
   ];
 
-  // Phase that normalizes checkbox format after the updater runs.
-  // Fixes common LLM mistakes (missing checkboxes, wrong brackets, etc.)
-  // and amends the updater's commit if any corrections were made.
+  // Fixes common LLM checkbox mistakes (missing checkboxes, wrong brackets, …)
+  // left by the updater, and commits the corrections.
   const normalizePhase: PipelinePhase = {
     kind: "function",
     label: "Normalize TODO format",
@@ -81,7 +80,6 @@ export async function buildUpdateTodoPipeline(input: {
 
       if (modified.length > 0) {
         ctx.emitStatus(`Normalized checkbox format in: ${modified.join(", ")}`);
-        // Stage and commit the normalized files
         const env = getCleanEnv();
         const add = Bun.spawn(["git", "add", ...modified], { cwd: workspacePath, env });
         await add.exited;

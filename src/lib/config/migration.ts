@@ -10,10 +10,6 @@ import {
 
 const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "suggest", "hooks", "slack"]);
 
-// ---------------------------------------------------------------------------
-// Config file generation
-// ---------------------------------------------------------------------------
-
 /** Generate default config file content with comments. */
 export function generateDefaultConfigContent(): string {
   const lines = [
@@ -89,10 +85,6 @@ export function ensureConfigFile(filePath: string): boolean {
   fs.writeFileSync(filePath, generateDefaultConfigContent(), "utf-8");
   return true;
 }
-
-// ---------------------------------------------------------------------------
-// Config migration
-// ---------------------------------------------------------------------------
 
 interface ParsedLine {
   type: "top-key" | "nested-key" | "other";
@@ -222,7 +214,6 @@ const TYPE_OVERRIDE_HINT_LINES = [
  * hint comment, insert/replace it at the end of the section.
  */
 function addTypeOverrideHint(lines: string[]): string[] {
-  // Check if the operations section exists
   const hasOperations = lines.some((line) => {
     const parsed = parseConfigLine(line);
     return parsed.type === "top-key" && parsed.key === "operations";
@@ -407,7 +398,6 @@ function addMissingEntries(lines: string[]): string[] {
     }
   }
 
-  // Determine what's missing
   const missing = KNOWN_CONFIG_KEYS.filter((def) => {
     const id = def.section ? `${def.section}.${def.key}` : def.key;
     return !found.has(id);
@@ -435,7 +425,6 @@ function addMissingEntries(lines: string[]): string[] {
   );
 
   // Insert missing nested entries at end of their existing sections
-  // Group by section
   const sectionInsertions = new Map<string, string[]>();
   for (const m of missingInExistingSection) {
     if (!sectionInsertions.has(m.section!)) {

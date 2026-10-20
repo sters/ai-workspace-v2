@@ -7,10 +7,6 @@ import { CONFIG_DEFAULTS, OPERATION_TYPE_NAMES } from "./defaults";
 import { substituteEnvVars } from "./env-substitution";
 import { getWorkspaceConfigFilePath } from "./workspace-dir";
 
-// ---------------------------------------------------------------------------
-// YAML loading
-// ---------------------------------------------------------------------------
-
 /**
  * Normalize a raw YAML-parsed config object: extract per-operation-type
  * override objects from `operations` into `operations.typeOverrides`.
@@ -140,10 +136,6 @@ export function loadConfigFile(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Env overrides
-// ---------------------------------------------------------------------------
-
 function envOverrides(): Partial<AppConfig> {
   const result: Partial<AppConfig> = {};
 
@@ -179,10 +171,6 @@ function envOverrides(): Partial<AppConfig> {
 
   return result;
 }
-
-// ---------------------------------------------------------------------------
-// Deep merge
-// ---------------------------------------------------------------------------
 
 /**
  * Merge config layers: defaults <- fileConfig <- envOverrides.
@@ -321,10 +309,6 @@ export function mergeConfig(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Per-operation-type config resolution
-// ---------------------------------------------------------------------------
-
 /**
  * Get resolved settings for a specific operation type.
  * Per-type overrides take precedence over the global defaults.
@@ -342,10 +326,6 @@ export function getOperationConfig(type: OperationType): OperationTypeSettings {
     steps: overrides?.steps,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Cached singleton (stored on globalThis to survive Next.js module isolation)
-// ---------------------------------------------------------------------------
 
 const globalStore = globalThis as unknown as {
   __aiwAppConfig?: AppConfig | null;

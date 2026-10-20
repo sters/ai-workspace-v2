@@ -9,10 +9,6 @@ import type { DisplayNode } from "@/types/claude";
 import { buildDisplayNodes } from "./display-nodes";
 import { EntryRow } from "./entries";
 
-// ---------------------------------------------------------------------------
-// Render a list of DisplayNode[], dispatching to the correct component
-// ---------------------------------------------------------------------------
-
 function DisplayNodeList({ nodes }: { nodes: DisplayNode[] }) {
   return (
     <div className="space-y-1.5">
@@ -123,10 +119,6 @@ export function ChildGroupSection({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Sub-agent section
-// ---------------------------------------------------------------------------
-
 export function SubAgentSection({
   group,
 }: {
@@ -159,7 +151,6 @@ export function SubAgentSection({
 
   return (
     <div className="rounded-md border border-indigo-200 dark:border-indigo-800">
-      {/* Header */}
       <div
         role={isExpandable ? "button" : undefined}
         tabIndex={isExpandable ? 0 : undefined}

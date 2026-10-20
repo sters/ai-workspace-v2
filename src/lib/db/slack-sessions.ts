@@ -7,18 +7,14 @@ import { getDb, _onDbReset } from "./connection";
  * a thread's conversation survive a slack-server restart, since the CLI session
  * itself lives on disk under `~/.claude`.
  *
- * TTL / cap defaults match the previous in-memory behavior. `now` is injected
- * (rather than read from the clock) so eviction and expiry are unit-testable.
+ * `now` is injected (rather than read from the clock) so eviction and expiry
+ * are unit-testable.
  */
 
 /** How long a thread's session is kept before it is considered stale. */
 export const SESSION_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours
 /** Cap on tracked threads to bound the table; oldest is evicted past this. */
 export const MAX_SESSIONS = 200;
-
-// ---------------------------------------------------------------------------
-// Lazy prepared statements
-// ---------------------------------------------------------------------------
 
 let _upsert: Statement | null = null;
 let _get: Statement | null = null;
@@ -86,10 +82,6 @@ export function _resetSlackSessionStatements(): void {
 }
 
 _onDbReset(_resetSlackSessionStatements);
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 /** Return the live session id for a thread, or undefined if absent/expired. */
 export function getSession(

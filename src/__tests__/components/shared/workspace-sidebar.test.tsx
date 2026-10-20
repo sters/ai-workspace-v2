@@ -65,7 +65,6 @@ vi.mock("@/hooks/use-usage-limit-stops", () => ({
   useUsageLimitStops: () => mockUseUsageLimitStops(),
 }));
 
-// Import after mocks
 import { WorkspaceSidebar } from "@/components/shared/workspace-sidebar";
 
 function makeWorkspace(

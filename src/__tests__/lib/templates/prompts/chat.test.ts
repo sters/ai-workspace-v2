@@ -58,10 +58,9 @@ describe("chat system prompts", () => {
   });
 
   it("ends the first turn in a wait everywhere except the task variant", () => {
-    // The one difference between the four, and the reason the shared first-turn
-    // block takes `afterReads` as a parameter: its fixed text put "then wait
-    // for the user" at the end of the task prompt, outranking the system
-    // prompt's "start on it".
+    // The reason the shared first-turn block takes `afterReads` as a parameter:
+    // a fixed "then wait for the user" at the end of the task prompt would
+    // outrank the system prompt's "start on it".
     const waiting = Object.entries(variants)
       .filter(([, prompt]) => /wait for the user/i.test(prompt))
       .map(([name]) => name);
@@ -138,9 +137,8 @@ describe("built opening prompts", () => {
     ["discussion", () => buildDiscussionChatPrompt(workspaceId, workspacePath, "this comment")],
     ["start-prompt", () => buildStartPromptChatPrompt(workspaceId, workspacePath, "check CI")],
   ])("keeps the %s prompt a set of pointers rather than an embedded corpus", (_name, build) => {
-    // The README body and a computed TODO progress table used to be inlined
-    // here, which both dumped the README into the browser terminal and pinned a
-    // snapshot of files an operation rewrites.
+    // Inlining the README body or a TODO progress table dumps the README into
+    // the browser terminal and pins a snapshot of files an operation rewrites.
     expect(build().length).toBeLessThan(1200);
   });
 });

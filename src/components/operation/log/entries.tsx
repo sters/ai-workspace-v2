@@ -7,10 +7,6 @@ import { MarkdownRenderer } from "../../shared/content/markdown-renderer";
 import { Callout } from "../../shared/containers/callout";
 import { ResultBox } from "../../shared/feedback/result-box";
 
-// ---------------------------------------------------------------------------
-// Entry renderers
-// ---------------------------------------------------------------------------
-
 export function EntryRow({ entry }: { entry: LogEntry }) {
   switch (entry.kind) {
     case "text":

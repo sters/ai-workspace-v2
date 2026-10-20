@@ -31,7 +31,6 @@ export function ServerCard({
     if (result.ok) onSaved();
   }, [server.name, server.scope, onSaved]);
 
-  // MCP auth operation — single click login
   const mcpAuth = useOperation(`mcp-auth:${server.name}`);
   const authStartedRef = useRef(false);
 
@@ -49,14 +48,12 @@ export function ServerCard({
     }
   }, [mcpAuth, server.name, needsAuth]);
 
-  // Reset the started ref when operation finishes
   useEffect(() => {
     if (!mcpAuth.isRunning && !mcpAuth.operation) {
       authStartedRef.current = false;
     }
   }, [mcpAuth.isRunning, mcpAuth.operation]);
 
-  // Refresh status when auth operation completes
   useEffect(() => {
     if (mcpAuth.operation && !mcpAuth.isRunning) {
       onSaved();
@@ -162,7 +159,6 @@ export function ServerCard({
         </ul>
       )}
 
-      {/* MCP Auth terminal — inline xterm.js readonly display */}
       {mcpAuth.operation && mcpAuth.events.length > 0 && (
         <div className="mt-3">
           <McpAuthTerminal

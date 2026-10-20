@@ -7,12 +7,10 @@ import type { CodeReviewerInput } from "@/types/prompts";
 describe("getCodeReviewerSystemPrompt", () => {
   const prompt = getCodeReviewerSystemPrompt();
 
-  // The reviewer used to be told to discover and run the repo's lint/test
-  // commands and report failures as Critical Issues. The `Verify constraints`
-  // phase already runs the README's declared commands deterministically and
-  // classifies each failure against the merge-base, so the reviewer's copy only
-  // added a second, unclassified verdict on the same commands — a failure that
-  // predates the branch reached the autonomous gate as a blocker.
+  // The `Verify constraints` phase runs the README's declared commands and
+  // classifies each failure against the merge-base. A reviewer running them too
+  // adds a second, unclassified verdict, so a failure that predates the branch
+  // reaches the autonomous gate as a blocker.
   it("does not instruct the reviewer to run lint/test/build commands itself", () => {
     expect(prompt).not.toMatch(/\*\*Run Lint & Tests\*\*/);
     expect(prompt).not.toMatch(/run them\. Report any failures as \*\*Critical Issues\*\*/);

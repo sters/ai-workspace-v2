@@ -1,9 +1,5 @@
 /**
- * Centralized batch mode definitions.
- *
- * Batch modes describe multi-step operation pipelines (e.g. Execute → Review → PR).
- * These definitions are shared across operation-panel, todo-updater, new-workspace,
- * init-next-actions, next-action-suggestions, and repo-todo-card.
+ * Batch modes: multi-step operation pipelines (e.g. Execute → Review → PR).
  */
 
 export type BatchMode =
@@ -94,9 +90,6 @@ function getAutonomousLabel(startWith: string): string {
     : suffix;
 }
 
-/**
- * Build SplitButton items for autonomous operations.
- */
 export function buildAutonomousItems(
   startWith: string,
   baseBody: Record<string, string>,
@@ -129,9 +122,6 @@ export function buildNextActionAutonomousItems(
 /** Autonomous params that may appear in URL search params. */
 const AUTONOMOUS_URL_KEYS = ["startWith", "instruction", "draft", "maxLoops"] as const;
 
-/**
- * Extract autonomous-related params from URLSearchParams.
- */
 export function extractAutonomousParams(
   searchParams: URLSearchParams,
 ): Record<string, string> {
@@ -150,9 +140,6 @@ export function extractAutonomousParams(
 /** Batch params that may appear in URL search params. */
 const BATCH_URL_KEYS = ["startWith", "mode", "instruction", "draft"] as const;
 
-/**
- * Extract batch-related params from URLSearchParams.
- */
 export function extractBatchParams(
   searchParams: URLSearchParams,
 ): Record<string, string> {

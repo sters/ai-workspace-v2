@@ -1,8 +1,3 @@
-/**
- * Prompt template for discovering repository constraints (lint, test, build commands, etc.)
- * and appending them to the workspace README's Requirements section.
- */
-
 import { BASE_PLACEHOLDER, CHANGED_FILES_PLACEHOLDER } from "@/lib/workspace/constraint-scope";
 
 export interface RepoConstraintsInput {

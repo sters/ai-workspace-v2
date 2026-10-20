@@ -70,9 +70,6 @@ describe("review baseline", () => {
     expect(found?.timestamp).toBe("20260102-000000");
   });
 
-  // A session that recorded a baseline for a repo added later is still the right
-  // baseline for the repos it does cover, so skipping the whole session would
-  // needlessly widen the review for all of them.
   it("skips a session whose baseline is unreadable and falls back to an older one", async () => {
     seedSession("20260101-000000", { "repo-a": "good111" });
     const brokenDir = path.join(reviewsDir(), "20260102-000000");

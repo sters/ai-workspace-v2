@@ -21,12 +21,12 @@
 export function sanitizeSlug(input: string, maxLength = 50): string {
   let slug = input
     .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "-")  // Replace non-ASCII, spaces, special chars with hyphens
-    .replace(/-+/g, "-")          // Collapse multiple hyphens
-    .replace(/^-+|-+$/g, "");     // Trim leading/trailing hyphens
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
 
   if (slug.length > maxLength) {
-    slug = slug.slice(0, maxLength).replace(/-+$/, ""); // Trim trailing hyphens from truncation
+    slug = slug.slice(0, maxLength).replace(/-+$/, "");
   }
 
   return slug || "workspace";

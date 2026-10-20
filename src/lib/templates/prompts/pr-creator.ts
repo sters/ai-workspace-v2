@@ -1,8 +1,3 @@
-/**
- * Prompt template for workspace-repo-create-or-update-pr agent.
- * Creates or updates a pull request for a repository.
- */
-
 import type { PRCreatorInput } from "@/types/prompts";
 import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
 import { NO_WORKSPACE_REFERENCES, worktreeCdRules } from "./shared";

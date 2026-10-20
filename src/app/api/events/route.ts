@@ -12,11 +12,9 @@ export const dynamic = "force-dynamic";
  * Resolve events for a completed operation from memory or disk.
  */
 function resolveCompletedEvents(operationId: string): OperationEventList | null {
-  // Try memory first
   const memEvents = getOperationEvents(operationId);
   if (memEvents.length > 0) return memEvents;
 
-  // Fall back to disk
   const stored = readOperationLog(operationId);
   return stored ? stored.events : null;
 }

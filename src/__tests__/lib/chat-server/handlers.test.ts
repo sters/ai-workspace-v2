@@ -65,7 +65,7 @@ beforeEach(() => {
   mockSpawnClaudeTerminal.mockReset();
   mockPtyResize = vi.fn();
   // A pending `exited` keeps the session live, as a real one is while the user
-  // is typing in it. Resolving it eagerly marked every session exited.
+  // is typing in it.
   mockSpawnClaudeTerminal.mockReturnValue({
     terminal: { write: vi.fn(), resize: mockPtyResize },
     kill: vi.fn(),

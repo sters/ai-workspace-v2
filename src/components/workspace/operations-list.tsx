@@ -17,14 +17,13 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
 
   const wsParam = encodeURIComponent(workspaceName);
 
-  // Poll running operations: fast when active, slow when idle
   const { data: runningOps, mutate: mutateRunning } = useSWR<OperationListItem[]>(
     `/api/operations?workspace=${wsParam}&status=running`,
     fetcher,
     { refreshInterval: 10000 },
   );
 
-  // Fetch all operations once (includes completed from disk); no polling needed
+  // Includes completed operations, read from disk.
   const { data: allOps, mutate: mutateAll } = useSWR<OperationListItem[]>(
     `/api/operations?workspace=${wsParam}`,
     fetcher,
@@ -42,7 +41,6 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
   useEffect(() => {
     const currentIds = new Set((runningOps ?? []).map((op) => op.id));
     const prevIds = prevRunningIdsRef.current;
-    // Check if any previously running operation is no longer running
     if (prevIds.size > 0) {
       for (const id of prevIds) {
         if (!currentIds.has(id)) {
@@ -59,7 +57,6 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
     const running = runningOps ?? [];
     const all = allOps ?? [];
     const runningIds = new Set(running.map((op) => op.id));
-    // Replace stale entries with fresh running data
     const completed = all.filter((op) => !runningIds.has(op.id));
     return [...running, ...completed];
   })();
@@ -89,10 +86,8 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
       Object.assign(body, extractAutonomousParams(searchParams));
     }
 
-    // Clear search params
     router.replace(pathname, { scroll: false });
 
-    // Start the operation
     fetch(`/api/operations/${action}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

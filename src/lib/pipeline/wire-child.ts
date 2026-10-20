@@ -121,10 +121,9 @@ function dismissPendingAsksForChild(
     });
   }
 
-  // Recompute the global flag from the full event stream. The narrow
-  // "only reset when this child had an unanswered ask" check missed the case
-  // where the child's ask was auto-answered (skipAskUserQuestion mode emits a
-  // synthetic tool_result), leaving hasPendingAsk stuck true forever.
+  // Recompute the global flag from the full event stream: this child's ask may
+  // have been auto-answered (skipAskUserQuestion mode emits a synthetic
+  // tool_result), so whether it had an unanswered ask does not decide the flag.
   recomputeHasPendingAsk(managed);
 }
 
@@ -147,7 +146,7 @@ export function wireChild(
   });
   emitStatus(managed, "Initializing...", { childLabel, ...phaseExtra });
 
-  // Fix 6: If the ClaudeProcess supports process tracking (CLI backend),
+  // If the ClaudeProcess supports process tracking (CLI backend),
   // register a callback so that when submitAnswer spawns a new subprocess,
   // the childProcesses entry stays current. This ensures the timeout handler
   // can find and kill the resumed process.

@@ -2,10 +2,6 @@ import type { Database, Statement } from "bun:sqlite";
 import type { OperationEvent } from "@/types/operation";
 import { getDb, _onDbReset } from "./connection";
 
-// ---------------------------------------------------------------------------
-// Lazy prepared statements
-// ---------------------------------------------------------------------------
-
 let _insertEvent: Statement | null = null;
 let _getByOpId: Statement | null = null;
 
@@ -32,10 +28,6 @@ export function _resetEventStatements(): void {
 
 _onDbReset(_resetEventStatements);
 
-// ---------------------------------------------------------------------------
-// Row ↔ Domain
-// ---------------------------------------------------------------------------
-
 interface EventRow {
   id: number;
   operation_id: string;
@@ -58,10 +50,6 @@ function rowToEvent(row: EventRow): OperationEvent {
     ...(row.phase_label != null && { phaseLabel: row.phase_label }),
   };
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 /**
  * Append events to the database in a single transaction.

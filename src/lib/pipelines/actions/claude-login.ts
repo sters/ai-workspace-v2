@@ -24,7 +24,6 @@ export function buildClaudeLoginPhase(): PipelinePhaseFunction {
     kind: "function",
     label: "Claude Login",
     fn: async (ctx) => {
-      // Step 1: Check current status
       ctx.emitStatus("Checking current auth status...");
       try {
         const status = await checkAuthStatus();
@@ -33,7 +32,6 @@ export function buildClaudeLoginPhase(): PipelinePhaseFunction {
         ctx.emitStatus(`Auth status check failed: ${err}`);
       }
 
-      // Step 2: Run claude auth login
       ctx.emitStatus("Running claude auth login...");
 
       const proc = spawnClaudeAuth("login");

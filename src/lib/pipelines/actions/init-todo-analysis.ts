@@ -1,9 +1,7 @@
 /**
- * Init's post-setup TODO analysis sub-pipeline (phases C–G):
- * Discover repo constraints → Plan TODOs → Coordinate → Review → Commit snapshot.
- *
- * Used by `buildInitPipeline` for fresh inits and by autonomous's
- * "Ensure TODOs" salvage phase when an existing workspace is missing TODO files.
+ * Init's post-setup TODO analysis sub-pipeline. Used by `buildInitPipeline` for
+ * fresh inits and by autonomous's "Ensure TODOs" salvage phase when an existing
+ * workspace is missing TODO files.
  */
 
 import { pathExists } from "@/lib/fs";
@@ -35,7 +33,7 @@ export interface InitTodoAnalysisInput {
   wsName: () => string;
   /** Workspace absolute path. Getter for the same reason. */
   wsPath: () => string;
-  /** Repos to analyze. Getter to support late-binding from init's Phase B. */
+  /** Repos to analyze. Getter because init sets them up in an earlier phase. */
   repos: () => InitTodoAnalysisRepo[];
   /** Task type ("feature" | "review" | "research" | …). Skips planning for review/research. */
   taskType: () => string;
@@ -52,9 +50,6 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
   const { wsName, wsPath, repos, taskType, interactionLevel } = input;
 
   return [
-    // Phase C: Discover repo constraints (lint/test/build) and append to README,
-    // and, alongside, each repo's implementation / review guidance into
-    // artifacts/repo-guidance/ for the planner, executor and reviewers.
     {
       kind: "function",
       label: "Discover repo constraints",
@@ -72,13 +67,10 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
         return constraints;
       },
     },
-    // Phase C2: Start the toolchain prep in the background.
-    //
-    // Deliberately fire-and-forget: the phases behind it (planning, plan review,
-    // the README gates) read source and write markdown, so they gain nothing by
-    // waiting, and the dependency install / submodule checkout they would be
-    // waiting on measured 4.3 min inside the first executor child. Execute awaits
-    // whatever is still running; see `toolchain-prewarm.ts`.
+    // Fire-and-forget: the phases behind it (planning, plan review, the README
+    // gates) read source and write markdown, so they gain nothing by waiting on
+    // the dependency install / submodule checkout. Execute awaits whatever is
+    // still running; see `toolchain-prewarm.ts`.
     {
       kind: "function",
       label: "Prepare toolchain",
@@ -115,7 +107,6 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
         return true;
       },
     },
-    // Phase D: Plan TODOs for each repo (parallel)
     {
       kind: "function",
       label: "Plan TODO items",
@@ -174,7 +165,6 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
         return allSuccess;
       },
     },
-    // Phase E: Coordinate TODOs across repos
     {
       kind: "function",
       label: "Coordinate TODOs",
@@ -194,8 +184,8 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
         }).fn(ctx);
       },
     },
-    // Phase F: Review TODOs (parallel, per repo) and revise them from the verdict.
-    // Both children run under this one budget; the review half measured ~3 min.
+    // Reviews the TODOs and revises them from the verdict; both children run
+    // under this one budget.
     {
       kind: "function",
       label: "Review TODOs",
@@ -214,7 +204,6 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
         }).fn(ctx);
       },
     },
-    // Phase G: Commit workspace snapshot
     {
       kind: "function",
       label: "Commit snapshot",

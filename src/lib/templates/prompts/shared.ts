@@ -7,9 +7,7 @@
  *    rules), because the same wording drifting per-file is how one agent ends
  *    up told to `cd` and another told never to.
  * 2. Model-behavior calibrations that apply to a whole class of agents
- *    (deliverable length, subagent delegation, scope, review coverage). These
- *    follow Anthropic's Claude Opus 5 / Sonnet 5 prompting guidance; see
- *    CLAUDE.md's "Prompt conventions" section for the rationale.
+ *    (deliverable length, subagent delegation, scope, review coverage).
  */
 
 /**
@@ -46,31 +44,19 @@ export const NO_CD_RULES = `### Working Directory Rules
 /**
  * Search strategy for agents that explore a repository before writing anything.
  *
- * The first version of this fragment did not work, and re-measuring the planner
- * phase it was written for shows why — each failure is a wording defect, not a
- * missing rule, so the rewrite is aimed at these four specifically:
+ * Each clause answers a specific misreading:
  *
- *  - **"together in a single message" is harness vocabulary.** 73 assistant turns
- *    carried exactly one tool call each — never two — while 26 of 54 Bash calls
- *    packed several lookups into one command string with `;` and `echo ===`
- *    separators. The agent *did* batch; it read "one message" as "one command",
- *    which is the one reading that saves nothing. So the rule now names the unit
- *    (several tool calls in one turn), shows it, and says outright that
- *    `;`-packing is not it.
- *  - **A closed list of shell tools is read as the closed list it is.** The old
- *    text named `grep` / `find` / `ls` / `cat`; the transcript used `sed` 9×,
- *    `awk` 2×, `wc` 2× and `head` 26×, none of them listed. The replacement
- *    states the test for when a shell is needed at all, and marks its table
- *    non-exhaustive (see the note on literal enumerations in CLAUDE.md's Prompt
- *    conventions).
- *  - **`Read` looked inapplicable to the file that mattered.** Most `sed -n
- *    'X,Yp'` calls targeted a 17k-line generated file. Nothing said `Read` takes
- *    an offset and a limit, so the shell stayed the only way to read a slice.
- *  - **It lost on emphasis and position.** It rendered immediately before
- *    `worktreeCdRules`, whose opening line is an all-caps MUST about Bash, and
- *    the planner's user prompt ends with a ```bash fence. Rationale ("they are
- *    much faster") does not outrank a MUST, so the fragment now leads with the
- *    directive and the composition order puts it *after* the cd rule.
+ *  - **The unit is tool calls in one turn**, named and shown, with `;`-packing
+ *    several lookups into one Bash string called out as not it. "In a single
+ *    message" is harness vocabulary and reads as "one command".
+ *  - **The shell-to-tool table is marked non-exhaustive** and states the test for
+ *    when a shell is needed at all, because a closed list of tools is read as
+ *    closed and every unlisted one (`sed`, `head`, `awk`, `wc`) feels permitted.
+ *  - **`Read` takes an offset and a limit**, said outright, or the shell stays
+ *    the only way to read a slice of a large file.
+ *  - **It leads with the directive and renders after `worktreeCdRules`**, whose
+ *    opening all-caps MUST about Bash otherwise has the last word; rationale
+ *    alone does not outrank a MUST.
  *
  * It still narrows `cd` to shell commands rather than forbidding it — forbidding
  * it is `NO_CD_RULES`, a different convention for a different class of agent.
@@ -125,10 +111,8 @@ Delegate to a subagent only for large tracks of work that are genuinely independ
  * Scope calibration: deliver the requested task, neither narrowed nor widened.
  *
  * The second paragraph is aimed at the one route by which widening looks like
- * diligence rather than overreach: imitating a neighbouring call site. Asked for
- * two SWR options on a new query, an updater cited the sibling hook that sets
- * seven and prescribed all seven; the five nobody asked for became the finding
- * that spent the run's last cycle, so it never opened a PR.
+ * diligence rather than overreach: imitating a neighbouring call site, whose
+ * extra parts become findings that cost a cycle to undo.
  */
 export const SCOPE_DISCIPLINE = `### Scope
 

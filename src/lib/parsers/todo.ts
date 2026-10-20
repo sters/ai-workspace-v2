@@ -1,9 +1,5 @@
 import type { TodoItem, TodoFile, TodoSection } from "@/types/workspace";
 
-// ---------------------------------------------------------------------------
-// Batch utilities
-// ---------------------------------------------------------------------------
-
 export interface TodoItemGroup {
   parent: TodoItem;
   subItems: TodoItem[];
@@ -195,7 +191,6 @@ export function normalizeTodoCheckboxes(content: string): string {
       continue;
     }
 
-    // Normalize bullet character: * → -
     fixed = fixed.replace(/^(\s*)\* /, "$1- ");
 
     // Fix bracket formatting: - [] or - [  ] → - [ ]
@@ -204,7 +199,6 @@ export function normalizeTodoCheckboxes(content: string): string {
       "$1[ ]$3",
     );
 
-    // Uppercase X → lowercase
     fixed = fixed.replace(/^(\s*- )\[X\]/, "$1[x]");
 
     // Already a valid checkbox — track indent and move on
@@ -232,7 +226,6 @@ export function normalizeTodoCheckboxes(content: string): string {
         continue;
       }
 
-      // Convert to pending checkbox
       result.push(`${bulletMatch[1]}- [ ] ${bulletMatch[2]}`);
       lastCheckboxIndent = indent;
       continue;
@@ -311,7 +304,6 @@ export function parseTodoSections(content: string): TodoSection[] {
       current = { heading: "", items: [], notes: [] };
     }
 
-    // Try checkbox item
     let matched = false;
     for (const [pattern, status] of STATUS_PATTERNS) {
       const match = line.match(pattern);

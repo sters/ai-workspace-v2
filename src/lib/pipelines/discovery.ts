@@ -1,9 +1,3 @@
-/**
- * Pipeline for workspace discovery.
- * Picks up to 5 recent workspaces, runs Claude in parallel per workspace,
- * and saves discovered suggestions to DB.
- */
-
 import { listOperations } from "@/lib/db/operations";
 import { listWorkspaces } from "@/lib/workspace/reader";
 import { getReadme } from "@/lib/workspace/reader";
@@ -30,23 +24,20 @@ export function buildDiscoveryPipeline(): PipelinePhase[] {
           return true;
         }
 
-        // Pick the most recently modified workspaces (already sorted by lastModified desc)
+        // listWorkspaces() sorts by lastModified, newest first.
         const targets = workspaces.slice(0, MAX_WORKSPACES);
         const allNames = workspaces.map((ws) => ws.name);
 
         ctx.emitStatus(`Building prompts for ${targets.length} workspace(s)...`);
 
-        // Build a prompt per workspace
         const resultTexts = new Map<string, string>();
         const children: GroupChild[] = [];
 
         for (const ws of targets) {
-          // Get operations for this workspace
           const ops = listOperations(ws.name)
             .filter((op) => op.status === "completed")
             .slice(0, 10);
 
-          // Read README content
           const readmeContent = (await getReadme(ws.name)) ?? "";
 
           const input: DiscoveryInput = {
@@ -92,7 +83,6 @@ export function buildDiscoveryPipeline(): PipelinePhase[] {
 
         const results = await ctx.runChildGroup(children);
 
-        // Collect and save suggestions from all workspaces
         let totalSaved = 0;
         for (let i = 0; i < targets.length; i++) {
           const wsName = targets[i].name;

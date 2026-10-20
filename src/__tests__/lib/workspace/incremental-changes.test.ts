@@ -74,9 +74,9 @@ describe("getIncrementalChanges", () => {
     expect(inc!.changedFiles.trim()).toBe("");
   });
 
-  // The case that motivated the path restriction: this branch merged origin/main
-  // mid-run, which brought 10 other commits into <baseline>..HEAD. Without the
-  // restriction the next review's target includes another team's work.
+  // A mid-run merge of origin/main brings other commits into <baseline>..HEAD.
+  // Without the path restriction the next review's target includes another
+  // team's work.
   it("excludes files that arrived only from the base branch via a merge", async () => {
     const baseline = commit("a.txt", "a\n", "add a");
 

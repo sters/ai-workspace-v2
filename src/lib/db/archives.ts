@@ -1,10 +1,6 @@
 import type { Database, Statement } from "bun:sqlite";
 import { getDb, _onDbReset } from "./connection";
 
-// ---------------------------------------------------------------------------
-// Lazy prepared statements
-// ---------------------------------------------------------------------------
-
 let _archive: Statement | null = null;
 let _unarchive: Statement | null = null;
 let _isArchived: Statement | null = null;
@@ -53,10 +49,6 @@ export function _resetArchiveStatements(): void {
 }
 
 _onDbReset(_resetArchiveStatements);
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export function archiveWorkspace(name: string): void {
   const db = getDb();

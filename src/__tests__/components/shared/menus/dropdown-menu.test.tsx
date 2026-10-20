@@ -73,7 +73,6 @@ describe("DropdownMenu", () => {
       />,
     );
     await user.click(screen.getByRole("button", { name: "Open" }));
-    // Focus the first top-level item, then arrow-right into the submenu
     const groupItem = screen.getByRole("menuitem", { name: /Editor/ });
     groupItem.focus();
     await user.keyboard("{ArrowRight}");

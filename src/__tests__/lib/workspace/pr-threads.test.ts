@@ -47,7 +47,7 @@ describe("parsePrView", () => {
     isDraft: false,
     headRefName: "feature/cache",
     baseRefName: "main",
-    author: { login: "sters" },
+    author: { login: "alice" },
     updatedAt: "2026-08-05T01:02:03Z",
   });
 
@@ -69,7 +69,7 @@ describe("parsePrView", () => {
       state: "OPEN",
       isDraft: false,
       baseRefName: "main",
-      author: "sters",
+      author: "alice",
       threads: [],
     });
   });
@@ -225,7 +225,7 @@ describe("parseConversationComments", () => {
         {
           id: "PRR_pending",
           url: "https://github.com/acme/widgets/pull/42#pullrequestreview-5",
-          author: { login: "sters" },
+          author: { login: "alice" },
           body: "Draft thoughts",
           createdAt: "2026-08-04T10:10:00Z",
           state: "PENDING",

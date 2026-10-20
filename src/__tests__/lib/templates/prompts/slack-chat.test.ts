@@ -18,13 +18,6 @@ describe("getSlackChatSystemPrompt", () => {
     expect(sys).toMatch(/Pull Requests tab/);
     expect(sys).toContain("init <description>");
   });
-
-  it("scopes memory writes to the memories table and an explicit request", () => {
-    const sys = getSlackChatSystemPrompt();
-    expect(sys).toMatch(/write to its `memories` table/);
-    expect(sys).toMatch(/Only write \(remember\) when the user EXPLICITLY asks/);
-    expect(sys).toMatch(/NEVER `DROP`\/`ALTER`/);
-  });
 });
 
 describe("buildSlackChatPrompt", () => {

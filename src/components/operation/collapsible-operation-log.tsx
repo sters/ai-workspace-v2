@@ -42,7 +42,6 @@ export function CollapsibleOperationLog({
     return results;
   }, [isDone, events]);
 
-  // Count log entries (excluding results) for the header
   const logEntryCount = useMemo(() => {
     if (!isDone) return 0;
     let count = 0;
@@ -55,7 +54,6 @@ export function CollapsibleOperationLog({
   }, [isDone, events]);
 
   if (!isDone) {
-    // While running, render directly without collapsible wrapper
     return (
       <OperationLog
         operationId={operation.id}
@@ -69,7 +67,6 @@ export function CollapsibleOperationLog({
 
   return (
     <div className="rounded-md border">
-      {/* Collapsible header */}
       <div
         role="button"
         tabIndex={0}
@@ -96,7 +93,6 @@ export function CollapsibleOperationLog({
         </span>
       </div>
 
-      {/* Expanded: full log */}
       {expanded && (
         <div className="border-t p-2">
           <OperationLog
@@ -107,7 +103,6 @@ export function CollapsibleOperationLog({
         </div>
       )}
 
-      {/* Results — show all phase results */}
       {resultEntries.length > 0 && (
         <div className="border-t p-2 space-y-2">
           {resultEntries.map((entry, i) => (

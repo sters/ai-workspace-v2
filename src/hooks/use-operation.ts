@@ -60,7 +60,6 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
       .catch(() => {});
   }, [initialOperationId]);
 
-  // ---------- SSE ----------
   const { events, connected, error: sseError, notFound: sseNotFound, clear } = useSSE(
     baseOperation?.id ?? null
   );
@@ -108,7 +107,6 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
     return result;
   }, [baseOperation, events]);
 
-  // ---------- Persist to localStorage ----------
   useEffect(() => {
     if (!storageKey) return;
     // Wait for the restore effect — persisting the null first render would
@@ -124,7 +122,6 @@ export function useOperation(storageKey?: string, initialOperationId?: string) {
     }
   }, [storageKey, operation, hydrated]);
 
-  // ---------- Actions ----------
   const start = useCallback(
     async (type: OperationType, body: Record<string, string>) => {
       clear();

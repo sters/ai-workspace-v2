@@ -125,16 +125,13 @@ export async function findConflictMarkers(
  * Fetch `origin/<base>` and merge it into the worktree's branch with `--no-ff`.
  *
  * **The question is about the commit the pull request holds, not about the
- * worktree**, and conflating the two is what made the first version of this
- * report a lie. It decided "nothing to do" from `merge-base --is-ancestor
- * origin/<base> HEAD` alone, so a merge sitting unpushed in the worktree — a
- * push this operation had failed to land, a human merging by hand, an
- * autonomous run's own mid-run merge — read as `already contains origin/<base>`
- * while GitHub went on showing the pull request as conflicting, because GitHub
- * judges the *pushed* head. Both facts were true and the conclusion was wrong.
- * So `prHeadSha` (from `gh pr view`, i.e. the commit GitHub judged) decides what
- * counts as done, and the base being contained locally without being contained
- * there is `unpushed`: nothing to merge, everything to push.
+ * worktree.** GitHub judges the *pushed* head, so a merge sitting unpushed in
+ * the worktree — a push this operation failed to land, a human merging by hand,
+ * an autonomous run's own mid-run merge — leaves the pull request conflicting
+ * even though HEAD contains `origin/<base>`. So `prHeadSha` (from `gh pr view`,
+ * i.e. the commit GitHub judged) decides what counts as done, and the base being
+ * contained locally without being contained there is `unpushed`: nothing to
+ * merge, everything to push.
  *
  * The ordering around that carries the rest:
  *
@@ -162,8 +159,8 @@ export async function findConflictMarkers(
  *   the conflict case — it is git refusing for some other reason — and leaving
  *   the worktree half-merged would strand every later phase.
  *
- * Every verdict names the shas it rests on, because the report that was wrong
- * named none and so could not be checked after the fact.
+ * Every verdict names the shas it rests on, so it can be checked after the
+ * fact.
  */
 export async function mergeBaseIntoBranch(
   repo: { repoName: string; worktreePath: string },
@@ -510,9 +507,7 @@ export function summarizeBaseMerges(outcomes: BaseMergeOutcome[]): string {
     problems.length > 0 ? `${problems.length} needing attention` : null,
   ].filter(Boolean);
 
-  // "already contains its base" as a headline was the claim that was wrong, so
-  // it now says whose state it is describing: the pull request's, not the
-  // worktree's.
+  // Names whose state it describes: the pull request's, not the worktree's.
   const headline =
     problems.length === 0 && pushed.length === 0
       ? "Every pull request already holds its base branch"

@@ -167,7 +167,6 @@ export function useTerminal(options?: UseTerminalOptions): UseTerminalReturn {
     return () => window.removeEventListener("focus", handleFocus);
   }, [focusOnWindowFocus]);
 
-  // Auto-dispose on unmount
   useEffect(() => {
     return () => dispose();
   }, [dispose]);

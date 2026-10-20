@@ -2,7 +2,6 @@
  * Shared fetch helpers for client-side API calls.
  */
 
-/** Discriminated union for API call results. */
 export type ApiResult<T = unknown> =
   | { ok: true; data: T }
   | { ok: false; error: string };
@@ -14,7 +13,6 @@ export const fetcher = (url: string) =>
     return r.json();
   });
 
-/** POST JSON to an endpoint and return the parsed response. */
 export async function postJson<TResponse = unknown, TBody extends object = Record<string, unknown>>(
   url: string,
   body: TBody,

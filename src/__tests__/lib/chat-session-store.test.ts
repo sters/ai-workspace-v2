@@ -8,7 +8,6 @@ import {
   GC_MAX_EXITED,
 } from "@/lib/chat-server";
 
-// Minimal ChatSession stub for GC tests
 function makeSession(
   id: string,
   overrides: { exited?: boolean; exitedAt?: number | null } = {},
@@ -28,7 +27,6 @@ function makeSession(
 }
 
 describe("trimBuffer", () => {
-
   it("returns the same buffer at exactly the high watermark", () => {
     const buf = Array.from({ length: BUFFER_HIGH }, (_, i) => `chunk-${i}`);
     const result = trimBuffer(buf);
@@ -41,7 +39,6 @@ describe("trimBuffer", () => {
     const buf = Array.from({ length: total }, (_, i) => `chunk-${i}`);
     const result = trimBuffer(buf);
     expect(result).toHaveLength(BUFFER_LOW);
-    // Should keep the most recent chunks
     expect(result[0]).toBe(`chunk-${total - BUFFER_LOW}`);
     expect(result[result.length - 1]).toBe(`chunk-${total - 1}`);
   });
@@ -68,7 +65,6 @@ describe("gcSessions", () => {
     const now = Date.now();
     const sessions = new Map<string, ReturnType<typeof makeSession>>();
 
-    // Create GC_MAX_EXITED + 5 exited sessions, all within age limit
     const total = GC_MAX_EXITED + 5;
     for (let i = 0; i < total; i++) {
       const id = `s-${i}`;
@@ -83,11 +79,9 @@ describe("gcSessions", () => {
     expect(removed).toBe(5);
     expect(sessions.size).toBe(GC_MAX_EXITED);
 
-    // The oldest 5 should be gone (s-0 through s-4)
     for (let i = 0; i < 5; i++) {
       expect(sessions.has(`s-${i}`)).toBe(false);
     }
-    // The newest should remain
     for (let i = 5; i < total; i++) {
       expect(sessions.has(`s-${i}`)).toBe(true);
     }
@@ -97,7 +91,6 @@ describe("gcSessions", () => {
     const now = Date.now();
     const sessions = new Map<string, ReturnType<typeof makeSession>>();
 
-    // 3 very old sessions (should be removed by age)
     for (let i = 0; i < 3; i++) {
       const id = `old-${i}`;
       sessions.set(
@@ -106,7 +99,6 @@ describe("gcSessions", () => {
       );
     }
 
-    // GC_MAX_EXITED recent exited sessions (should all survive count check)
     for (let i = 0; i < GC_MAX_EXITED; i++) {
       const id = `recent-${i}`;
       sessions.set(
@@ -117,7 +109,6 @@ describe("gcSessions", () => {
 
     const removed = gcSessions(sessions, now);
 
-    // All 3 old ones removed by age check
     expect(removed).toBe(3);
     expect(sessions.size).toBe(GC_MAX_EXITED);
   });

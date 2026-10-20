@@ -48,7 +48,6 @@ export async function buildCreatePrPipeline(input: {
   };
 
   const children = await Promise.all(repos.map(async (repo) => {
-    // Detect base branch from README metadata or repo itself
     const metaRepo = meta.repositories.find(
       (r) => r.path === repo.repoPath || r.alias === repo.repoName,
     );

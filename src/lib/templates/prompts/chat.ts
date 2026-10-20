@@ -223,9 +223,6 @@ ${REPLY_LANGUAGE}
 ${ON_DEMAND_READING}`;
 }
 
-/**
- * Build the initial prompt sent to Claude when starting an interactive chat session.
- */
 export function buildInitPrompt(workspaceId: string, workspacePath: string): string {
   return firstTurnSection(workspacePath);
 }
@@ -301,9 +298,6 @@ export function buildStartPromptChatPrompt(
   ].join("\n");
 }
 
-/**
- * Build the initial prompt for a chat session focused on a specific review.
- */
 export function buildReviewChatPrompt(
   workspaceId: string,
   workspacePath: string,
@@ -317,9 +311,6 @@ export function buildReviewChatPrompt(
   ].join("\n");
 }
 
-/**
- * Build the initial prompt for a chat session focused on research results.
- */
 export function buildResearchChatPrompt(
   workspaceId: string,
   workspacePath: string,

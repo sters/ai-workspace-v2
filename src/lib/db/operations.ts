@@ -3,10 +3,6 @@ import type { Operation, OperationListItem, OperationResultSummary } from "@/typ
 import type { OperationLogAgeInfo } from "@/lib/operation-store/types";
 import { getDb, _onDbReset } from "./connection";
 
-// ---------------------------------------------------------------------------
-// Lazy prepared statements
-// ---------------------------------------------------------------------------
-
 let _insert: Statement | null = null;
 let _updateStatus: Statement | null = null;
 let _updateWorkspace: Statement | null = null;
@@ -150,10 +146,6 @@ export function _resetStatements(): void {
 
 _onDbReset(_resetStatements);
 
-// ---------------------------------------------------------------------------
-// Safe JSON parsing helper
-// ---------------------------------------------------------------------------
-
 function safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
   if (!json) return fallback;
   try {
@@ -162,10 +154,6 @@ function safeJsonParse<T>(json: string | null | undefined, fallback: T): T {
     return fallback;
   }
 }
-
-// ---------------------------------------------------------------------------
-// Row ↔ Domain conversions
-// ---------------------------------------------------------------------------
 
 interface OperationRow {
   id: string;
@@ -206,10 +194,6 @@ function rowToListItem(row: OperationRow): OperationListItem {
     ...(row.result_summary && { resultSummary: safeJsonParse<OperationListItem["resultSummary"]>(row.result_summary, undefined) }),
   };
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 export function insertOperation(op: Operation): void {
   const db = getDb();

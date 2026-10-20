@@ -5,10 +5,6 @@ import type { PipelinePhase } from "@/types/pipeline";
 import type { ManagedOperation } from "@/lib/pipeline/types";
 import { executePipelinePhases } from "@/lib/pipeline/execute-phases";
 
-// ---------------------------------------------------------------------------
-// Mock dependencies that talk to SQLite or external services
-// ---------------------------------------------------------------------------
-
 vi.mock("@/lib/db", () => ({
   bufferEvent: vi.fn(),
   stopAutoFlush: vi.fn(),
@@ -34,10 +30,6 @@ vi.mock("@/lib/config", () => ({
   getConfig: vi.fn().mockReturnValue({}),
   getOperationConfig: vi.fn().mockReturnValue({}),
 }));
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function makeManagedOperation(phases: PipelinePhase[]): {
   managed: ManagedOperation;
@@ -72,7 +64,6 @@ function makeManagedOperation(phases: PipelinePhase[]): {
     abortController: new AbortController(),
   };
 
-  // Capture events via listener (survives markComplete's events.length = 0)
   managed.listeners.add((event) => {
     capturedEvents.push({ type: event.type, data: event.data });
   });
@@ -92,16 +83,11 @@ function makeFunctionPhase(
   };
 }
 
-/** Collect status event messages from captured events. */
 function statusMessages(capturedEvents: { type: string; data: string }[]): string[] {
   return capturedEvents
     .filter((e) => e.type === "status")
     .map((e) => e.data);
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe("execute-phases retry logic", () => {
   beforeEach(() => {
@@ -126,7 +112,6 @@ describe("execute-phases retry logic", () => {
     expect(callCount).toBe(1);
     expect(managed.operation.status).toBe("failed");
     expect(phaseInfos[0].status).toBe("failed");
-    // No retry events
     const retryMsgs = statusMessages(capturedEvents).filter((m) => m.includes("retry"));
     expect(retryMsgs).toHaveLength(0);
   });
@@ -171,7 +156,6 @@ describe("execute-phases retry logic", () => {
 
     expect(callCount).toBe(1);
     expect(managed.operation.status).toBe("completed");
-    // No "retrying" events should be emitted
     const retryingEvents = statusMessages(capturedEvents).filter((m) => m.includes("retrying"));
     expect(retryingEvents).toHaveLength(0);
   });
@@ -220,13 +204,11 @@ describe("execute-phases retry logic", () => {
 
     expect(callCount).toBe(3);
 
-    // Should have "retrying" phase update events
     const phaseUpdateEvents = statusMessages(capturedEvents).filter((m) =>
       m.startsWith("__phaseUpdate:") && m.includes('"retrying"'),
     );
     expect(phaseUpdateEvents.length).toBeGreaterThanOrEqual(1);
 
-    // Should have retry status messages
     const retryMessages = statusMessages(capturedEvents).filter((m) =>
       m.includes("retry") && !m.startsWith("__phaseUpdate:"),
     );
@@ -281,7 +263,6 @@ describe("execute-phases retry logic", () => {
       operationType: "execute",
     });
 
-    // Should have run once and then been aborted during delay
     expect(callCount).toBe(1);
     expect(managed.operation.status).toBe("failed");
   });
@@ -403,9 +384,7 @@ describe("execute-phases retry logic", () => {
       pipelineOptions: { onPhaseComplete },
     });
 
-    // Phase was called 3 times (1 + 2 retries)
     expect(callCount).toBe(3);
-    // onPhaseComplete should be called only once (after all retries exhausted)
     expect(onPhaseComplete).toHaveBeenCalledTimes(1);
     expect(onPhaseComplete).toHaveBeenCalledWith(0, phase, false);
   });

@@ -1,4 +1,3 @@
-// Defaults & constants
 export {
   CONFIG_DEFAULTS,
   OPERATION_TYPE_NAMES,
@@ -7,14 +6,12 @@ export {
 } from "./defaults";
 export type { ConfigKeyDef } from "./defaults";
 
-// Workspace config directory
 export {
   getWorkspaceConfigDir,
   getWorkspaceDbPath,
   getWorkspaceConfigFilePath,
 } from "./workspace-dir";
 
-// Config resolution
 export {
   getConfig,
   getConfigFilePath,
@@ -31,10 +28,8 @@ export {
   _setConfigFilePath,
 } from "./resolver";
 
-// Model / effort resolution
 export { resolveModel, resolveEffort, STEP_DEFAULT_MODELS, STEP_DEFAULT_EFFORTS } from "./model";
 
-// Migration & generation
 export {
   ensureConfigFile,
   generateDefaultConfigContent,
@@ -42,7 +37,6 @@ export {
   migrateConfigFile,
 } from "./migration";
 
-// Workspace paths
 export {
   getWorkspaceDir,
   resolveWorkspaceName,

@@ -2,11 +2,9 @@
  * Whether each repository's pull request has moved since the last review
  * judged it.
  *
- * The two sides of the comparison already exist and were never put together:
  * `baseline.json` records what each worktree's HEAD was when a review ran, and
- * the PR read knows the head commit GitHub has. A review workspace's whole
- * reason to exist is a PR someone else keeps pushing to, and nothing on the
- * page said whether the newest review still describes it.
+ * the PR read knows the head commit GitHub has. Comparing the two tells whether
+ * the newest review still describes a PR someone else keeps pushing to.
  *
  * `worktreeStale` is kept separate from `updatedSinceReview` because they lead
  * to different actions: a PR that moved calls for a re-review, while a worktree

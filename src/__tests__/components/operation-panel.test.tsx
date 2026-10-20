@@ -39,7 +39,6 @@ vi.mock("@/components/shared/feedback/toast", () => ({
   showToast: (...args: unknown[]) => mockShowToast(...args),
 }));
 
-// Import after mocks
 import { OperationPanel } from "@/components/workspace/operation-panel";
 
 describe("OperationPanel archive button", () => {

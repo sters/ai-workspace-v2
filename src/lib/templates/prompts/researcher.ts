@@ -21,10 +21,6 @@ import {
   WRITTEN_DELIVERABLE_LENGTH,
 } from "./shared";
 
-// ---------------------------------------------------------------------------
-// Phase 1 — Findings (user prompts: dynamic data only)
-// ---------------------------------------------------------------------------
-
 /** Build prompt for a per-repo findings agent (Phase 1). */
 export function buildResearchFindingsRepoPrompt(input: ResearchFindingsRepoInput): string {
   const { repo } = input;
@@ -75,10 +71,6 @@ ${repoList}
 \`${input.workspacePath}/templates/research-findings-cross-repository.md\`
 `;
 }
-
-// ---------------------------------------------------------------------------
-// Phase 2 — Recommendations & Next Steps (user prompts: dynamic data only)
-// ---------------------------------------------------------------------------
 
 /** Build prompt for a per-repo recommendations agent (Phase 2). */
 export function buildResearchRecommendationsRepoPrompt(input: ResearchRecommendationsRepoInput): string {
@@ -151,10 +143,6 @@ ${findingsSections}
 `;
 }
 
-// ---------------------------------------------------------------------------
-// Phase 3 — Integration (user prompt: dynamic data only)
-// ---------------------------------------------------------------------------
-
 /** Build prompt for the integration / summary agent (Phase 3). */
 export function buildResearchIntegrationPrompt(input: ResearchIntegrationInput): string {
   const fileSections = input.allFiles
@@ -187,10 +175,6 @@ ${fileSections}
 `;
 }
 
-// ---------------------------------------------------------------------------
-// Shared rules embedded in all research system prompts
-// ---------------------------------------------------------------------------
-
 const RESEARCH_SHARED_RULES = `### Language
 
 - **Always write all output (findings, recommendations, summaries) in English**, regardless of the language used in the workspace README.
@@ -214,10 +198,6 @@ ${NO_CD_RULES}
 - Be objective: report findings without bias
 - Be actionable: recommendations should be concrete
 `;
-
-// ---------------------------------------------------------------------------
-// Phase-specific system prompts
-// ---------------------------------------------------------------------------
 
 const RESEARCH_FINDINGS_REPO_INSTRUCTIONS = `You are a specialized research agent focused on investigating a **single repository**. Your role is to deeply explore the assigned repository and document your findings.
 
@@ -328,10 +308,6 @@ const RESEARCH_INTEGRATION_INSTRUCTIONS = `You are a specialized research agent 
 - Keep the summary concise but comprehensive
 
 ${RESEARCH_SHARED_RULES}`;
-
-// ---------------------------------------------------------------------------
-// System prompt getters
-// ---------------------------------------------------------------------------
 
 /** System prompt for per-repo findings agents (Phase 1). */
 export function getResearchFindingsRepoSystemPrompt(): string {

@@ -1,13 +1,8 @@
 /**
- * Prompt template for workspace-repo-todo-reviewer agent.
- * Reviews and validates TODO items for a specific repository.
- *
- * This is the cheapest review in the pipeline — it runs before any code exists,
- * so a finding here costs a TODO edit instead of an execute + review cycle. Its
- * verdict is structured (`TODO_REVIEW_SCHEMA`) and applied by the revision step
- * in `pipelines/actions/review-todos.ts`; it used to be free text that nothing
- * parsed, which meant findings that predicted a cycle-1 regression were emitted
- * into the log and dropped.
+ * The TODO plan reviewer: the cheapest review in the pipeline, because it runs
+ * before any code exists, so a finding here costs a TODO edit instead of an
+ * execute + review cycle. Its verdict is structured (`TODO_REVIEW_SCHEMA`) and
+ * applied by the revision step in `pipelines/actions/review-todos.ts`.
  */
 
 import type { ReviewerInput, TodoReviewFinding } from "@/types/prompts";
