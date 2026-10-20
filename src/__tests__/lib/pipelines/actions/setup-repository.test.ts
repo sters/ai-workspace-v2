@@ -217,6 +217,49 @@ describe("setupRepositories", () => {
     ]);
   });
 
+  // A quick create from the form, one from Slack and an init may each set up a
+  // worktree of the same clone at once.
+  describe("setups of one clone running at once", () => {
+    function slowGit(cmd: unknown) {
+      const s = String(cmd);
+      if (s.includes("fetch --all") || s.includes("git clone")) return Bun.sleep(20).then(() => "");
+      return defaultExec(cmd);
+    }
+
+    it("share the fetch already running instead of starting a second one", async () => {
+      mockExec.mockImplementation(slowGit);
+      const emitted: string[] = [];
+
+      const [first, second] = await Promise.all([
+        setupRepositories(WORKSPACE, [{ repoPath: "github.com/acme/repo:one" }], vi.fn()),
+        setupRepositories(WORKSPACE, [{ repoPath: "github.com/acme/repo:two" }], (m) => emitted.push(m)),
+      ]);
+
+      expect([...first, ...second].every((o) => o.ok)).toBe(true);
+      expect(fetchCalls()).toHaveLength(1);
+      expect(emitted.some((m) => /already running/.test(m))).toBe(true);
+    });
+
+    it("share a clone in flight, whose second copy would find the directory taken", async () => {
+      mockExec.mockImplementation(slowGit);
+      mockExists.mockImplementation(async (p) => String(p).endsWith("/.git") || String(p) === WS_ABS);
+
+      await Promise.all([
+        setupRepositories(WORKSPACE, [{ repoPath: "github.com/acme/repo:one" }], vi.fn()),
+        setupRepositories(WORKSPACE, [{ repoPath: "github.com/acme/repo:two" }], vi.fn()),
+      ]);
+
+      expect(mockExec.mock.calls.filter((c) => String(c[0]).startsWith("git clone"))).toHaveLength(1);
+    });
+
+    it("fetch again for a setup that starts after the last fetch finished", async () => {
+      await setupRepositories(WORKSPACE, [{ repoPath: "github.com/acme/repo:one" }], vi.fn());
+      await setupRepositories(WORKSPACE, [{ repoPath: "github.com/acme/repo:two" }], vi.fn());
+
+      expect(fetchCalls()).toHaveLength(2);
+    });
+  });
+
   it("checks out worktrees of one clone concurrently while creating their branches one at a time", async () => {
     let addsInFlight = 0;
     let maxAdds = 0;

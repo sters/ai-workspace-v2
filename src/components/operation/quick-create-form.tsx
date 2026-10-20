@@ -18,7 +18,8 @@ import {
   workspaceDirName,
 } from "@/lib/naming";
 import type { SetupRepositoryResult } from "@/types/pipeline";
-import type { QuickCreateStart } from "@/types/workspace";
+import { useQuickCreates } from "@/hooks/use-quick-creates";
+import type { QuickCreateProgress, QuickCreateStart } from "@/types/workspace";
 
 /** The default first, since it is also the dropdown's initial value. */
 const TASK_TYPES = ["feature", "bugfix", "research", "review"] as const;
@@ -98,6 +99,32 @@ export function QuickCreateForm() {
    */
   const [status, setStatus] = useState<"idle" | "creating" | "sent">("idle");
 
+  /**
+   * The server's record of creates, this form's own included. One still
+   * running — sent from here, or from this form before the user left it —
+   * keeps the button disabled for the same reason `sent` does.
+   */
+  const { quickCreates } = useQuickCreates({ polling: status === "creating" });
+  const running = quickCreates.find((q) => q.state === "running");
+  /**
+   * Creates this form saw running. Only those are reported once they finish:
+   * one that ended before the form opened is old news, and the user already
+   * went wherever it led.
+   */
+  const [watched, setWatched] = useState<string[]>([]);
+  const newlyRunning = quickCreates.filter((q) => q.state === "running" && !watched.includes(q.id));
+  if (newlyRunning.length > 0) setWatched([...watched, ...newlyRunning.map((q) => q.id)]);
+  /**
+   * This form's own create reports through its response, and the button is
+   * only enabled while no other create runs — so once a response arrives,
+   * every create this form watched is either that one or long over.
+   */
+  const [answered, setAnswered] = useState(false);
+  const finished =
+    status === "idle" && !answered
+      ? quickCreates.find((q) => q.state !== "running" && watched.includes(q.id))
+      : undefined;
+
   const chosen = useMemo(
     () => [...new Set([...selected, ...parseExtraRepositories(extra)])],
     [selected, extra],
@@ -156,6 +183,7 @@ export function QuickCreateForm() {
         ...(note.trim() ? { note: note.trim() } : {}),
       });
     } catch (err) {
+      setAnswered(true);
       // The request never came back, so whether it created anything is unknown.
       // Staying disabled is the safe half of that: a blind retry is how the
       // duplicate gets made.
@@ -166,6 +194,7 @@ export function QuickCreateForm() {
       return;
     }
 
+    setAnswered(true);
     if (!response.ok) {
       setStatus("idle");
       setFailure(response.error);
@@ -306,9 +335,11 @@ export function QuickCreateForm() {
 
       <Button
         onClick={create}
-        disabled={(!effectiveName && !hasPr) || chosen.length === 0 || status !== "idle"}
+        disabled={
+          (!effectiveName && !hasPr) || chosen.length === 0 || status !== "idle" || running !== undefined
+        }
       >
-        {status === "creating" ? (
+        {status === "creating" || running ? (
           <>
             <Spinner />
             Creating workspace…
@@ -319,6 +350,10 @@ export function QuickCreateForm() {
           "Create workspace"
         )}
       </Button>
+
+      {running && <QuickCreateLog progress={running} />}
+
+      {finished && <FinishedQuickCreate progress={finished} />}
 
       {failure && (
         <div
@@ -373,6 +408,65 @@ export function QuickCreateForm() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** The tail of a running create's setup output: git is the slow part, and it says where it is. */
+function QuickCreateLog({ progress }: { progress: QuickCreateProgress }) {
+  return (
+    <div aria-live="polite" className="space-y-1 rounded-md border p-2 text-xs">
+      <p className="font-medium">
+        Creating{" "}
+        {progress.workspace ? <code className="font-mono">{progress.workspace}</code> : progress.name}
+        …
+      </p>
+      {progress.log.length > 0 && (
+        <pre className="max-h-48 overflow-auto whitespace-pre-wrap font-mono text-muted-foreground">
+          {progress.log.slice(-30).join("\n")}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A create this form watched run without having sent it: the user left and
+ * came back. The server already started what follows, so this offers the way
+ * there rather than going.
+ */
+function FinishedQuickCreate({ progress }: { progress: QuickCreateProgress }) {
+  if (progress.state === "failed" || !progress.workspace) {
+    return (
+      <div role="alert" className="rounded-md bg-red-50 p-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+        Creating {progress.name} failed: {progress.error}
+      </div>
+    );
+  }
+  const { workspace, start } = progress;
+  const clean = !progress.problems && start?.kind !== "failed";
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border p-2 text-sm">
+      <span>
+        Workspace <code className="font-mono">{workspace}</code> was created
+        {clean
+          ? "."
+          : start?.kind === "failed"
+            ? `, but its ${start.what} could not start: ${start.error}`
+            : `, but ${progress.problems} repositor${progress.problems === 1 ? "y" : "ies"} could not be set up.`}
+      </span>
+      {start?.kind === "review" ? (
+        <Link href={operationHref(workspace, start.operationId)} className="font-medium underline">
+          Open its review
+        </Link>
+      ) : clean ? (
+        <Link href={chatPagePath(workspace)} className="font-medium underline">
+          Open its chat
+        </Link>
+      ) : null}
+      <Link href={`/workspace/${encodeURIComponent(workspace)}`} className="underline">
+        Open the workspace
+      </Link>
     </div>
   );
 }

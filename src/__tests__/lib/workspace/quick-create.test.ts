@@ -50,6 +50,29 @@ function pr(overrides: Partial<PrBranchInfo> = {}): PrBranchInfo {
   };
 }
 
+type PerRepoSetup = (
+  ws: string,
+  repo: string,
+  base: string | undefined,
+  emit: (m: string) => void,
+  checkout?: string,
+) => SetupRepositoryResult | Promise<SetupRepositoryResult> | undefined;
+
+/** `setupRepositories` over a per-repository mock, tagging output by repository as the real one does. */
+function perRepo(setup: PerRepoSetup): QuickCreateDeps["setupRepositories"] {
+  return async (ws, requests, emit) =>
+    Promise.all(
+      requests.map(async (req) => {
+        try {
+          const result = await setup(ws, req.repoPath, req.baseBranchOverride, (m) => emit(`[${req.repoPath}] ${m}`), req.checkoutBranch);
+          return { repoPath: req.repoPath, ok: true as const, result: result as SetupRepositoryResult };
+        } catch (error) {
+          return { repoPath: req.repoPath, ok: false as const, error };
+        }
+      }),
+    );
+}
+
 /** A workspace directory as `setupWorkspace` leaves it: template README, no TODO. */
 function stageWorkspace(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "quick-create-"));
@@ -152,7 +175,7 @@ describe("createQuickWorkspace", () => {
         repositories: ["github.com/acme/web", "github.com/acme/api"],
         note: "fix the crash",
       },
-      { setupRepository },
+      { setupRepositories: perRepo(setupRepository) },
     );
 
     expect(mockSetupWorkspace).toHaveBeenCalledWith("bugfix", "fix the crash", undefined, "login crash");
@@ -172,6 +195,42 @@ describe("createQuickWorkspace", () => {
     expect(mockCommitWorkspaceSnapshot.mock.calls[0][0]).toBe(WS_NAME);
   });
 
+  it("hands every repository to one setup, so their fetches run in parallel", async () => {
+    mockSetupWorkspace.mockResolvedValue({ workspaceName: WS_NAME, workspacePath: stageWorkspace() });
+    const setupRepositories = vi.fn(perRepo((_ws, repo) => repoResult(repo)));
+
+    await createQuickWorkspace(
+      { name: "n", taskType: "bugfix", repositories: ["github.com/acme/web", "github.com/acme/api"] },
+      { setupRepositories } as unknown as QuickCreateDeps,
+    );
+
+    expect(setupRepositories).toHaveBeenCalledTimes(1);
+    expect(setupRepositories.mock.calls[0][1]).toEqual([
+      { repoPath: "github.com/acme/web" },
+      { repoPath: "github.com/acme/api" },
+    ]);
+  });
+
+  it("reports setup as it happens, after naming the workspace", async () => {
+    mockSetupWorkspace.mockResolvedValue({ workspaceName: WS_NAME, workspacePath: stageWorkspace() });
+    const progress: string[] = [];
+    const onCreated = vi.fn();
+    const setupRepository = vi.fn((_ws: string, repo: string, _base: unknown, emit: (m: string) => void) => {
+      // Named before any worktree, so a delete of it can be refused meanwhile.
+      expect(onCreated).toHaveBeenCalledWith(WS_NAME);
+      emit("fetching latest...");
+      return repoResult(repo);
+    });
+
+    await createQuickWorkspace(
+      { name: "n", taskType: "bugfix", repositories: ["github.com/acme/web", "github.com/acme/api"] },
+      { setupRepositories: perRepo(setupRepository), onProgress: (m: string) => progress.push(m), onCreated } as unknown as QuickCreateDeps,
+    );
+
+    expect(progress[0]).toBe(`Created workspace ${WS_NAME}`);
+    expect(progress).toContain("[github.com/acme/api] fetching latest...");
+  });
+
   it("declares the cached constraints of the repositories that have them", async () => {
     // Nothing on this path discovers constraints, so without the cache a
     // review of this workspace runs no lint/test/build at all.
@@ -182,7 +241,7 @@ describe("createQuickWorkspace", () => {
     await createQuickWorkspace(
       { name: "n", taskType: "bugfix", repositories: ["github.com/acme/web", "github.com/acme/api"] },
       {
-        setupRepository: vi.fn((_ws: string, repo: string) => repoResult(repo)),
+        setupRepositories: perRepo(vi.fn((_ws: string, repo: string) => repoResult(repo))),
         cachedConstraints: vi.fn((worktreePath: string) =>
           worktreePath.endsWith("/web") ? lint : null,
         ),
@@ -199,7 +258,7 @@ describe("createQuickWorkspace", () => {
 
     await createQuickWorkspace(
       { name: "ログイン時のクラッシュ", taskType: "bugfix", repositories: [], note: "fix the crash" },
-      { setupRepository: vi.fn() },
+      { setupRepositories: perRepo(vi.fn()) },
     );
 
     const readme = fs.readFileSync(path.join(dir, "README.md"), "utf-8");
@@ -217,7 +276,7 @@ describe("createQuickWorkspace", () => {
         repositories: [],
         note: "Fix the login crash\nthe refresh path 500s instead of retrying",
       },
-      { setupRepository: vi.fn() },
+      { setupRepositories: perRepo(vi.fn()) },
     );
 
     // The slug comes from the first line; the note stays the request in full.
@@ -245,7 +304,7 @@ describe("createQuickWorkspace", () => {
         taskType: "bugfix",
         repositories: ["github.com/acme/web", "github.com/acme/api", "github.com/acme/infra"],
       },
-      { setupRepository },
+      { setupRepositories: perRepo(setupRepository) },
     );
 
     expect(result.repositories.map((r) => r.repoPath)).toEqual([
@@ -271,7 +330,7 @@ describe("createQuickWorkspace", () => {
 
     await createQuickWorkspace(
       { name: "n", taskType: "bugfix", repositories: ["github.com/acme/web"] },
-      { setupRepository: vi.fn((_ws: string, repo: string) => repoResult(repo)) },
+      { setupRepositories: perRepo(vi.fn((_ws: string, repo: string) => repoResult(repo))) },
     );
 
     expect(fs.readdirSync(dir)).toEqual(["README.md"]);
@@ -283,7 +342,7 @@ describe("createQuickWorkspace", () => {
 
     await createQuickWorkspace(
       { name: "login crash", taskType: "feature", repositories: [] },
-      { setupRepository: vi.fn() },
+      { setupRepositories: perRepo(vi.fn()) },
     );
 
     expect(mockSetupWorkspace).toHaveBeenCalledWith("feature", "login crash", undefined, "login crash");
@@ -296,10 +355,10 @@ describe("createQuickWorkspace", () => {
     const result = await createQuickWorkspace(
       { name: "n", taskType: "bugfix", repositories: ["github.com/acme/web"] },
       {
-        setupRepository: vi.fn((_ws: string, repo: string, _base: string | undefined, emit: (m: string) => void) => {
+        setupRepositories: perRepo(vi.fn((_ws: string, repo: string, _base: string | undefined, emit: (m: string) => void) => {
           emit("Base branch: main");
           return repoResult(repo);
-        }),
+        })),
       },
     );
 
@@ -319,7 +378,7 @@ describe("createQuickWorkspace", () => {
 
       const result = await createQuickWorkspace(
         { name: "n", taskType: "review", repositories: [`${WEB_PR}/files`] },
-        { setupRepository, resolvePullRequest: () => pr() },
+        { setupRepositories: perRepo(setupRepository), resolvePullRequest: () => pr() },
       );
 
       expect(setupRepository).toHaveBeenCalledWith(
@@ -340,7 +399,7 @@ describe("createQuickWorkspace", () => {
       await createQuickWorkspace(
         { taskType: "review", repositories: [WEB_PR] },
         {
-          setupRepository: vi.fn((_ws: string, repo: string) => repoResult(repo)),
+          setupRepositories: perRepo(vi.fn((_ws: string, repo: string) => repoResult(repo))),
           resolvePullRequest: () => pr(),
         },
       );
@@ -359,7 +418,7 @@ describe("createQuickWorkspace", () => {
       await createQuickWorkspace(
         { taskType: "feature", repositories: [WEB_PR], note: "Address the review comments" },
         {
-          setupRepository: vi.fn((_ws: string, repo: string) => repoResult(repo)),
+          setupRepositories: perRepo(vi.fn((_ws: string, repo: string) => repoResult(repo))),
           resolvePullRequest: () => pr(),
         },
       );
@@ -380,7 +439,7 @@ describe("createQuickWorkspace", () => {
           taskType: "review",
           repositories: ["github.com/acme/web", WEB_PR, "github.com/acme/web:second"],
         },
-        { setupRepository, resolvePullRequest: () => pr() },
+        { setupRepositories: perRepo(setupRepository), resolvePullRequest: () => pr() },
       );
 
       // An aliased entry is a separate worktree directory, so it stays.
@@ -398,7 +457,7 @@ describe("createQuickWorkspace", () => {
       const result = await createQuickWorkspace(
         { name: "n", taskType: "review", repositories: [WEB_PR, other] },
         {
-          setupRepository,
+          setupRepositories: perRepo(setupRepository),
           resolvePullRequest: (info: PrUrlInfo) =>
             pr({ prUrl: info.url, headBranch: `branch-${info.prNumber}` }),
         },
@@ -419,7 +478,7 @@ describe("createQuickWorkspace", () => {
       const result = await createQuickWorkspace(
         { name: "n", taskType: "review", repositories: [fork, unreadable, "github.com/acme/tools"] },
         {
-          setupRepository,
+          setupRepositories: perRepo(setupRepository),
           resolvePullRequest: (info: PrUrlInfo) => {
             if (info.url === unreadable) throw new Error("gh: not found");
             return pr({ prUrl: info.url, repoPath: info.repoPath, isFork: true });
@@ -440,7 +499,7 @@ describe("createQuickWorkspace", () => {
         createQuickWorkspace(
           { taskType: "review", repositories: [WEB_PR] },
           {
-            setupRepository: vi.fn(),
+            setupRepositories: perRepo(vi.fn()),
             resolvePullRequest: () => {
               throw new Error("gh: not found");
             },

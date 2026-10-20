@@ -7,6 +7,7 @@ import { readdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "../config";
 import { exec, execArgs, repoDir } from "./helpers";
+import { isQuickCreateBuilding } from "./quick-create-progress";
 import type { WorkspaceRepo } from "@/types/workspace";
 
 // ---------------------------------------------------------------------------
@@ -160,6 +161,11 @@ export async function deleteWorkspace(workspaceName: string): Promise<void> {
   const wsPath = path.join(getWorkspaceDir(), workspaceName);
   if (!(await pathExists(wsPath))) {
     throw new Error(`Workspace directory not found: ${wsPath}`);
+  }
+  if (isQuickCreateBuilding(workspaceName)) {
+    throw new Error(
+      `Workspace "${workspaceName}" is still being set up by a quick create; delete it once that finishes.`,
+    );
   }
 
   // Collect repository paths that have worktrees

@@ -80,7 +80,10 @@ async function fetchAllWithRetries(
  */
 const WORKTREE_CHECKOUT_CONCURRENCY = 4;
 
-const g = globalThis as unknown as { __aiwCloneLocks?: Map<string, Promise<unknown>> };
+const g = globalThis as unknown as {
+  __aiwCloneLocks?: Map<string, Promise<unknown>>;
+  __aiwCloneSyncs?: Map<string, Promise<void>>;
+};
 
 /**
  * Serializes the steps that write a clone's shared metadata. Creating a branch
@@ -168,12 +171,39 @@ async function requireWorkspaceDir(workspaceName: string): Promise<string> {
   return wsPath;
 }
 
-/** Clone the repository, or fetch it when it is already on disk. */
+/**
+ * Clone the repository, or fetch it when it is already on disk.
+ *
+ * Setups from different callers (the quick-create form, Slack, init) may reach
+ * one clone at once. Two fetches of it collide on its ref locks and two clones
+ * on its directory, so a setup that arrives while one is running waits for that
+ * one: its refs are as current as a fetch of its own would make them.
+ */
 async function ensureLocalClone(
   actualRepoPath: string,
   emitStatus: (message: string) => void,
 ): Promise<void> {
   const repoAbsPath = path.join(repoDir(), actualRepoPath);
+  const syncs = (g.__aiwCloneSyncs ??= new Map());
+  const running = syncs.get(repoAbsPath);
+  if (running) {
+    emitStatus("A fetch of this repository is already running, waiting for it...");
+    return running;
+  }
+  const sync = syncClone(actualRepoPath, repoAbsPath, emitStatus);
+  syncs.set(repoAbsPath, sync);
+  try {
+    await sync;
+  } finally {
+    if (syncs.get(repoAbsPath) === sync) syncs.delete(repoAbsPath);
+  }
+}
+
+async function syncClone(
+  actualRepoPath: string,
+  repoAbsPath: string,
+  emitStatus: (message: string) => void,
+): Promise<void> {
   if (!(await pathExists(repoAbsPath))) {
     emitStatus(`Repository not found locally, cloning ${actualRepoPath}...`);
     const parentDir = path.dirname(repoAbsPath);

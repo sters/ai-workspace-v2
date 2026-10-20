@@ -165,3 +165,23 @@ export type QuickCreateStart =
   | { kind: "review"; operationId: string }
   | { kind: "none" }
   | { kind: "failed"; what: "chat" | "review"; error: string };
+
+/**
+ * A quick create the web form sent, as the server tracks it while it runs and
+ * for a while after, so a form opened in the meantime can show it.
+ */
+export interface QuickCreateProgress {
+  id: string;
+  /** What the request was named by, for display before the workspace exists. */
+  name: string;
+  startedAt: number;
+  state: "running" | "done" | "failed";
+  /** Set as soon as the workspace directory exists. */
+  workspace?: string;
+  log: string[];
+  finishedAt?: number;
+  start?: QuickCreateStart;
+  /** Repositories that could not be set up. */
+  problems?: number;
+  error?: string;
+}

@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockCreateQuickWorkspace = vi.fn();
-const mockSetupRepository = vi.fn();
+const mockSetupRepositories = vi.fn();
 
 vi.mock("@/lib/workspace/quick-create", () => ({
   createQuickWorkspace: (...a: unknown[]) => mockCreateQuickWorkspace(...a),
@@ -10,7 +10,7 @@ vi.mock("@/lib/workspace/quick-create", () => ({
 }));
 
 vi.mock("@/lib/pipelines/actions/setup-repository", () => ({
-  setupRepository: (...a: unknown[]) => mockSetupRepository(...a),
+  setupRepositories: (...a: unknown[]) => mockSetupRepositories(...a),
 }));
 
 const mockStartTaskChat = vi.fn();
@@ -202,5 +202,75 @@ describe("POST /api/workspaces", () => {
     const response = await post({ repositories: ["https://github.com/acme/web/pull/42"] });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: "Nothing to name it by" });
+  });
+});
+
+// The form that sent a create may be closed and reopened while it runs; what it
+// shows then comes from here, not from the request it no longer holds.
+describe("POST /api/workspaces — progress a reopened form can read", () => {
+  beforeEach(async () => {
+    const { _resetQuickCreates } = await import("@/lib/workspace/quick-create-progress");
+    _resetQuickCreates();
+  });
+
+  async function listed() {
+    const { GET } = await import("@/app/api/quick-creates/route");
+    return (await GET()).json();
+  }
+
+  it("lists the create as running with what setup has reported, then settles it with its start", async () => {
+    let release: () => void = () => {};
+    mockCreateQuickWorkspace.mockImplementationOnce(
+      async (_input: unknown, deps: { onProgress: (m: string) => void }) => {
+        deps.onProgress("[github.com/acme/web] Repository found locally, fetching latest...");
+        await new Promise<void>((r) => (release = r));
+        return {
+          workspace: "bugfix-login-crash-20260911",
+          workspacePath: "/ws/bugfix-login-crash-20260911",
+          repositories: [],
+          pullRequests: [],
+          problems: [],
+          log: [],
+        };
+      },
+    );
+
+    const pending = post({ name: "login crash", repositories: ["github.com/acme/web"], note: "fix" });
+    await vi.waitFor(async () =>
+      expect(await listed()).toMatchObject([
+        {
+          name: "login crash",
+          state: "running",
+          log: ["[github.com/acme/web] Repository found locally, fetching latest..."],
+        },
+      ]),
+    );
+
+    release();
+    await pending;
+    expect(await listed()).toMatchObject([
+      { state: "done", workspace: "bugfix-login-crash-20260911", start: { kind: "chat", sessionId: "chat-1" } },
+    ]);
+  });
+
+  it("settles a create that threw as failed, so the form stops waiting on it", async () => {
+    mockCreateQuickWorkspace.mockRejectedValueOnce(new Error("disk full"));
+    await post({ name: "n", repositories: ["github.com/acme/web"] });
+
+    expect(await listed()).toMatchObject([{ state: "failed", error: expect.stringContaining("disk full") }]);
+  });
+
+  it("leaves out a refused create, which made nothing", async () => {
+    const { QuickCreateRefusal } = await import("@/lib/workspace/quick-create");
+    mockCreateQuickWorkspace.mockRejectedValueOnce(new QuickCreateRefusal("Nothing to name it by"));
+    await post({ repositories: ["https://github.com/acme/web/pull/42"] });
+
+    expect(await listed()).toEqual([]);
+  });
+
+  it("leaves out a create no form is waiting on", async () => {
+    await post({ name: "n", repositories: ["github.com/acme/web"], followUp: false });
+
+    expect(await listed()).toEqual([]);
   });
 });

@@ -107,13 +107,13 @@ export interface QuickCreateDeps {
    * Injected rather than imported: the real one lives under `lib/pipelines/`,
    * which imports this layer, and the tests need a seam that does not run git.
    */
-  setupRepository: (
+  setupRepositories: (
     workspaceName: string,
-    repositoryPath: string,
-    baseBranchOverride: string | undefined,
+    requests: { repoPath: string; baseBranchOverride?: string; checkoutBranch?: string }[],
     emitStatus: (message: string) => void,
-    checkoutBranch?: string,
-  ) => Promise<SetupRepositoryResult>;
+  ) => Promise<
+    ({ repoPath: string; ok: true; result: SetupRepositoryResult } | { repoPath: string; ok: false; error: unknown })[]
+  >;
   /** `gh pr view`, injected for the same reason. */
   resolvePullRequest: (pr: PrUrlInfo) => Promise<PrBranchInfo>;
   /**
@@ -122,6 +122,10 @@ export interface QuickCreateDeps {
    * repository without them reaches review with no lint/test/build declared.
    */
   cachedConstraints?: (worktreePath: string) => Promise<RepoConstraint[] | null>;
+  /** Each step as it happens, for a caller showing progress while git runs. */
+  onProgress?: (message: string) => void;
+  /** The workspace directory now exists under this name; no worktree does yet. */
+  onCreated?: (workspace: string) => void;
 }
 
 /** The PR as it goes into `## Initial Request`: what a reader needs without opening it. */
@@ -144,6 +148,7 @@ async function resolvePullRequests(
   entries: string[],
   resolve: QuickCreateDeps["resolvePullRequest"],
   problems: QuickCreateProblem[],
+  onProgress: QuickCreateDeps["onProgress"],
 ): Promise<Map<string, PrBranchInfo>> {
   const resolved = new Map<string, PrBranchInfo>();
   const repos = new Set<string>();
@@ -153,6 +158,7 @@ async function resolvePullRequests(
     if (!info) continue;
 
     let pr: PrBranchInfo;
+    onProgress?.(`[${entry}] Reading the PR`);
     try {
       pr = await resolve(info);
     } catch (err) {
@@ -236,7 +242,7 @@ export function fillQuickReadme(
  * A repository that fails to set up is reported rather than fatal, and the
  * README declares only the worktrees that exist: the workspace is already on
  * disk by then, and declaring a repository without a worktree makes every
- * later phase report it as missing. Same trade `setupRepository` makes with a
+ * later phase report it as missing. Same trade `setupRepositories` makes with a
  * failed fetch — the run keeps whatever it managed to get.
  */
 export async function createQuickWorkspace(
@@ -248,6 +254,7 @@ export async function createQuickWorkspace(
     input.repositories,
     deps.resolvePullRequest,
     problems,
+    deps.onProgress,
   );
   const resolved = [...pullRequestsByEntry.values()];
   const prRepos = new Set(resolved.map((pr) => pr.repoPath));
@@ -272,34 +279,46 @@ export async function createQuickWorkspace(
     undefined,
     name,
   );
+  deps.onCreated?.(workspaceName);
+  deps.onProgress?.(`Created workspace ${workspaceName}`);
 
   const repositories: SetupRepositoryResult[] = [];
   const pullRequests: QuickCreatePullRequest[] = [];
   const log: string[] = [];
 
-  for (const entry of input.repositories) {
+  // All at once: each clone's fetch is the slow part, and they run in parallel.
+  const planned = input.repositories.flatMap((entry) => {
     const pr = pullRequestsByEntry.get(entry);
     // A PR that could not be read is already a problem; a plain entry for a
     // repository a PR brings is the same worktree directory.
-    if (!pr && (parsePrUrl(entry) || prRepos.has(entry))) continue;
-
-    const emit = (message: string) => {
-      log.push(`[${entry}] ${message}`);
-    };
-    try {
-      if (pr) {
-        repositories.push(
-          await deps.setupRepository(workspaceName, pr.repoPath, pr.baseBranch, emit, pr.headBranch),
-        );
-        pullRequests.push({ url: pr.prUrl, repoPath: pr.repoPath, headBranch: pr.headBranch });
-      } else {
-        repositories.push(await deps.setupRepository(workspaceName, entry, undefined, emit));
-      }
-    } catch (err) {
-      problems.push({ repository: entry, error: String(err) });
-      log.push(`[${entry}] Failed: ${err}`);
+    if (!pr && (parsePrUrl(entry) || prRepos.has(entry))) return [];
+    return [{ entry, pr }];
+  });
+  const emit = (message: string) => {
+    log.push(message);
+    deps.onProgress?.(message);
+  };
+  const outcomes = planned.length > 0
+    ? await deps.setupRepositories(
+        workspaceName,
+        planned.map(({ entry, pr }) =>
+          pr
+            ? { repoPath: pr.repoPath, baseBranchOverride: pr.baseBranch, checkoutBranch: pr.headBranch }
+            : { repoPath: entry },
+        ),
+        emit,
+      )
+    : [];
+  outcomes.forEach((outcome, i) => {
+    const { entry, pr } = planned[i];
+    if (outcome.ok) {
+      repositories.push(outcome.result);
+      if (pr) pullRequests.push({ url: pr.prUrl, repoPath: pr.repoPath, headBranch: pr.headBranch });
+    } else {
+      problems.push({ repository: entry, error: String(outcome.error) });
+      emit(`[${entry}] Failed: ${outcome.error}`);
     }
-  }
+  });
 
   const readmePath = path.join(workspacePath, "README.md");
   if (await pathExists(readmePath)) {

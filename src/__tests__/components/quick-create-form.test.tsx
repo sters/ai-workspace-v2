@@ -13,6 +13,11 @@ vi.mock("@/lib/api", () => ({
   postJson: (...a: unknown[]) => mockPostJson(...a),
 }));
 
+const mockUseQuickCreates = vi.fn();
+vi.mock("@/hooks/use-quick-creates", () => ({
+  useQuickCreates: (...a: unknown[]) => mockUseQuickCreates(...a),
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
 }));
@@ -77,6 +82,7 @@ beforeEach(() => {
   mockUseRepositories.mockReset();
   mockPostJson.mockReset().mockResolvedValue(ok());
   mockPush.mockReset();
+  mockUseQuickCreates.mockReset().mockReturnValue({ quickCreates: [] });
   sessionStorage.clear();
   setRepositories([WEB, API]);
 });
@@ -403,6 +409,80 @@ describe("QuickCreateForm", () => {
         "/workspace/bugfix-login-crash-20260911",
       );
       expect(button).toBeDisabled();
+    });
+  });
+
+  // The create runs on the server whether or not this form is open, so a form
+  // opened while it runs reads its state from there rather than from a request
+  // it never sent.
+  describe("a create still running from an earlier visit", () => {
+    const RUNNING = {
+      id: "q1",
+      name: "login crash",
+      startedAt: 0,
+      state: "running",
+      workspace: "bugfix-login-crash-20260911",
+      log: ["[github.com/acme/web] Repository found locally, fetching latest..."],
+    };
+
+    it("keeps the button disabled and shows how far it has got", () => {
+      setRepositories([WEB]);
+      mockUseQuickCreates.mockReturnValue({ quickCreates: [RUNNING] });
+      render(<QuickCreateForm />);
+      fillName("another one");
+      fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+
+      expect(screen.getByRole("button", { name: /creating workspace/i })).toBeDisabled();
+      expect(screen.getByText(/fetching latest/)).toBeInTheDocument();
+    });
+
+    it("offers the way into its chat once it finishes, without following it there unasked", () => {
+      setRepositories([WEB]);
+      mockUseQuickCreates.mockReturnValue({ quickCreates: [RUNNING] });
+      const { rerender } = render(<QuickCreateForm />);
+
+      mockUseQuickCreates.mockReturnValue({
+        quickCreates: [{ ...RUNNING, state: "done", start: { kind: "chat", sessionId: "chat-1" } }],
+      });
+      rerender(<QuickCreateForm />);
+
+      expect(screen.getByRole("link", { name: /open its chat/i })).toHaveAttribute(
+        "href",
+        "/workspace/bugfix-login-crash-20260911/chat/interactive",
+      );
+      expect(mockPush).not.toHaveBeenCalled();
+    });
+
+    it("leaves its own create to the response, so a failure is not reported twice", async () => {
+      setRepositories([WEB]);
+      let settle: (value: unknown) => void = () => {};
+      mockPostJson.mockReturnValue(new Promise((resolve) => (settle = resolve)));
+      const { rerender } = render(<QuickCreateForm />);
+      fillName("login crash");
+      fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+      fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+
+      mockUseQuickCreates.mockReturnValue({ quickCreates: [RUNNING] });
+      rerender(<QuickCreateForm />);
+      settle({ ok: false, error: "Error: disk full" });
+      await waitFor(() => expect(screen.getByText(/disk full/)).toBeInTheDocument());
+      mockUseQuickCreates.mockReturnValue({
+        quickCreates: [{ ...RUNNING, state: "failed", error: "Error: disk full" }],
+      });
+      rerender(<QuickCreateForm />);
+
+      expect(screen.getAllByText(/disk full/)).toHaveLength(1);
+    });
+
+    it("says nothing of a create that had already finished before the form opened", () => {
+      setRepositories([WEB]);
+      mockUseQuickCreates.mockReturnValue({
+        quickCreates: [{ ...RUNNING, state: "done", start: { kind: "chat", sessionId: "chat-1" } }],
+      });
+      render(<QuickCreateForm />);
+
+      expect(screen.queryByRole("link", { name: /open its chat/i })).toBeNull();
+      expect(screen.queryByText(/fetching latest/)).toBeNull();
     });
   });
 });
