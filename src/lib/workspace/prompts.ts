@@ -52,6 +52,7 @@ import {
   getDiscussionChatSystemPrompt,
   getStartPromptChatSystemPrompt,
   getSlackChatSystemPrompt,
+  getSlackWorkspaceChatSystemPrompt,
   getPrCommentValidatorSystemPrompt,
   getFindingGrounderSystemPrompt,
   getConflictResolverSystemPrompt,
@@ -97,6 +98,7 @@ const SYSTEM_PROMPTS: Record<string, () => string> = {
   "discussion-chat.md": getDiscussionChatSystemPrompt,
   "start-prompt-chat.md": getStartPromptChatSystemPrompt,
   "slack-chat.md": getSlackChatSystemPrompt,
+  "slack-workspace-chat.md": getSlackWorkspaceChatSystemPrompt,
 };
 
 // ---------------------------------------------------------------------------

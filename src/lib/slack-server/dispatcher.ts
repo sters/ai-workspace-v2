@@ -1,4 +1,4 @@
-import type { Command } from "./commands";
+import type { InitCommand } from "./commands";
 
 /**
  * Operation summary returned by the operations API. We only consume `id` and
@@ -23,9 +23,10 @@ export interface DispatchedOperation {
  */
 export async function dispatch(
   baseUrl: string,
-  cmd: Command,
+  cmd: InitCommand,
+  workspace?: string,
 ): Promise<DispatchedOperation> {
-  const { path, body } = buildRequest(cmd);
+  const { path, body } = buildRequest(cmd, workspace);
   const url = `${baseUrl}${path}`;
   const res = await fetch(url, {
     method: "POST",
@@ -47,8 +48,30 @@ interface ApiRequest {
 /**
  * `init --only` → /api/operations/init (single init operation, no chain).
  * `init`        → /api/operations/autonomous with startWith=init (autonomous loop).
+ *
+ * In a thread bound to `workspace` the request is more work on that workspace,
+ * so it is planned into its TODOs rather than given a workspace of its own:
+ * `init --only` → /api/operations/update-todo, `init` → autonomous from
+ * update-todo.
  */
-export function buildRequest(cmd: Command): ApiRequest {
+export function buildRequest(cmd: InitCommand, workspace?: string): ApiRequest {
+  if (workspace) {
+    if (cmd.only) {
+      return {
+        path: "/api/operations/update-todo",
+        body: { workspace, instruction: cmd.description, interactionLevel: "low" },
+      };
+    }
+    return {
+      path: "/api/operations/autonomous",
+      body: {
+        startWith: "update-todo",
+        workspace,
+        instruction: cmd.description,
+        interactionLevel: "low",
+      },
+    };
+  }
   if (cmd.only) {
     return {
       path: "/api/operations/init",

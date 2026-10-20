@@ -2,12 +2,16 @@ import { App, LogLevel } from "@slack/bolt";
 import type { WebClient } from "@slack/web-api";
 import type { AppMentionEvent } from "@slack/types";
 import { addPendingNotification } from "@/lib/db/slack-notifications";
+import { deleteSession } from "@/lib/db/slack-sessions";
+import { bindThreadWorkspace } from "@/lib/db/slack-thread-workspaces";
+import { resolveBoundWorkspace } from "./bound-workspace";
 import { parseCommand, USAGE, type Command } from "./commands";
-import { converse, hasThreadSession } from "./conversation";
+import { converse, hasThreadSession, type BoundWorkspace } from "./conversation";
 import { dispatch } from "./dispatcher";
 import { startNotifier, type Notifier } from "./notifier";
 import { fetchThreadTranscript } from "./thread-fetch";
 import { mergeWithThreadLink } from "./thread-link";
+import { createSlackWorkspace } from "./workspace-create";
 
 export interface SlackServerOptions {
   botToken: string;
@@ -39,6 +43,10 @@ export interface RunningSlackServer {
  * After dispatching `init` (autonomous mode), a pending-notification row is
  * inserted into SQLite so the notifier can post the PR list once the run
  * completes. `init --only` skips this since no PRs are expected.
+ *
+ * `ws` creates a workspace and binds the thread to it. In a bound thread the
+ * conversation runs inside the workspace, and `init` works on it instead of
+ * creating another one.
  */
 export async function startSlackServer(opts: SlackServerOptions): Promise<RunningSlackServer> {
   const app = new App({
@@ -57,12 +65,13 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
       return;
     }
 
+    const threadTs = mention.thread_ts ?? mention.ts;
     const parsed = parseCommand(mention.text ?? "");
     if (!parsed.ok) {
       if (parsed.kind === "chat") {
-        await handleConversation(client, mention, parsed.message, user);
+        await handleConversation(client, mention, parsed.message, user, await resolveBoundWorkspace(threadTs));
       } else {
-        await say({ text: parsed.reply, thread_ts: mention.thread_ts ?? mention.ts });
+        await say({ text: parsed.reply, thread_ts: threadTs });
       }
       return;
     }
@@ -71,14 +80,20 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
 
     if (command.description.trim() === "") {
       await say({
-        text: "init requires a description (or post the mention inside a thread so a link can be attached).\n\n" + USAGE,
-        thread_ts: mention.thread_ts ?? mention.ts,
+        text: `${command.op} requires a description (or post the mention inside a thread so a link can be attached).\n\n` + USAGE,
+        thread_ts: threadTs,
       });
       return;
     }
 
+    if (command.op === "ws") {
+      await handleWorkspaceCreate(client, mention, command.description, user, opts.apiBaseUrl);
+      return;
+    }
+
+    const bound = await resolveBoundWorkspace(threadTs);
     try {
-      const op = await dispatch(opts.apiBaseUrl, command);
+      const op = await dispatch(opts.apiBaseUrl, command, bound?.name);
       // Track the operation so the notifier can post PR URLs back when it finishes.
       // `--only` runs init alone (no PRs expected), so skip tracking.
       if (!command.only) {
@@ -86,7 +101,7 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
           addPendingNotification({
             operationId: op.id,
             channel: mention.channel,
-            threadTs: mention.thread_ts ?? mention.ts,
+            threadTs: threadTs,
           });
         } catch (err) {
           console.warn(
@@ -96,15 +111,15 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
         }
       }
       await say({
-        text: "OK! I'll start your request!",
-        thread_ts: mention.thread_ts ?? mention.ts,
+        text: bound ? `OK! I'll start on it in \`${bound.name}\`!` : "OK! I'll start your request!",
+        thread_ts: threadTs,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[slack-server] dispatch failed:", message);
       await say({
         text: `Sorry, failed to start: ${message}`,
-        thread_ts: mention.thread_ts ?? mention.ts,
+        thread_ts: threadTs,
       });
     }
   });
@@ -140,6 +155,7 @@ async function handleConversation(
   mention: AppMentionEvent,
   message: string,
   userId: string,
+  workspace?: BoundWorkspace,
 ): Promise<void> {
   const threadTs = mention.thread_ts ?? mention.ts;
 
@@ -199,6 +215,7 @@ async function handleConversation(
       userId,
       threadContext: threadContext || undefined,
       onProgress,
+      workspace,
     });
   } catch (err) {
     reply = `Sorry, something went wrong: ${err instanceof Error ? err.message : String(err)}`;
@@ -218,6 +235,58 @@ async function handleConversation(
   }
 
   await client.chat.postMessage({ channel: mention.channel, thread_ts: threadTs, text: reply });
+}
+
+/**
+ * Handle `ws`: create a workspace for the request, bind the thread to it, then
+ * hand the request to the thread's first conversation turn inside it.
+ *
+ * Any session the thread already had is dropped on binding: it ran at the
+ * ai-workspace root under the read-only prompt, and resuming it from the
+ * workspace would carry neither the workspace context nor its write policy.
+ */
+async function handleWorkspaceCreate(
+  client: WebClient,
+  mention: AppMentionEvent,
+  description: string,
+  userId: string,
+  apiBaseUrl: string,
+): Promise<void> {
+  const threadTs = mention.thread_ts ?? mention.ts;
+  const post = (text: string) => client.chat.postMessage({ channel: mention.channel, thread_ts: threadTs, text });
+
+  await post("🛠 Creating a workspace…");
+  const created = await createSlackWorkspace(apiBaseUrl, description);
+  if (!created.ok) {
+    await post(
+      created.reason === "no-repositories"
+        ? "I couldn't tell which repository this is about. Mention `ws` again with the repository named (e.g. `github.com/org/repo`)."
+        : created.reason === "plan-failed"
+          ? "Sorry, I couldn't work out the workspace to create. Please try again."
+          : `Sorry, failed to create the workspace: ${created.error}`,
+    );
+    return;
+  }
+
+  bindThreadWorkspace(threadTs, created.workspace);
+  deleteSession(threadTs);
+
+  const lines = [
+    `Created \`${created.workspace}\`` +
+      (created.repositories.length > 0 ? ` with ${created.repositories.map((r) => `\`${r}\``).join(", ")}` : "") +
+      ". This thread now works in it; `init <what to do>` here plans and runs work on it through to a PR.",
+  ];
+  for (const p of created.problems) lines.push(`⚠️ \`${p.repository}\`: ${p.error}`);
+  await post(lines.join("\n"));
+
+  const bound = await resolveBoundWorkspace(threadTs);
+  await handleConversation(
+    client,
+    mention,
+    description,
+    userId,
+    bound ? { ...bound, newWorkspace: true } : { path: created.workspacePath, newWorkspace: true },
+  );
 }
 
 /** Safety cap on the summary length (it's already a one-liner from the model). */

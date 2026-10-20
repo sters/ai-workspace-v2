@@ -63,6 +63,28 @@ describe("POST /api/workspaces — what starts after the create", () => {
     await expect(response.json()).resolves.toMatchObject({ start: { kind: "chat", sessionId: "chat-1" } });
   });
 
+  it("starts nothing when the caller runs what follows itself", async () => {
+    mockCreateQuickWorkspace.mockResolvedValueOnce({
+      workspace: "review-pr-42",
+      workspacePath: "/ws/review-pr-42",
+      repositories: [],
+      pullRequests: [PR],
+      problems: [],
+      log: [],
+    });
+    const response = await post({
+      name: "n",
+      taskType: "review",
+      repositories: [PR.url],
+      note: "look at it",
+      followUp: false,
+    });
+
+    expect(mockStartTaskChat).not.toHaveBeenCalled();
+    expect(mockStartUserReview).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({ start: { kind: "none" } });
+  });
+
   it("starts no session without a note, which has nothing to hand it", async () => {
     const response = await post({ name: "n", repositories: ["github.com/acme/web"] });
 

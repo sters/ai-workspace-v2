@@ -36,6 +36,12 @@ export const quickCreateWorkspaceSchema = z
       .min(1, "select at least one repository")
       .transform((repos) => [...new Set(repos)]),
     note: z.string().optional(),
+    /**
+     * Whether the server starts what follows the create (a task chat on the
+     * note, or a review of a PR). Off for a caller that runs its own session
+     * on the workspace, such as the Slack bot.
+     */
+    followUp: z.boolean().default(true),
   })
   .refine(
     (input) =>

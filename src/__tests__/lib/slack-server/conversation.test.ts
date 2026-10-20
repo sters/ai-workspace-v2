@@ -5,6 +5,7 @@ const runClaudeMock = vi.fn();
 const getConfigMock = vi.fn();
 const ensureMemoryMock = vi.fn();
 const summarizeMock = vi.fn();
+const ensurePromptMock = vi.fn((agent: string) => `/ws/prompts/${agent}.md`);
 
 vi.mock("@/lib/claude", () => ({
   runClaude: (...args: unknown[]) => runClaudeMock(...args),
@@ -14,7 +15,7 @@ vi.mock("@/lib/config", () => ({
   getResolvedWorkspaceRoot: () => "/ws",
 }));
 vi.mock("@/lib/workspace/prompts", () => ({
-  ensureGlobalSystemPrompt: () => "/ws/prompts/slack-chat.md",
+  ensureGlobalSystemPrompt: (agent: string) => ensurePromptMock(agent),
 }));
 vi.mock("@/lib/slack-server/memory-db", () => ({
   ensureSlackMemoryDb: (...args: unknown[]) => ensureMemoryMock(...args),
@@ -295,5 +296,42 @@ describe("converse", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  describe("in a thread bound to a workspace", () => {
+    const workspace = { path: "/ws/workspace/feature-login-20261020" };
+    const callOpts = (i: number) =>
+      runClaudeMock.mock.calls[i][2] as { cwd: string; appendSystemPromptFile: string };
+
+    it("runs inside the workspace under the workspace-bound system prompt", async () => {
+      runClaudeMock.mockReturnValue(fakeProc({ sessionId: "s", resultText: "done", events: [complete(0)] }));
+
+      await converse("t", "fix it", { userId: "U1", workspace });
+
+      expect(callOpts(0).cwd).toBe(workspace.path);
+      expect(callOpts(0).appendSystemPromptFile).toBe("/ws/prompts/slack-workspace-chat.md");
+      expect(lastPrompt()).toContain(`${workspace.path}/README.md`);
+      expect(lastPrompt()).not.toContain("Scratch directory");
+    });
+
+    it("tells a resumed turn it is read-only while an operation runs", async () => {
+      setSession("t", "sess-1", Date.now());
+      runClaudeMock.mockReturnValue(fakeProc({ sessionId: "sess-1", resultText: "ok", events: [complete(0)] }));
+
+      await converse("t", "rename it", { workspace: { ...workspace, runningOperation: "autonomous" } });
+
+      expect(callResume(0)).toBe("sess-1");
+      expect(lastPrompt()).toMatch(/autonomous\) is running/);
+      expect(lastPrompt()).toMatch(/rename it$/);
+    });
+
+    it("leaves an unbound thread at the ai-workspace root", async () => {
+      runClaudeMock.mockReturnValue(fakeProc({ sessionId: "s", resultText: "ok", events: [complete(0)] }));
+
+      await converse("t", "hi");
+
+      expect(callOpts(0).cwd).toBe("/ws");
+      expect(callOpts(0).appendSystemPromptFile).toBe("/ws/prompts/slack-chat.md");
+    });
   });
 });

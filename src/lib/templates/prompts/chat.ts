@@ -57,6 +57,17 @@ ${ON_DEMAND_READING}`;
 }
 
 /**
+ * The one README edit a task session makes before any code, shared with the
+ * Slack session a `ws` mention opens (`slack-workspace-chat.ts`).
+ */
+export const TASK_README_EDIT =
+  "One Edit call on that `README.md`, before any code: rewrite the `# Task:` heading into a concise title for the request — under 70 characters, since it is reused verbatim as the title of any pull request this task opens — and replace the `## Goal` comment with a few lines saying what must be true once the request is done. Write both in English even when the request is in another language; `## Initial Request` keeps the request verbatim and stays as it is.";
+
+/** Completes a sentence naming that edit ("Step 3 is …"): why it stops at the heading and Goal. */
+export const TASK_README_SCOPE =
+  "the whole of what you write there, and it is a rough sketch grounded in the request — not a contract. Leave `## Non-Goal`, `## Assumptions`, `## Requirements` and `## Acceptance Criteria` as the template's comments, and leave the `TODO-*.md` files alone: the README verifier and the autonomous gate treat those sections as authoritative, and the pipeline's own phases write them. If the task turns out to need a real contract, say so and point the user at the `update-readme` operation.";
+
+/**
  * System prompt for review-focused chat sessions.
  * Review chats DO have explicit discussion intent (the review summary is
  * the topic), so Claude may engage with that content — but still must not
@@ -132,10 +143,10 @@ The user's request is in the first message. Your first turn is:
 
 1. One Bash call: \`cd <workspace path from the user prompt>\` on its own — no other command, no \`&&\`/\`;\`.
 2. One Read call: the workspace \`README.md\`, at the path in the user prompt. It says which repositories have worktrees here and where they are.
-3. One Edit call on that \`README.md\`, before any code: rewrite the \`# Task:\` heading into a concise title for the request — under 70 characters, since it is reused verbatim as the title of any pull request this task opens — and replace the \`## Goal\` comment with a few lines saying what must be true once the request is done. Write both in English even when the request is in another language; \`## Initial Request\` keeps the request verbatim and stays as it is.
+3. ${TASK_README_EDIT}
 4. Then start on the request, without asking for permission to begin.
 
-Step 3 is the whole of what you write there, and it is a rough sketch grounded in the request — not a contract. Leave \`## Non-Goal\`, \`## Assumptions\`, \`## Requirements\` and \`## Acceptance Criteria\` as the template's comments, and leave the \`TODO-*.md\` files alone: the README verifier and the autonomous gate treat those sections as authoritative, and the pipeline's own phases write them. If the task turns out to need a real contract, say so and point the user at the \`update-readme\` operation.
+Step 3 is ${TASK_README_SCOPE}
 
 Work the request through: find the code involved, make the change in the worktrees the README declares, and verify it with the repository's own checks (its lint / test / build commands, as the repository defines them — a repository with a \`## Repository Constraints\` section in the README has them listed there). Report what you did when you are done.
 

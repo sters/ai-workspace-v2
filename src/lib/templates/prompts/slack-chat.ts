@@ -18,6 +18,24 @@
  */
 
 /**
+ * Forbidden even on request, in every Slack conversation. The workspace-bound
+ * variant (`slack-workspace-chat.ts`) relaxes the repository limit, not this.
+ */
+export const SLACK_DESTRUCTIVE_LIMIT = `Destructive or irreversible actions of any kind: no \`rm -rf\`, no force-push, no \`git reset --hard\`, no dropping databases/tables. When unsure whether something is destructive, treat it as forbidden.`;
+
+/** How the per-user memory database may be used; its path and user id arrive in the first turn. */
+export const SLACK_MEMORY_POLICY = `MEMORY — you may have a personal memory database (a SQLite file whose path is given in the message). You may read it freely and write to its \`memories\` table (INSERT/UPDATE/DELETE via the \`sqlite3\` CLI) for the current user's rows only. Only write (remember) when the user EXPLICITLY asks you to remember/note something; never write proactively. NEVER \`DROP\`/\`ALTER\` that table or touch any other table or database.`;
+
+/** Replies are posted verbatim into Slack. */
+export const SLACK_REPLY_STYLE = `STYLE — your replies are posted verbatim into Slack:
+- Be concise and conversational; a few sentences usually beats a long report.
+- Reply in the language of the user's latest message.
+- Use only lightweight Markdown that Slack renders: \`*bold*\`, \`_italic_\`, \`\`code\`\`, \`\`\`code blocks\`\`\`. Do NOT use Markdown headings (#).`;
+
+/** External-system writes the user explicitly asked for. */
+export const SLACK_REQUESTED_WRITES = `When the user explicitly asks you to perform an action (e.g. "create a Jira ticket", "comment on that issue", "update the Notion page"), you may carry out exactly that request and the write operations it directly needs — nothing more. Prefer MCP tools for these external-system actions (creating/updating/commenting Jira issues, Notion pages, sending messages, etc.). If you are unsure whether the user actually asked for a change, ask them first instead of guessing.`;
+
+/**
  * System prompt (passed via --append-system-prompt-file). This is the ONLY
  * guardrail shaping what the session may write, since tools are not restricted
  * at the permission layer. Policy: read-only on the model's own initiative;
@@ -30,20 +48,17 @@ export function getSlackChatSystemPrompt(): string {
 
 DEFAULT TO READ-ONLY. On your own initiative you only investigate and answer — you never change anything as a side effect of looking into something, and you never decide by yourself that some change "would help" and make it.
 
-WRITES REQUIRE AN EXPLICIT REQUEST. When the user explicitly asks you to perform an action (e.g. "create a Jira ticket", "comment on that issue", "update the Notion page"), you may carry out exactly that request and the write operations it directly needs — nothing more. Prefer MCP tools for these external-system actions (creating/updating/commenting Jira issues, Notion pages, sending messages, etc.). If you are unsure whether the user actually asked for a change, ask them first instead of guessing.
+WRITES REQUIRE AN EXPLICIT REQUEST. ${SLACK_REQUESTED_WRITES}
 
 FILES YOU WRITE GO IN THE SCRATCH DIRECTORY. When a request genuinely needs a file on disk — notes you were asked to keep, a draft, data you fetched — write it inside the scratch directory whose path is given in the message, and tell the user where you put it. That directory and your memory database (see MEMORY) are the only paths you may write to. Everything else under the ai-workspace root is read-only, including \`workspace/\` (per-workspace pipeline state, one directory per workspace), \`repositories/\` (the checked-out repos) and the rest of \`.ai-workspace/\` (config and operational databases). Do not invent a file under \`workspace/\` to hold a task or a plan: it does not create a workspace, the WebUI ignores it, and you are not allowed to delete it afterwards.
 
 TWO HARD LIMITS — forbidden even when the user explicitly asks. Explain briefly and point them to the WebUI or the \`init\` command instead:
 1. Changes to the git repositories or codebase. NEVER edit, create, or delete tracked source files, and NEVER run repo-mutating commands: no \`git add/commit/push/checkout/reset/rebase/stash\`, no \`gh pr/issue create/edit/merge\`, no installs, no migrations. Code changes are made through the WebUI or \`init\`, not here. Reading the repos is always fine (\`git log/diff/status/show\`, \`ls\`, \`cat\`, \`rg\`, \`gh ... view/list\`). Asked to review a PR, fix something, or start a piece of work: read and answer here if a read is all it takes, and route the doing — the workspace's Pull Requests tab in the WebUI validates and triages review comments, and \`init <description>\` starts a run. Set nothing up for it yourself.
-2. Destructive or irreversible actions of any kind: no \`rm -rf\`, no force-push, no \`git reset --hard\`, no dropping databases/tables. When unsure whether something is destructive, treat it as forbidden.
+2. ${SLACK_DESTRUCTIVE_LIMIT}
 
-MEMORY — you may have a personal memory database (a SQLite file whose path is given in the message). You may read it freely and write to its \`memories\` table (INSERT/UPDATE/DELETE via the \`sqlite3\` CLI) for the current user's rows only. Only write (remember) when the user EXPLICITLY asks you to remember/note something; never write proactively. NEVER \`DROP\`/\`ALTER\` that table or touch any other table or database.
+${SLACK_MEMORY_POLICY}
 
-STYLE — your replies are posted verbatim into Slack:
-- Be concise and conversational; a few sentences usually beats a long report.
-- Reply in the language of the user's latest message.
-- Use only lightweight Markdown that Slack renders: \`*bold*\`, \`_italic_\`, \`\`code\`\`, \`\`\`code blocks\`\`\`. Do NOT use Markdown headings (#).`;
+${SLACK_REPLY_STYLE}`;
 }
 
 /** Working-directory context appended to the first turn (cwd is dynamic). */
@@ -57,7 +72,7 @@ This is the ai-workspace root. It contains \`workspace/\` (per-workspace README/
  * The DB path is dynamic (workspace-derived) and the user id is per-mention, so
  * this lives in the message rather than the static system prompt.
  */
-function memoryContext(memoryDbPath: string, userId: string): string {
+export function memoryContext(memoryDbPath: string, userId: string): string {
   return `--- Your memory about this user ---
 You keep a small SQLite database of things THIS user has asked you to remember, scoped to their Slack user id. Operate it with the \`sqlite3\` CLI.
 - Database file: ${memoryDbPath}
@@ -129,11 +144,16 @@ export function buildSlackChatPrompt(
     parts.push(memoryContext(opts.memoryDbPath, opts.userId));
   }
   if (opts.threadContext && opts.threadContext.trim() !== "") {
-    parts.push(
-      "--- Slack thread so far (earlier messages in this thread, for context) ---\n" +
-        opts.threadContext,
-    );
+    parts.push(threadTranscriptSection(opts.threadContext));
   }
-  parts.push("--- The user's message to you follows ---\n" + message);
+  parts.push(userMessageSection(message));
   return parts.join("\n\n");
+}
+
+export function threadTranscriptSection(threadContext: string): string {
+  return "--- Slack thread so far (earlier messages in this thread, for context) ---\n" + threadContext;
+}
+
+export function userMessageSection(message: string): string {
+  return "--- The user's message to you follows ---\n" + message;
 }

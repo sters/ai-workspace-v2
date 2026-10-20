@@ -20,6 +20,10 @@
  * path under `workspace/`, which the WebUI then ignores and the prompt's own
  * no-destructive-actions rule prevents it from cleaning up.
  *
+ * A thread bound to a workspace (`ws`) runs its turns inside that workspace
+ * instead, under `slack-workspace-chat`: the worktrees are writable there,
+ * committing and publishing still are not.
+ *
  * Per-user memory: when `slack.memoryEnabled` is set and a Slack user id is
  * known, the conversation is pointed at a dedicated SQLite file
  * (`@/lib/slack-server/memory-db`) it may read/write via `sqlite3` to recall
@@ -30,7 +34,7 @@
 import { runClaude } from "@/lib/claude";
 import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
 import { deleteSession, getSession, setSession } from "@/lib/db/slack-sessions";
-import { buildSlackChatPrompt } from "@/lib/templates/prompts";
+import { buildSlackChatPrompt, buildSlackWorkspaceChatPrompt } from "@/lib/templates/prompts";
 import { ensureGlobalSystemPrompt } from "@/lib/workspace/prompts";
 import { getSlackScratchDir } from "./chat-scratch";
 import { ensureSlackMemoryDb } from "./memory-db";
@@ -60,6 +64,21 @@ export interface ConverseOptions {
    * in that case. Errors thrown by the callback are ignored.
    */
   onProgress?: (progress: string) => void | Promise<void>;
+  /**
+   * The workspace the thread is bound to (by a `ws` mention). The turn then
+   * runs inside it, under the workspace-bound system prompt, which may change
+   * its worktrees.
+   */
+  workspace?: BoundWorkspace;
+}
+
+export interface BoundWorkspace {
+  /** Absolute path to the workspace directory, the turn's cwd. */
+  path: string;
+  /** Created for this very message, so the first turn writes its README's Task heading and Goal. */
+  newWorkspace?: boolean;
+  /** Type of an operation running on the workspace now; the turn is then read-only. */
+  runningOperation?: string;
 }
 
 interface TurnResult {
@@ -106,12 +125,28 @@ export async function converse(
 
   const runAttempt = (resume: string | undefined): Promise<TurnResult> => {
     const isFirstTurn = resume === undefined;
+    const bound = opts.workspace;
+    if (bound) {
+      const prompt = buildSlackWorkspaceChatPrompt(bound.path, message, isFirstTurn, {
+        newWorkspace: bound.newWorkspace,
+        runningOperation: bound.runningOperation,
+        threadContext: opts.threadContext,
+        ...memoryOpts(),
+      });
+      return runTurn(threadKey, prompt, resume, config, opts.onProgress, {
+        cwd: bound.path,
+        agent: "slack-workspace-chat",
+      });
+    }
     const prompt = buildSlackChatPrompt(workspaceRoot, message, isFirstTurn, {
       scratchDir: getSlackScratchDir(workspaceRoot, threadKey),
       threadContext: opts.threadContext,
       ...memoryOpts(),
     });
-    return runTurn(threadKey, prompt, resume, config, opts.onProgress);
+    return runTurn(threadKey, prompt, resume, config, opts.onProgress, {
+      cwd: workspaceRoot,
+      agent: "slack-chat",
+    });
   };
 
   let result = await runAttempt(resumeSessionId);
@@ -132,15 +167,15 @@ async function runTurn(
   prompt: string,
   resumeSessionId: string | undefined,
   config: ReturnType<typeof getConfig>,
-  onProgress?: (progress: string) => void | Promise<void>,
+  onProgress: ((progress: string) => void | Promise<void>) | undefined,
+  where: { cwd: string; agent: "slack-chat" | "slack-workspace-chat" },
 ): Promise<TurnResult> {
-  const proc = runClaude("slack-chat", prompt, {
-    cwd: getResolvedWorkspaceRoot(),
+  const proc = runClaude(where.agent, prompt, {
+    cwd: where.cwd,
     // No allowedTools/addDirs: inherit the host's ambient Claude permissions
-    // (same as every other operation). The write policy (read-only by default,
-    // explicitly-requested writes only, no repo/destructive changes) is
-    // enforced by the system prompt, not at the tool layer.
-    appendSystemPromptFile: await ensureGlobalSystemPrompt("slack-chat"),
+    // (same as every other operation). The write policy is enforced by the
+    // agent's system prompt, not at the tool layer.
+    appendSystemPromptFile: await ensureGlobalSystemPrompt(where.agent),
     resumeSessionId,
     skipAskUserQuestion: true,
     model: config.slack.chatModel ?? undefined,

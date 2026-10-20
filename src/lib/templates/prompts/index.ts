@@ -35,6 +35,14 @@ export { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildR
 export { getCreateTodoPlannerSystemPrompt, buildCreateTodoFromReviewPrompt } from "./create-todo-planner";
 export { getSearchSystemPrompt, buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "./search";
 export { buildSlackChatPrompt, getSlackChatSystemPrompt } from "./slack-chat";
+export {
+  buildSlackWorkspaceChatPrompt,
+  buildSlackWorkspacePlanPrompt,
+  getSlackWorkspaceChatSystemPrompt,
+  parseSlackWorkspacePlan,
+  SLACK_WORKSPACE_PLAN_SCHEMA,
+  type SlackWorkspacePlan,
+} from "./slack-workspace-chat";
 export { getRepoConstraintsSystemPrompt, buildRepoConstraintsPrompt } from "./repo-constraints";
 export { getRepoGuidanceSystemPrompt, buildRepoGuidancePrompt } from "./repo-guidance";
 export { getAutonomousGateSystemPrompt, buildAutonomousGatePrompt, AUTONOMOUS_GATE_SCHEMA } from "./autonomous-gate";

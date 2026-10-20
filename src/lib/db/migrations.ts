@@ -172,6 +172,18 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 10,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE slack_thread_workspaces (
+          thread_key TEXT PRIMARY KEY,
+          workspace  TEXT NOT NULL,
+          created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+      `);
+    },
+  },
 ];
 
 /**

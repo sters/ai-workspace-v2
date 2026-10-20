@@ -116,4 +116,18 @@ describe("parseCommand", () => {
       }
     });
   });
+  describe("ws (workspace bound to the thread)", () => {
+    it("captures the description verbatim", () => {
+      const r = parseCommand("<@U0BOT123> ws fix the --verbose flag in the CLI");
+      expect(r).toEqual({ ok: true, command: { op: "ws", description: "fix the --verbose flag in the CLI" } });
+    });
+
+    it("is a command even with no description, which the thread link may supply", () => {
+      expect(parseCommand("ws")).toEqual({ ok: true, command: { op: "ws", description: "" } });
+    });
+
+    it("leaves a sentence that merely starts with the letters to the conversation", () => {
+      expect(parseCommand("wsgi config looks off?")).toMatchObject({ ok: false, kind: "chat" });
+    });
+  });
 });

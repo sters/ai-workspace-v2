@@ -80,7 +80,9 @@ export async function POST(request: Request) {
       resolvePullRequest: resolvePrBranch,
       cachedConstraints: cachedRepoConstraints,
     });
-    const start = await startAfterCreate(result, parsed.data.taskType, parsed.data.note);
+    const start: QuickCreateStart = parsed.data.followUp
+      ? await startAfterCreate(result, parsed.data.taskType, parsed.data.note)
+      : { kind: "none" };
     return NextResponse.json({ ...result, start });
   } catch (err) {
     if (err instanceof QuickCreateRefusal) {
