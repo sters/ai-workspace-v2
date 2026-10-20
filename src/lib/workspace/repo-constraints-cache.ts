@@ -28,8 +28,8 @@ export interface RepoConstraintsCacheEntry {
   key: string;
 }
 
-/** Bump when the fingerprint rules change, so entries keyed by the old rules miss. */
-const FINGERPRINT_VERSION = "v1";
+/** Bump when the fingerprint rules or the recorded command format change, so older entries miss. */
+const FINGERPRINT_VERSION = "v2";
 
 /** Hashed whole: any change can change which command a repository documents. */
 const HASHED_PATHS = [
@@ -165,7 +165,9 @@ export async function readRepoConstraintsCache(entry: RepoConstraintsCacheEntry)
 }
 
 function formatConstraintLines(constraints: RepoConstraint[]): string {
-  return constraints.map((c) => `- ${c.label}: \`${c.command}\``).join("\n");
+  return constraints
+    .map((c) => `- ${c.label}: \`${c.command}\`${c.fullCommand ? ` (full: \`${c.fullCommand}\`)` : ""}`)
+    .join("\n");
 }
 
 export async function writeRepoConstraintsCache(

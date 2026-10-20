@@ -4,6 +4,7 @@
  */
 
 import type { ExecutorInput, BatchedExecutorInput } from "@/types/prompts";
+import { BASE_PLACEHOLDER, CHANGED_FILES_PLACEHOLDER } from "@/lib/workspace/constraint-scope";
 import {
   NO_TICKET_IDS_IN_CODE,
   NO_WORKSPACE_REFERENCES,
@@ -133,10 +134,11 @@ ${NO_WORKSPACE_REFERENCES}
 
 **CRITICAL: Before marking ANY TODO item as completed (\`[x]\`), you MUST verify that all repository constraints listed in the "Repository Constraints" section of the Workspace README above are satisfied.**
 
-1. Run **every** constraint command listed for this repository (Lint, Test, Build, etc.) once per **batch of related changes** rather than once per item: finish a coherent group of items, run the full constraint set, then mark that group. Re-run for a single item only when it touched something the previous run did not cover.
-2. If any constraint command fails, fix the issue before proceeding
-3. Do NOT mark items as \`[x]\` until all constraint commands have passed against a state that includes that item's changes
-4. If a constraint cannot be satisfied and you cannot fix it, mark the item as \`[!]\` (blocked) with a note explaining which constraint failed and why
+1. Run **every** constraint command listed for this repository (Lint, Test, Build, etc.) once per **batch of related changes** rather than once per item: finish a coherent group of items, run the whole declared set, then mark that group. Re-run for a single item only when it touched something the previous run did not cover.
+2. A command containing \`${BASE_PLACEHOLDER}\` or \`${CHANGED_FILES_PLACEHOLDER}\` is scoped to the branch's changes. Fill them in before running it: \`${BASE_PLACEHOLDER}\` is \`git merge-base HEAD origin/<base branch>\`, and \`${CHANGED_FILES_PLACEHOLDER}\` is the files added or modified against it, committed or not, untracked included, deleted ones left out. If no file is in scope, the command has nothing to check. Run the \`(full: ...)\` form only when the merge-base cannot be resolved.
+3. If any constraint command fails, fix the issue before proceeding
+4. Do NOT mark items as \`[x]\` until all constraint commands have passed against a state that includes that item's changes
+5. If a constraint cannot be satisfied and you cannot fix it, mark the item as \`[!]\` (blocked) with a note explaining which constraint failed and why
 
 ### Error Handling
 

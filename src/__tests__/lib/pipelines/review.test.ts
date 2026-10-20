@@ -64,6 +64,11 @@ vi.mock("@/lib/workspace/constraint-runner", () => ({
   buildNoConstraintsReport: vi.fn(() => "NOT-DECLARED-REPORT"),
 }));
 
+vi.mock("@/lib/workspace/constraint-scope", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/workspace/constraint-scope")>()),
+  resolveConstraintScope: vi.fn(async () => null),
+}));
+
 vi.mock("@/lib/env", () => ({
   getCleanEnv: vi.fn(() => ({})),
 }));
@@ -97,8 +102,10 @@ import { readRepoGuidance } from "@/lib/workspace/repo-guidance";
 import { parseConstraints } from "@/lib/parsers/readme";
 import {
   execConstraintCommand,
+  buildConstraintReport,
   buildNoConstraintsReport,
 } from "@/lib/workspace/constraint-runner";
+import { resolveConstraintScope } from "@/lib/workspace/constraint-scope";
 import type { PhaseFunctionContext, PipelinePhaseFunction, PipelinePhaseGroup } from "@/types/pipeline";
 
 import { getRepoChanges } from "@/lib/workspace";
@@ -118,6 +125,8 @@ const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
 const mockParseConstraints = vi.mocked(parseConstraints);
 const mockExecConstraintCommand = vi.mocked(execConstraintCommand);
 const mockBuildNoConstraintsReport = vi.mocked(buildNoConstraintsReport);
+const mockBuildConstraintReport = vi.mocked(buildConstraintReport);
+const mockResolveConstraintScope = vi.mocked(resolveConstraintScope);
 const mockGetRepoChanges = vi.mocked(getRepoChanges);
 const mockBuildCodeReviewerPrompt = vi.mocked(buildCodeReviewerPrompt);
 const mockBuildCrossRepoPrompt = vi.mocked(buildCrossRepositoryReviewerPrompt);
@@ -407,6 +416,93 @@ describe("buildReviewPipeline — constraint timeout aborts remaining commands i
         (m) => m.includes("repo-a") && /skip/i.test(m) && /timeout|timed out/i.test(m),
       ),
     ).toBe(true);
+  });
+});
+
+describe("buildReviewPipeline — scoped constraint commands", () => {
+  const repo = {
+    repoName: "mono",
+    repoPath: "owner/mono",
+    worktreePath: "/repos/mono/worktrees/test-ws",
+  } as ReturnType<typeof listWorkspaceRepos>[number];
+  const lint = { label: "Lint", command: "eslint {changed_files}", fullCommand: "pnpm lint" };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFileMap.clear();
+    mockExecConstraintCommand.mockReset();
+    mockListWorkspaceRepos.mockReturnValue([repo]);
+    mockParseConstraints.mockReturnValue([{ repoName: "mono", constraints: [lint] }]);
+  });
+
+  async function runVerify() {
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    const ctx = createMockCtx();
+    await (phases[0] as PipelinePhaseFunction).fn(ctx);
+    const results = mockBuildConstraintReport.mock.calls[0][1];
+    return { ctx, results };
+  }
+
+  it("runs the command over the changed files only", async () => {
+    mockResolveConstraintScope.mockResolvedValue({
+      base: "b0",
+      changedFiles: ["pkg/a.ts"],
+      baseFiles: ["pkg/a.ts"],
+    });
+    mockExecConstraintCommand.mockResolvedValue({
+      exitCode: 0, stdout: "", stderr: "", timedOut: false, durationMs: 1,
+    });
+
+    const { results } = await runVerify();
+    expect(mockResolveConstraintScope).toHaveBeenCalledWith(repo.worktreePath, "main");
+    expect(mockExecConstraintCommand.mock.calls.map((c) => c[0])).toEqual(["eslint 'pkg/a.ts'"]);
+    expect(results[0]).toMatchObject({ status: "PASS", command: lint.command, ran: "eslint 'pkg/a.ts'" });
+  });
+
+  it("runs the full command when the merge-base cannot be resolved", async () => {
+    mockResolveConstraintScope.mockResolvedValue(null);
+    mockExecConstraintCommand.mockResolvedValue({
+      exitCode: 0, stdout: "", stderr: "", timedOut: false, durationMs: 1,
+    });
+
+    await runVerify();
+    expect(mockExecConstraintCommand.mock.calls.map((c) => c[0])).toEqual(["pnpm lint"]);
+  });
+
+  it("reports SKIPPED without running anything when no file is in scope", async () => {
+    mockResolveConstraintScope.mockResolvedValue({ base: "b0", changedFiles: [], baseFiles: [] });
+
+    const { ctx, results } = await runVerify();
+    expect(mockExecConstraintCommand).not.toHaveBeenCalled();
+    expect(results[0]).toMatchObject({ status: "SKIPPED", passed: false });
+    expect(ctx.emitResult).not.toHaveBeenCalledWith("Constraint verification completed with failures");
+  });
+
+  it("counts a failure over files that are all new as the branch's own, without a merge-base run", async () => {
+    mockResolveConstraintScope.mockResolvedValue({
+      base: "b0",
+      changedFiles: ["pkg/new.ts"],
+      baseFiles: [],
+    });
+    mockExecConstraintCommand.mockResolvedValue({
+      exitCode: 1, stdout: "", stderr: "x", timedOut: false, durationMs: 1,
+    });
+
+    const { results } = await runVerify();
+    expect(mockExecConstraintCommand).toHaveBeenCalledTimes(1);
+    expect(results[0].status).toBe("FAIL");
+  });
+
+  it("does not resolve a scope for a repository whose commands are all unscoped", async () => {
+    mockParseConstraints.mockReturnValue([
+      { repoName: "mono", constraints: [{ label: "Lint", command: "make lint" }] },
+    ]);
+    mockExecConstraintCommand.mockResolvedValue({
+      exitCode: 0, stdout: "", stderr: "", timedOut: false, durationMs: 1,
+    });
+
+    await runVerify();
+    expect(mockResolveConstraintScope).not.toHaveBeenCalled();
   });
 });
 

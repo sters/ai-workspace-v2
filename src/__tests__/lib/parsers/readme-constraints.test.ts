@@ -131,4 +131,18 @@ describe("parseConstraints", () => {
     expect(result).toHaveLength(1);
     expect(result[0].repoName).toBe("good-repo");
   });
+
+  it("reads a scoped command's full fallback from the same line", () => {
+    const content = `## Repository Constraints
+
+### mono
+
+- Lint: \`eslint {changed_files}\` (full: \`pnpm lint\`)
+- Test: \`pnpm test\`
+`;
+    expect(parseConstraints(content)[0].constraints).toEqual([
+      { label: "Lint", command: "eslint {changed_files}", fullCommand: "pnpm lint" },
+      { label: "Test", command: "pnpm test" },
+    ]);
+  });
 });

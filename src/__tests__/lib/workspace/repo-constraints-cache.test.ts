@@ -206,6 +206,12 @@ describe("appendRepoConstraints", () => {
     expect(twice).toMatch(/## Repository Constraints[\s\S]*### api[\s\S]*\n## Related Resources/);
   });
 
+  it("keeps a scoped command's full fallback when copying it into a README", async () => {
+    const scoped = [{ label: "Lint", command: "eslint {changed_files}", fullCommand: "pnpm lint" }];
+    const out = appendRepoConstraints("# Task: x\n", "web", scoped);
+    expect(parseConstraints(out)).toEqual([{ repoName: "web", constraints: scoped }]);
+  });
+
   it("creates the section when the README has none", async () => {
     const out = appendRepoConstraints("# Task: x\n\n## Goal\n\ny\n", "web", LINT);
     expect(parseConstraints(out)).toEqual([{ repoName: "web", constraints: LINT }]);

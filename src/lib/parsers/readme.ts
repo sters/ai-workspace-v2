@@ -4,6 +4,8 @@ import type { AcceptanceCriterion, WorkspaceMeta } from "@/types/workspace";
 export interface RepoConstraint {
   label: string;
   command: string;
+  /** Run instead of a scoped `command` when its scope cannot be resolved (`constraint-scope.ts`). */
+  fullCommand?: string;
 }
 
 export interface RepoConstraints {
@@ -96,13 +98,20 @@ export function parseAcceptanceCriteria(content: string): AcceptanceCriterion[] 
   return results;
 }
 
-/** The `- <Label>: \`<command>\`` lines of one repository's constraint block. */
+/**
+ * The `- <Label>: \`<command>\`` lines of one repository's constraint block,
+ * each optionally followed by ` (full: \`<command>\`)`.
+ */
 export function parseConstraintLines(block: string): RepoConstraint[] {
-  const constraintPattern = /^\s*-\s+([\w][\w\s]*?):\s*`([^`]+)`/gm;
+  const constraintPattern = /^\s*-\s+([\w][\w\s]*?):\s*`([^`]+)`(?:\s*\(full:\s*`([^`]+)`\))?/gm;
   const constraints: RepoConstraint[] = [];
   let match;
   while ((match = constraintPattern.exec(block)) !== null) {
-    constraints.push({ label: match[1].trim(), command: match[2] });
+    constraints.push({
+      label: match[1].trim(),
+      command: match[2],
+      ...(match[3] ? { fullCommand: match[3] } : {}),
+    });
   }
   return constraints;
 }

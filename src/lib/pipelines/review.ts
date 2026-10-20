@@ -38,6 +38,11 @@ import {
   buildNoConstraintsReport,
 } from "@/lib/workspace/constraint-runner";
 import type { ConstraintExecResult } from "@/lib/workspace/constraint-runner";
+import {
+  expandConstraintCommand,
+  resolveConstraintScope,
+  usesScope,
+} from "@/lib/workspace/constraint-scope";
 import { getCleanEnv } from "@/lib/env";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
@@ -400,10 +405,30 @@ export async function buildReviewPipeline(
           }
 
           const results: ConstraintExecResult[] = [];
+          const scope = repoConstraints.constraints.some((c) => usesScope(c.command))
+            ? await resolveConstraintScope(repo.worktreePath, baseBranch)
+            : null;
 
           for (const constraint of repoConstraints.constraints) {
+            const head = expandConstraintCommand(constraint, scope, "head");
+            if (head.kind === "skip") {
+              results.push({
+                label: constraint.label,
+                command: constraint.command,
+                exitCode: null,
+                passed: false,
+                stdout: "",
+                stderr: head.reason,
+                timedOut: false,
+                durationMs: 0,
+                status: "SKIPPED",
+              });
+              ctx.emitStatus(`[${repo.repoName}] ${constraint.label}: SKIPPED (${head.reason})`);
+              continue;
+            }
+
             ctx.emitStatus(`[${repo.repoName}] Running: ${constraint.label} (\`${constraint.command}\`)`);
-            const result = await execConstraintCommand(constraint.command, {
+            const result = await execConstraintCommand(head.command, {
               cwd: repo.worktreePath,
             });
 
@@ -416,13 +441,12 @@ export async function buildReviewPipeline(
             } else if (result.exitCode === 0) {
               status = "PASS";
             } else {
-              // Check if the failure is pre-existing by running on the merge-base
-              status = await checkPreExisting(
-                constraint.command,
-                repo.worktreePath,
-                baseBranch,
-                env,
-              );
+              // A scoped command whose files all are new to the branch has
+              // nothing to run on the merge-base: the failure is the branch's.
+              const base = expandConstraintCommand(constraint, scope, "base");
+              status = base.kind === "skip"
+                ? "FAIL"
+                : await checkPreExisting(base.command, repo.worktreePath, baseBranch, env);
             }
 
             const passed = status === "PASS";
@@ -431,6 +455,7 @@ export async function buildReviewPipeline(
             results.push({
               label: constraint.label,
               command: constraint.command,
+              ...(head.command !== constraint.command ? { ran: head.command } : {}),
               exitCode: result.exitCode,
               passed,
               stdout: result.stdout,

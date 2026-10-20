@@ -8,6 +8,8 @@ import { getCleanEnv } from "@/lib/env";
 export interface ConstraintExecResult {
   label: string;
   command: string;
+  /** The command actually run, when scope expansion or a full fallback made it differ from `command`. */
+  ran?: string;
   exitCode: number | null;
   passed: boolean;
   stdout: string;
@@ -19,6 +21,7 @@ export interface ConstraintExecResult {
 
 const DEFAULT_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const DEFAULT_MAX_CHARS = 5000;
+const RAN_MAX_CHARS = 500;
 
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
@@ -101,6 +104,7 @@ export function buildConstraintReport(
     const displayStatus = r.timedOut ? "TIMEOUT" : r.status;
     md += `## ${r.label}: ${displayStatus}\n\n`;
     md += `- **Command**: \`${r.command}\`\n`;
+    if (r.ran && r.ran !== r.command) md += `- **Ran**: \`${r.ran.length > RAN_MAX_CHARS ? `${r.ran.slice(0, RAN_MAX_CHARS)}…` : r.ran}\`\n`;
     md += `- **Exit Code**: ${r.exitCode ?? "N/A (timed out)"}\n`;
     md += `- **Duration**: ${r.durationMs}ms\n`;
 
