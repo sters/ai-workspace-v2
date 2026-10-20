@@ -37,6 +37,7 @@ export function generateDefaultConfigContent(): string {
     "#   functionTimeoutMinutes: 3",
     "#   defaultInteractionLevel: mid   # low / mid / high",
     "#   batchSize: 15                  # TODO groups per batch in execute operations",
+    "#   fetchIntervalMinutes: 10       # reuse a clone fetched less than N minutes ago when setting up a worktree (0 = always fetch)",
     "#   model: null                    # null = CLI default (opus / sonnet / haiku)",
     "#   effort: null                   # null = per-step default (low / medium / high / xhigh / max)",
     // Same block the migrator maintains, so a generated file needs no migration.
@@ -202,7 +203,7 @@ const TYPE_OVERRIDE_HINT_LINES = [
   "#   #           verify-todo, deep-search, create-pr",
   "#   #   claude-haiku-5-5 / low  — reshaping text already handed over:",
   "#   #           prune-suggestions, collect-reviews, aggregate-suggestions",
-  "#   # Per-operation-type overrides (any setting above except the two concurrency caps):",
+  "#   # Per-operation-type overrides (any setting above except maxConcurrent, maxGroupConcurrency, fetchIntervalMinutes):",
   "#   # <operation-type>:              # init / execute / review / create-pr / update-todo / etc.",
   "#   #   claudeTimeoutMinutes: 20",
   "#   #   functionTimeoutMinutes: 3",

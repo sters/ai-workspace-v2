@@ -1,7 +1,9 @@
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
+const config = vi.hoisted(() => ({ operations: { fetchIntervalMinutes: 10 } }));
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/ws",
+  getConfig: () => config,
 }));
 vi.mock("@/lib/workspace/helpers", () => ({
   exec: vi.fn(() => ""),
@@ -11,6 +13,8 @@ vi.mock("@/lib/workspace/helpers", () => ({
 }));
 vi.mock("@/lib/fs", () => ({ pathExists: vi.fn() }));
 const files = vi.hoisted(() => new Map<string, string>());
+/** mtime (ms) of each path `stat` finds; anything else is ENOENT. */
+const mtimes = vi.hoisted(() => new Map<string, number>());
 vi.mock("node:fs/promises", () => {
   const fs = {
     mkdir: vi.fn(async () => {}),
@@ -21,6 +25,11 @@ vi.mock("node:fs/promises", () => {
       return text;
     }),
     writeFile: vi.fn(async (p: string, text: string) => { files.set(p, text); }),
+    stat: vi.fn(async (p: string) => {
+      const mtimeMs = mtimes.get(p);
+      if (mtimeMs === undefined) throw Object.assign(new Error(`ENOENT: ${p}`), { code: "ENOENT" });
+      return { mtimeMs };
+    }),
   };
   return { ...fs, default: fs };
 });
@@ -184,6 +193,52 @@ describe("setupRepository", () => {
     });
 
     await expect(setup()).rejects.toThrow(/repository not found/);
+  });
+});
+
+describe("skipping a fetch the clone had a moment ago", () => {
+  const FETCH_HEAD = `${REPO_ABS}/.git/FETCH_HEAD`;
+  const MINUTE = 60 * 1000;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mtimes.clear();
+    config.operations.fetchIntervalMinutes = 10;
+    mockExec.mockImplementation(defaultExec);
+    mockExists.mockImplementation(async (p) => {
+      const s = String(p);
+      if (s.endsWith("/.git")) return true;
+      return s === REPO_ABS || s === WS_ABS;
+    });
+  });
+
+  it("does not fetch a clone fetched within the interval, and says so", async () => {
+    mtimes.set(FETCH_HEAD, Date.now() - 3 * MINUTE);
+    const emitted: string[] = [];
+
+    const [outcome] = await setupRepositories(WORKSPACE, [{ repoPath: "github.com/acme/repo" }], (m) => emitted.push(m));
+
+    expect(outcome.ok).toBe(true);
+    expect(fetchCalls()).toEqual([]);
+    expect(emitted.some((m) => /fetched 3 min ago/.test(m))).toBe(true);
+  });
+
+  it("fetches a clone whose last fetch is older than the interval", async () => {
+    mtimes.set(FETCH_HEAD, Date.now() - 11 * MINUTE);
+    await setupRepositories(WORKSPACE, [{ repoPath: "github.com/acme/repo" }], vi.fn());
+    expect(fetchCalls()).toHaveLength(1);
+  });
+
+  it("fetches a clone that was never fetched", async () => {
+    await setupRepositories(WORKSPACE, [{ repoPath: "github.com/acme/repo" }], vi.fn());
+    expect(fetchCalls()).toHaveLength(1);
+  });
+
+  it("always fetches with an interval of 0", async () => {
+    config.operations.fetchIntervalMinutes = 0;
+    mtimes.set(FETCH_HEAD, Date.now());
+    await setupRepositories(WORKSPACE, [{ repoPath: "github.com/acme/repo" }], vi.fn());
+    expect(fetchCalls()).toHaveLength(1);
   });
 });
 

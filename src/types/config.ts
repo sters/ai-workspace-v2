@@ -44,6 +44,11 @@ export interface AppConfig {
      * Applies per group, not globally, so it multiplies with `maxConcurrent`.
      */
     maxGroupConcurrency: number;
+    /**
+     * A clone fetched less than this many minutes ago is used as it is when a
+     * worktree is set up from it. 0 fetches every time.
+     */
+    fetchIntervalMinutes: number;
     /** Per-operation-type setting overrides. Keys are OperationType values. */
     typeOverrides: Partial<Record<OperationType, Partial<OperationTypeSettings>>>;
   };

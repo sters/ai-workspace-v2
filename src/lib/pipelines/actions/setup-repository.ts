@@ -4,9 +4,9 @@
  */
 
 import { pathExists } from "@/lib/fs";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { getWorkspaceDir } from "@/lib/config";
+import { getConfig, getWorkspaceDir } from "@/lib/config";
 import { dateStamp, deriveBranchName } from "@/lib/naming";
 import { exec, repoDir, detectBaseBranch, remoteBranchExists } from "@/lib/workspace/helpers";
 import { Semaphore } from "@/lib/semaphore";
@@ -172,7 +172,8 @@ async function requireWorkspaceDir(workspaceName: string): Promise<string> {
 }
 
 /**
- * Clone the repository, or fetch it when it is already on disk.
+ * Clone the repository, or fetch it when it is already on disk and was not
+ * fetched within `operations.fetchIntervalMinutes`.
  *
  * Setups from different callers (the quick-create form, Slack, init) may reach
  * one clone at once. Two fetches of it collide on its ref locks and two clones
@@ -199,6 +200,18 @@ async function ensureLocalClone(
   }
 }
 
+/**
+ * How long ago the clone was last fetched, from `FETCH_HEAD`, which every fetch
+ * rewrites — a fetch run by hand included. Null when it has none.
+ */
+async function msSinceLastFetch(repoAbsPath: string): Promise<number | null> {
+  try {
+    return Date.now() - (await stat(path.join(repoAbsPath, ".git", "FETCH_HEAD"))).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
 async function syncClone(
   actualRepoPath: string,
   repoAbsPath: string,
@@ -212,6 +225,14 @@ async function syncClone(
     await exec(`git clone "${repoUrl}" "${repoAbsPath}"`);
     emitStatus("Clone complete.");
   } else {
+    const fetchedAgoMs = await msSinceLastFetch(repoAbsPath);
+    const intervalMs = getConfig().operations.fetchIntervalMinutes * 60 * 1000;
+    if (fetchedAgoMs !== null && fetchedAgoMs < intervalMs) {
+      emitStatus(
+        `Repository found locally, fetched ${Math.floor(fetchedAgoMs / 60_000)} min ago; using it without fetching`,
+      );
+      return;
+    }
     emitStatus(`Repository found locally, fetching latest...`);
     await fetchAllWithRetries(repoAbsPath, emitStatus);
   }

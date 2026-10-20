@@ -31,6 +31,7 @@ export const CONFIG_DEFAULTS: AppConfig = {
     // beyond that, since it is where the executor gets fresh context and the
     // remaining-work re-read (see execute.ts) resumes a batch that ran long.
     batchSize: 15,
+    fetchIntervalMinutes: 10,
     typeOverrides: {},
   },
   chat: {
@@ -123,6 +124,7 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "functionTimeoutMinutes", section: "operations", defaultLine: "#   functionTimeoutMinutes: 3" },
   { key: "defaultInteractionLevel", section: "operations", defaultLine: "#   defaultInteractionLevel: mid   # low / mid / high" },
   { key: "batchSize", section: "operations", defaultLine: "#   batchSize: 15                  # TODO groups per batch in execute operations" },
+  { key: "fetchIntervalMinutes", section: "operations", defaultLine: "#   fetchIntervalMinutes: 10       # reuse a clone fetched less than N minutes ago when setting up a worktree (0 = always fetch)" },
   { key: "model", section: "operations", defaultLine: "#   model: null                    # null = CLI default (opus / sonnet / haiku)" },
   { key: "effort", section: "operations", defaultLine: "#   effort: null                   # null = per-step default (low / medium / high / xhigh / max)" },
   { key: "chat", section: null, defaultLine: "# chat:" },

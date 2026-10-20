@@ -268,6 +268,11 @@ export function mergeConfig(
         file.operations?.batchSize,
         defaults.operations.batchSize,
       ),
+      fetchIntervalMinutes: pick(
+        env.operations?.fetchIntervalMinutes,
+        file.operations?.fetchIntervalMinutes,
+        defaults.operations.fetchIntervalMinutes,
+      ),
       model: pick(
         env.operations?.model,
         file.operations?.model,
