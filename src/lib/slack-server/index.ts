@@ -12,6 +12,15 @@ import { dispatch } from "./dispatcher";
 import { startNotifier, type Notifier } from "./notifier";
 import { fetchThreadTranscript } from "./thread-fetch";
 import { mergeWithThreadLink } from "./thread-link";
+import {
+  composeStatus,
+  createdHeader,
+  CREATING_WORKSPACE,
+  postStatus,
+  updateStatus,
+  WORKING,
+  workingInHeader,
+} from "./status-message";
 import { isThreadOpenInWebUi } from "./webui-attach";
 import { createSlackWorkspace } from "./workspace-create";
 
@@ -42,9 +51,10 @@ export interface RunningSlackServer {
  * the URL, not the message bodies) is appended to the description so Claude
  * can decide to fetch the thread on demand.
  *
- * After dispatching `init` (autonomous mode), a pending-notification row is
- * inserted into SQLite so the notifier can post the PR list once the run
- * completes. `init --only` skips this since no PRs are expected.
+ * `init` and `ws` each report through one status message, edited in place
+ * (`status-message.ts`). For `init` a pending-notification row records it in
+ * SQLite, so the notifier can add the workspace once created and the result
+ * once the run finishes.
  *
  * `ws` creates a workspace and binds the thread to it. In a bound thread the
  * conversation runs inside the workspace, and `init` works on it instead of
@@ -94,35 +104,33 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
     }
 
     const bound = await resolveBoundWorkspace(threadTs);
+    const header = bound ? workingInHeader(bound.name) : undefined;
+    const statusTs = await postStatus(
+      client,
+      mention.channel,
+      threadTs,
+      header ? composeStatus(header, WORKING) : CREATING_WORKSPACE,
+    );
     try {
       const op = await dispatch(opts.apiBaseUrl, command, bound?.name);
-      // Track the operation so the notifier can post PR URLs back when it finishes.
-      // `--only` runs init alone (no PRs expected), so skip tracking.
-      if (!command.only) {
-        try {
-          addPendingNotification({
-            operationId: op.id,
-            channel: mention.channel,
-            threadTs: threadTs,
-          });
-        } catch (err) {
-          console.warn(
-            `[slack-server] could not record pending notification for op=${op.id}:`,
-            err instanceof Error ? err.message : String(err),
-          );
-        }
+      try {
+        addPendingNotification({
+          operationId: op.id,
+          channel: mention.channel,
+          threadTs: threadTs,
+          messageTs: statusTs,
+          statusHeader: header,
+        });
+      } catch (err) {
+        console.warn(
+          `[slack-server] could not record pending notification for op=${op.id}:`,
+          err instanceof Error ? err.message : String(err),
+        );
       }
-      await say({
-        text: bound ? `OK! I'll start on it in \`${bound.name}\`!` : "OK! I'll start your request!",
-        thread_ts: threadTs,
-      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error("[slack-server] dispatch failed:", message);
-      await say({
-        text: `Sorry, failed to start: ${message}`,
-        thread_ts: threadTs,
-      });
+      await updateStatus(client, mention.channel, threadTs, statusTs, composeStatus(header, `Sorry, failed to start: ${message}`));
     }
   });
 
@@ -141,12 +149,19 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
   };
 }
 
+/** A status message already in the thread, which the turn edits instead of posting its own placeholder. */
+interface ThreadStatus {
+  ts?: string;
+  /** Kept above the turn's progress and reply. */
+  header?: string;
+}
+
 /**
- * Handle a free-form conversation mention: post a placeholder in the thread,
- * run a read-only Claude query (continuing the thread's session if one
- * exists), then edit the placeholder with the reply. On any Slack API failure
- * along the way we fall back to posting a fresh message so the user always
- * gets an answer.
+ * Handle a free-form conversation mention: post a placeholder in the thread
+ * (or take over `status`), run a Claude query (continuing the thread's session
+ * if one exists), then edit the placeholder with the reply. On any Slack API
+ * failure along the way we fall back to posting a fresh message so the user
+ * always gets an answer.
  *
  * The Slack thread (`thread_ts ?? ts`) is the conversation key, so follow-up
  * mentions in the same thread continue the same Claude session. `userId` scopes
@@ -162,10 +177,11 @@ async function handleConversation(
   message: string,
   userId: string,
   workspace?: BoundWorkspace,
+  status?: ThreadStatus,
 ): Promise<void> {
   const threadTs = mention.thread_ts ?? mention.ts;
   if (!workspace) {
-    await runConversationTurn(client, mention, message, userId);
+    await runConversationTurn(client, mention, message, userId, undefined, status);
     return;
   }
 
@@ -173,14 +189,19 @@ async function handleConversation(
   startThreadTurn(threadTs, Date.now());
   try {
     if (await isThreadOpenInWebUi(threadTs)) {
-      await client.chat.postMessage({
-        channel: mention.channel,
-        thread_ts: threadTs,
-        text: "This conversation is open in the WebUI chat right now. Stop the session there, then mention me again to continue here.",
-      });
+      await updateStatus(
+        client,
+        mention.channel,
+        threadTs,
+        status?.ts,
+        composeStatus(
+          status?.header,
+          "This conversation is open in the WebUI chat right now. Stop the session there, then mention me again to continue here.",
+        ),
+      );
       return;
     }
-    await runConversationTurn(client, mention, message, userId, workspace);
+    await runConversationTurn(client, mention, message, userId, workspace, status);
   } finally {
     endThreadTurn(threadTs);
   }
@@ -192,37 +213,29 @@ async function runConversationTurn(
   message: string,
   userId: string,
   workspace?: BoundWorkspace,
+  status?: ThreadStatus,
 ): Promise<void> {
   const threadTs = mention.thread_ts ?? mention.ts;
+  const header = status?.header;
 
   // First mention inside an existing thread: fold the whole thread in as
   // context so the user can ask things like "summarize this thread". On
   // resume turns the CLI session already holds the context, so we skip the
-  // fetch. Fetch before posting the placeholder so it isn't included.
+  // fetch. Fetch before posting the placeholder so it isn't included; a
+  // status message posted earlier is left out by its ts.
   let threadContext = "";
   if (mention.thread_ts && !hasThreadSession(threadTs)) {
     threadContext = await fetchThreadTranscript(
       client,
       mention.channel,
       mention.thread_ts,
-      mention.ts,
+      status?.ts ? [mention.ts, status.ts] : [mention.ts],
     );
   }
 
-  let placeholderTs: string | undefined;
-  try {
-    const posted = await client.chat.postMessage({
-      channel: mention.channel,
-      thread_ts: threadTs,
-      text: "🤔 Thinking…",
-    });
-    placeholderTs = posted.ts;
-  } catch (err) {
-    console.warn(
-      "[slack-server] could not post placeholder:",
-      err instanceof Error ? err.message : String(err),
-    );
-  }
+  const placeholderTs = status
+    ? status.ts
+    : await postStatus(client, mention.channel, threadTs, "🤔 Thinking…");
 
   // While the turn runs, edit the placeholder in place with a snapshot of the
   // assistant's progress so a long investigation reads as a live status line
@@ -235,7 +248,7 @@ async function runConversationTurn(
       await client.chat.update({
         channel: mention.channel,
         ts: placeholderTs,
-        text: formatProgress(progress),
+        text: composeStatus(header, formatProgress(progress)),
       });
     } catch (err) {
       console.warn(
@@ -258,24 +271,13 @@ async function runConversationTurn(
   }
   finished = true;
 
-  if (placeholderTs) {
-    try {
-      await client.chat.update({ channel: mention.channel, ts: placeholderTs, text: reply });
-      return;
-    } catch (err) {
-      console.warn(
-        "[slack-server] could not update placeholder, posting fresh message:",
-        err instanceof Error ? err.message : String(err),
-      );
-    }
-  }
-
-  await client.chat.postMessage({ channel: mention.channel, thread_ts: threadTs, text: reply });
+  await updateStatus(client, mention.channel, threadTs, placeholderTs, composeStatus(header, reply));
 }
 
 /**
  * Handle `ws`: create a workspace for the request, bind the thread to it, then
- * hand the request to the thread's first conversation turn inside it.
+ * hand the request to the thread's first conversation turn inside it. One
+ * status message carries all of it, from creating through the turn's reply.
  *
  * Any session the thread already had is dropped on binding: it ran at the
  * ai-workspace root under the read-only prompt, and resuming it from the
@@ -289,12 +291,14 @@ async function handleWorkspaceCreate(
   apiBaseUrl: string,
 ): Promise<void> {
   const threadTs = mention.thread_ts ?? mention.ts;
-  const post = (text: string) => client.chat.postMessage({ channel: mention.channel, thread_ts: threadTs, text });
-
-  await post("🛠 Creating a workspace…");
+  let statusTs = await postStatus(client, mention.channel, threadTs, CREATING_WORKSPACE);
   const created = await createSlackWorkspace(apiBaseUrl, description);
   if (!created.ok) {
-    await post(
+    await updateStatus(
+      client,
+      mention.channel,
+      threadTs,
+      statusTs,
       created.reason === "no-repositories"
         ? "I couldn't tell which repository this is about. Mention `ws` again with the repository named (e.g. `github.com/org/repo`)."
         : created.reason === "plan-failed"
@@ -308,13 +312,12 @@ async function handleWorkspaceCreate(
   deleteSession(threadTs);
 
   const lines = [
-    `Created \`${created.workspace}\`` +
-      (created.repositories.length > 0 ? ` with ${created.repositories.map((r) => `\`${r}\``).join(", ")}` : "") +
-      ". This thread now works in it; `init <what to do>` here plans and runs work on it through to a PR.",
+    `${createdHeader(created.workspace, created.repositories)} This thread now works in it; \`init <what to do>\` here plans and runs work on it through to a PR.`,
     `To continue this conversation in the WebUI, open <${apiBaseUrl}${chatPagePath(created.workspace)}|its chat> and choose *Continue Slack conversation*.`,
   ];
   for (const p of created.problems) lines.push(`⚠️ \`${p.repository}\`: ${p.error}`);
-  await post(lines.join("\n"));
+  const header = lines.join("\n");
+  statusTs = await updateStatus(client, mention.channel, threadTs, statusTs, composeStatus(header, WORKING));
 
   const bound = await resolveBoundWorkspace(threadTs);
   await handleConversation(
@@ -323,6 +326,7 @@ async function handleWorkspaceCreate(
     description,
     userId,
     bound ? { ...bound, newWorkspace: true } : { path: created.workspacePath, newWorkspace: true },
+    { ts: statusTs, header },
   );
 }
 

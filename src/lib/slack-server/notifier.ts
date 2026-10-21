@@ -2,10 +2,16 @@ import type { WebClient } from "@slack/web-api";
 import type { OperationEvent } from "@/types/operation";
 import { getEvents } from "@/lib/db/events";
 import { getOperation } from "@/lib/db/operations";
-import { listReadyNotifications, deleteNotification } from "@/lib/db/slack-notifications";
+import {
+  listReadyNotifications,
+  listUnannouncedWorkspaces,
+  setStatusHeader,
+  deleteNotification,
+} from "@/lib/db/slack-notifications";
 import { extractPrUrls, type PrUrlInfo } from "@/lib/workspace/pr-url";
 import { README_CLARITY_PHASE_LABEL, README_CLARITY_STOP_PREFIX } from "@/lib/templates/prompts/readme-clarity-gate";
 import { FINAL_CYCLE_STOP_PREFIX } from "@/lib/templates/prompts/autonomous-gate";
+import { composeStatus, createdHeader, updateStatus, WORKING } from "./status-message";
 
 /** Phase label set by the autonomous pipeline for the Create PR step
  * (`src/lib/pipelines/autonomous.ts`, `buildCreatePrPhase`). Filtering by
@@ -17,6 +23,9 @@ const CREATE_PR_PHASE_LABEL = "Create PR";
 const DEFAULT_INTERVAL_MS = 30_000;
 
 const NO_PRS_MSG = "Done! No PRs were created. Please check details on WebUI.";
+/** `init --only` and its bound-thread form plan the work and stop: no PR is expected. */
+const PLANNED_MSG = "Done! The work is planned. Please check details on WebUI.";
+const FAILED_MSG = "❌ The run failed. Please check details on WebUI.";
 
 export interface NotifierOptions {
   client: WebClient;
@@ -31,18 +40,50 @@ export interface Notifier {
 }
 
 /**
- * Start a polling loop that:
- *   1. queries `slack_pending_notifications` JOIN `operations` for finished rows
- *   2. for `completed`: extracts PR URLs from events and posts to Slack thread
- *   3. for `failed`: silently drops (per product decision, no failure notification)
- *   4. always deletes the row when handled
+ * Start a polling loop that keeps each tracked run's status message current:
+ *   1. a running operation whose workspace has just been created gets the
+ *      workspace header over the working line
+ *   2. a `completed` one gets the result (created PRs, or why it stopped)
+ *   3. a `failed` one gets the failure, only when there is a status message
+ *      to correct; a row without one is dropped silently
+ *   4. a finished row is always deleted once handled
  *
- * Errors per row are logged but never crash the loop.
+ * The status message is edited in place, and a fresh message is posted only
+ * when it cannot be. Errors per row are logged but never crash the loop.
  */
 export function startNotifier(opts: NotifierOptions): Notifier {
   const intervalMs = opts.intervalMs ?? DEFAULT_INTERVAL_MS;
 
+  async function announceWorkspaces(): Promise<void> {
+    let rows;
+    try {
+      rows = listUnannouncedWorkspaces();
+    } catch (err) {
+      console.error("[slack-server] notifier: failed to query unannounced workspaces:", err);
+      return;
+    }
+    for (const row of rows) {
+      const header = createdHeader(row.workspace);
+      try {
+        // Set before editing, so a message that cannot be edited is not retried every poll.
+        setStatusHeader(row.operationId, header);
+        await opts.client.chat.update({
+          channel: row.channel,
+          ts: row.messageTs,
+          text: composeStatus(header, WORKING),
+        });
+      } catch (err) {
+        console.warn(
+          `[slack-server] notifier: could not announce workspace for op=${row.operationId}:`,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+  }
+
   async function runOnce(): Promise<void> {
+    await announceWorkspaces();
+
     let ready;
     try {
       ready = listReadyNotifications();
@@ -52,6 +93,8 @@ export function startNotifier(opts: NotifierOptions): Notifier {
     }
     for (const row of ready) {
       try {
+        const header = row.statusHeader ?? (row.workspace ? createdHeader(row.workspace) : undefined);
+        let body: string | undefined;
         if (row.status === "completed") {
           const events = getEvents(row.operationId);
           const op = getOperation(row.operationId);
@@ -63,15 +106,15 @@ export function startNotifier(opts: NotifierOptions): Notifier {
           // outstanding, so "no PRs were created" would read as a clean no-op.
           const incompleteStop = extractIncompleteStop(events);
           const prs = extractCreatedPrs(events, { inputDescription });
-          await opts.client.chat.postMessage({
-            channel: row.channel,
-            thread_ts: row.threadTs,
-            text: clarityStop ?? (incompleteStop !== null
-              ? withCreatedPrs(incompleteStop, prs)
-              : buildCompletionMessage(prs)),
-          });
+          body = clarityStop ?? (incompleteStop !== null
+            ? withCreatedPrs(incompleteStop, prs)
+            : op && op.type !== "autonomous" ? PLANNED_MSG : buildCompletionMessage(prs));
+        } else if (row.messageTs) {
+          body = FAILED_MSG;
         }
-        // status === "failed": silently drop per product decision
+        if (body !== undefined) {
+          await updateStatus(opts.client, row.channel, row.threadTs, row.messageTs, composeStatus(header, body));
+        }
       } catch (err) {
         console.error(
           `[slack-server] notifier: failed to process op=${row.operationId}:`,

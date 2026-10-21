@@ -16,7 +16,7 @@ describe("formatThreadMessages", () => {
         { user: "U1", text: "keep me", ts: "1" },
         { user: "U2", text: "drop me", ts: "2" },
       ],
-      "2",
+      ["2"],
     );
     expect(out).toBe("@U1: keep me");
   });
@@ -47,7 +47,7 @@ describe("fetchThreadTranscript", () => {
     });
     const client = { conversations: { replies } };
 
-    const out = await fetchThreadTranscript(client as never, "C1", "1", "2");
+    const out = await fetchThreadTranscript(client as never, "C1", "1", ["2"]);
     expect(out).toBe("@U1: a");
     expect(replies).toHaveBeenCalledTimes(1);
     expect(replies).toHaveBeenCalledWith({ channel: "C1", ts: "1", limit: 200, cursor: undefined });

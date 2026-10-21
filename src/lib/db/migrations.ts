@@ -201,6 +201,15 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 13,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE slack_pending_notifications ADD COLUMN message_ts TEXT;
+        ALTER TABLE slack_pending_notifications ADD COLUMN status_header TEXT;
+      `);
+    },
+  },
 ];
 
 /**

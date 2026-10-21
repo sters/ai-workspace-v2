@@ -21,14 +21,14 @@ export interface ThreadMessage {
 /**
  * Render thread messages into a plain-text transcript. Pure.
  *
- * Messages with no text are skipped, and the message whose `ts` equals
- * `excludeTs` (typically the triggering mention itself) is dropped so it
- * isn't duplicated alongside the user's message in the prompt.
+ * Messages with no text are skipped, and messages whose `ts` is in
+ * `excludeTs` (the triggering mention, which is already the user's message in
+ * the prompt, and the bot's own status message) are dropped.
  */
-export function formatThreadMessages(messages: ThreadMessage[], excludeTs?: string): string {
+export function formatThreadMessages(messages: ThreadMessage[], excludeTs: readonly string[] = []): string {
   const lines: string[] = [];
   for (const m of messages) {
-    if (excludeTs && m.ts === excludeTs) continue;
+    if (m.ts && excludeTs.includes(m.ts)) continue;
     const text = (m.text ?? "").trim();
     if (text === "") continue;
     const who = m.user ? `@${m.user}` : m.bot_id ? "bot" : "unknown";
@@ -56,7 +56,7 @@ export async function fetchThreadTranscript(
   client: Pick<WebClient, "conversations">,
   channel: string,
   threadTs: string,
-  excludeTs?: string,
+  excludeTs: readonly string[] = [],
 ): Promise<string> {
   const all: ThreadMessage[] = [];
   let cursor: string | undefined;
