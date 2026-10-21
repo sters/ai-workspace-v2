@@ -7,6 +7,7 @@ import { buildInitPrompt, buildReviewChatPrompt, buildResearchChatPrompt, buildT
 import { ensureSessionSystemPrompt, cleanupSessionSystemPrompt } from "@/lib/workspace/prompts";
 import type { ChatSession, ClientMessage, ServerMessage, WsData } from "@/types/chat-server";
 import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
+import { setSession } from "@/lib/db/slack-sessions";
 
 export function send(ws: { send(data: string): void }, msg: ServerMessage) {
   ws.send(JSON.stringify(msg));
@@ -15,6 +16,7 @@ import { readTurnProgress, UNKNOWN_TURN_PROGRESS } from "./activity";
 import { trimBuffer } from "./buffer";
 import { getStore, nextSessionId, persistSessionCreated, persistSessionExited, persistSessionDeleted } from "./store";
 import { runGc } from "./gc";
+import { resolveSlackThread } from "./slack-thread";
 
 type Ws = { send(data: string): void; data: WsData };
 
@@ -83,13 +85,26 @@ function endSession(sessionId: string): void {
  * Why `msg` cannot start a session, or null when it can. Every built opening
  * prompt has the session read the README on its first turn, so a workspace
  * without one starts a session that can only go hunting for the file. A
- * caller-supplied prompt opts out.
+ * caller-supplied prompt opts out, as does a Slack thread, whose session
+ * already holds its context.
  */
 export async function refuseStart(msg: StartMsg): Promise<string | null> {
+  if (msg.slackThread) return refuseSlackThread(msg.slackThread, msg.workspaceId);
   if (msg.initialPrompt) return null;
   const workspacePath = path.join(getResolvedWorkspaceRoot(), "workspace", msg.workspaceId);
   if (await pathExists(path.join(workspacePath, "README.md"))) return null;
   return `Workspace "${msg.workspaceId}" has no README.md — run init before starting a chat session.`;
+}
+
+/** Two chats resuming one CLI session would interleave their turns into its transcript. */
+function refuseSlackThread(threadKey: string, workspaceId: string): string | null {
+  for (const session of getStore().__chatSessions!.values()) {
+    if (session.slackThread === threadKey && !session.exited) {
+      return "That Slack conversation is already open in another chat session.";
+    }
+  }
+  const resolved = resolveSlackThread(threadKey, workspaceId, Date.now());
+  return resolved.ok ? null : resolved.error;
 }
 
 export type SpawnOutcome = { ok: true; sessionId: string } | { ok: false; error: string };
@@ -107,15 +122,30 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
   // Run GC opportunistically
   runGc();
 
+  // A Slack thread's session ran in the workspace directory, and resuming it
+  // from there keeps its relative paths and project-scoped history in place.
+  // `--resume` goes first and no prompt goes last: the session opens on its
+  // history and waits.
+  let opening: { leadingArgs: string[]; trailingArgs: string[]; agentName: string; cwd: string };
+  let slack: { threadKey: string; cliSessionId: string } | null = null;
+  if (msg.slackThread) {
+    const resolved = resolveSlackThread(msg.slackThread, msg.workspaceId, Date.now());
+    if (!resolved.ok) return { ok: false, error: resolved.error };
+    slack = { threadKey: msg.slackThread, cliSessionId: resolved.cliSessionId };
+    opening = { leadingArgs: ["--resume", resolved.cliSessionId], trailingArgs: [], agentName: "chat", cwd: workspacePath };
+  } else {
+    const built = buildChatOpening(msg, workspacePath);
+    opening = { leadingArgs: [], trailingArgs: [built.prompt], agentName: built.agentName, cwd: root };
+  }
+
   const sessionId = nextSessionId();
   if (ws) ws.data.sessionId = sessionId;
 
   const listeners = new Set<DataListener>();
 
-  const { prompt: initPrompt, agentName } = buildChatOpening(msg, workspacePath);
   const systemPromptFile = await ensureSessionSystemPrompt(
     workspacePath,
-    agentName,
+    opening.agentName,
     sessionId,
     { workspaceId: msg.workspaceId },
   );
@@ -132,8 +162,8 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
   let proc;
   try {
     proc = spawnClaudeTerminal({
-      args: ["--append-system-prompt-file", systemPromptFile, ...modelArgs, initPrompt],
-      cwd: root,
+      args: [...opening.leadingArgs, "--append-system-prompt-file", systemPromptFile, ...modelArgs, ...opening.trailingArgs],
+      cwd: opening.cwd,
       listeners,
       ...(size && { cols: size.cols, rows: size.rows }),
     });
@@ -159,6 +189,7 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
     waitingDecidedForOutputAt: null,
     cols: size?.cols ?? DEFAULT_PTY_COLS,
     rows: size?.rows ?? DEFAULT_PTY_ROWS,
+    ...(slack && { slackThread: slack.threadKey }),
   };
   store.__chatSessions!.set(sessionId, session);
   persistSessionCreated(session);
@@ -181,6 +212,9 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
     session.exitCode = code;
     session.exitedAt = Date.now();
     persistSessionExited(sessionId, code);
+    // The thread's session idles out on its last Slack turn; the turns typed
+    // here count as activity too.
+    if (slack) setSession(slack.threadKey, slack.cliSessionId, Date.now());
     if (session.activeWs) {
       send(session.activeWs, { type: "exited", code });
     }

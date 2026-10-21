@@ -1,6 +1,9 @@
 "use client";
 
+import useSWR from "swr";
 import { useChatSession } from "@/hooks/use-chat-session";
+import { fetcher } from "@/lib/api";
+import type { WorkspaceSlackThread } from "@/lib/chat-server/slack-thread";
 import { Button } from "../shared/buttons/button";
 import { StartChatButton } from "./start-chat-button";
 import { StatusText } from "../shared/feedback/status-text";
@@ -28,6 +31,7 @@ export function ChatTerminal({
     exitCode,
     error,
     openSession,
+    continueSlackThread,
     cancelResume,
     stopSession,
   } = useChatSession(workspaceId, {
@@ -38,6 +42,30 @@ export function ChatTerminal({
     discussion,
     onHandoffDelivered,
   });
+
+  // Polled so the button frees up once a Slack turn in flight finishes.
+  const { data: slackData } = useSWR<{ slackThread: WorkspaceSlackThread | null }>(
+    `/api/workspaces/${encodeURIComponent(workspaceId)}/slack-thread`,
+    fetcher,
+    { refreshInterval: 10000 },
+  );
+  const slackThread = slackData?.slackThread;
+  const continueSlackButton = slackThread && state !== "connecting" && state !== "resuming" && (
+    <Button
+      variant="secondary"
+      disabled={!slackThread.resumable || slackThread.turnInFlight}
+      title={
+        !slackThread.resumable
+          ? "The Slack conversation has no session to continue: it never ran a turn, or it expired."
+          : slackThread.turnInFlight
+            ? "Slack is answering in the thread right now."
+            : "Resume the Slack thread's Claude session here. Slack waits until this session is stopped."
+      }
+      onClick={() => continueSlackThread(slackThread.threadKey)}
+    >
+      Continue Slack conversation
+    </Button>
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -65,6 +93,7 @@ export function ChatTerminal({
             <StartChatButton label="New Session" onStart={openSession} />
           </>
         )}
+        {state !== "idle" && continueSlackButton}
         {error && (
           <StatusText variant="error">{error}</StatusText>
         )}
@@ -87,7 +116,10 @@ export function ChatTerminal({
             <p className="mb-4 text-sm text-muted-foreground">
               Start an interactive Claude session to discuss this workspace
             </p>
-            <StartChatButton label="Start Chat" onStart={openSession} />
+            <div className="flex items-center justify-center gap-2">
+              <StartChatButton label="Start Chat" onStart={openSession} />
+              {continueSlackButton}
+            </div>
           </div>
         </div>
       )}

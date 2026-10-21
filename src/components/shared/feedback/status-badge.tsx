@@ -56,6 +56,8 @@ const variants: Record<string, string> = {
   "severity-warning":
     "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
   "severity-suggestion": "bg-muted text-muted-foreground",
+  // A workspace created from a Slack thread
+  slack: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900 dark:text-fuchsia-200",
   // Muted variant (config editor "not found")
   muted: "bg-muted text-muted-foreground",
 };

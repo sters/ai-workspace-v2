@@ -53,8 +53,24 @@ vi.mock("@/lib/db/chat-sessions", () => ({
   deleteChatSession: vi.fn(),
 }));
 
+/** Slack threads by key: the workspace each is bound to, its CLI session and its turn in flight. */
+const slackThreads = new Map<string, { workspace: string; sessionId?: string; turnStartedAt?: number }>();
+const mockSetSession = vi.fn();
+
+vi.mock("@/lib/db/slack-thread-workspaces", () => ({
+  getThreadWorkspace: (key: string) => slackThreads.get(key)?.workspace,
+  getThreadTurnStartedAt: (key: string) => slackThreads.get(key)?.turnStartedAt,
+}));
+
+vi.mock("@/lib/db/slack-sessions", () => ({
+  getSession: (key: string) => slackThreads.get(key)?.sessionId,
+  setSession: (...args: unknown[]) => mockSetSession(...args),
+}));
+
+const SLACK_MAX_TURN_MS = 60_000;
+
 function setChatModel(model: ClaudeModel | null) {
-  mockGetConfig.mockReturnValue({ chat: { model } });
+  mockGetConfig.mockReturnValue({ chat: { model }, slack: { chatMaxTurnMs: SLACK_MAX_TURN_MS } });
 }
 
 let mockPtyResize: ReturnType<typeof vi.fn>;
@@ -76,6 +92,8 @@ beforeEach(() => {
   mockEnsureSessionSystemPrompt.mockReturnValue("/mock/session-prompt.md");
   mockCleanupSessionSystemPrompt.mockReset();
   setChatModel("sonnet");
+  slackThreads.clear();
+  mockSetSession.mockReset();
 
   // Reset the chat-server store to avoid leakage between tests via globalThis.
   const g = globalThis as unknown as {
@@ -368,6 +386,89 @@ describe("handleStart startPrompt", () => {
     expect(opts.args).toContain("init-prompt-body");
     const [, agentName] = mockEnsureSessionSystemPrompt.mock.calls[0];
     expect(agentName).toBe("chat");
+  });
+});
+
+describe("handleStart slackThread", () => {
+  const THREAD = "1700000000.000100";
+
+  async function startFromThread() {
+    const { handleStart } = await import("@/lib/chat-server/handlers");
+    const ws = makeWs();
+    await handleStart(ws, { type: "start", workspaceId: WITH_README, slackThread: THREAD });
+    const errors = ws.sent.map((m) => JSON.parse(m)).filter((m) => m.type === "error");
+    return { ws, errors };
+  }
+
+  it("resumes the thread's CLI session in the workspace directory, opening on no prompt", async () => {
+    slackThreads.set(THREAD, { workspace: WITH_README, sessionId: "cli-sess-1" });
+
+    const { errors } = await startFromThread();
+
+    expect(errors).toEqual([]);
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    expect(opts.args.slice(0, 2)).toEqual(["--resume", "cli-sess-1"]);
+    expect(opts.args).not.toContain("init-prompt-body");
+    expect(opts.cwd).toBe(path.join(tmpRoot, "workspace", WITH_README));
+  });
+
+  it("refuses a thread bound to another workspace", async () => {
+    slackThreads.set(THREAD, { workspace: "other", sessionId: "cli-sess-1" });
+
+    const { errors } = await startFromThread();
+
+    expect(mockSpawnClaudeTerminal).not.toHaveBeenCalled();
+    expect(errors).toHaveLength(1);
+  });
+
+  it("refuses a thread whose conversation has no session to continue", async () => {
+    slackThreads.set(THREAD, { workspace: WITH_README });
+
+    const { errors } = await startFromThread();
+
+    expect(mockSpawnClaudeTerminal).not.toHaveBeenCalled();
+    expect(errors).toHaveLength(1);
+  });
+
+  it("refuses while Slack is running a turn on the session", async () => {
+    slackThreads.set(THREAD, { workspace: WITH_README, sessionId: "cli-sess-1", turnStartedAt: Date.now() - 1000 });
+
+    const { errors } = await startFromThread();
+
+    expect(mockSpawnClaudeTerminal).not.toHaveBeenCalled();
+    expect(errors[0].message).toMatch(/Slack/);
+  });
+
+  it("ignores a turn marker left by a bot that died mid-turn", async () => {
+    slackThreads.set(THREAD, {
+      workspace: WITH_README,
+      sessionId: "cli-sess-1",
+      turnStartedAt: Date.now() - 3 * SLACK_MAX_TURN_MS,
+    });
+
+    await startFromThread();
+
+    expect(mockSpawnClaudeTerminal).toHaveBeenCalledTimes(1);
+  });
+
+  it("refuses a second chat on a thread one is already continuing", async () => {
+    slackThreads.set(THREAD, { workspace: WITH_README, sessionId: "cli-sess-1" });
+    await startFromThread();
+
+    const { errors } = await startFromThread();
+
+    expect(mockSpawnClaudeTerminal).toHaveBeenCalledTimes(1);
+    expect(errors).toHaveLength(1);
+  });
+
+  it("keeps the Slack conversation alive past its idle expiry once the chat ends", async () => {
+    slackThreads.set(THREAD, { workspace: WITH_README, sessionId: "cli-sess-1" });
+    await startFromThread();
+
+    exitSpawnedProcess(0);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockSetSession).toHaveBeenCalledWith(THREAD, "cli-sess-1", expect.any(Number));
   });
 });
 

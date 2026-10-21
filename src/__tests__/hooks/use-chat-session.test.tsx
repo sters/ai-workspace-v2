@@ -283,3 +283,35 @@ describe("useChatSession openSession", () => {
     expect(sockets).toHaveLength(1);
   });
 });
+
+describe("useChatSession continueSlackThread", () => {
+  function stubLiveSessions(sessions: { id: string; workspaceId: string; startedAt: number; slackThread?: string }[]) {
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => sessions })));
+  }
+
+  it("starts a session on the thread, even with a plain chat live", async () => {
+    stubLiveSessions([{ id: "chat-1", workspaceId: "ws", startedAt: 1 }]);
+    const { result } = renderHook(() => useChatSession("ws"));
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+    sockets[0].receive({ type: "replay_done" });
+
+    await act(() => result.current.continueSlackThread("t1"));
+    await waitFor(() => expect(sockets[1]?.sent).toHaveLength(1));
+
+    expect(sockets[1].firstFrame()).toMatchObject({ type: "start", workspaceId: "ws", slackThread: "t1", replaces: "chat-1" });
+  });
+
+  it("attaches to the chat already continuing the thread instead of starting another", async () => {
+    stubLiveSessions([
+      { id: "chat-1", workspaceId: "ws", startedAt: 1, slackThread: "t1" },
+      { id: "chat-2", workspaceId: "ws", startedAt: 2 },
+    ]);
+    const { result } = renderHook(() => useChatSession("ws"));
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+
+    await act(() => result.current.continueSlackThread("t1"));
+    await waitFor(() => expect(sockets[1]?.sent).toHaveLength(1));
+
+    expect(sockets[1].firstFrame()).toMatchObject({ type: "resume", sessionId: "chat-1" });
+  });
+});

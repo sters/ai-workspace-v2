@@ -119,6 +119,7 @@ const wsStartSchema = z.object({
   discussion: z.string().optional(),
   startPrompt: z.string().optional(),
   replaces: z.string().optional(),
+  slackThread: z.string().min(1).optional(),
   cols: z.number().optional(),
   rows: z.number().optional(),
 });

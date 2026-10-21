@@ -64,6 +64,7 @@ export function handleSessionsList(): Response {
         workspaceId: session.workspaceId,
         startedAt: session.startedAt,
         busy: isSessionBusy(session, now),
+        ...(session.slackThread && { slackThread: session.slackThread }),
       });
     }
   }

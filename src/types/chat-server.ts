@@ -30,6 +30,8 @@ export interface ChatSession {
   progress: TurnProgress;
   /** See `ChatActivityState` in `lib/chat-server/activity.ts`. */
   waitingDecidedForOutputAt: number | null;
+  /** The Slack thread whose conversation this session continues. */
+  slackThread?: string;
   /** Size the PTY currently has, so a no-op resize can be skipped. */
   cols: number;
   rows: number;
@@ -78,6 +80,11 @@ interface StartMessage {
    * keeps running with nothing left to reach it from the chat tab.
    */
   replaces?: string;
+  /**
+   * Key of a Slack thread bound to this workspace. The session resumes that
+   * thread's CLI session instead of opening on a prompt of its own.
+   */
+  slackThread?: string;
   /** Size of the browser terminal, so the PTY is born at the right size. */
   cols?: number;
   rows?: number;

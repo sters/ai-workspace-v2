@@ -14,6 +14,8 @@ export interface ChatSessionInfo {
    * can see the PTY, and guessing `false` labels a working session idle.
    */
   busy?: boolean;
+  /** The Slack thread whose conversation this session continues. */
+  slackThread?: string;
 }
 
 export type SessionState = "idle" | "connecting" | "resuming" | "running" | "exited";

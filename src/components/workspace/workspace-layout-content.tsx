@@ -2,6 +2,7 @@
 
 import { use, useEffect } from "react";
 import Link from "next/link";
+import useSWR from "swr";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { Card } from "@/components/shared/containers/card";
@@ -9,6 +10,8 @@ import { ProgressBar } from "@/components/shared/feedback/progress-bar";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
 import { OperationPanel } from "@/components/workspace/operation-panel";
 import { cn } from "@/lib/utils";
+import { fetcher } from "@/lib/api";
+import type { WorkspaceSlackThread } from "@/lib/chat-server/slack-thread";
 import { VALID_AUTO_ACTIONS } from "@/lib/constants";
 import { extractBatchParams, extractAutonomousParams } from "@/lib/batch-modes";
 
@@ -36,6 +39,11 @@ export function WorkspaceLayoutContent({
   const { name } = use(params);
   const decodedName = decodeURIComponent(name);
   const { workspace, isLoading, error, refresh } = useWorkspace(decodedName);
+  const { data: slackData } = useSWR<{ slackThread: WorkspaceSlackThread | null }>(
+    `/api/workspaces/${encodeURIComponent(decodedName)}/slack-thread`,
+    fetcher,
+  );
+  const slackThread = slackData?.slackThread;
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -113,6 +121,15 @@ export function WorkspaceLayoutContent({
               <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                 Archived
               </span>
+            )}
+            {slackThread && (
+              slackThread.permalink ? (
+                <a href={slackThread.permalink} target="_blank" rel="noopener noreferrer" title="Open the Slack thread">
+                  <StatusBadge label="Slack" variant="slack" className="hover:underline" />
+                </a>
+              ) : (
+                <StatusBadge label="Slack" variant="slack" title="Created from a Slack thread" />
+              )
             )}
             <StatusBadge label={workspace.meta.taskType} />
             {workspace.meta.ticketId && (

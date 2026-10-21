@@ -62,6 +62,18 @@ async function findLiveSession(workspaceId: string, preferred: string | null): P
   }
 }
 
+/** The live session already continuing a Slack thread, which a second one may not resume alongside. */
+async function findSlackThreadSession(workspaceId: string, threadKey: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/chat-sessions");
+    if (!res.ok) return null;
+    const sessions = (await res.json()) as ChatSessionInfo[];
+    return sessions.find((s) => s.workspaceId === workspaceId && s.slackThread === threadKey)?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function useChatSession(
   workspaceId: string,
   options?: {
@@ -282,7 +294,8 @@ export function useChatSession(
     [workspaceId, cleanup, init, dispose, termRef],
   );
 
-  const startSession = useCallback(async (startPrompt?: string) => {
+  const startSession = useCallback(async (opening: { startPrompt?: string; slackThread?: string } = {}) => {
+    const { startPrompt, slackThread } = opening;
     const replaces = sessionIdRef.current ?? loadChatSession(workspaceId);
     cleanup();
     const gen = ++generationRef.current;
@@ -328,7 +341,7 @@ export function useChatSession(
       const research = researchChatRef.current;
       const task = taskRef.current;
       const discussion = discussionRef.current;
-      ws.send(JSON.stringify({ type: "start", workspaceId, cols: term.cols, rows: term.rows, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }), ...(task && { task }), ...(discussion && { discussion }), ...(startPrompt && { startPrompt }), ...(replaces && { replaces }) }));
+      ws.send(JSON.stringify({ type: "start", workspaceId, cols: term.cols, rows: term.rows, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }), ...(task && { task }), ...(discussion && { discussion }), ...(startPrompt && { startPrompt }), ...(slackThread && { slackThread }), ...(replaces && { replaces }) }));
     };
 
     ws.onmessage = (event) => {
@@ -405,12 +418,29 @@ export function useChatSession(
     openingRef.current = true;
     try {
       if (startPrompt) {
-        await startSession(startPrompt);
+        await startSession({ startPrompt });
         return;
       }
       const live = await findLiveSession(workspaceId, sessionIdRef.current ?? loadChatSession(workspaceId));
       if (live) await resumeSession(live);
       else await startSession();
+    } finally {
+      openingRef.current = false;
+    }
+  }, [workspaceId, resumeSession, startSession]);
+
+  /**
+   * Continue a Slack thread's conversation here: the server resumes the
+   * thread's CLI session. Like a start prompt, it replaces a live plain chat,
+   * which is about something else.
+   */
+  const continueSlackThread = useCallback(async (threadKey: string) => {
+    if (openingRef.current) return;
+    openingRef.current = true;
+    try {
+      const live = await findSlackThreadSession(workspaceId, threadKey);
+      if (live) await resumeSession(live);
+      else await startSession({ slackThread: threadKey });
     } finally {
       openingRef.current = false;
     }
@@ -473,6 +503,7 @@ export function useChatSession(
     exitCode,
     error,
     openSession,
+    continueSlackThread,
     cancelResume,
     stopSession,
   };

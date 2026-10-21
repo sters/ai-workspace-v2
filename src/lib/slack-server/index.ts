@@ -3,7 +3,8 @@ import type { WebClient } from "@slack/web-api";
 import type { AppMentionEvent } from "@slack/types";
 import { addPendingNotification } from "@/lib/db/slack-notifications";
 import { deleteSession } from "@/lib/db/slack-sessions";
-import { bindThreadWorkspace } from "@/lib/db/slack-thread-workspaces";
+import { bindThreadWorkspace, endThreadTurn, startThreadTurn } from "@/lib/db/slack-thread-workspaces";
+import { chatPagePath } from "@/lib/chat-handoff";
 import { resolveBoundWorkspace } from "./bound-workspace";
 import { parseCommand, USAGE, type Command } from "./commands";
 import { converse, hasThreadSession, type BoundWorkspace } from "./conversation";
@@ -11,6 +12,7 @@ import { dispatch } from "./dispatcher";
 import { startNotifier, type Notifier } from "./notifier";
 import { fetchThreadTranscript } from "./thread-fetch";
 import { mergeWithThreadLink } from "./thread-link";
+import { isThreadOpenInWebUi } from "./webui-attach";
 import { createSlackWorkspace } from "./workspace-create";
 
 export interface SlackServerOptions {
@@ -149,8 +151,42 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
  * The Slack thread (`thread_ts ?? ts`) is the conversation key, so follow-up
  * mentions in the same thread continue the same Claude session. `userId` scopes
  * the conversation's per-user memory.
+ *
+ * A bound thread's session can also be continued from the WebUI chat, and only
+ * one side drives it at a time: the turn is marked in flight for the chat
+ * server to see, and refused while a chat holds the session.
  */
 async function handleConversation(
+  client: WebClient,
+  mention: AppMentionEvent,
+  message: string,
+  userId: string,
+  workspace?: BoundWorkspace,
+): Promise<void> {
+  const threadTs = mention.thread_ts ?? mention.ts;
+  if (!workspace) {
+    await runConversationTurn(client, mention, message, userId);
+    return;
+  }
+
+  // Marked before the check, so a chat starting in between sees the turn.
+  startThreadTurn(threadTs, Date.now());
+  try {
+    if (await isThreadOpenInWebUi(threadTs)) {
+      await client.chat.postMessage({
+        channel: mention.channel,
+        thread_ts: threadTs,
+        text: "This conversation is open in the WebUI chat right now. Stop the session there, then mention me again to continue here.",
+      });
+      return;
+    }
+    await runConversationTurn(client, mention, message, userId, workspace);
+  } finally {
+    endThreadTurn(threadTs);
+  }
+}
+
+async function runConversationTurn(
   client: WebClient,
   mention: AppMentionEvent,
   message: string,
@@ -268,13 +304,14 @@ async function handleWorkspaceCreate(
     return;
   }
 
-  bindThreadWorkspace(threadTs, created.workspace);
+  bindThreadWorkspace(threadTs, created.workspace, await fetchPermalink(client, mention.channel, threadTs));
   deleteSession(threadTs);
 
   const lines = [
     `Created \`${created.workspace}\`` +
       (created.repositories.length > 0 ? ` with ${created.repositories.map((r) => `\`${r}\``).join(", ")}` : "") +
       ". This thread now works in it; `init <what to do>` here plans and runs work on it through to a PR.",
+    `To continue this conversation in the WebUI, open <${apiBaseUrl}${chatPagePath(created.workspace)}|its chat> and choose *Continue Slack conversation*.`,
   ];
   for (const p of created.problems) lines.push(`⚠️ \`${p.repository}\`: ${p.error}`);
   await post(lines.join("\n"));
@@ -287,6 +324,20 @@ async function handleWorkspaceCreate(
     userId,
     bound ? { ...bound, newWorkspace: true } : { path: created.workspacePath, newWorkspace: true },
   );
+}
+
+/** Link to a message, or undefined when Slack would not give one: the link is a convenience, never a reason to fail. */
+async function fetchPermalink(client: WebClient, channel: string, messageTs: string): Promise<string | undefined> {
+  try {
+    const res = await client.chat.getPermalink({ channel, message_ts: messageTs });
+    return res.permalink || undefined;
+  } catch (err) {
+    console.warn(
+      `[slack-server] could not fetch permalink (channel=${channel} ts=${messageTs}):`,
+      err instanceof Error ? err.message : String(err),
+    );
+    return undefined;
+  }
 }
 
 /** Safety cap on the summary length (it's already a one-liner from the model). */

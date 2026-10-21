@@ -184,6 +184,23 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 11,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE slack_thread_workspaces ADD COLUMN turn_started_at INTEGER;
+        CREATE INDEX idx_slack_thread_workspaces_workspace ON slack_thread_workspaces(workspace);
+      `);
+    },
+  },
+  {
+    version: 12,
+    up: (db) => {
+      db.exec(`
+        ALTER TABLE slack_thread_workspaces ADD COLUMN permalink TEXT;
+      `);
+    },
+  },
 ];
 
 /**
