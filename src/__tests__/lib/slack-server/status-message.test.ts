@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { composeStatus, updateStatus } from "@/lib/slack-server/status-message";
+import { composeStatus, finishStatus, updateStatus } from "@/lib/slack-server/status-message";
 
 describe("composeStatus", () => {
   it("puts the body under the header", () => {
@@ -11,19 +11,19 @@ describe("composeStatus", () => {
   });
 });
 
-describe("updateStatus", () => {
-  function client(updateFails = false) {
-    return {
-      chat: {
-        update: vi.fn(async () => {
-          if (updateFails) throw new Error("message_not_found");
-          return { ok: true };
-        }),
-        postMessage: vi.fn(async () => ({ ok: true, ts: "9.9" })),
-      },
-    };
-  }
+function client(updateFails = false) {
+  return {
+    chat: {
+      update: vi.fn(async () => {
+        if (updateFails) throw new Error("message_not_found");
+        return { ok: true };
+      }),
+      postMessage: vi.fn(async () => ({ ok: true, ts: "9.9" })),
+    },
+  };
+}
 
+describe("updateStatus", () => {
   it("edits the status message in place", async () => {
     const c = client();
     const ts = await updateStatus(c as never, "C", "1.0", "1.5", "done");
@@ -45,5 +45,22 @@ describe("updateStatus", () => {
     await updateStatus(c as never, "C", "1.0", undefined, "done");
     expect(c.chat.update).not.toHaveBeenCalled();
     expect(c.chat.postMessage).toHaveBeenCalledTimes(1);
+  });
+});
+
+// A long run's result must notify the thread, which an edit does not.
+describe("finishStatus", () => {
+  it("closes the status message and posts the result as a new message", async () => {
+    const c = client();
+    await finishStatus(c as never, "C", "1.0", "1.5", "Created `w`.", "✅ Done.", "Done! Created PRs");
+    expect(c.chat.update).toHaveBeenCalledWith({ channel: "C", ts: "1.5", text: "Created `w`.\n\n✅ Done." });
+    expect(c.chat.postMessage).toHaveBeenCalledWith({ channel: "C", thread_ts: "1.0", text: "Done! Created PRs" });
+  });
+
+  it("posts the result only once when the status message cannot be edited", async () => {
+    const c = client(true);
+    await finishStatus(c as never, "C", "1.0", "1.5", undefined, "✅ Done.", "result");
+    expect(c.chat.postMessage).toHaveBeenCalledTimes(1);
+    expect(c.chat.postMessage).toHaveBeenCalledWith({ channel: "C", thread_ts: "1.0", text: "result" });
   });
 });

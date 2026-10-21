@@ -3,14 +3,18 @@ import type { WebClient } from "@slack/web-api";
 /**
  * `ws` and `init` each report through one status message in the thread,
  * edited in place: {@link CREATING_WORKSPACE}, then the workspace header over
- * {@link WORKING}, then the header over the result. A thread bound to a
- * workspace starts from the header, since nothing is created.
+ * {@link WORKING}, then the header over {@link DONE} or {@link FAILED}. A
+ * thread bound to a workspace starts from the header, since nothing is
+ * created. The result itself is posted as a new message: the work usually
+ * takes long, and an edit notifies nobody.
  */
 
 type ChatClient = Pick<WebClient, "chat">;
 
 export const CREATING_WORKSPACE = "🛠 Creating a workspace…";
 export const WORKING = "⏳ Working…";
+export const DONE = "✅ Done.";
+export const FAILED = "❌ Failed.";
 
 export function createdHeader(workspace: string, repositories: string[] = []): string {
   const repos = repositories.length > 0 ? ` with ${repositories.map((r) => `\`${r}\``).join(", ")}` : "";
@@ -65,4 +69,28 @@ export async function updateStatus(
     }
   }
   return postStatus(client, channel, threadTs, text);
+}
+
+/**
+ * Close the status message with `statusLine` under `header`, then post
+ * `result` as a new message. When the status message cannot be edited only
+ * the result is posted, so it never arrives twice.
+ */
+export async function finishStatus(
+  client: ChatClient,
+  channel: string,
+  threadTs: string,
+  messageTs: string | undefined,
+  header: string | undefined,
+  statusLine: string,
+  result: string,
+): Promise<void> {
+  if (messageTs) {
+    try {
+      await client.chat.update({ channel, ts: messageTs, text: composeStatus(header, statusLine) });
+    } catch (err) {
+      console.warn("[slack-server] could not close status message:", err instanceof Error ? err.message : String(err));
+    }
+  }
+  await client.chat.postMessage({ channel, thread_ts: threadTs, text: result });
 }

@@ -33,7 +33,7 @@ describe("notifier status message", () => {
 
   afterEach(() => notifier.stop());
 
-  it("edits one message from creating, to created and working, to done", async () => {
+  it("edits the status message up to done and posts the result as a new message", async () => {
     makeOp("op-1", "autonomous");
     addPendingNotification({ operationId: "op-1", channel: "C", threadTs: "1.0", messageTs: "1.5" });
 
@@ -55,9 +55,14 @@ describe("notifier status message", () => {
     expect(client.chat.update).toHaveBeenLastCalledWith({
       channel: "C",
       ts: "1.5",
-      text: "Created `feature-x-20261021`.\n\nDone! No PRs were created. Please check details on WebUI.",
+      text: "Created `feature-x-20261021`.\n\n✅ Done.",
     });
-    expect(client.chat.postMessage).not.toHaveBeenCalled();
+    expect(client.chat.postMessage).toHaveBeenCalledTimes(1);
+    expect(client.chat.postMessage).toHaveBeenCalledWith({
+      channel: "C",
+      thread_ts: "1.0",
+      text: "Done! No PRs were created. Please check details on WebUI.",
+    });
     expect(listReadyNotifications()).toEqual([]);
   });
 
@@ -76,19 +81,32 @@ describe("notifier status message", () => {
 
     updateOperationStatus("op-1", "completed", new Date().toISOString());
     await notifier.runOnce();
-    const text = (client.chat.update.mock.calls.at(-1) as unknown as [{ text: string }])[0].text;
-    expect(text.startsWith("Working in `bound-ws`.\n\nDone!")).toBe(true);
-    expect(text).not.toContain("No PRs");
+    const status = (client.chat.update.mock.calls.at(-1) as unknown as [{ text: string }])[0].text;
+    expect(status).toBe("Working in `bound-ws`.\n\n✅ Done.");
+    const result = (client.chat.postMessage.mock.calls.at(-1) as unknown as [{ text: string }])[0].text;
+    expect(result.startsWith("Done!")).toBe(true);
+    expect(result).not.toContain("No PRs");
   });
 
-  it("replaces the working line with the failure when the run fails", async () => {
+  it("marks the status message failed and posts the failure when the run fails", async () => {
     makeOp("op-1", "autonomous", "feature-x-20261021");
     addPendingNotification({ operationId: "op-1", channel: "C", threadTs: "1.0", messageTs: "1.5" });
     updateOperationStatus("op-1", "failed", new Date().toISOString());
 
     await notifier.runOnce();
-    const text = (client.chat.update.mock.calls.at(-1) as unknown as [{ text: string }])[0].text;
-    expect(text.startsWith("Created `feature-x-20261021`.\n\n")).toBe(true);
-    expect(text).toContain("failed");
+    const status = (client.chat.update.mock.calls.at(-1) as unknown as [{ text: string }])[0].text;
+    expect(status).toBe("Created `feature-x-20261021`.\n\n❌ Failed.");
+    const result = (client.chat.postMessage.mock.calls.at(-1) as unknown as [{ text: string }])[0].text;
+    expect(result).toContain("failed");
+  });
+
+  it("stays silent about a failure with no status message to correct", async () => {
+    makeOp("op-1", "autonomous", "feature-x-20261021");
+    addPendingNotification({ operationId: "op-1", channel: "C", threadTs: "1.0" });
+    updateOperationStatus("op-1", "failed", new Date().toISOString());
+
+    await notifier.runOnce();
+    expect(client.chat.update).not.toHaveBeenCalled();
+    expect(client.chat.postMessage).not.toHaveBeenCalled();
   });
 });

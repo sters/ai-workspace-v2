@@ -16,6 +16,8 @@ import {
   composeStatus,
   createdHeader,
   CREATING_WORKSPACE,
+  DONE,
+  finishStatus,
   postStatus,
   updateStatus,
   WORKING,
@@ -157,11 +159,12 @@ interface ThreadStatus {
 }
 
 /**
- * Handle a free-form conversation mention: post a placeholder in the thread
- * (or take over `status`), run a Claude query (continuing the thread's session
- * if one exists), then edit the placeholder with the reply. On any Slack API
- * failure along the way we fall back to posting a fresh message so the user
- * always gets an answer.
+ * Handle a free-form conversation mention: post a placeholder in the thread,
+ * run a Claude query (continuing the thread's session if one exists), then
+ * edit the placeholder with the reply. Given `status` instead, the turn shows
+ * its progress there, closes it as done and posts the reply as a new message.
+ * On any Slack API failure along the way we fall back to posting a fresh
+ * message so the user always gets an answer.
  *
  * The Slack thread (`thread_ts ?? ts`) is the conversation key, so follow-up
  * mentions in the same thread continue the same Claude session. `userId` scopes
@@ -271,13 +274,18 @@ async function runConversationTurn(
   }
   finished = true;
 
-  await updateStatus(client, mention.channel, threadTs, placeholderTs, composeStatus(header, reply));
+  if (status) {
+    await finishStatus(client, mention.channel, threadTs, placeholderTs, header, DONE, reply);
+    return;
+  }
+  await updateStatus(client, mention.channel, threadTs, placeholderTs, reply);
 }
 
 /**
  * Handle `ws`: create a workspace for the request, bind the thread to it, then
  * hand the request to the thread's first conversation turn inside it. One
- * status message carries all of it, from creating through the turn's reply.
+ * status message carries all of it, from creating through the turn's
+ * progress; the reply is a message of its own.
  *
  * Any session the thread already had is dropped on binding: it ran at the
  * ai-workspace root under the read-only prompt, and resuming it from the

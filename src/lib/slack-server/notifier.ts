@@ -11,7 +11,7 @@ import {
 import { extractPrUrls, type PrUrlInfo } from "@/lib/workspace/pr-url";
 import { README_CLARITY_PHASE_LABEL, README_CLARITY_STOP_PREFIX } from "@/lib/templates/prompts/readme-clarity-gate";
 import { FINAL_CYCLE_STOP_PREFIX } from "@/lib/templates/prompts/autonomous-gate";
-import { composeStatus, createdHeader, updateStatus, WORKING } from "./status-message";
+import { composeStatus, createdHeader, DONE, FAILED, finishStatus, WORKING } from "./status-message";
 
 /** Phase label set by the autonomous pipeline for the Create PR step
  * (`src/lib/pipelines/autonomous.ts`, `buildCreatePrPhase`). Filtering by
@@ -43,13 +43,14 @@ export interface Notifier {
  * Start a polling loop that keeps each tracked run's status message current:
  *   1. a running operation whose workspace has just been created gets the
  *      workspace header over the working line
- *   2. a `completed` one gets the result (created PRs, or why it stopped)
- *   3. a `failed` one gets the failure, only when there is a status message
- *      to correct; a row without one is dropped silently
+ *   2. a `completed` one is closed as done, and the result (created PRs, or
+ *      why it stopped) posted as a new message
+ *   3. a `failed` one is closed as failed and the failure posted, only when
+ *      there is a status message to correct; a row without one is dropped
+ *      silently
  *   4. a finished row is always deleted once handled
  *
- * The status message is edited in place, and a fresh message is posted only
- * when it cannot be. Errors per row are logged but never crash the loop.
+ * Errors per row are logged but never crash the loop.
  */
 export function startNotifier(opts: NotifierOptions): Notifier {
   const intervalMs = opts.intervalMs ?? DEFAULT_INTERVAL_MS;
@@ -113,7 +114,15 @@ export function startNotifier(opts: NotifierOptions): Notifier {
           body = FAILED_MSG;
         }
         if (body !== undefined) {
-          await updateStatus(opts.client, row.channel, row.threadTs, row.messageTs, composeStatus(header, body));
+          await finishStatus(
+            opts.client,
+            row.channel,
+            row.threadTs,
+            row.messageTs,
+            header,
+            row.status === "completed" ? DONE : FAILED,
+            body,
+          );
         }
       } catch (err) {
         console.error(
