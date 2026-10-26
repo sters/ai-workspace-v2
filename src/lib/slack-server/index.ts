@@ -1,6 +1,7 @@
 import { App, LogLevel } from "@slack/bolt";
 import type { WebClient } from "@slack/web-api";
 import type { AppMentionEvent } from "@slack/types";
+import { unarchiveWorkspace } from "@/lib/db/archives";
 import { addPendingNotification } from "@/lib/db/slack-notifications";
 import { deleteSession } from "@/lib/db/slack-sessions";
 import { bindThreadWorkspace, endThreadTurn, startThreadTurn } from "@/lib/db/slack-thread-workspaces";
@@ -83,7 +84,9 @@ export async function startSlackServer(opts: SlackServerOptions): Promise<Runnin
     const parsed = parseCommand(mention.text ?? "");
     if (!parsed.ok) {
       if (parsed.kind === "chat") {
-        await handleConversation(client, mention, parsed.message, user, await resolveBoundWorkspace(threadTs));
+        const bound = await resolveBoundWorkspace(threadTs);
+        if (bound) unarchiveWorkspace(bound.name);
+        await handleConversation(client, mention, parsed.message, user, bound);
       } else {
         await say({ text: parsed.reply, thread_ts: threadTs });
       }

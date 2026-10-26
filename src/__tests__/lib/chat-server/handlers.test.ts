@@ -53,6 +53,12 @@ vi.mock("@/lib/db/chat-sessions", () => ({
   deleteChatSession: vi.fn(),
 }));
 
+const mockUnarchiveWorkspace = vi.fn();
+
+vi.mock("@/lib/db/archives", () => ({
+  unarchiveWorkspace: (...args: unknown[]) => mockUnarchiveWorkspace(...args),
+}));
+
 /** Slack threads by key: the workspace each is bound to, its CLI session and its turn in flight. */
 const slackThreads = new Map<string, { workspace: string; sessionId?: string; turnStartedAt?: number }>();
 const mockSetSession = vi.fn();
@@ -94,6 +100,7 @@ beforeEach(() => {
   setChatModel("sonnet");
   slackThreads.clear();
   mockSetSession.mockReset();
+  mockUnarchiveWorkspace.mockReset();
 
   // Reset the chat-server store to avoid leakage between tests via globalThis.
   const g = globalThis as unknown as {
@@ -194,6 +201,19 @@ describe("handleStart", () => {
       .filter((m) => m.type === "error");
     expect(errors).toHaveLength(1);
     expect(errors[0].message).toMatch(/README/);
+  });
+
+  it("unarchives the workspace it starts a session in", async () => {
+    await startSession();
+
+    expect(mockUnarchiveWorkspace).toHaveBeenCalledWith(WITH_README);
+  });
+
+  it("leaves the workspace archived when the start is refused", async () => {
+    const { handleStart } = await import("@/lib/chat-server/handlers");
+    await handleStart(makeWs(), { type: "start", workspaceId: WITHOUT_README });
+
+    expect(mockUnarchiveWorkspace).not.toHaveBeenCalled();
   });
 
   it("leaves the caller's live session intact when a start is refused", async () => {

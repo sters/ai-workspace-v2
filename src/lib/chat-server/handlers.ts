@@ -7,6 +7,7 @@ import { buildInitPrompt, buildReviewChatPrompt, buildResearchChatPrompt, buildT
 import { ensureSessionSystemPrompt, cleanupSessionSystemPrompt } from "@/lib/workspace/prompts";
 import type { ChatSession, ClientMessage, ServerMessage, WsData } from "@/types/chat-server";
 import { getConfig, getResolvedWorkspaceRoot } from "@/lib/config";
+import { unarchiveWorkspace } from "@/lib/db/archives";
 import { setSession } from "@/lib/db/slack-sessions";
 
 export function send(ws: { send(data: string): void }, msg: ServerMessage) {
@@ -193,6 +194,7 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
   };
   store.__chatSessions!.set(sessionId, session);
   persistSessionCreated(session);
+  unarchiveWorkspace(msg.workspaceId);
 
   // Forward PTY output to buffer (raw bytes) + active WebSocket (decoded text)
   const outputListener: DataListener = (data, rawData) => {

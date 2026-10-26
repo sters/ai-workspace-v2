@@ -8,6 +8,8 @@ import {
   ConcurrencyLimitError,
   getMaxConcurrentOperations,
 } from "@/lib/pipeline-manager";
+import { getDb, _resetDb, _setDbPath } from "@/lib/db";
+import { archiveWorkspace, isWorkspaceArchived } from "@/lib/db/archives";
 
 vi.mock("@/lib/claude", () => ({
   runClaude: vi.fn(() => ({
@@ -148,6 +150,35 @@ describe("pipeline-manager concurrency", () => {
         { kind: "function", label: "test", fn: async () => true },
       ]);
     }).not.toThrow();
+  });
+});
+
+describe("pipeline-manager archive", () => {
+  beforeEach(() => {
+    getGlobalOps().clear();
+    _resetDb();
+    _setDbPath(":memory:");
+    getDb();
+  });
+
+  it("unarchives the workspace an operation starts on", () => {
+    archiveWorkspace("ws-1");
+
+    startOperationPipeline("execute", "ws-1", [
+      { kind: "function", label: "test", fn: async () => true },
+    ]);
+
+    expect(isWorkspaceArchived("ws-1")).toBe(false);
+  });
+
+  it("keeps a workspace being deleted archived", () => {
+    archiveWorkspace("ws-1");
+
+    startOperationPipeline("delete", "ws-1", [
+      { kind: "function", label: "test", fn: async () => true },
+    ]);
+
+    expect(isWorkspaceArchived("ws-1")).toBe(true);
   });
 });
 

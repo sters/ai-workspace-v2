@@ -7,6 +7,7 @@ import { emitStatus } from "./events";
 import { gcCompletedOperations } from "./gc";
 import { getPhaseLabel } from "./phase-helpers";
 import { insertOperation, startAutoFlush } from "@/lib/db";
+import { unarchiveWorkspace } from "@/lib/db/archives";
 import { executePipelinePhases } from "./execute-phases";
 
 export function startOperationPipeline(
@@ -66,6 +67,7 @@ export function startOperationPipeline(
   // Persist to SQLite first — if this fails, no memory orphan
   insertOperation(operation);
   startAutoFlush(id);
+  if (type !== "delete") unarchiveWorkspace(workspace);
 
   operations.set(id, managed);
   emitStatus(managed, `Starting pipeline with ${phases.length} phases`);
