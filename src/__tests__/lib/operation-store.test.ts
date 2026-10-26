@@ -8,7 +8,7 @@ import {
   deleteStoredOperationsForWorkspace,
 } from "@/lib/operation-store";
 import type { Operation, OperationEvent } from "@/types/operation";
-import { getDb, _resetDb, _setDbPath, insertOperation, appendEvents } from "@/lib/db";
+import { getDb, _resetDb, _setDbPath, insertOperation, appendEvents, getOperation } from "@/lib/db";
 import { extractResultSummary } from "@/lib/parsers/stream";
 
 const ID1 = "00000000-0000-4000-8000-000000000001";
@@ -90,6 +90,13 @@ describe("operation-store", () => {
       const result = readOperationLog(ID2);
 
       expect(result!.events[0]).toEqual(events[0]);
+    });
+
+    it("settles an operation that failed before its workspace was set", () => {
+      const op = makeOperation(ID1, { type: "autonomous", workspace: "", status: "running", completedAt: undefined });
+      insertOperation(op);
+      writeOperationLog({ ...op, status: "failed", completedAt: new Date().toISOString() });
+      expect(getOperation(ID1)?.status).toBe("failed");
     });
 
     it("reads with explicit workspace without scanning all dirs", () => {

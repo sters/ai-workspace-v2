@@ -3,7 +3,7 @@ import {
   updateOperationStatus,
   updateOperationMeta,
 } from "../db";
-import { validateId, validateWorkspace } from "./constants";
+import { validateId } from "./constants";
 
 /**
  * Persist a completed operation to SQLite.
@@ -18,7 +18,6 @@ export function writeOperationLog(
   resultSummary?: OperationResultSummary,
 ): void {
   if (!validateId(operation.id)) return;
-  if (!validateWorkspace(operation.workspace)) return;
 
   updateOperationStatus(
     operation.id,
