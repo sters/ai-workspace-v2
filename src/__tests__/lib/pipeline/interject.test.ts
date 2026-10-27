@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockKillOperation = vi.fn();
 const mockWhenOperationFinished = vi.fn();
 const mockStartOperationPipeline = vi.fn();
-const mockFindRunningOpByWorkspace = vi.fn();
+const mockFindRunningOpsByWorkspace = vi.fn();
 const mockSubscribeToOperation = vi.fn();
 const mockBuildAutonomousPipeline = vi.fn(() => [{ kind: "single" }]);
 
@@ -12,7 +12,7 @@ vi.mock("@/lib/pipeline", () => ({
   killOperation: (...a: unknown[]) => mockKillOperation(...a),
   whenOperationFinished: (...a: unknown[]) => mockWhenOperationFinished(...a),
   startOperationPipeline: (...a: unknown[]) => mockStartOperationPipeline(...a),
-  findRunningOpByWorkspace: (...a: unknown[]) => mockFindRunningOpByWorkspace(...a),
+  findRunningOpsByWorkspace: (...a: unknown[]) => mockFindRunningOpsByWorkspace(...a),
   subscribeToOperation: (...a: unknown[]) => mockSubscribeToOperation(...a),
 }));
 
@@ -36,7 +36,7 @@ beforeEach(() => {
   mockKillOperation.mockReset();
   mockWhenOperationFinished.mockReset().mockResolvedValue(undefined);
   mockStartOperationPipeline.mockReset();
-  mockFindRunningOpByWorkspace.mockReset();
+  mockFindRunningOpsByWorkspace.mockReset();
   mockSubscribeToOperation.mockReset();
   mockBuildAutonomousPipeline.mockClear();
   interjectsInFlight.clear();
@@ -57,7 +57,7 @@ describe("acquireInterject / releaseInterject", () => {
 
 describe("killAndAwait", () => {
   it("returns wasAutonomous=false and no inputs when nothing is running", async () => {
-    mockFindRunningOpByWorkspace.mockReturnValue(undefined);
+    mockFindRunningOpsByWorkspace.mockReturnValue([]);
     const result = await killAndAwait("ws-a");
     expect(result).toEqual({ wasAutonomous: false });
     expect(mockKillOperation).not.toHaveBeenCalled();
@@ -65,17 +65,28 @@ describe("killAndAwait", () => {
   });
 
   it("kills and awaits when something is running", async () => {
-    mockFindRunningOpByWorkspace.mockReturnValue({
-      operation: { id: "op-1", type: "execute", workspace: "ws-a", status: "running" },
-    });
+    mockFindRunningOpsByWorkspace.mockReturnValue([
+      { operation: { id: "op-1", type: "execute", workspace: "ws-a", status: "running" } },
+    ]);
     const result = await killAndAwait("ws-a");
     expect(mockKillOperation).toHaveBeenCalledWith("op-1");
     expect(mockWhenOperationFinished).toHaveBeenCalledWith("op-1");
     expect(result).toEqual({ wasAutonomous: false });
   });
 
+  it("kills every operation running on the workspace", async () => {
+    mockFindRunningOpsByWorkspace.mockReturnValue([
+      { operation: { id: "op-1", type: "execute", workspace: "ws-a", status: "running", inputs: { repo: "widgets" } } },
+      { operation: { id: "auto-1", type: "autonomous", workspace: "ws-a", status: "running", inputs: { repo: "gadgets" } } },
+    ]);
+    const result = await killAndAwait("ws-a");
+    expect(mockKillOperation.mock.calls).toEqual([["op-1"], ["auto-1"]]);
+    expect(mockWhenOperationFinished.mock.calls).toEqual([["op-1"], ["auto-1"]]);
+    expect(result).toEqual({ wasAutonomous: true, autonomousInputs: { repo: "gadgets" } });
+  });
+
   it("captures inputs and flags wasAutonomous when running op is autonomous", async () => {
-    mockFindRunningOpByWorkspace.mockReturnValue({
+    mockFindRunningOpsByWorkspace.mockReturnValue([{
       operation: {
         id: "auto-1",
         type: "autonomous",
@@ -83,7 +94,7 @@ describe("killAndAwait", () => {
         status: "running",
         inputs: { description: "task", maxLoops: "3" },
       },
-    });
+    }]);
     const result = await killAndAwait("ws-a");
     expect(result.wasAutonomous).toBe(true);
     expect(result.autonomousInputs).toEqual({ description: "task", maxLoops: "3" });

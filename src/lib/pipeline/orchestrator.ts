@@ -2,13 +2,14 @@ import type { Operation, OperationPhaseInfo, OperationType } from "@/types/opera
 import type { PipelinePhase, PipelineOptions } from "@/types/pipeline";
 import type { ManagedOperation } from "./types";
 import { operations, nextId } from "./store";
-import { getMaxConcurrentOperations, ConcurrencyLimitError } from "./constants";
+import { getMaxConcurrentOperations, ConcurrencyLimitError, WorkspaceBusyError } from "./constants";
 import { emitStatus } from "./events";
 import { gcCompletedOperations } from "./gc";
 import { getPhaseLabel } from "./phase-helpers";
 import { insertOperation, startAutoFlush } from "@/lib/db";
 import { unarchiveWorkspace } from "@/lib/db/archives";
 import { executePipelinePhases } from "./execute-phases";
+import { blocksOperation } from "@/lib/operation-conflict";
 
 export function startOperationPipeline(
   type: OperationType,
@@ -21,7 +22,11 @@ export function startOperationPipeline(
 
   let running = 0;
   for (const managed of operations.values()) {
-    if (managed.operation.status === "running") running++;
+    if (managed.operation.status !== "running") continue;
+    running++;
+    if (blocksOperation(managed.operation, workspace, inputs?.repo)) {
+      throw new WorkspaceBusyError(workspace, managed.operation.type);
+    }
   }
   if (running >= getMaxConcurrentOperations()) {
     throw new ConcurrencyLimitError(running);

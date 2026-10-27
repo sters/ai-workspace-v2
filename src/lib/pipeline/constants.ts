@@ -57,9 +57,24 @@ export function executePhaseBudgetMs(batchCount: number, batchSize: number): num
 }
 
 export class ConcurrencyLimitError extends Error {
-  constructor(running: number) {
-    super(`Too many concurrent operations (${running}/${getMaxConcurrentOperations()}). Try again later.`);
+  constructor(
+    running: number,
+    message = `Too many concurrent operations (${running}/${getMaxConcurrentOperations()}). Try again later.`,
+  ) {
+    super(message);
     this.name = "ConcurrencyLimitError";
+  }
+}
+
+/**
+ * The workspace, or the repository the operation targets, already has a
+ * running operation. A `ConcurrencyLimitError` so every route refuses it the
+ * same way.
+ */
+export class WorkspaceBusyError extends ConcurrencyLimitError {
+  constructor(workspace: string, runningType: OperationType) {
+    super(0, `A ${runningType} operation is already running on ${workspace}. Wait for it to finish.`);
+    this.name = "WorkspaceBusyError";
   }
 }
 

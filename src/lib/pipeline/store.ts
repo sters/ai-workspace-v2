@@ -19,11 +19,8 @@ export function nextId(): string {
   return crypto.randomUUID();
 }
 
-export function findRunningOpByWorkspace(workspace: string): ManagedOperation | undefined {
-  for (const managed of operations.values()) {
-    if (managed.operation.workspace === workspace && managed.operation.status === "running") {
-      return managed;
-    }
-  }
-  return undefined;
+export function findRunningOpsByWorkspace(workspace: string): ManagedOperation[] {
+  return [...operations.values()].filter(
+    (managed) => managed.operation.workspace === workspace && managed.operation.status === "running",
+  );
 }

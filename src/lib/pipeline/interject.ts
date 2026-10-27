@@ -3,7 +3,7 @@ import {
   killOperation,
   whenOperationFinished,
   startOperationPipeline,
-  findRunningOpByWorkspace,
+  findRunningOpsByWorkspace,
   subscribeToOperation,
 } from "@/lib/pipeline";
 import { interjectsInFlight } from "./store";
@@ -23,17 +23,17 @@ export async function killAndAwait(workspace: string): Promise<{
   wasAutonomous: boolean;
   autonomousInputs?: Record<string, string>;
 }> {
-  const running = findRunningOpByWorkspace(workspace);
-  if (!running) return { wasAutonomous: false };
+  const running = findRunningOpsByWorkspace(workspace);
+  // Several can run at once, one per repository; only the first autonomous one is restarted.
+  const autonomous = running.find((managed) => managed.operation.type === "autonomous");
 
-  const wasAutonomous = running.operation.type === "autonomous";
-  const autonomousInputs = wasAutonomous ? { ...(running.operation.inputs ?? {}) } : undefined;
+  for (const managed of running) {
+    killOperation(managed.operation.id);
+    await whenOperationFinished(managed.operation.id);
+  }
 
-  killOperation(running.operation.id);
-  await whenOperationFinished(running.operation.id);
-
-  return wasAutonomous && autonomousInputs
-    ? { wasAutonomous: true, autonomousInputs }
+  return autonomous
+    ? { wasAutonomous: true, autonomousInputs: { ...(autonomous.operation.inputs ?? {}) } }
     : { wasAutonomous: false };
 }
 

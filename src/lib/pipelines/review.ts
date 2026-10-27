@@ -615,7 +615,8 @@ export async function startUserReview(
     carryPostedFindings: true,
     refreshFromRemote: options.refreshFromRemote,
   });
-  return startOperationPipeline("review", workspace, phases, undefined,
-    options.refreshFromRemote ? { refreshFromRemote: "true" } : undefined,
-  );
+  return startOperationPipeline("review", workspace, phases, undefined, {
+    ...(options.refreshFromRemote && { refreshFromRemote: "true" }),
+    ...(options.repository && { repo: options.repository }),
+  });
 }

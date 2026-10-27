@@ -39,7 +39,7 @@ export function OperationPanel({
    */
   onArchived?: () => void;
 }) {
-  const { operations, isWorkspaceRunning, isWorkspaceTypeRunning } = useRunningOperations();
+  const { operations, isWorkspaceRunning } = useRunningOperations();
   const isRunning = isWorkspaceRunning(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
   const { openers } = useOpeners();
@@ -110,7 +110,7 @@ export function OperationPanel({
           onClick={() =>
             startAndNavigate("autonomous", body({ startWith: "execute" }))
           }
-          disabled={isWorkspaceTypeRunning(workspaceName, "execute")}
+          disabled={isRunning}
           items={[
             {
               label: "Execute only",
@@ -122,7 +122,7 @@ export function OperationPanel({
           variant="secondary"
           label={<><ClipboardCheck className="h-3.5 w-3.5" /> Review</>}
           onClick={() => startAndNavigate("review", body())}
-          disabled={isWorkspaceTypeRunning(workspaceName, "review")}
+          disabled={isRunning}
           items={[
             {
               // Fetches and fast-forwards each worktree first, so a PR that
@@ -138,7 +138,7 @@ export function OperationPanel({
         <RepositoryActionButton
           label={<><GitPullRequest className="h-3.5 w-3.5" /> Create PR</>}
           onClick={() => startAndNavigate("create-pr", body())}
-          disabled={isWorkspaceTypeRunning(workspaceName, "create-pr")}
+          disabled={isRunning}
           repositories={repositories}
           onRepoClick={(repo) =>
             startAndNavigate("create-pr", body({ repository: repo.path }))
@@ -174,7 +174,7 @@ export function OperationPanel({
             onClick={() =>
               startAndNavigate("delete", { workspace: workspacePath })
             }
-            disabled={isWorkspaceTypeRunning(workspaceName, "delete")}
+            disabled={isRunning}
           >
             <Trash2 className="h-3.5 w-3.5" /> Delete workspace
           </Button>

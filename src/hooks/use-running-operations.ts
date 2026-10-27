@@ -3,6 +3,7 @@
 import useSWR from "swr";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import { fetcher } from "@/lib/api";
+import { blocksOperation } from "@/lib/operation-conflict";
 
 /**
  * Expand a batch operation into the individual operation types it encompasses,
@@ -38,10 +39,6 @@ export function useRunningOperations() {
 
   const runningWorkspaces = new Set<string>();
   const runningWorkspaceTypes = new Map<string, Set<OperationType>>();
-  /** Map of "workspace\0type\0repo" → true for operations targeting a specific repo. */
-  const runningRepoOps = new Set<string>();
-  /** Track which workspace+type combos have a workspace-wide (no repo) operation. */
-  const workspaceWideOps = new Set<string>();
 
   for (const op of operations) {
     runningWorkspaces.add(op.workspace);
@@ -54,13 +51,6 @@ export function useRunningOperations() {
       for (const t of expandBatchTypes(op.inputs)) types.add(t);
     } else {
       types.add(op.type);
-    }
-
-    const repo = op.inputs?.repo;
-    if (repo) {
-      runningRepoOps.add(`${op.workspace}\0${op.type}\0${repo}`);
-    } else {
-      workspaceWideOps.add(`${op.workspace}\0${op.type}`);
     }
   }
 
@@ -78,20 +68,9 @@ export function useRunningOperations() {
     return types.has(type);
   };
 
-  /**
-   * Check if a specific repo is blocked by a running operation of the given type.
-   * Returns true if:
-   * - A workspace-wide (no repo) operation of that type is running, OR
-   * - A repo-specific operation of that type is running for this exact repo.
-   */
-  const isRepoTypeRunning = (
-    workspace: string,
-    type: OperationType,
-    repo: string,
-  ): boolean => {
-    if (workspaceWideOps.has(`${workspace}\0${type}`)) return true;
-    return runningRepoOps.has(`${workspace}\0${type}\0${repo}`);
-  };
+  /** Whether the server would refuse an operation on `repo` of `workspace` (see `blocksOperation`). */
+  const isRepoBusy = (workspace: string, repo: string): boolean =>
+    operations.some((op) => blocksOperation(op, workspace, repo));
 
-  return { operations, runningWorkspaces, isWorkspaceRunning, isWorkspaceTypeRunning, isRepoTypeRunning, mutate };
+  return { operations, runningWorkspaces, isWorkspaceRunning, isWorkspaceTypeRunning, isRepoBusy, mutate };
 }

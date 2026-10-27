@@ -2,6 +2,7 @@ export { startOperationPipeline } from "./orchestrator";
 export {
   getMaxConcurrentOperations,
   ConcurrencyLimitError,
+  WorkspaceBusyError,
   getTimeoutDefaults,
 } from "./constants";
 export {
@@ -13,6 +14,6 @@ export {
   deleteOperation,
 } from "./queries";
 export { killOperation, submitAnswer, whenOperationFinished } from "./controls";
-export { findRunningOpByWorkspace, interjectsInFlight } from "./store";
+export { findRunningOpsByWorkspace, interjectsInFlight } from "./store";
 export { _gc } from "./gc";
 export { failStaleOperations } from "./cleanup-stale";

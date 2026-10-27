@@ -28,9 +28,10 @@ export async function POST(request: Request) {
 
   try {
     const phases = await buildCreatePrPipeline({ workspace, draft: draft !== false, repository });
-    const operation = startOperationPipeline("create-pr", workspace, phases, undefined,
-      draft === false ? { draft: "false" } : undefined,
-    );
+    const operation = startOperationPipeline("create-pr", workspace, phases, undefined, {
+      ...(draft === false && { draft: "false" }),
+      ...(repository && { repo: repository }),
+    });
     return NextResponse.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {

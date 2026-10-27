@@ -26,7 +26,9 @@ export async function POST(request: Request) {
 
   try {
     const phases = await buildExecutePipeline({ workspace, repository: data.repository });
-    const operation = startOperationPipeline("execute", workspace, phases);
+    const operation = startOperationPipeline("execute", workspace, phases, undefined,
+      data.repository ? { repo: data.repository } : undefined,
+    );
     return NextResponse.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {

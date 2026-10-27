@@ -43,7 +43,7 @@ export function TodoUpdater({
   workspaceName: string;
   repositories?: { alias: string; path: string }[];
 }) {
-  const { isWorkspaceRunning, isWorkspaceTypeRunning, isRepoTypeRunning } = useRunningOperations();
+  const { isWorkspaceRunning, isWorkspaceTypeRunning, isRepoBusy } = useRunningOperations();
   const isUpdateTodoRunning = isWorkspaceTypeRunning(workspaceName, "update-todo");
   const canInterject = !isUpdateTodoRunning && isWorkspaceRunning(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
@@ -130,7 +130,7 @@ export function TodoUpdater({
           key={todo.filename}
           todo={todo}
           workspacePath={workspacePath}
-          disabled={isRepoTypeRunning(workspaceName, "update-todo", todo.repoName)}
+          disabled={isRepoBusy(workspaceName, todo.repoName)}
           workspaceBusy={isWorkspaceRunning(workspaceName)}
           repoPath={findRepoPath(todo.repoName, repositories ?? [])}
           onStartAndNavigate={startAndNavigate}

@@ -6,6 +6,7 @@ import {
   killOperation,
   subscribeToOperation,
   ConcurrencyLimitError,
+  WorkspaceBusyError,
   getMaxConcurrentOperations,
 } from "@/lib/pipeline-manager";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
@@ -309,5 +310,34 @@ describe("pipeline-manager phase timeout", () => {
       e.data.includes("timed out after 50ms"),
     );
     expect(timedOutEvent).toBeDefined();
+  });
+});
+
+describe("pipeline-manager workspace conflicts", () => {
+  const phases = () => [{ kind: "function" as const, label: "test", fn: () => new Promise<boolean>(() => {}) }];
+
+  beforeEach(() => {
+    getGlobalOps().clear();
+  });
+
+  it("refuses a second operation on a repository that already has one running", () => {
+    startOperationPipeline("execute", "ws-1", phases(), undefined, { repo: "github.com/acme/widgets" });
+
+    expect(() =>
+      startOperationPipeline("review", "ws-1", phases(), undefined, { repo: "widgets" }),
+    ).toThrow(WorkspaceBusyError);
+    expect(() => startOperationPipeline("delete", "ws-1", phases())).toThrow(WorkspaceBusyError);
+    expect(() =>
+      startOperationPipeline("execute", "ws-1", phases(), undefined, { repo: "github.com/acme/gadgets" }),
+    ).not.toThrow();
+  });
+
+  it("refuses any operation on a workspace running a workspace-wide one", () => {
+    startOperationPipeline("autonomous", "ws-1", phases());
+
+    expect(() =>
+      startOperationPipeline("execute", "ws-1", phases(), undefined, { repo: "widgets" }),
+    ).toThrow(WorkspaceBusyError);
+    expect(() => startOperationPipeline("execute", "ws-2", phases())).not.toThrow();
   });
 });

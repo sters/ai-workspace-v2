@@ -40,7 +40,7 @@ export function RepoTodoCard({
   disabled: boolean;
   /**
    * Whether any operation is running on the workspace. Separate from `disabled`
-   * (which is this repo's update-todo) because merging the base branch writes to
+   * (an operation holding this repository) because merging the base branch writes to
    * the worktree and pushes, so it must not start under a running executor.
    */
   workspaceBusy?: boolean;

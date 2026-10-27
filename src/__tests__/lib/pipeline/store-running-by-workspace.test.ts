@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect, beforeEach } from "vitest";
-import { operations, findRunningOpByWorkspace } from "@/lib/pipeline/store";
+import { operations, findRunningOpsByWorkspace } from "@/lib/pipeline/store";
 import type { ManagedOperation } from "@/lib/pipeline/types";
 import type { Operation } from "@/types/operation";
 
@@ -28,23 +28,24 @@ function makeManaged(
   };
 }
 
-describe("findRunningOpByWorkspace", () => {
+describe("findRunningOpsByWorkspace", () => {
   beforeEach(() => {
     operations.clear();
   });
 
-  it("returns undefined when no op exists for workspace", () => {
-    expect(findRunningOpByWorkspace("missing")).toBeUndefined();
+  it("returns nothing when no op exists for workspace", () => {
+    expect(findRunningOpsByWorkspace("missing")).toEqual([]);
   });
 
-  it("returns the running op for the workspace", () => {
-    const managed = makeManaged("op-1", "ws-a", "running");
-    operations.set("op-1", managed);
-    expect(findRunningOpByWorkspace("ws-a")?.operation.id).toBe("op-1");
+  it("returns every running op for the workspace", () => {
+    operations.set("op-1", makeManaged("op-1", "ws-a", "running"));
+    operations.set("op-2", makeManaged("op-2", "ws-a", "running"));
+    operations.set("op-3", makeManaged("op-3", "ws-b", "running"));
+    expect(findRunningOpsByWorkspace("ws-a").map((m) => m.operation.id)).toEqual(["op-1", "op-2"]);
   });
 
   it("ignores completed ops", () => {
     operations.set("op-1", makeManaged("op-1", "ws-a", "completed"));
-    expect(findRunningOpByWorkspace("ws-a")).toBeUndefined();
+    expect(findRunningOpsByWorkspace("ws-a")).toEqual([]);
   });
 });

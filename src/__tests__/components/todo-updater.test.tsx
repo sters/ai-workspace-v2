@@ -40,7 +40,7 @@ function setRunning(opts: { workspaceRunning?: boolean; updateTodoRunning?: bool
     isWorkspaceRunning: () => Boolean(opts.workspaceRunning),
     isWorkspaceTypeRunning: (_ws: string, type: string) =>
       type === "update-todo" ? Boolean(opts.updateTodoRunning) : false,
-    isRepoTypeRunning: () => false,
+    isRepoBusy: () => false,
   });
 }
 
