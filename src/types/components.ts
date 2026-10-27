@@ -13,6 +13,8 @@ export type ButtonVariant =
 export interface SplitButtonItem {
   label: string;
   onClick: () => void | Promise<unknown>;
+  /** Overrides the button's `disabled` for this item, so a busy button can keep some items open. */
+  disabled?: boolean;
 }
 
 export type SplitButtonVariant = "primary" | "secondary" | "outline";

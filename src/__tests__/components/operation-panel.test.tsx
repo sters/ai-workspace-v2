@@ -18,11 +18,13 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+let busyRepo: string | undefined;
 vi.mock("@/hooks/use-running-operations", () => ({
   useRunningOperations: () => ({
     operations: [],
-    isWorkspaceRunning: () => false,
+    isWorkspaceRunning: () => busyRepo !== undefined,
     isWorkspaceTypeRunning: () => false,
+    isRepoBusy: (_ws: string, repo: string) => busyRepo !== undefined && repo === busyRepo,
   }),
 }));
 
@@ -40,6 +42,35 @@ vi.mock("@/components/shared/feedback/toast", () => ({
 }));
 
 import { OperationPanel } from "@/components/workspace/operation-panel";
+
+describe("OperationPanel Create PR", () => {
+  afterEach(() => {
+    busyRepo = undefined;
+  });
+
+  it("keeps the repositories without a running operation selectable while the workspace is busy", async () => {
+    busyRepo = "github.com/acme/widgets";
+    render(
+      <OperationPanel
+        workspaceName="ws"
+        workspacePath="/tmp/ws"
+        repositories={[
+          { alias: "widgets", path: "github.com/acme/widgets" },
+          { alias: "gadgets", path: "github.com/acme/gadgets" },
+        ]}
+      />,
+    );
+
+    const main = screen.getByRole("button", { name: /Create PR/ });
+    expect(main).toBeDisabled();
+    const dropdown = main.nextElementSibling as HTMLElement;
+    expect(dropdown).toBeEnabled();
+
+    await userEvent.click(dropdown);
+    expect(screen.getByRole("menuitem", { name: "widgets" })).toBeDisabled();
+    expect(screen.getByRole("menuitem", { name: "gadgets" })).toBeEnabled();
+  });
+});
 
 describe("OperationPanel archive button", () => {
   let fetchMock: ReturnType<typeof vi.fn>;

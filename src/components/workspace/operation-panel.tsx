@@ -39,7 +39,7 @@ export function OperationPanel({
    */
   onArchived?: () => void;
 }) {
-  const { operations, isWorkspaceRunning } = useRunningOperations();
+  const { operations, isWorkspaceRunning, isRepoBusy } = useRunningOperations();
   const isRunning = isWorkspaceRunning(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
   const { openers } = useOpeners();
@@ -143,6 +143,7 @@ export function OperationPanel({
           onRepoClick={(repo) =>
             startAndNavigate("create-pr", body({ repository: repo.path }))
           }
+          isRepoDisabled={(repo) => isRepoBusy(workspaceName, repo.path)}
         />
         {openerMenuItems.length > 0 && (
           <DropdownMenu

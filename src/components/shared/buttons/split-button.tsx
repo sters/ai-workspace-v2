@@ -46,6 +46,7 @@ export function SplitButton({
   const [itemPending, setItemPending] = useState(false);
 
   const pending = mainPending || itemPending;
+  const itemDisabled = (item: SplitButtonItem) => item.disabled ?? Boolean(disabled);
 
   useEffect(() => {
     if (!open) return;
@@ -90,7 +91,7 @@ export function SplitButton({
       </button>
       <button
         onClick={() => setOpen(!open)}
-        disabled={disabled || pending}
+        disabled={pending || items.every(itemDisabled)}
         className={dropClass}
         aria-label="More options"
         aria-expanded={open}
@@ -121,6 +122,7 @@ export function SplitButton({
               key={index}
               ref={(el) => { menuItemsRef.current[index] = el; }}
               role="menuitem"
+              disabled={itemDisabled(item)}
               onClick={() => {
                 setOpen(false);
                 const result = item.onClick();
@@ -129,7 +131,7 @@ export function SplitButton({
                   (result as Promise<unknown>).finally(() => setItemPending(false));
                 }
               }}
-              className="w-full px-3 py-1.5 text-left text-sm text-foreground hover:bg-accent"
+              className="w-full px-3 py-1.5 text-left text-sm text-foreground hover:bg-accent disabled:opacity-50 disabled:hover:bg-transparent"
             >
               {item.label}
             </button>

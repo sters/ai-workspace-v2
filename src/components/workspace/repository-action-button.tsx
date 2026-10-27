@@ -15,16 +15,20 @@ export function RepositoryActionButton({
   disabled,
   repositories,
   onRepoClick,
+  isRepoDisabled,
 }: {
   label: ReactNode;
   onClick: () => void;
   disabled?: boolean;
   repositories?: { alias: string; path: string }[];
   onRepoClick: (repo: { alias: string; path: string }) => void;
+  /** Per-repository override of `disabled`. */
+  isRepoDisabled?: (repo: { alias: string; path: string }) => boolean;
 }) {
   const repoItems = (repositories ?? []).map((repo) => ({
     label: repo.alias || repo.path.split("/").pop() || repo.path,
     onClick: () => onRepoClick(repo),
+    disabled: isRepoDisabled?.(repo),
   }));
 
   if (repoItems.length === 0) {
