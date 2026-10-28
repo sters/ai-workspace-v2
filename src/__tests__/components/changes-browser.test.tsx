@@ -1,13 +1,15 @@
 import { act, render, screen, fireEvent, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import type { RepoChangeSet } from "@/types/changes";
+import type { OperationType } from "@/types/operation";
+import { blocksOperation } from "@/lib/operation-conflict";
 
 const mockReplace = vi.fn();
 const mockPush = vi.fn();
 const mockUseChanges = vi.fn();
 const mockUseDiff = vi.fn();
 const mockStart = vi.fn();
-let runningTypes: string[] = [];
+let running: { type: OperationType; workspace: string; inputs?: Record<string, string> }[] = [];
 let searchParams = new URLSearchParams();
 // The comments live in a module-level cache per workspace, so each test gets its own.
 let ws = "";
@@ -29,8 +31,8 @@ vi.mock("@/hooks/use-start-and-navigate", () => ({
 
 vi.mock("@/hooks/use-running-operations", () => ({
   useRunningOperations: () => ({
-    isWorkspaceRunning: () => runningTypes.length > 0,
-    isWorkspaceTypeRunning: (_ws: string, type: string) => runningTypes.includes(type),
+    isWorkspaceRunning: (workspace: string) => running.some((op) => op.workspace === workspace),
+    isRepoBusy: (workspace: string, repo: string) => running.some((op) => blocksOperation(op, workspace, repo)),
   }),
 }));
 
@@ -96,7 +98,7 @@ beforeEach(() => {
   mockPush.mockReset();
   mockStart.mockReset();
   mockStart.mockResolvedValue(true);
-  runningTypes = [];
+  running = [];
   ws = `ws-${++wsCount}`;
   sessionStorage.clear();
   searchParams = new URLSearchParams();
@@ -337,13 +339,22 @@ describe("ChangesBrowser", () => {
     expect(screen.getByText("1 comment")).toBeInTheDocument();
   });
 
-  it("does not start a run over a workspace another operation is editing", () => {
-    runningTypes = ["review"];
+  it("does not start a run over a repository another operation is editing", () => {
+    running = [{ type: "execute", workspace: ws, inputs: { repo: "github.com/acme/web" } }];
     searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
     render(<ChangesBrowser workspaceName={ws} />);
     comment("Merge the two lines.");
 
     expect(screen.getByRole("button", { name: /make todos/i })).toBeDisabled();
+  });
+
+  it("starts a run on a repository while another repository's operation is running", () => {
+    running = [{ type: "execute", workspace: ws, inputs: { repo: "github.com/acme/api" } }];
+    searchParams = new URLSearchParams({ repo: "github.com/acme/web", file: "src/app.ts" });
+    render(<ChangesBrowser workspaceName={ws} />);
+    comment("Merge the two lines.");
+
+    expect(screen.getByRole("button", { name: /make todos/i })).toBeEnabled();
   });
 
   it("asks for a comment on every selection before making TODOs of them", () => {

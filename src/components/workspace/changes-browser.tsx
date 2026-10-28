@@ -64,7 +64,7 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
   const [collapsedRepos, setCollapsedRepos] = useState<Set<string>>(new Set());
   const comments = useChangeComments(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
-  const { isWorkspaceRunning } = useRunningOperations();
+  const { isWorkspaceRunning, isRepoBusy } = useRunningOperations();
   // The page's bottom padding (`p-6` on <main>).
   const { attach: attachFill, height: fillHeight } = useViewportFillHeight({
     bottomGap: 24,
@@ -173,14 +173,15 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
     router.push(chatPagePath(workspaceName));
   };
 
+  // `repo` is a single value, so comments spanning worktrees run workspace-wide.
+  const repoPaths = new Set(comments.items.map((c) => c.repoPath));
+  const todoRepo = repoPaths.size === 1 ? [...repoPaths][0] : undefined;
   const makeTodos = async () => {
-    // `repo` is a single value, so comments spanning worktrees run workspace-wide.
-    const repoPaths = new Set(comments.items.map((c) => c.repoPath));
     const started = await startAndNavigate("autonomous", {
       workspace: workspaceName,
       startWith: "update-todo",
       instruction: buildChangeCommentsTodoInstruction(comments.items),
-      ...(repoPaths.size === 1 && { repo: [...repoPaths][0] }),
+      ...(todoRepo && { repo: todoRepo }),
     });
     if (started) comments.clear();
   };
@@ -203,7 +204,7 @@ export function ChangesBrowser({ workspaceName }: { workspaceName: string }) {
           onClear={comments.clear}
           onTalk={talkInChat}
           onMakeTodos={makeTodos}
-          workspaceBusy={isWorkspaceRunning(workspaceName)}
+          busy={todoRepo ? isRepoBusy(workspaceName, todoRepo) : isWorkspaceRunning(workspaceName)}
         />
       )}
 
@@ -313,7 +314,7 @@ function CommentsTray({
   onClear,
   onTalk,
   onMakeTodos,
-  workspaceBusy,
+  busy,
 }: {
   items: ChangeComment[];
   onOpen: (comment: ChangeComment) => void;
@@ -321,7 +322,8 @@ function CommentsTray({
   onClear: () => void;
   onTalk: () => void;
   onMakeTodos: () => Promise<void>;
-  workspaceBusy: boolean;
+  /** Whether an operation already holds the repository (or workspace) the TODO run would target. */
+  busy: boolean;
 }) {
   const uncommented = items.filter((c) => !c.comment.trim()).length;
   return (
@@ -337,8 +339,8 @@ function CommentsTray({
           <Button
             variant="secondary"
             onClick={onMakeTodos}
-            disabled={uncommented > 0 || workspaceBusy}
-            title={workspaceBusy ? "An operation is already running for this workspace." : undefined}
+            disabled={uncommented > 0 || busy}
+            title={busy ? "Another operation is already running on the repositories these comments are in." : undefined}
           >
             <ListTodo className="h-4 w-4" />
             Make TODOs
