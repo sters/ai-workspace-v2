@@ -121,7 +121,7 @@ async function loadCiFailures(
 export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
   const { pullRequests, problems, validations, isLoading, error, refresh } =
     usePullRequests(workspaceName);
-  const { isWorkspaceRunning } = useRunningOperations();
+  const { isWorkspaceRunning, isRepoBusy } = useRunningOperations();
   const startAndNavigate = useStartAndNavigate(workspaceName);
   const router = useRouter();
 
@@ -153,7 +153,8 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
   const noteFor = (key: string): string | undefined => notes[key]?.trim() || undefined;
 
   // A validate reads the worktrees and a triage writes TODO files, so both would
-  // be judging or planning against a tree another operation is editing.
+  // be judging or planning against a tree another operation is editing. Validate
+  // runs workspace-wide; a triage only needs the repository it is scoped to.
   const isRunning = isWorkspaceRunning(workspaceName);
 
   const threadsById = useMemo(() => {
@@ -222,6 +223,7 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
     }
     return names.size === 1 ? [...names][0] : undefined;
   }, [selectedIds, selectedCheckKeys, threadsById, failuresByKey]);
+  const triageBusy = scopedRepo ? isRepoBusy(workspaceName, scopedRepo) : isRunning;
 
   // A thread that scrolled out of view because the resolved filter changed is
   // still selected, so the counts are taken from the selections themselves.
@@ -422,7 +424,7 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
                   keyOf={(check) => checkKey(pr, check)}
                   selectedKeys={selectedCheckKeys}
                   onToggle={toggleCheck}
-                  disabled={isRunning}
+                  disabled={isRepoBusy(workspaceName, pr.repoName)}
                   notes={notes}
                   onNoteChange={setNote}
                 />
@@ -448,7 +450,7 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
                     validation={validations[thread.id]}
                     selected={selectedIds.has(thread.id)}
                     onToggle={toggle}
-                    disabled={isRunning}
+                    disabled={isRepoBusy(workspaceName, pr.repoName)}
                     note={notes[thread.id] ?? ""}
                     onNoteChange={setNote}
                   />
@@ -504,7 +506,7 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
               </Button>
               <Button
                 variant="primary"
-                disabled={isRunning || isReadingLogs}
+                disabled={triageBusy || isReadingLogs}
                 onClick={handleTriage}
                 title="Plan and implement the selection, then reply on the PR"
               >
@@ -513,7 +515,8 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
             </div>
             {isRunning && (
               <StatusText className="w-full text-xs">
-                An operation is already running for this workspace — wait for it to finish.
+                An operation is running on this workspace. Validate waits for it to finish, and so does
+                Triage when it touches the same repository.
               </StatusText>
             )}
           </div>

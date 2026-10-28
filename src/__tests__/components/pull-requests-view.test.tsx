@@ -7,6 +7,8 @@ import type {
   PrThreadValidation,
   WorkspacePullRequest,
 } from "@/types/pull-request";
+import type { OperationType } from "@/types/operation";
+import { blocksOperation } from "@/lib/operation-conflict";
 
 function zeroCounts(): Record<PrCheckState, number> {
   return {
@@ -30,12 +32,13 @@ function checksOf(checks: PrCheck[]) {
 const mockStartAndNavigate = vi.fn();
 const mockUsePullRequests = vi.fn();
 const mockRefresh = vi.fn();
-let workspaceRunning = false;
+let running: { type: OperationType; workspace: string; inputs?: Record<string, string> }[] = [];
 
 vi.mock("@/hooks/use-running-operations", () => ({
   useRunningOperations: () => ({
-    isWorkspaceRunning: () => workspaceRunning,
+    isWorkspaceRunning: (workspace: string) => running.some((op) => op.workspace === workspace),
     isWorkspaceTypeRunning: () => false,
+    isRepoBusy: (workspace: string, repo: string) => running.some((op) => blocksOperation(op, workspace, repo)),
   }),
 }));
 
@@ -147,7 +150,7 @@ beforeEach(() => {
   mockRefresh.mockReset();
   mockPush.mockReset();
   sessionStorage.clear();
-  workspaceRunning = false;
+  running = [];
   mockFetch.mockReset();
   mockFetch.mockResolvedValue({
     ok: true,
@@ -443,10 +446,28 @@ describe("PullRequestsView", () => {
   });
 
   it("blocks both actions while another operation holds the worktrees", () => {
-    workspaceRunning = true;
+    running = [{ type: "autonomous", workspace: "feat" }];
     setData();
     render(<PullRequestsView workspaceName="feat" />);
     // Selection is disabled too, so drive the bar via select-all.
+    expect(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ })).toBeDisabled();
+  });
+
+  it("triages a repository while another repository's operation runs, but does not validate", () => {
+    running = [{ type: "execute", workspace: "feat", inputs: { repo: "github.com/acme/gadgets" } }];
+    setData();
+    render(<PullRequestsView workspaceName="feat" />);
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ }));
+
+    expect(screen.getByRole("button", { name: "Triage" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Validate" })).toBeDisabled();
+  });
+
+  it("keeps a repository's comments unselectable while an operation runs on it", () => {
+    running = [{ type: "execute", workspace: "feat", inputs: { repo: "github.com/acme/widgets" } }];
+    setData();
+    render(<PullRequestsView workspaceName="feat" />);
     expect(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ })).toBeDisabled();
   });
 

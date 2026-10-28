@@ -151,7 +151,7 @@ export function TodoUpdater({
                 </p>
               </div>
               <Button
-                disabled={isWorkspaceRunning(workspaceName)}
+                disabled={isRepoBusy(workspaceName, repoName)}
                 onClick={() =>
                   startAndNavigate("autonomous", {
                     workspace: workspacePath,

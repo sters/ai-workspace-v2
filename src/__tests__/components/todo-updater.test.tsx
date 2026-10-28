@@ -35,12 +35,14 @@ function makeTodo(overrides: Partial<TodoFile> = {}): TodoFile {
   };
 }
 
-function setRunning(opts: { workspaceRunning?: boolean; updateTodoRunning?: boolean }) {
+/** `workspaceRunning` is a workspace-wide operation; `busyRepos` are operations on one repository each. */
+function setRunning(opts: { workspaceRunning?: boolean; updateTodoRunning?: boolean; busyRepos?: string[] }) {
+  const busyRepos = opts.busyRepos ?? [];
   mockUseRunningOperations.mockReturnValue({
-    isWorkspaceRunning: () => Boolean(opts.workspaceRunning),
+    isWorkspaceRunning: () => Boolean(opts.workspaceRunning) || busyRepos.length > 0,
     isWorkspaceTypeRunning: (_ws: string, type: string) =>
       type === "update-todo" ? Boolean(opts.updateTodoRunning) : false,
-    isRepoBusy: () => false,
+    isRepoBusy: (_ws: string, repo: string) => Boolean(opts.workspaceRunning) || busyRepos.includes(repo),
   });
 }
 
@@ -160,6 +162,21 @@ describe("TodoUpdater", () => {
       );
 
       expect(screen.getByRole("button", { name: /plan todos/i })).toBeDisabled();
+    });
+
+    it("plans a repository while another repository's operation runs, but not one with its own", () => {
+      const repositories = [
+        { alias: "repo-a", path: "github.com/org/repo-a" },
+        { alias: "repo-b", path: "github.com/org/repo-b" },
+      ];
+      setRunning({ busyRepos: ["repo-a"] });
+      const { unmount } = render(
+        <TodoUpdater todos={[]} workspacePath="/ws/ws" workspaceName="ws" repositories={repositories} />,
+      );
+      const [planA, planB] = screen.getAllByRole("button", { name: /plan todos/i });
+      expect(planA).toBeDisabled();
+      expect(planB).toBeEnabled();
+      unmount();
     });
   });
 
