@@ -191,6 +191,21 @@ describe("useChatSession handoff delivery", () => {
     sockets[0].receive({ type: "started", sessionId: "chat-1" });
     await waitFor(() => expect(onHandoffDelivered).toHaveBeenCalledTimes(1));
   });
+
+  it("starts New Session blank once the topic's session has ended", async () => {
+    const { result } = renderHook(() =>
+      useChatSession("ws", { discussion: "this comment", onHandoffDelivered: vi.fn() }),
+    );
+    await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
+    act(() => sockets[0].receive({ type: "started", sessionId: "chat-1" }));
+    act(() => sockets[0].receive({ type: "exited", code: 0 }));
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [] })));
+
+    await act(() => result.current.openSession());
+    await waitFor(() => expect(sockets[1]?.sent).toHaveLength(1));
+    expect(sockets[1].firstFrame()).toMatchObject({ type: "start" });
+    expect("discussion" in sockets[1].firstFrame()).toBe(false);
+  });
 });
 
 describe("useChatSession replacing a session", () => {

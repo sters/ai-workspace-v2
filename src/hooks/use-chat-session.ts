@@ -127,6 +127,13 @@ export function useChatSession(
   discussionRef.current = options?.discussion;
   const onHandoffDeliveredRef = useRef(options?.onHandoffDelivered);
   onHandoffDeliveredRef.current = options?.onHandoffDelivered;
+  // Once delivered, the options above belong to that session: a later New
+  // Session starts blank instead of repeating them.
+  const handoffSpentRef = useRef(false);
+  const deliverHandoff = useCallback(() => {
+    handoffSpentRef.current = true;
+    onHandoffDeliveredRef.current?.();
+  }, []);
 
   const onDataDisposableRef = useRef<{ dispose: () => void } | null>(null);
   const stateRef = useRef(state);
@@ -244,7 +251,7 @@ export function useChatSession(
             } else {
               setState("running");
               // A task never reaches a resumed session, so it is spent here.
-              onHandoffDeliveredRef.current?.();
+              deliverHandoff();
             }
             break;
           case "exited":
@@ -291,7 +298,7 @@ export function useChatSession(
         }
       });
     },
-    [workspaceId, cleanup, init, dispose, termRef],
+    [workspaceId, cleanup, init, dispose, termRef, deliverHandoff],
   );
 
   const startSession = useCallback(async (opening: { startPrompt?: string; slackThread?: string } = {}) => {
@@ -336,11 +343,12 @@ export function useChatSession(
     wsRef.current = ws;
 
     ws.onopen = () => {
-      const prompt = initialPromptRef.current;
-      const review = reviewTimestampRef.current;
-      const research = researchChatRef.current;
-      const task = taskRef.current;
-      const discussion = discussionRef.current;
+      const spent = handoffSpentRef.current;
+      const prompt = spent ? undefined : initialPromptRef.current;
+      const review = spent ? undefined : reviewTimestampRef.current;
+      const research = spent ? undefined : researchChatRef.current;
+      const task = spent ? undefined : taskRef.current;
+      const discussion = spent ? undefined : discussionRef.current;
       ws.send(JSON.stringify({ type: "start", workspaceId, cols: term.cols, rows: term.rows, ...(prompt && { initialPrompt: prompt }), ...(review && { reviewTimestamp: review }), ...(research && { researchChat: true }), ...(task && { task }), ...(discussion && { discussion }), ...(startPrompt && { startPrompt }), ...(slackThread && { slackThread }), ...(replaces && { replaces }) }));
     };
 
@@ -360,7 +368,7 @@ export function useChatSession(
             sessionIdRef.current = msg.sessionId;
             saveChatSession(workspaceId, msg.sessionId);
           }
-          onHandoffDeliveredRef.current?.();
+          deliverHandoff();
           break;
         case "output":
           if (msg.data) term.write(msg.data);
@@ -398,7 +406,7 @@ export function useChatSession(
         ws.send(JSON.stringify({ type: "input", data }));
       }
     });
-  }, [workspaceId, cleanup, init, dispose, termRef]);
+  }, [workspaceId, cleanup, init, dispose, termRef, deliverHandoff]);
 
   // Shared by every button that opens a chat, so a burst of clicks across them
   // opens one session rather than one per click.
