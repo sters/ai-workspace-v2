@@ -35,6 +35,8 @@ const variants: Record<string, string> = {
     "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
   "op-asking":
     "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
+  "op-waiting":
+    "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
   // A CI check that has not started. Its own colour rather than `op-running`'s
   // blue or `muted`'s grey: queued is neither in progress nor finished.
   "check-queued":

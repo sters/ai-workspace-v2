@@ -3,21 +3,13 @@ import type { PipelinePhase, PipelineOptions } from "@/types/pipeline";
 import type { ManagedOperation } from "./types";
 import { getTimeoutDefaults } from "./constants";
 import { emitStatus, markComplete } from "./events";
-import { emitPhaseUpdate, getPhaseLabel } from "./phase-helpers";
+import { delay, emitPhaseUpdate, getPhaseLabel } from "./phase-helpers";
+import { usageLimitPausedMs } from "./usage-limit-wait";
 import { runFunctionPhase, runSinglePhase, runGroupPhase } from "./phase-runners";
 import { updateOperationMeta } from "@/lib/db";
 
 const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 3000;
-
-/** Sleep for `ms` milliseconds, resolving early if `signal` fires. */
-function delay(ms: number, signal?: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    if (signal?.aborted) { resolve(); return; }
-    const timer = setTimeout(resolve, ms);
-    signal?.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
-  });
-}
 
 export interface ExecutePhasesParams {
   managed: ManagedOperation;
@@ -155,7 +147,16 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
           ? new AbortController()
           : undefined;
 
-        const timeoutTimer = setTimeout(() => {
+        let pausedMsCredited = usageLimitPausedMs(managed);
+        const onTimeout = () => {
+          const pausedMs = usageLimitPausedMs(managed) - pausedMsCredited;
+          if (pausedMs > 0) {
+            pausedMsCredited += pausedMs;
+            const info = phaseInfos[i];
+            if (info?.timeoutMs !== undefined) info.timeoutMs += pausedMs;
+            timeoutTimer = setTimeout(onTimeout, pausedMs);
+            return;
+          }
           timedOut = true;
           emitStatus(managed, `Phase ${phaseNum} timed out after ${timeoutMs}ms`, phaseExtra);
           // Abort function phases via a per-phase abort controller
@@ -168,7 +169,8 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
           for (const [, entry] of managed.childProcesses) {
             try { entry.process.kill(); } catch { /* already exited */ }
           }
-        }, timeoutMs);
+        };
+        let timeoutTimer = setTimeout(onTimeout, timeoutMs);
 
         // For function phases, swap the abort signal temporarily so the phase
         // sees a per-phase signal that only fires on timeout, not permanently.

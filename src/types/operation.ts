@@ -99,6 +99,8 @@ export interface OperationListItem {
   resultSummary?: OperationResultSummary;
   /** True when the operation is waiting for user input (AskUserQuestion). */
   hasPendingAsk?: boolean;
+  /** ISO time a child waiting out a usage limit will run again; absent when nothing is waiting. */
+  usageLimitWaitUntil?: string;
 }
 
 /**

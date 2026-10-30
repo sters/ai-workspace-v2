@@ -27,9 +27,19 @@ export interface ManagedOperation {
    * that point, so this is the only in-memory source for the listing.
    */
   resultSummary?: OperationResultSummary;
+  /** Time children spent waiting out a usage limit, credited back to the phase timeout. */
+  usageLimitPause?: {
+    active: number;
+    since: number;
+    totalMs: number;
+    /** Epoch ms the latest in-progress wait ends; 0 when nothing is waiting. */
+    until: number;
+  };
 }
 
 export interface WireChildResult {
   success: boolean;
   resultText?: string;
+  /** Epoch ms the exhausted allowance resets, when the child failed on a usage limit. */
+  usageLimitResetsAt?: number;
 }

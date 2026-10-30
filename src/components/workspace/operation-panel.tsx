@@ -183,8 +183,12 @@ export function OperationPanel({
       </div>
       {isRunning && runningOp && (
         <p className="text-sm text-muted-foreground">
-          <span className={`inline-block h-2 w-2 animate-pulse rounded-full mr-1.5 ${runningOp.hasPendingAsk ? "bg-orange-500" : "bg-blue-500"}`} />
-          {runningOp.hasPendingAsk ? "Waiting for input" : "Operation running"} &mdash;{" "}
+          <span className={`inline-block h-2 w-2 animate-pulse rounded-full mr-1.5 ${runningOp.hasPendingAsk ? "bg-orange-500" : runningOp.usageLimitWaitUntil ? "bg-amber-500" : "bg-blue-500"}`} />
+          {runningOp.hasPendingAsk
+            ? "Waiting for input"
+            : runningOp.usageLimitWaitUntil
+              ? `Waiting for the usage limit to reset (${new Date(runningOp.usageLimitWaitUntil).toLocaleTimeString()})`
+              : "Operation running"} &mdash;{" "}
           <Link
             href={`/workspace/${encodeURIComponent(workspaceName)}/operations?operationId=${encodeURIComponent(runningOp.id)}`}
             className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"

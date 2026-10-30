@@ -261,6 +261,11 @@ export function mergeConfig(
         file.operations?.fetchIntervalMinutes,
         defaults.operations.fetchIntervalMinutes,
       ),
+      waitOutUsageLimit: pick(
+        env.operations?.waitOutUsageLimit,
+        file.operations?.waitOutUsageLimit,
+        defaults.operations.waitOutUsageLimit,
+      ),
       model: pick(
         env.operations?.model,
         file.operations?.model,

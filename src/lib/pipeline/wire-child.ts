@@ -127,6 +127,17 @@ function dismissPendingAsksForChild(
   recomputeHasPendingAsk(managed);
 }
 
+/** Reset time (epoch ms) of a `rate_limit_event` the CLI emits when it refuses a request. */
+function parseRejectedResetsAt(data: string): number | undefined {
+  try {
+    const info = JSON.parse(data).rate_limit_info;
+    if (info?.status === "rejected" && typeof info.resetsAt === "number") return info.resetsAt * 1000;
+  } catch {
+    // not a stream-json line
+  }
+  return undefined;
+}
+
 /**
  * Wire a child ClaudeProcess to the parent ManagedOperation.
  * Tags every event with childLabel (and optional phaseExtra) and updates child status on completion.
@@ -172,6 +183,7 @@ export function wireChild(
 
   return new Promise<WireChildResult>((resolve) => {
     let resolved = false;
+    let rejectedResetsAt: number | undefined;
     const signal = managed.abortController.signal;
 
     // Abort listener — cleaned up when the complete event fires
@@ -195,6 +207,10 @@ export function wireChild(
       };
       emitEvent(managed, tagged);
 
+      if (event.type === "output" && event.data.includes('"rate_limit_event"')) {
+        rejectedResetsAt = parseRejectedResetsAt(event.data) ?? rejectedResetsAt;
+      }
+
       if (event.type === "complete") {
         if (resolved) return;
         resolved = true;
@@ -214,7 +230,11 @@ export function wireChild(
         const child = managed.operation.children?.find((c) => c.id === childId);
         if (child) child.status = success ? "completed" : "failed";
         managed.childProcesses.delete(childId);
-        resolve({ success, resultText: process.getResultText() });
+        resolve({
+          success,
+          resultText: process.getResultText(),
+          ...(!success && rejectedResetsAt !== undefined && { usageLimitResetsAt: rejectedResetsAt }),
+        });
       }
     });
 

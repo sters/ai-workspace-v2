@@ -49,6 +49,11 @@ export interface AppConfig {
      * worktree is set up from it. 0 fetches every time.
      */
     fetchIntervalMinutes: number;
+    /**
+     * When a Claude child fails on an exhausted usage allowance, wait for the
+     * reset and run it again instead of failing the operation.
+     */
+    waitOutUsageLimit: boolean;
     /** Per-operation-type setting overrides. Keys are OperationType values. */
     typeOverrides: Partial<Record<OperationType, Partial<OperationTypeSettings>>>;
   };

@@ -71,7 +71,8 @@ export function OperationSummary({
 }) {
   const currentPhase = operation.currentPhase;
   const isAsking = operation.status === "running" && operation.hasPendingAsk;
-  const displayStatus = isAsking ? "asking" : operation.status;
+  const waitUntil = operation.status === "running" ? operation.usageLimitWaitUntil : undefined;
+  const displayStatus = isAsking ? "asking" : waitUntil ? "waiting" : operation.status;
 
   return (
     <div className="min-w-0 flex-1">
@@ -99,7 +100,13 @@ export function OperationSummary({
           </span>
         )}
       </div>
-      {currentPhase && <PhaseExpiration phase={currentPhase} now={now} />}
+      {waitUntil ? (
+        <div className="mt-1.5 text-xs text-amber-700 dark:text-amber-300">
+          Usage limit reached — retrying after {new Date(waitUntil).toLocaleTimeString()}
+        </div>
+      ) : (
+        currentPhase && <PhaseExpiration phase={currentPhase} now={now} />
+      )}
     </div>
   );
 }

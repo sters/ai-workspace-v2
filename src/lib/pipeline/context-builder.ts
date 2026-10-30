@@ -2,7 +2,7 @@ import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { RunClaudeOptions } from "@/types/claude";
 import type { ManagedOperation } from "./types";
 import { emitEvent, emitStatus } from "./events";
-import { wireChild } from "./wire-child";
+import { runChildWaitingOutUsageLimit } from "./usage-limit-wait";
 import { runClaude } from "@/lib/claude";
 import { resolveEffort, resolveModel } from "@/lib/config";
 import { Semaphore } from "@/lib/semaphore";
@@ -117,8 +117,7 @@ export function buildPhaseFunctionContext(
         (childOptions?.jsonSchema || childOptions?.cwd || childOptions?.addDirs || childOptions?.allowedTools || childOptions?.skipAskUserQuestion || childOptions?.appendSystemPromptFile || model || effort)
           ? { jsonSchema: childOptions?.jsonSchema, cwd: childOptions?.cwd, addDirs: childOptions?.addDirs, allowedTools: childOptions?.allowedTools, skipAskUserQuestion: childOptions?.skipAskUserQuestion, appendSystemPromptFile: childOptions?.appendSystemPromptFile, model, effort }
           : undefined;
-      const proc = runClaude(cid, prompt, claudeOpts);
-      const result = await wireChild(managed, cid, label, proc, childPhaseExtra);
+      const result = await runChildWaitingOutUsageLimit(managed, cid, label, () => runClaude(cid, prompt, claudeOpts), childPhaseExtra);
       if (result.resultText && childOptions?.onResultText) {
         childOptions.onResultText(result.resultText);
       }
@@ -149,8 +148,7 @@ export function buildPhaseFunctionContext(
             (child.cwd || child.addDirs || child.allowedTools || child.jsonSchema || child.skipAskUserQuestion || child.appendSystemPromptFile || model || effort)
               ? { cwd: child.cwd, addDirs: child.addDirs, allowedTools: child.allowedTools, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion, appendSystemPromptFile: child.appendSystemPromptFile, model, effort }
               : undefined;
-          const proc = runClaude(cid, child.prompt, claudeOpts);
-          const result = await wireChild(managed, cid, child.label, proc, childPhaseExtra);
+          const result = await runChildWaitingOutUsageLimit(managed, cid, child.label, () => runClaude(cid, child.prompt, claudeOpts), childPhaseExtra);
           if (result.resultText && child.onResultText) {
             child.onResultText(result.resultText);
           }

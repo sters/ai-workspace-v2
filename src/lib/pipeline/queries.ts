@@ -2,6 +2,7 @@ import type { Operation, OperationEvent, OperationListItem } from "@/types/opera
 import type { ManagedOperation } from "./types";
 import { operations } from "./store";
 import { gcCompletedOperations } from "./gc";
+import { usageLimitWaitUntil } from "./usage-limit-wait";
 
 export function getOperations(): Operation[] {
   gcCompletedOperations();
@@ -14,6 +15,7 @@ function toSummary(managed: ManagedOperation): OperationListItem {
   // Computed by `markComplete`; extracting it here would read an events array
   // it has already cleared.
   const resultSummary = managed.resultSummary;
+  const waitUntil = usageLimitWaitUntil(managed);
   return {
     id: op.id,
     type: op.type,
@@ -25,6 +27,7 @@ function toSummary(managed: ManagedOperation): OperationListItem {
     ...(op.inputs && { inputs: op.inputs }),
     ...(resultSummary && { resultSummary }),
     ...(managed.hasPendingAsk && { hasPendingAsk: true }),
+    ...(waitUntil !== undefined && { usageLimitWaitUntil: new Date(waitUntil).toISOString() }),
   };
 }
 

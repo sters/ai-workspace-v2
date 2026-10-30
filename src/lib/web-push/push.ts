@@ -103,6 +103,32 @@ export function sendChatWaitingNotification(sessionId: string, workspace: string
   });
 }
 
+/**
+ * An operation started waiting out a usage limit (`resumeAt`, epoch ms), or
+ * its wait ended and it is running again (`null`). One tag per operation, so
+ * the resume replaces the wait notice.
+ */
+export function sendUsageLimitNotification(
+  operationId: string,
+  workspace: string,
+  resumeAt: number | null,
+): void {
+  const path = `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`;
+  broadcastNotification(resumeAt === null
+    ? {
+      title: "ai-workspace: Operation resumed",
+      body: `Usage limit reset — the operation in "${workspace}" is running again`,
+      tag: `usage-limit-${operationId}`,
+      url: buildAbsoluteUrl(path),
+    }
+    : {
+      title: "ai-workspace: Waiting for usage limit",
+      body: `Operation in "${workspace}" will retry after ${new Date(resumeAt).toLocaleTimeString()}`,
+      tag: `usage-limit-${operationId}`,
+      url: buildAbsoluteUrl(path),
+    });
+}
+
 export function sendAskNotification(operationId: string, workspace?: string): void {
   const path = workspace
     ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`

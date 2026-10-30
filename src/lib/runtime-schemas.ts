@@ -194,6 +194,7 @@ export const operationListItemSchema = z.object({
     })).optional(),
   }).optional(),
   hasPendingAsk: z.boolean().optional(),
+  usageLimitWaitUntil: z.string().optional(),
 }).passthrough();
 
 export const operationEventSchema = z.object({

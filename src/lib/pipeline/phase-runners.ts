@@ -2,7 +2,7 @@ import type { PipelinePhase, PipelinePhaseFunction, PipelinePhaseSingle, Pipelin
 import type { RunClaudeOptions } from "@/types/claude";
 import type { ManagedOperation } from "./types";
 import { emitEvent, emitStatus } from "./events";
-import { wireChild } from "./wire-child";
+import { runChildWaitingOutUsageLimit } from "./usage-limit-wait";
 import { buildPhaseFunctionContext } from "./context-builder";
 import { runClaude } from "@/lib/claude";
 import { resolveEffort, resolveModel } from "@/lib/config";
@@ -77,8 +77,7 @@ export async function runSinglePhase(
   const singleOpts: RunClaudeOptions | undefined = (phase.cwd || phase.addDirs || phase.allowedTools || phase.appendSystemPromptFile || model || effort)
     ? { cwd: phase.cwd, addDirs: phase.addDirs, allowedTools: phase.allowedTools, appendSystemPromptFile: phase.appendSystemPromptFile, model, effort }
     : undefined;
-  const process = runClaude(childId, phase.prompt, singleOpts);
-  const result = await wireChild(managed, childId, phase.label, process, phaseExtra);
+  const result = await runChildWaitingOutUsageLimit(managed, childId, phase.label, () => runClaude(childId, phase.prompt, singleOpts), phaseExtra);
   return result.success;
 }
 
@@ -105,8 +104,7 @@ export async function runGroupPhase(
         (child.cwd || child.addDirs || child.allowedTools || child.jsonSchema || child.skipAskUserQuestion || child.appendSystemPromptFile || model || effort)
           ? { cwd: child.cwd, addDirs: child.addDirs, allowedTools: child.allowedTools, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion, appendSystemPromptFile: child.appendSystemPromptFile, model, effort }
           : undefined;
-      const process = runClaude(childId, child.prompt, claudeOpts);
-      const result = await wireChild(managed, childId, child.label, process, phaseExtra);
+      const result = await runChildWaitingOutUsageLimit(managed, childId, child.label, () => runClaude(childId, child.prompt, claudeOpts), phaseExtra);
       if (result.resultText && child.onResultText) {
         child.onResultText(result.resultText);
       }
