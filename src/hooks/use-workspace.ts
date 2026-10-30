@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import type {
   WorkspaceSummary,
@@ -11,7 +11,12 @@ import type {
 } from "@/types/workspace";
 import type { ArtifactFileContent, ArtifactListing } from "@/types/artifact";
 import type { FileDiff, WorkspaceChanges } from "@/types/changes";
-import type { WorkspacePullRequestsResult } from "@/types/pull-request";
+import type {
+  PullRequestProblem,
+  RepoPullRequestRead,
+  WorkspacePullRequest,
+  WorkspacePullRequestRepos,
+} from "@/types/pull-request";
 import type { ReviewFindingsResult } from "@/types/review-findings";
 import type { ReviewFreshnessResult } from "@/types/review-freshness";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";
@@ -82,18 +87,83 @@ export function useReviews(name: string) {
  * `refresh` is the deliberate one: it asks past the server cache, which is the
  * only way to see a comment or a CI result from seconds ago.
  */
+export interface RepoPullRequestState extends RepoPullRequestRead {
+  repoName: string;
+  repoPath: string;
+  /** Whether its first read is still out — a re-read keeps showing the last one. */
+  isLoading: boolean;
+}
+
+/**
+ * The repositories first, then one request per repository, all at once, so
+ * each PR renders as its `gh` round trips return instead of with the slowest.
+ * Every revalidation of the repository list (mount, focus, Refresh) re-reads
+ * the repositories; the server's TTL cache makes the unforced ones free.
+ */
 export function usePullRequests(name: string) {
   const url = name ? `/api/workspaces/${encodeURIComponent(name)}/pull-requests` : null;
-  const { data, error, isLoading, mutate } = useSWR<WorkspacePullRequestsResult>(url, fetcher);
+  const [loaded, setLoaded] = useState<{ url: string | null; reads: Record<string, RepoPullRequestRead> }>({
+    url,
+    reads: {},
+  });
+  const forceNext = useRef(false);
+  // A newer round of reads supersedes the one still out.
+  const generation = useRef(0);
 
-  const refresh = useCallback(
-    () => (url ? mutate(fetcher(`${url}?refresh=1`)) : mutate()),
-    [url, mutate],
+  const loadRepos = useCallback(
+    (repos: WorkspacePullRequestRepos["repos"], force: boolean) => {
+      if (!url) return;
+      const gen = ++generation.current;
+      for (const repo of repos) {
+        const query = new URLSearchParams({ repo: repo.repoPath });
+        if (force) query.set("refresh", "1");
+        (fetcher(`${url}?${query}`) as Promise<RepoPullRequestRead>)
+          .catch((err): RepoPullRequestRead => ({
+            problem: { repoName: repo.repoName, reason: err instanceof Error ? err.message : String(err) },
+          }))
+          .then((read) => {
+            if (gen !== generation.current) return;
+            setLoaded((prev) => ({
+              url,
+              reads: { ...(prev.url === url ? prev.reads : {}), [repo.repoPath]: read },
+            }));
+          });
+      }
+    },
+    [url],
   );
 
+  const { data, error, isLoading, mutate } = useSWR<WorkspacePullRequestRepos>(url, fetcher, {
+    onSuccess: (list) => {
+      const force = forceNext.current;
+      forceNext.current = false;
+      loadRepos(list.repos, force);
+    },
+  });
+
+  const refresh = useCallback(() => {
+    forceNext.current = true;
+    return mutate();
+  }, [mutate]);
+
+  const reads = loaded.url === url ? loaded.reads : undefined;
+  const { repos, pullRequests, problems } = useMemo(() => {
+    const repos: RepoPullRequestState[] = (data?.repos ?? []).map((repo) => ({
+      ...repo,
+      ...reads?.[repo.repoPath],
+      isLoading: !reads || !(repo.repoPath in reads),
+    }));
+    return {
+      repos,
+      pullRequests: repos.flatMap((r): WorkspacePullRequest[] => (r.pr ? [r.pr] : [])),
+      problems: repos.flatMap((r): PullRequestProblem[] => (r.problem ? [r.problem] : [])),
+    };
+  }, [data, reads]);
+
   return {
-    pullRequests: data?.pullRequests ?? [],
-    problems: data?.problems ?? [],
+    repos,
+    pullRequests,
+    problems,
     validations: data?.validations ?? {},
     isLoading,
     error,

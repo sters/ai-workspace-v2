@@ -1,11 +1,19 @@
 import path from "node:path";
 import { NextResponse } from "next/server";
 import { getWorkspaceDir } from "@/lib/config";
-import { getCachedPullRequests, PR_CACHE_TTL_MS } from "@/lib/workspace/pr-cache";
+import { listWorkspaceRepos } from "@/lib/workspace/git";
+import { getCachedRepoPullRequest, PR_CACHE_TTL_MS } from "@/lib/workspace/pr-cache";
 import { readPrValidations } from "@/lib/workspace/pr-validations";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * Without `?repo=`, the repositories and the recorded validations — local and
+ * cheap, read off disk every time so a just-finished validate operation shows
+ * up immediately. With `?repo=<repoPath>`, that repository's PR: TTL-cached
+ * because it costs two `gh` round trips, and `?refresh=1` is the tab's Refresh
+ * button asking past the cache.
+ */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ name: string }> }
@@ -17,22 +25,26 @@ export async function GET(
       return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
     }
 
-    // The PR read is TTL-cached because it costs two `gh` round trips per
-    // repository; `?refresh=1` is the tab's Refresh button asking past it. The
-    // validations come off disk every time — they are local and cheap, and a
-    // just-finished validate operation must show up immediately.
-    const force = new URL(request.url).searchParams.get("refresh") !== null;
-    const [{ pullRequests, problems }, store] = await Promise.all([
-      getCachedPullRequests(name, { force }),
-      readPrValidations(path.join(getWorkspaceDir(), name)),
-    ]);
+    const searchParams = new URL(request.url).searchParams;
+    const repoPath = searchParams.get("repo");
+    const repos = await listWorkspaceRepos(name);
 
-    return NextResponse.json({
-      pullRequests,
-      problems,
-      validations: store.validations,
-      cacheTtlMs: PR_CACHE_TTL_MS,
+    if (repoPath === null) {
+      const store = await readPrValidations(path.join(getWorkspaceDir(), name));
+      return NextResponse.json({
+        repos: repos.map(({ repoName, repoPath }) => ({ repoName, repoPath })),
+        validations: store.validations,
+      });
+    }
+
+    const repo = repos.find((r) => r.repoPath === repoPath);
+    if (!repo) {
+      return NextResponse.json({ error: `Repository not in workspace: ${repoPath}` }, { status: 404 });
+    }
+    const read = await getCachedRepoPullRequest(name, repo, {
+      force: searchParams.get("refresh") !== null,
     });
+    return NextResponse.json({ ...read, cacheTtlMs: PR_CACHE_TTL_MS });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }

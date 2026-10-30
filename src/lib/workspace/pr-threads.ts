@@ -16,12 +16,14 @@
 
 import { execArgs } from "./helpers";
 import { listWorkspaceRepos } from "./git";
+import type { WorkspaceRepo } from "@/types/workspace";
 import type {
   PrCheck,
   PrCheckState,
   PrChecksSummary,
   PrReviewThread,
   PullRequestProblem,
+  RepoPullRequestRead,
   WorkspacePullRequest,
 } from "@/types/pull-request";
 
@@ -404,66 +406,70 @@ async function fetchThreadsAndChecks(pr: WorkspacePullRequest): Promise<{
 }
 
 /**
- * The PR for each repo's current branch, with its review threads.
- *
- * Repos are read concurrently: each one costs two network round trips, and they
- * are independent. A repo that yields nothing lands in `problems` rather than
- * being dropped, so the tab can distinguish "no PR opened yet" from "`gh`
- * failed" — the second is actionable and the first is normal.
+ * The PR for one repo's current branch, with its review threads. Never rejects:
+ * a repo that yields nothing comes back as a `problem`, so the tab can
+ * distinguish "no PR opened yet" from "`gh` failed" — the second is actionable
+ * and the first is normal.
  */
+export async function readRepoPullRequest(repo: WorkspaceRepo): Promise<RepoPullRequestRead> {
+  let pr: WorkspacePullRequest | null;
+  try {
+    const raw = await execArgs(
+      ["gh", "pr", "view", "--json", PR_VIEW_FIELDS],
+      { cwd: repo.worktreePath },
+    );
+    pr = parsePrView(raw, repo);
+  } catch (err) {
+    // `gh pr view` exits non-zero both when no PR exists for the branch and
+    // when the call itself failed; its stderr is the only thing that
+    // distinguishes them, so it is surfaced verbatim.
+    return {
+      problem: { repoName: repo.repoName, reason: String(err instanceof Error ? err.message : err) },
+    };
+  }
+
+  if (!pr) {
+    return { problem: { repoName: repo.repoName, reason: "Could not read PR details from gh" } };
+  }
+
+  try {
+    const { threads, checks } = await fetchThreadsAndChecks(pr);
+    pr.threads = threads;
+    pr.checks = checks;
+  } catch (err) {
+    // The PR itself is worth showing without its threads; say why they are
+    // missing. `checks` stays `reported: false`, which the tab renders as
+    // "unknown" rather than as a green PR.
+    return {
+      pr,
+      problem: {
+        repoName: repo.repoName,
+        reason: `PR #${pr.number} found, but review threads and CI could not be read: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      },
+    };
+  }
+
+  return { pr };
+}
+
+/** Flatten per-repo reads into the workspace-wide shape. */
+export function mergeRepoPullRequestReads(results: RepoPullRequestRead[]): {
+  pullRequests: WorkspacePullRequest[];
+  problems: PullRequestProblem[];
+} {
+  return {
+    pullRequests: results.flatMap((r) => (r.pr ? [r.pr] : [])),
+    problems: results.flatMap((r) => (r.problem ? [r.problem] : [])),
+  };
+}
+
+/** The PR for each repo's current branch, read concurrently. */
 export async function listWorkspacePullRequests(workspaceName: string): Promise<{
   pullRequests: WorkspacePullRequest[];
   problems: PullRequestProblem[];
 }> {
   const repos = await listWorkspaceRepos(workspaceName);
-
-  const results = await Promise.all(
-    repos.map(async (repo) => {
-      let pr: WorkspacePullRequest | null;
-      try {
-        const raw = await execArgs(
-          ["gh", "pr", "view", "--json", PR_VIEW_FIELDS],
-          { cwd: repo.worktreePath },
-        );
-        pr = parsePrView(raw, repo);
-      } catch (err) {
-        // `gh pr view` exits non-zero both when no PR exists for the branch and
-        // when the call itself failed; its stderr is the only thing that
-        // distinguishes them, so it is surfaced verbatim.
-        return {
-          problem: { repoName: repo.repoName, reason: String(err instanceof Error ? err.message : err) },
-        };
-      }
-
-      if (!pr) {
-        return { problem: { repoName: repo.repoName, reason: "Could not read PR details from gh" } };
-      }
-
-      try {
-        const { threads, checks } = await fetchThreadsAndChecks(pr);
-        pr.threads = threads;
-        pr.checks = checks;
-      } catch (err) {
-        // The PR itself is worth showing without its threads; say why they are
-        // missing. `checks` stays `reported: false`, which the tab renders as
-        // "unknown" rather than as a green PR.
-        return {
-          pr,
-          problem: {
-            repoName: repo.repoName,
-            reason: `PR #${pr.number} found, but review threads and CI could not be read: ${
-              err instanceof Error ? err.message : String(err)
-            }`,
-          },
-        };
-      }
-
-      return { pr };
-    }),
-  );
-
-  return {
-    pullRequests: results.flatMap((r) => (r.pr ? [r.pr] : [])),
-    problems: results.flatMap((r) => (r.problem ? [r.problem] : [])),
-  };
+  return mergeRepoPullRequestReads(await Promise.all(repos.map(readRepoPullRequest)));
 }

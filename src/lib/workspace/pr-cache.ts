@@ -18,8 +18,14 @@
  * precisely so a thread GitHub has since resolved is skipped.
  */
 
-import { listWorkspacePullRequests } from "./pr-threads";
-import type { PullRequestProblem, WorkspacePullRequest } from "@/types/pull-request";
+import { listWorkspaceRepos } from "./git";
+import { mergeRepoPullRequestReads, readRepoPullRequest } from "./pr-threads";
+import type {
+  PullRequestProblem,
+  RepoPullRequestRead,
+  WorkspacePullRequest,
+} from "@/types/pull-request";
+import type { WorkspaceRepo } from "@/types/workspace";
 
 /**
  * Short enough that a reviewer's comment shows up on the next look, long enough
@@ -27,16 +33,15 @@ import type { PullRequestProblem, WorkspacePullRequest } from "@/types/pull-requ
  */
 export const PR_CACHE_TTL_MS = 60 * 1000;
 
-interface PullRequestRead {
-  pullRequests: WorkspacePullRequest[];
-  problems: PullRequestProblem[];
-}
-
 interface CacheEntry {
-  promise: Promise<PullRequestRead>;
+  promise: Promise<RepoPullRequestRead>;
   storedAt: number;
 }
 
+/**
+ * Keyed per repository rather than per workspace, so the tab's per-repository
+ * requests and a workspace-wide read share one round trip.
+ */
 const globalForPrCache = globalThis as unknown as {
   __aiwPrCache?: Map<string, CacheEntry>;
 };
@@ -46,35 +51,56 @@ function cache(): Map<string, CacheEntry> {
   return globalForPrCache.__aiwPrCache;
 }
 
-export function getCachedPullRequests(
+function cacheKey(workspace: string, repoPath: string): string {
+  return `${workspace}\0${repoPath}`;
+}
+
+export function getCachedRepoPullRequest(
   workspace: string,
+  repo: WorkspaceRepo,
   opts?: { force?: boolean; now?: number },
-): Promise<PullRequestRead> {
+): Promise<RepoPullRequestRead> {
   const now = opts?.now ?? Date.now();
   const entries = cache();
+  const key = cacheKey(workspace, repo.repoPath);
 
   if (!opts?.force) {
-    const hit = entries.get(workspace);
+    const hit = entries.get(key);
     if (hit && now - hit.storedAt < PR_CACHE_TTL_MS) return hit.promise;
   }
 
-  const promise = listWorkspacePullRequests(workspace);
-  entries.set(workspace, { promise, storedAt: now });
+  const promise = readRepoPullRequest(repo);
+  entries.set(key, { promise, storedAt: now });
 
-  // A rejection here means the workspace itself could not be listed — per-repo
-  // failures resolve as `problems` instead. Holding it for the full TTL would
-  // keep reporting an error the user has already fixed.
+  // The read resolves its failures as `problems`, so a rejection is unexpected;
+  // holding it for the full TTL would keep reporting an error already fixed.
   promise.catch(() => {
-    if (entries.get(workspace)?.promise === promise) entries.delete(workspace);
+    if (entries.get(key)?.promise === promise) entries.delete(key);
   });
 
   return promise;
 }
 
-/** Drop one workspace's entry, or the whole cache when given no workspace. */
+export async function getCachedPullRequests(
+  workspace: string,
+  opts?: { force?: boolean; now?: number },
+): Promise<{ pullRequests: WorkspacePullRequest[]; problems: PullRequestProblem[] }> {
+  const repos = await listWorkspaceRepos(workspace);
+  return mergeRepoPullRequestReads(
+    await Promise.all(repos.map((repo) => getCachedRepoPullRequest(workspace, repo, opts))),
+  );
+}
+
+/** Drop one workspace's entries, or the whole cache when given no workspace. */
 export function invalidatePullRequestCache(workspace?: string): void {
-  if (workspace === undefined) cache().clear();
-  else cache().delete(workspace);
+  if (workspace === undefined) {
+    cache().clear();
+    return;
+  }
+  const prefix = cacheKey(workspace, "");
+  for (const key of cache().keys()) {
+    if (key.startsWith(prefix)) cache().delete(key);
+  }
 }
 
 /** Reset for testing. */

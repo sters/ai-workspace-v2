@@ -1,15 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, MessageSquare, RefreshCw } from "lucide-react";
-import { usePullRequests } from "@/hooks/use-workspace";
+import { usePullRequests, type RepoPullRequestState } from "@/hooks/use-workspace";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { Button } from "../shared/buttons/button";
 import { Card } from "../shared/containers/card";
 import { Callout } from "../shared/containers/callout";
 import { StatusBadge } from "../shared/feedback/status-badge";
+import { Spinner } from "../shared/feedback/spinner";
 import { StatusText } from "../shared/feedback/status-text";
 import { PrReviewThreadRow } from "./pr-review-thread";
 import { isTriageableCheck, PrChecksSummaryView } from "./pr-checks-summary";
@@ -119,7 +120,7 @@ async function loadCiFailures(
 }
 
 export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
-  const { pullRequests, problems, validations, isLoading, error, refresh } =
+  const { repos, pullRequests, validations, isLoading, error, refresh } =
     usePullRequests(workspaceName);
   const { isWorkspaceRunning, isRepoBusy } = useRunningOperations();
   const startAndNavigate = useStartAndNavigate(workspaceName);
@@ -128,6 +129,7 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedCheckKeys, setSelectedCheckKeys] = useState<Set<string>>(new Set());
   const [showResolved, setShowResolved] = useState(false);
+  const sectionEls = useRef(new Map<string, HTMLElement>());
   // The log read is a `gh` round trip per check, so the click has to say it is
   // doing something before the operation page takes over.
   const [isReadingLogs, setIsReadingLogs] = useState(false);
@@ -339,6 +341,63 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
     );
   }
 
+  const allLoaded = repos.every((r) => !r.isLoading);
+
+  const renderPullRequest = (pr: WorkspacePullRequest) => {
+    const threads = visibleThreads(pr);
+    return (
+      <Card variant="flush">
+        <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+          <PrStateBadge pr={pr} />
+          <a
+            href={pr.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-sm hover:underline"
+          >
+            #{pr.number} {pr.title} <ExternalLink className="h-3 w-3" />
+          </a>
+          <PrChecksSummaryView
+            checks={pr.checks}
+            keyOf={(check) => checkKey(pr, check)}
+            selectedKeys={selectedCheckKeys}
+            onToggle={toggleCheck}
+            disabled={isRepoBusy(workspaceName, pr.repoName)}
+            notes={notes}
+            onNoteChange={setNote}
+          />
+          <span className="ml-auto text-xs text-muted-foreground">
+            {pr.headRefName} → {pr.baseRefName} · {pr.threads.length} comment
+            {pr.threads.length === 1 ? "" : "s"}
+          </span>
+        </div>
+
+        {threads.length === 0 ? (
+          <div className="px-4 py-3">
+            <StatusText className="text-xs">
+              {pr.threads.length === 0
+                ? "No review comments on this PR."
+                : "All comments on this PR are resolved or hidden."}
+            </StatusText>
+          </div>
+        ) : (
+          threads.map((thread) => (
+            <PrReviewThreadRow
+              key={thread.id}
+              thread={thread}
+              validation={validations[thread.id]}
+              selected={selectedIds.has(thread.id)}
+              onToggle={toggle}
+              disabled={isRepoBusy(workspaceName, pr.repoName)}
+              note={notes[thread.id] ?? ""}
+              onNoteChange={setNote}
+            />
+          ))
+        )}
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-4 pb-24">
       <div className="flex items-center justify-between">
@@ -369,96 +428,61 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
         </div>
       </div>
 
-      {problems.length > 0 && (
-        <Callout variant="info">
-          <p className="mb-1 text-sm font-medium">
-            {problems.length} repositor{problems.length === 1 ? "y" : "ies"} without review threads
-          </p>
-          <ul className="space-y-0.5 text-xs text-muted-foreground">
-            {problems.map((p) => (
-              <li key={p.repoName}>
-                <span className="font-medium">{p.repoName}</span>: {p.reason}
-              </li>
-            ))}
-          </ul>
-        </Callout>
-      )}
-
-      {pullRequests.length === 0 ? (
-        <Card variant="dashed">
-          <StatusText>
-            No pull request found on any of this workspace&apos;s branches yet. Run Create PR from
-            the operations panel first.
-          </StatusText>
-        </Card>
+      {repos.length === 0 ? (
+        <StatusText>This workspace has no repositories.</StatusText>
       ) : (
-        pullRequests.map((pr) => {
-          const threads = visibleThreads(pr);
-          return (
-            <Card key={pr.url} variant="flush">
-              <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
-                <span className="text-sm font-medium">{pr.repoName}</span>
-                <StatusBadge
-                  label={pr.isDraft ? "draft" : pr.state.toLowerCase()}
-                  variant={
-                    pr.isDraft
-                      ? "muted"
-                      : pr.state === "OPEN"
-                        ? "op-running"
-                        : pr.state === "MERGED"
-                          ? "op-completed"
-                          : "op-failed"
-                  }
-                  shape="square"
-                />
-                <a
-                  href={pr.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm hover:underline"
-                >
-                  #{pr.number} {pr.title} <ExternalLink className="h-3 w-3" />
-                </a>
-                <PrChecksSummaryView
-                  checks={pr.checks}
-                  keyOf={(check) => checkKey(pr, check)}
-                  selectedKeys={selectedCheckKeys}
-                  onToggle={toggleCheck}
-                  disabled={isRepoBusy(workspaceName, pr.repoName)}
-                  notes={notes}
-                  onNoteChange={setNote}
-                />
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {pr.headRefName} → {pr.baseRefName} · {pr.threads.length} comment
-                  {pr.threads.length === 1 ? "" : "s"}
-                </span>
-              </div>
+        <div className="grid gap-4 md:grid-cols-[minmax(14rem,22rem)_1fr]">
+          <nav aria-label="Repositories" className="space-y-1 md:sticky md:top-4 md:self-start">
+            {repos.map((repo) => (
+              <RepoNavItem
+                key={repo.repoPath}
+                repo={repo}
+                showResolved={showResolved}
+                onSelect={() =>
+                  sectionEls.current.get(repo.repoPath)?.scrollIntoView({ block: "start" })
+                }
+              />
+            ))}
+          </nav>
 
-              {threads.length === 0 ? (
-                <div className="px-4 py-3">
-                  <StatusText className="text-xs">
-                    {pr.threads.length === 0
-                      ? "No review comments on this PR."
-                      : "All comments on this PR are resolved or hidden."}
-                  </StatusText>
-                </div>
-              ) : (
-                threads.map((thread) => (
-                  <PrReviewThreadRow
-                    key={thread.id}
-                    thread={thread}
-                    validation={validations[thread.id]}
-                    selected={selectedIds.has(thread.id)}
-                    onToggle={toggle}
-                    disabled={isRepoBusy(workspaceName, pr.repoName)}
-                    note={notes[thread.id] ?? ""}
-                    onNoteChange={setNote}
-                  />
-                ))
-              )}
-            </Card>
-          );
-        })
+          <div className="min-w-0 space-y-6">
+            {allLoaded && pullRequests.length === 0 && (
+              <Card variant="dashed">
+                <StatusText>
+                  No pull request found on any of this workspace&apos;s branches yet. Run Create PR
+                  from the operations panel first.
+                </StatusText>
+              </Card>
+            )}
+            {repos.map((repo) => (
+              <section
+                key={repo.repoPath}
+                ref={(el) => {
+                  if (el) sectionEls.current.set(repo.repoPath, el);
+                  else sectionEls.current.delete(repo.repoPath);
+                }}
+                aria-label={repo.repoName}
+                className="scroll-mt-4 space-y-2"
+              >
+                <p className="truncate text-sm font-medium" title={repo.repoPath}>
+                  {repo.repoName}
+                </p>
+                {repo.isLoading && !repo.pr && !repo.problem ? (
+                  <StatusText className="text-xs">Loading pull request…</StatusText>
+                ) : (
+                  <>
+                    {/* "No PR yet" and "`gh` failed" read the same from a distance,
+                        so the reason is shown verbatim. */}
+                    {repo.problem && (
+                      <StatusText className="text-xs">{repo.problem.reason}</StatusText>
+                    )}
+                    {repo.pr && renderPullRequest(repo.pr)}
+                  </>
+                )}
+              </section>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Action bar. Sticky so a selection made at the top of a long PR can be
@@ -523,5 +547,66 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
         </div>
       )}
     </div>
+  );
+}
+
+function PrStateBadge({ pr }: { pr: WorkspacePullRequest }) {
+  return (
+    <StatusBadge
+      label={pr.isDraft ? "draft" : pr.state.toLowerCase()}
+      variant={
+        pr.isDraft
+          ? "muted"
+          : pr.state === "OPEN"
+            ? "op-running"
+            : pr.state === "MERGED"
+              ? "op-completed"
+              : "op-failed"
+      }
+      shape="square"
+    />
+  );
+}
+
+function RepoNavItem({
+  repo,
+  showResolved,
+  onSelect,
+}: {
+  repo: RepoPullRequestState;
+  showResolved: boolean;
+  onSelect: () => void;
+}) {
+  const { pr } = repo;
+  const comments = pr ? pr.threads.filter((t) => showResolved || !t.isResolved).length : 0;
+  const failing = pr ? pr.checks.counts.failure : 0;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="flex w-full items-center gap-1.5 rounded-md border bg-card px-2 py-2 text-left hover:bg-accent"
+    >
+      <span className="min-w-0 flex-1 truncate text-sm font-medium" title={repo.repoPath}>
+        {repo.repoName}
+      </span>
+      {repo.isLoading && !pr && !repo.problem ? (
+        <Spinner className="shrink-0 text-muted-foreground" />
+      ) : pr ? (
+        <>
+          {failing > 0 && (
+            <span className="shrink-0 text-xs text-red-500" title="Failing checks">
+              ✕{failing}
+            </span>
+          )}
+          <span className="inline-flex shrink-0 items-center gap-0.5 text-xs text-muted-foreground" title="Comments">
+            <MessageSquare className="h-3 w-3" />
+            {comments}
+          </span>
+          <PrStateBadge pr={pr} />
+        </>
+      ) : (
+        <span className="shrink-0 text-xs text-muted-foreground">no PR</span>
+      )}
+    </button>
   );
 }

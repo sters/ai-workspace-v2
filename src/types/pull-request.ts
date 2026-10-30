@@ -188,8 +188,17 @@ export interface PrValidationStore {
   validations: Record<string, PrThreadValidation>;
 }
 
-export interface WorkspacePullRequestsResult {
-  pullRequests: WorkspacePullRequest[];
-  problems: PullRequestProblem[];
+/** One repository's PR, or why it has none — at least one of the two is set. */
+export interface RepoPullRequestRead {
+  pr?: WorkspacePullRequest;
+  problem?: PullRequestProblem;
+}
+
+/**
+ * The Pull Requests tab's first read: the repositories it then reads one by one,
+ * so a slow `gh` on one repository does not hold back the others.
+ */
+export interface WorkspacePullRequestRepos {
+  repos: { repoName: string; repoPath: string }[];
   validations: Record<string, PrThreadValidation>;
 }

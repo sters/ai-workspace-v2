@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type {
   PrCheck,
@@ -121,9 +121,28 @@ function setData(opts: {
   isLoading?: boolean;
   error?: unknown;
 } = {}) {
+  const pullRequests = opts.pullRequests ?? [pr()];
+  const problems = opts.problems ?? [];
   mockUsePullRequests.mockReturnValue({
-    pullRequests: opts.pullRequests ?? [pr()],
-    problems: opts.problems ?? [],
+    repos: [
+      ...pullRequests.map((p) => ({
+        repoName: p.repoName,
+        repoPath: p.repoPath,
+        isLoading: false,
+        pr: p,
+        problem: problems.find((x) => x.repoName === p.repoName),
+      })),
+      ...problems
+        .filter((x) => !pullRequests.some((p) => p.repoName === x.repoName))
+        .map((problem) => ({
+          repoName: problem.repoName,
+          repoPath: `github.com/acme/${problem.repoName}`,
+          isLoading: false,
+          problem,
+        })),
+    ],
+    pullRequests,
+    problems,
     validations: opts.validations ?? {},
     isLoading: opts.isLoading ?? false,
     error: opts.error,
@@ -474,14 +493,40 @@ describe("PullRequestsView", () => {
   it("reports a repo whose threads could not be read instead of dropping it", () => {
     setData({ problems: [{ repoName: "gadgets", reason: "no pull requests found" }] });
     render(<PullRequestsView workspaceName="feat" />);
-    expect(screen.getByText("gadgets")).toBeInTheDocument();
-    expect(screen.getByText(/no pull requests found/)).toBeInTheDocument();
+    const section = screen.getByRole("region", { name: "gadgets" });
+    expect(within(section).getByText(/no pull requests found/)).toBeInTheDocument();
   });
 
   it("says so plainly when no branch has a PR yet", () => {
-    setData({ pullRequests: [] });
+    setData({ pullRequests: [], problems: [{ repoName: "gadgets", reason: "no pull requests found" }] });
     render(<PullRequestsView workspaceName="feat" />);
-    expect(screen.getByText(/No pull request found/i)).toBeInTheDocument();
+    expect(screen.getByText(/No pull request found on any/i)).toBeInTheDocument();
+  });
+
+  it("shows a repository's PR while another repository is still loading", () => {
+    setData();
+    const data = mockUsePullRequests();
+    mockUsePullRequests.mockReturnValue({
+      ...data,
+      repos: [
+        { repoName: "gadgets", repoPath: "github.com/acme/gadgets", isLoading: true },
+        ...data.repos,
+      ],
+    });
+    render(<PullRequestsView workspaceName="feat" />);
+
+    expect(within(screen.getByRole("region", { name: "gadgets" })).getByText(/Loading pull request/)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ })).toBeInTheDocument();
+    // Not "no PR yet" while the read is still out.
+    expect(screen.queryByText(/No pull request found on any/i)).not.toBeInTheDocument();
+  });
+
+  it("lists each repository on the left with where its PR stands", () => {
+    setData({ problems: [{ repoName: "gadgets", reason: "no pull requests found" }] });
+    render(<PullRequestsView workspaceName="feat" />);
+    const nav = screen.getByRole("navigation", { name: "Repositories" });
+    expect(within(nav).getByRole("button", { name: /widgets.*open/ })).toBeInTheDocument();
+    expect(within(nav).getByRole("button", { name: /gadgets.*no PR/ })).toBeInTheDocument();
   });
 
   describe("CI status", () => {
