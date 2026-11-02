@@ -38,14 +38,16 @@ export function resolveTicketRef(ticketId: string | undefined): string | null {
 /**
  * `Summary` → `[ABC-123] Summary`: every PR title of a ticketed task has this one
  * shape. A ticket the title already leads with in another shape (`ABC-123:`,
- * `(ABC-123)`, …) is rewritten into it rather than bracketed on a second time.
+ * `(ABC-123)`, …) or ends with in brackets (`Summary (ABC-123)`) is moved into it
+ * rather than bracketed on a second time.
  */
 export function applyTicketPrefix(title: string, ticketId: string | undefined): string {
   const id = resolveTicketRef(ticketId);
   if (!id) return title;
   const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const leading = new RegExp(`^\\s*[[(]?${escaped}(?![\\w-])[\\])]?\\s*[:|\\-–—]?\\s*`, "i");
-  return `[${id}] ${title.replace(leading, "")}`;
+  const trailing = new RegExp(`\\s*[[(]${escaped}[\\])]\\s*$`, "i");
+  return `[${id}] ${title.replace(leading, "").replace(trailing, "")}`;
 }
 
 /** A commit subject that records a checkpoint rather than the change. */

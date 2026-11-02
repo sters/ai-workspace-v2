@@ -58,6 +58,20 @@ describe("applyTicketPrefix", () => {
     expect(applyTicketPrefix(title, "ABC-123")).toBe("[ABC-123] Add pagination");
   });
 
+  it.each([
+    "fix(api): Add pagination (ABC-123)",
+    "fix(api): Add pagination [abc-123]",
+    "[ABC-123] fix(api): Add pagination (ABC-123)",
+  ])("moves the trailing ticket in %p to the front", (title) => {
+    expect(applyTicketPrefix(title, "ABC-123")).toBe("[ABC-123] fix(api): Add pagination");
+  });
+
+  it("keeps a trailing bracket naming another ticket", () => {
+    expect(applyTicketPrefix("Add pagination (ABC-1234)", "ABC-123")).toBe(
+      "[ABC-123] Add pagination (ABC-1234)",
+    );
+  });
+
   it("brackets the ticket on even when the title names it further in", () => {
     expect(applyTicketPrefix("Fix ABC-123 crash on retry", "ABC-123")).toBe(
       "[ABC-123] Fix ABC-123 crash on retry",
