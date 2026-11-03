@@ -29,9 +29,8 @@ vi.mock("@/lib/workspace", () => ({
 
 vi.mock("@/lib/templates", () => ({
   buildCodeReviewerPrompt: vi.fn(() => "code-reviewer-prompt"),
-  buildTodoVerifierPrompt: vi.fn(() => "todo-verifier-prompt"),
-  buildReadmeVerifierPrompt: vi.fn(() => "readme-verifier-prompt"),
-  buildCollectorPrompt: vi.fn(() => "collector-prompt"),
+  buildCompletionVerifierPrompt: vi.fn(() => "completion-verifier-prompt"),
+  COMPLETION_VERIFICATION_SCHEMA: {},
   buildCrossRepositoryReviewerPrompt: vi.fn(() => "cross-repo-reviewer-prompt"),
   buildFixVerifierPrompt: vi.fn(() => "fix-verifier-prompt"),
 }));
@@ -113,7 +112,7 @@ import {
   buildCodeReviewerPrompt,
   buildCrossRepositoryReviewerPrompt,
   buildFixVerifierPrompt,
-  buildReadmeVerifierPrompt,
+  buildCompletionVerifierPrompt,
 } from "@/lib/templates";
 import {
   captureRepoHead,
@@ -136,57 +135,73 @@ const mockReadPreviousBaseline = vi.mocked(readPreviousReviewBaseline);
 const mockWriteReviewBaseline = vi.mocked(writeReviewBaseline);
 const mockCollectPostedAsks = vi.mocked(collectPostedAsks);
 
-describe("buildReviewPipeline — skip verify-todo when TODO file is missing", () => {
+describe("buildReviewPipeline — completion verifier", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFileMap.clear();
   });
 
-  it("does NOT include a verify-todo child when the TODO file exists but is empty", async () => {
+  const repoA = {
+    repoName: "repo-a",
+    repoPath: "owner/repo-a",
+    worktreePath: "/repos/repo-a/worktrees/test-ws",
+  } as ReturnType<typeof listWorkspaceRepos>[number];
+
+  it("runs one verifier per repository, handing it the TODO file only when it has content", async () => {
     mockListWorkspaceRepos.mockReturnValue([
-      {
-        repoName: "empty-todo-repo",
-        repoPath: "owner/empty-todo-repo",
-        worktreePath: "/repos/empty-todo-repo/worktrees/test-ws",
-      } as ReturnType<typeof listWorkspaceRepos>[number],
+      { repoName: "empty-todo-repo", repoPath: "owner/empty-todo-repo", worktreePath: "/repos/e/worktrees/test-ws" } as ReturnType<typeof listWorkspaceRepos>[number],
+      { repoName: "active-repo", repoPath: "owner/active-repo", worktreePath: "/repos/a/worktrees/test-ws" } as ReturnType<typeof listWorkspaceRepos>[number],
     ]);
     mockFileMap.set("/ws/test-ws/TODO-empty-todo-repo.md", "   \n\n  ");
+    mockFileMap.set("/ws/test-ws/TODO-active-repo.md", "# TODO\n\n- [ ] do this\n");
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[1] as PipelinePhaseGroup;
-    const labels = groupPhase.children.map((c) => c.label);
-    expect(labels).not.toContain("verify-todo-empty-todo-repo");
+    const labels = (phases[1] as PipelinePhaseGroup).children.map((c) => c.label);
+
+    expect(labels.filter((l) => l.startsWith("verify-"))).toEqual(["verify-empty-todo-repo", "verify-active-repo"]);
+    const todoBy = Object.fromEntries(
+      vi.mocked(buildCompletionVerifierPrompt).mock.calls.map(([input]) => [input.repoName, input.todoContent]),
+    );
+    expect(todoBy).toEqual({ "empty-todo-repo": "", "active-repo": "# TODO\n\n- [ ] do this" });
   });
 
-  it("skips verify-todo only for repos missing a TODO file in a multi-repo workspace", async () => {
-    mockListWorkspaceRepos.mockReturnValue([
-      {
-        repoName: "no-todo-repo",
-        repoPath: "owner/no-todo-repo",
-        worktreePath: "/repos/no-todo-repo/worktrees/test-ws",
-      } as ReturnType<typeof listWorkspaceRepos>[number],
-      {
-        repoName: "active-repo",
-        repoPath: "owner/active-repo",
-        worktreePath: "/repos/active-repo/worktrees/test-ws",
-      } as ReturnType<typeof listWorkspaceRepos>[number],
-    ]);
-    mockFileMap.set(
-      "/ws/test-ws/TODO-active-repo.md",
-      "# TODO\n\n- [ ] do this\n",
-    );
+  it("renders both reports and the summary from the verifier's structured result", async () => {
+    mockListWorkspaceRepos.mockReturnValue([repoA]);
+    mockFileMap.set("/ws/test-ws/TODO-repo-a.md", "- [x] add handler");
 
     const phases = await buildReviewPipeline({ workspace: "test-ws" });
-    const groupPhase = phases[1] as PipelinePhaseGroup;
-    const labels = groupPhase.children.map((c) => c.label);
+    const verifier = (phases[1] as PipelinePhaseGroup).children.find((c) => c.label === "verify-repo-a")!;
+    verifier.onResultText!(JSON.stringify({
+      requirements: [{ requirement: "Handler exists", kind: "auto", status: "SATISFIED", evidence: "a.ts:1" }],
+      todoItems: [{ item: "add handler", status: "VERIFIED", evidence: "a.ts" }],
+      recommendations: [],
+    }));
+    mockBunWrite.mockClear();
 
-    expect(labels).not.toContain("verify-todo-no-todo-repo");
-    expect(labels).toContain("verify-todo-active-repo");
-    // Code reviews and README verifiers run for both repos regardless
-    expect(labels).toContain("review-no-todo-repo");
-    expect(labels).toContain("review-active-repo");
-    expect(labels).toContain("verify-readme-no-todo-repo");
-    expect(labels).toContain("verify-readme-active-repo");
+    const ctx = { emitStatus: vi.fn(), emitResult: vi.fn() } as unknown as PhaseFunctionContext;
+    expect(await (phases[2] as PipelinePhaseFunction).fn(ctx)).toBe(true);
+
+    const written = new Map(mockBunWrite.mock.calls.map((c) => [String((c as unknown[])[0]), String((c as unknown[])[1])]));
+    const dir = "/ws/test-ws/artifacts/reviews/2026-04-08T00-00-00";
+    expect(written.get(`${dir}/VERIFY-README-owner_repo-a.md`)).toContain("**Satisfaction Rate**: 100% (1 / 1)");
+    expect(written.get(`${dir}/VERIFY-TODO-owner_repo-a.md`)).toContain("**Completion Rate**: 100% (1 / 1)");
+    expect(written.get(`${dir}/SUMMARY.md`)).toContain("**Repositories Reviewed**: 1");
+    expect(ctx.emitResult).toHaveBeenCalledWith("Review summary written");
+  });
+
+  it("reports a repository whose verifier returned nothing usable instead of treating it as verified", async () => {
+    mockListWorkspaceRepos.mockReturnValue([repoA]);
+
+    const phases = await buildReviewPipeline({ workspace: "test-ws" });
+    (phases[1] as PipelinePhaseGroup).children.find((c) => c.label === "verify-repo-a")!.onResultText!("not json");
+    mockBunWrite.mockClear();
+
+    const ctx = { emitStatus: vi.fn(), emitResult: vi.fn() } as unknown as PhaseFunctionContext;
+    await (phases[2] as PipelinePhaseFunction).fn(ctx);
+
+    const summary = mockBunWrite.mock.calls.map((c) => String((c as unknown[])[1])).find((t) => t.includes("Workspace Review Summary"))!;
+    expect(summary).toMatch(/## Failed Reviews[\s\S]*repo-a: the completion verifier returned no result/);
+    expect(ctx.emitResult).toHaveBeenCalledWith("Review summary written; no completion verdict for repo-a");
   });
 });
 
@@ -285,7 +300,7 @@ describe("buildReviewPipeline — cross-repository review", () => {
     it("builds per-repo children only for the unfinished repository", async () => {
       const { labels } = await narrowedToWeb();
 
-      expect(labels).toEqual(expect.arrayContaining(["review-web", "verify-todo-web", "verify-readme-web"]));
+      expect(labels).toEqual(expect.arrayContaining(["review-web", "verify-web"]));
       expect(labels.filter((l) => l.endsWith("-api"))).toEqual([]);
     });
 
@@ -896,9 +911,9 @@ describe("buildReviewPipeline — phase order", () => {
     expect((phases[2] as PipelinePhaseFunction).label).toBe("Collect review results");
   });
 
-  it("points the README verifier at the constraint report instead of the commands", async () => {
+  it("points the completion verifier at the constraint report instead of the commands", async () => {
     await buildReviewPipeline({ workspace: "test-ws" });
-    expect(vi.mocked(buildReadmeVerifierPrompt)).toHaveBeenCalledWith(
+    expect(vi.mocked(buildCompletionVerifierPrompt)).toHaveBeenCalledWith(
       expect.objectContaining({
         constraintReportPath: expect.stringContaining("CONSTRAINTS-owner_repo-a.md"),
       }),
@@ -923,7 +938,7 @@ describe("buildReviewPipeline — a round with requested fixes keeps every revie
     mockFileMap.set("/ws/test-ws/TODO-repo-a.md", "- [ ] something");
   });
 
-  it("keeps the code reviewer and the TODO verifier next to the fix verifier", async () => {
+  it("keeps the code reviewer and the completion verifier next to the fix verifier", async () => {
     const phases = await buildReviewPipeline({
       workspace: "test-ws",
       requestedFixes: ["fix one"],
@@ -932,9 +947,8 @@ describe("buildReviewPipeline — a round with requested fixes keeps every revie
     expect(labels).toEqual(
       expect.arrayContaining([
         "verify-fixes-repo-a",
-        "verify-readme-repo-a",
+        "verify-repo-a",
         "review-repo-a",
-        "verify-todo-repo-a",
       ]),
     );
   });

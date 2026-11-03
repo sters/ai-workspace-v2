@@ -4,10 +4,8 @@ import type { WorkspaceRepo } from "./workspace";
 /** All known step type identifiers for config-based model / effort resolution. */
 export const STEP_TYPES = {
   CODE_REVIEW: "code-review",
-  VERIFY_TODO: "verify-todo",
-  VERIFY_README: "verify-readme",
+  VERIFY_COMPLETION: "verify-completion",
   VERIFY_FIXES: "verify-fixes",
-  COLLECT_REVIEWS: "collect-reviews",
   EXECUTE: "execute",
   RESEARCH: "research",
   ANALYZE_README: "analyze-readme",

@@ -1,5 +1,5 @@
 export { TODO_FEATURE_TEMPLATE, TODO_BUGFIX_TEMPLATE, TODO_RESEARCH_TEMPLATE, TODO_DEFAULT_TEMPLATE, selectTodoTemplate } from "./todo";
-export { REVIEW_REPORT_TEMPLATE, VERIFICATION_REPORT_TEMPLATE, README_VERIFICATION_REPORT_TEMPLATE, SUMMARY_REPORT_TEMPLATE, REPORT_TEMPLATES, RESEARCH_REPORT_TEMPLATES } from "./reports";
+export { REVIEW_REPORT_TEMPLATE, REPORT_TEMPLATES, RESEARCH_REPORT_TEMPLATES } from "./reports";
 export { buildReadmeContent } from "./readme";
 export { INITIAL_SETTINGS_LOCAL } from "./settings";
 
@@ -20,12 +20,11 @@ export {
   buildCodeReviewerPrompt,
   getCrossRepositoryReviewerSystemPrompt,
   buildCrossRepositoryReviewerPrompt,
-  getTodoVerifierSystemPrompt,
+  getCompletionVerifierSystemPrompt,
+  COMPLETION_VERIFICATION_SCHEMA,
   getFixVerifierSystemPrompt,
   buildFixVerifierPrompt,
-  buildTodoVerifierPrompt,
-  getReadmeVerifierSystemPrompt,
-  buildReadmeVerifierPrompt,
+  buildCompletionVerifierPrompt,
   getPRCreatorSystemPrompt,
   buildPRCreatorPrompt,
   getResearchFindingsRepoSystemPrompt,
@@ -41,8 +40,6 @@ export {
   buildUpdaterPrompt,
   getReadmeUpdaterSystemPrompt,
   buildReadmeUpdaterPrompt,
-  getCollectorSystemPrompt,
-  buildCollectorPrompt,
   getInitReadmeSystemPrompt,
   buildInitAnalyzeAndReadmePrompt,
   INIT_ANALYSIS_SCHEMA,

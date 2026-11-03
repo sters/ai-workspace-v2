@@ -72,8 +72,8 @@ export async function execConstraintCommand(
 /**
  * Report for a repo the README declares no constraint commands for. Written so
  * the review's constraint section distinguishes "nothing was run" from "every
- * command passed" — without it the collector sees no CONSTRAINTS-* file and
- * SUMMARY.md is simply silent, which reads as a pass.
+ * command passed" — without it the gate sees no CONSTRAINTS-* file, which reads
+ * as a pass.
  */
 export function buildNoConstraintsReport(repoName: string): string {
   return `# Constraint Verification: ${repoName}

@@ -33,7 +33,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.EXECUTE]: "opus",
   [STEP_TYPES.DISCOVER_CONSTRAINTS]: "opus",
   [STEP_TYPES.DISCOVER_GUIDANCE]: "opus",
-  [STEP_TYPES.VERIFY_README]: "opus",
+  [STEP_TYPES.VERIFY_COMPLETION]: "opus",
   [STEP_TYPES.CRITERIA_FEASIBILITY]: "opus",
   [STEP_TYPES.VALIDATE_PR_COMMENT]: "opus",
   [STEP_TYPES.GROUND_FINDING]: "opus",
@@ -68,10 +68,9 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   // mechanical goes to opus instead (`model.test.ts` enforces this).
   //
   // Sonnet takes the steps that still act like an agent — search the
-  // workspaces, check items against the code, or drive gh/git. At `low` it can report done without checking and stop to ask
+  // workspaces or drive gh/git. At `low` it can report done without checking and stop to ask
   // partway, which is why the executor and every step that writes code stay on
   // opus.
-  [STEP_TYPES.VERIFY_TODO]: CLAUDE_MODELS.SONNET_5_5,
   [STEP_TYPES.DEEP_SEARCH]: CLAUDE_MODELS.SONNET_5_5,
   // Fills a PR template from the diff and README, plus the gh/git mechanics.
   [STEP_TYPES.CREATE_PR]: CLAUDE_MODELS.SONNET_5_5,
@@ -81,7 +80,6 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   // agent prompt at `low` makes it skip checks and stop early — and keeps the
   // request under the prompt length where its price steps up.
   [STEP_TYPES.PRUNE_SUGGESTIONS]: CLAUDE_MODELS.HAIKU_5_5,
-  [STEP_TYPES.COLLECT_REVIEWS]: CLAUDE_MODELS.HAIKU_5_5,
   [STEP_TYPES.AGGREGATE_SUGGESTIONS]: CLAUDE_MODELS.HAIKU_5_5,
 };
 
@@ -148,9 +146,10 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // wall clock and spend.
   [STEP_TYPES.EXECUTE]: "medium",
   // Verifies against the enumerated `## Acceptance Criteria` checkboxes, which
-  // the prompt treats as the authoritative requirement set.
-  [STEP_TYPES.VERIFY_README]: "medium",
-  // Same shape as verify-readme and sized to match: the criteria list is
+  // the prompt treats as the authoritative requirement set, and the TODO items
+  // in the same pass.
+  [STEP_TYPES.VERIFY_COMPLETION]: "medium",
+  // Same shape as verify-completion and sized to match: the criteria list is
   // enumerated, so the question is bounded — but answering it means reading the
   // other repositories' source to see whether the contract can carry the data at
   // all, which is more than the `readme-clarity-gate` rung below does.
@@ -200,8 +199,8 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // A single yes/no against documented criteria, and deliberately biased toward
   // proceeding — it is a safety valve, not a quality bar.
   [STEP_TYPES.README_CLARITY_GATE]: "low",
-  // Checks an enumerated list of requested fixes against the code — bounded, like
-  // `verify-todo` on the rung below. It sits here rather than there because the
+  // Checks an enumerated list of requested fixes against the code — bounded and
+  // directed, which keeps it below `verify-completion`. It is not lower because the
   // asks are free-form prose rather than structured TODO items, and because a
   // `NOT LANDED` verdict is a hard loop reason for the gate: a false negative
   // costs a cycle, a false positive lets requested work disappear.
@@ -210,11 +209,9 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // sonnet/low and haiku/low — nothing to decide: extraction, aggregation, rule
   // application. See `STEP_DEFAULT_MODELS` for which model takes which.
   [STEP_TYPES.CREATE_PR]: "low",
-  [STEP_TYPES.VERIFY_TODO]: "low",
   [STEP_TYPES.DEEP_SEARCH]: "low",
   // Applies the prompt's documented rules to an existing suggestion list.
   [STEP_TYPES.PRUNE_SUGGESTIONS]: "low",
-  [STEP_TYPES.COLLECT_REVIEWS]: "low",
   [STEP_TYPES.AGGREGATE_SUGGESTIONS]: "low",
 };
 

@@ -34,8 +34,7 @@ After that, run commands like ${opts.examples} as separate Bash calls. Do NOT us
 
 /**
  * Working-directory rules for agents that span multiple directories (the
- * collector reads every repo's review files; the coordinator reads every
- * worktree), where a per-agent cwd would be meaningless.
+ * coordinator reads every worktree), where a per-agent cwd would be meaningless.
  */
 export const NO_CD_RULES = `### Working Directory Rules
 
@@ -90,8 +89,8 @@ Serialize only a call whose input genuinely depends on the previous result. A do
 
 /**
  * Length calibration for agents whose deliverable is a file on disk.
- * Reports are re-embedded verbatim into downstream prompts (the collector reads
- * every review, the autonomous gate reads every review AND every TODO file), so
+ * Reports are re-embedded verbatim into downstream prompts (the autonomous gate
+ * reads every review AND every TODO file), so
  * padding here multiplies into later phases' context and cost.
  */
 export const WRITTEN_DELIVERABLE_LENGTH = `### Report Length

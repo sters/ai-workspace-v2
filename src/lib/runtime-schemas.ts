@@ -135,6 +135,23 @@ export const resultUsageSchema = z.object({
   model_usage_since_last_result: modelUsageSchema.optional(),
 });
 
+/** The completion verifier's structured verdict (`COMPLETION_VERIFICATION_SCHEMA`). */
+export const completionVerificationSchema = z.object({
+  requirements: z.array(z.object({
+    requirement: z.string(),
+    kind: z.enum(["auto", "manual"]),
+    status: z.enum(["SATISFIED", "PARTIAL", "UNSATISFIED", "PENDING-HUMAN"]),
+    evidence: z.string(),
+    notes: z.string().optional(),
+  })),
+  todoItems: z.array(z.object({
+    item: z.string(),
+    status: z.enum(["VERIFIED", "UNVERIFIED", "PARTIAL", "INCOMPLETE", "UNMARKED", "SKIPPED"]),
+    evidence: z.string(),
+  })),
+  recommendations: z.array(z.string()),
+});
+
 // ---------------------------------------------------------------------------
 // WebSocket ClientMessage (chat-server.ts)
 // ---------------------------------------------------------------------------

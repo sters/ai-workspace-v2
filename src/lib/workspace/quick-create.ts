@@ -11,7 +11,7 @@
  * can read.
  *
  * The contract sections (Non-Goal, Assumptions, Requirements, Acceptance
- * Criteria) are left as the template's comments. The README verifier and the
+ * Criteria) are left as the template's comments. The completion verifier and the
  * autonomous gate treat them as authoritative, so filling them from a one-line
  * name would hand every later phase a contract nobody wrote; an empty one is
  * honest, and `update-readme` is the path that fills it if the task turns out

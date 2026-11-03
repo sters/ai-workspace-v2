@@ -12,9 +12,8 @@ export {
   getCrossRepositoryReviewerSystemPrompt,
   buildCrossRepositoryReviewerPrompt,
 } from "./cross-repository-reviewer";
-export { getTodoVerifierSystemPrompt, buildTodoVerifierPrompt } from "./todo-verifier";
+export { getCompletionVerifierSystemPrompt, buildCompletionVerifierPrompt, COMPLETION_VERIFICATION_SCHEMA } from "./completion-verifier";
 export { getFixVerifierSystemPrompt, buildFixVerifierPrompt } from "./fix-verifier";
-export { getReadmeVerifierSystemPrompt, buildReadmeVerifierPrompt } from "./readme-verifier";
 export { getPRCreatorSystemPrompt, buildPRCreatorPrompt } from "./pr-creator";
 export {
   getResearchFindingsRepoSystemPrompt,
@@ -29,7 +28,6 @@ export {
 } from "./researcher";
 export { getUpdaterSystemPrompt, buildUpdaterPrompt } from "./updater";
 export { getReadmeUpdaterSystemPrompt, buildReadmeUpdaterPrompt } from "./readme-updater";
-export { getCollectorSystemPrompt, buildCollectorPrompt } from "./collector";
 export { getInitReadmeSystemPrompt, buildInitAnalyzeAndReadmePrompt, INIT_ANALYSIS_SCHEMA } from "./init-readme";
 export { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildReviewChatPrompt, getResearchChatSystemPrompt, buildResearchChatPrompt, getTaskChatSystemPrompt, buildTaskChatPrompt, getDiscussionChatSystemPrompt, buildDiscussionChatPrompt, getStartPromptChatSystemPrompt, buildStartPromptChatPrompt } from "./chat";
 export { getCreateTodoPlannerSystemPrompt, buildCreateTodoFromReviewPrompt } from "./create-todo-planner";

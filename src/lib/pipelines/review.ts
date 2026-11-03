@@ -1,4 +1,3 @@
-import { globScan } from "@/lib/fs";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { getReadme } from "@/lib/workspace/reader";
@@ -12,9 +11,8 @@ import {
 } from "@/lib/workspace";
 import {
   buildCodeReviewerPrompt,
-  buildTodoVerifierPrompt,
-  buildReadmeVerifierPrompt,
-  buildCollectorPrompt,
+  buildCompletionVerifierPrompt,
+  COMPLETION_VERIFICATION_SCHEMA,
   buildCrossRepositoryReviewerPrompt,
   buildFixVerifierPrompt,
 } from "@/lib/templates";
@@ -27,6 +25,16 @@ import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { readKnownFindings } from "@/lib/workspace/known-findings";
 import { readRepoGuidance } from "@/lib/workspace/repo-guidance";
 import { findingsFilePath } from "@/lib/workspace/review-findings";
+import {
+  buildReviewSummary,
+  parseFixVerificationTable,
+  parseReportItems,
+  renderReadmeVerification,
+  renderTodoVerification,
+} from "@/lib/workspace/review-summary";
+import type { RepoSummaryInput } from "@/lib/workspace/review-summary";
+import { completionVerificationSchema } from "@/lib/runtime-schemas";
+import type { CompletionVerification } from "@/types/review-verification";
 import { repoReportStem } from "@/lib/workspace/review-report-names";
 import { selectRepos } from "@/lib/workspace/select-repos";
 import { collectPostedAsks } from "@/lib/workspace/posted-findings";
@@ -47,7 +55,7 @@ import { getCleanEnv } from "@/lib/env";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
 import type { CrossRepositoryReviewerInput } from "@/types/prompts";
-import { getTimeoutDefaults, startOperationPipeline } from "@/lib/pipeline-manager";
+import { startOperationPipeline } from "@/lib/pipeline-manager";
 
 export interface ReviewPipelineInput {
   workspace: string;
@@ -87,7 +95,7 @@ export interface ReviewPipelineInput {
  * `runSubPhases` discards the inner phases' own `timeoutMs`, so this is the only
  * budget that applies once the review is built inside a phase. Sized like the
  * autonomous cycle's review phase: the reviewer group scales with repo count,
- * plus 10 min of constraints and the collector.
+ * plus 10 min of constraints.
  */
 const REVIEW_SUBPIPELINE_BUDGET_MS = 45 * 60 * 1000;
 
@@ -152,7 +160,7 @@ export async function buildReviewPipeline(
     ? await collectPostedAsks(workspace)
     : new Map<string, string[]>();
 
-  // Pre-render the Acceptance Criteria checklist so the README verifier gets an
+  // Pre-render the Acceptance Criteria checklist so the completion verifier gets an
   // unambiguous auto/manual split instead of re-parsing prose.
   const acceptanceCriteria = parseAcceptanceCriteria(readmeContent)
     .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
@@ -160,6 +168,9 @@ export async function buildReviewPipeline(
 
   const reviewChildren: GroupChild[] = [];
   const repoBaseBranches = new Map<string, string>();
+  // Filled while the phases run, and read by the summary phase at the end.
+  const verifications = new Map<string, { data: CompletionVerification; hasTodo: boolean }>();
+  const constraintOutcomes = new Map<string, RepoSummaryInput["constraints"]>();
   // Collected per-repo context for the cross-repository reviewer (multi-repo only).
   const crossRepoInputs: CrossRepositoryReviewerInput["repos"] = [];
 
@@ -209,7 +220,6 @@ export async function buildReviewPipeline(
 
     const stem = repoReportStem(repo.repoPath, repo.repoName);
     const reviewFileName = `REVIEW-${stem}.md`;
-    const verifyFileName = `VERIFY-TODO-${stem}.md`;
     const constraintFileName = `CONSTRAINTS-${stem}.md`;
 
     // Code reviewer. Runs on every review, including a round that only applies
@@ -273,55 +283,41 @@ export async function buildReviewPipeline(
       });
     }
 
-    // TODO verifier — skipped only when the repo has no TODO file (or it's
-    // empty), since there is nothing for the verifier to check against.
-    const todoFileName = `TODO-${repo.repoName}.md`;
-    const todoFile = Bun.file(path.join(wsPath, todoFileName));
-    const todoContent = (await todoFile.exists())
-      ? await todoFile.text()
-      : "";
+    const todoFile = Bun.file(path.join(wsPath, `TODO-${repo.repoName}.md`));
+    const todoContent = (await todoFile.exists()) ? (await todoFile.text()).trim() : "";
 
-    if (todoContent.trim() !== "") {
-      reviewChildren.push({
-        label: `verify-todo-${repo.repoName}`,
-        stepType: STEP_TYPES.VERIFY_TODO,
-        prompt: buildTodoVerifierPrompt({
-          workspaceName: workspace,
-          repoPath: repo.repoPath,
-          repoName: repo.repoName,
-          baseBranch,
-          reviewTimestamp,
-          todoContent,
-          worktreePath: repo.worktreePath,
-          verifyFilePath: path.join(reviewDir, verifyFileName),
-        }),
-        addDirs: [reviewDir],
-        appendSystemPromptFile: await ensureSystemPrompt(wsPath, "todo-verifier"),
-      });
-    }
-
-    const readmeVerifyFileName = `VERIFY-README-${stem}.md`;
+    // README requirements and TODO items in one agent: both halves read the same
+    // diff and files to answer "was the planned work done". It returns data, and
+    // the summary phase renders both reports from it.
     reviewChildren.push({
-      label: `verify-readme-${repo.repoName}`,
-      stepType: STEP_TYPES.VERIFY_README,
-      prompt: buildReadmeVerifierPrompt({
+      label: `verify-${repo.repoName}`,
+      stepType: STEP_TYPES.VERIFY_COMPLETION,
+      prompt: buildCompletionVerifierPrompt({
         workspaceName: workspace,
         repoPath: repo.repoPath,
         repoName: repo.repoName,
         baseBranch,
-        reviewTimestamp,
         readmeContent,
         acceptanceCriteria,
+        todoContent,
         worktreePath: repo.worktreePath,
         repoChanges: repoChangesText,
-        verifyFilePath: path.join(reviewDir, readmeVerifyFileName),
         // Already written by the Verify constraints phase ahead of this group,
         // so a criterion phrased as "the declared commands exit 0" is answered
         // by reading it instead of re-running the build and test suite.
         constraintReportPath: path.join(reviewDir, constraintFileName),
       }),
+      jsonSchema: COMPLETION_VERIFICATION_SCHEMA as unknown as Record<string, unknown>,
+      onResultText: (text) => {
+        try {
+          const parsed = completionVerificationSchema.safeParse(JSON.parse(text));
+          if (parsed.success) verifications.set(repo.repoName, { data: parsed.data, hasTodo: todoContent !== "" });
+        } catch {
+          // Left unset: the summary reports the verifier as failed.
+        }
+      },
       addDirs: [reviewDir],
-      appendSystemPromptFile: await ensureSystemPrompt(wsPath, "readme-verifier"),
+      appendSystemPromptFile: await ensureSystemPrompt(wsPath, "completion-verifier"),
     });
   }
 
@@ -333,8 +329,8 @@ export async function buildReviewPipeline(
   // Cross-repository review: only when the whole workspace (no single-repo
   // filter) has more than one repo. Catches issues that span repos — API/contract
   // mismatches, shared-type drift, coordinated migrations — that per-repo
-  // reviewers can't see in isolation. Output filename matches the REVIEW-* glob
-  // so the collector and autonomous gate pick it up automatically.
+  // reviewers can't see in isolation. Its report sits beside the per-repo ones,
+  // where the summary phase and the autonomous gate read it.
   //
   // `unshift`, not `push`: it has to be built here because it needs every repo's
   // diff from the loop above, but the group starts children in array order
@@ -365,7 +361,7 @@ export async function buildReviewPipeline(
     // the merge-base before it can reach the gate as a blocker.
     //
     // It runs *before* the reviewer group, not after, so the report is on disk
-    // while the README verifier works: an acceptance criterion phrased as "the
+    // while the completion verifier works: an acceptance criterion phrased as "the
     // declared commands exit 0" was otherwise verified by re-running the whole
     // build and test suite, once per cycle, duplicating this phase's work with
     // no merge-base comparison behind it. Costs nothing in wall clock — the
@@ -393,6 +389,7 @@ export async function buildReviewPipeline(
             ctx.emitStatus(
               `[${repo.repoName}] No constraints declared in README — nothing to run`,
             );
+            constraintOutcomes.set(repo.repoName, { file: constraintFileName, undeclared: true });
             await Bun.write(
               path.join(reviewDir, constraintFileName),
               buildNoConstraintsReport(repo.repoName),
@@ -474,6 +471,7 @@ export async function buildReviewPipeline(
             }
           }
 
+          constraintOutcomes.set(repo.repoName, { file: constraintFileName, results });
           const report = buildConstraintReport(repo.repoName, results);
           await Bun.write(path.join(reviewDir, constraintFileName), report);
         }
@@ -501,32 +499,58 @@ export async function buildReviewPipeline(
     {
       kind: "function",
       label: "Collect review results",
-      timeoutMs: getTimeoutDefaults("review").claudeMs,
+      timeoutMs: 60 * 1000,
       fn: async (ctx) => {
-        const reviewGlob = new Bun.Glob("REVIEW-*");
-        const verifyGlob = new Bun.Glob("VERIFY-TODO-*");
-        const readmeVerifyGlob = new Bun.Glob("VERIFY-README-*");
-        const constraintGlob = new Bun.Glob("CONSTRAINTS-*");
-        const fixVerifyGlob = new Bun.Glob("VERIFY-FIXES-*");
-        const actualReviewFiles = (await globScan(reviewGlob, reviewDir));
-        const actualReadmeVerifyFiles = new Set((await globScan(readmeVerifyGlob, reviewDir)));
-        const actualVerifyFiles = (await globScan(verifyGlob, reviewDir));
-        const actualConstraintFiles = (await globScan(constraintGlob, reviewDir));
-        const actualFixVerifyFiles = (await globScan(fixVerifyGlob, reviewDir));
+        const readIfExists = async (name: string) => {
+          const file = Bun.file(path.join(reviewDir, name));
+          return (await file.exists()) ? file.text() : null;
+        };
 
-        const prompt = buildCollectorPrompt({
-          workspaceName: workspace,
+        const repoInputs: RepoSummaryInput[] = [];
+        for (const repo of repos) {
+          const stem = repoReportStem(repo.repoPath, repo.repoName);
+          const reviewFile = `REVIEW-${stem}.md`;
+          const reviewText = await readIfExists(reviewFile);
+
+          const verified = verifications.get(repo.repoName);
+          let verification: RepoSummaryInput["verification"] = null;
+          if (verified) {
+            const readmeFile = `VERIFY-README-${stem}.md`;
+            const todoFile = verified.hasTodo ? `VERIFY-TODO-${stem}.md` : null;
+            await Bun.write(path.join(reviewDir, readmeFile), renderReadmeVerification(repo.repoName, verified.data));
+            if (todoFile) await Bun.write(path.join(reviewDir, todoFile), renderTodoVerification(repo.repoName, verified.data));
+            verification = { readmeFile, todoFile, data: verified.data };
+          }
+
+          const fixesFile = `VERIFY-FIXES-${stem}.md`;
+          const fixesText = await readIfExists(fixesFile);
+
+          repoInputs.push({
+            repoName: repo.repoName,
+            reviewFile,
+            review: reviewText === null ? null : parseReportItems(reviewText),
+            verification,
+            constraints: constraintOutcomes.get(repo.repoName) ?? null,
+            fixes: fixesText === null ? null : { file: fixesFile, rows: parseFixVerificationTable(fixesText) },
+          });
+        }
+
+        const crossFile = "REVIEW-cross-repository.md";
+        const crossText = await readIfExists(crossFile);
+        const summary = buildReviewSummary({
           reviewTimestamp,
-          reviewDir,
-          reviewFiles: actualReviewFiles.map((f) => path.join(reviewDir, f)),
-          verifyFiles: actualVerifyFiles.map((f) => path.join(reviewDir, f)),
-          readmeVerifyFiles: [...actualReadmeVerifyFiles].map((f) => path.join(reviewDir, f)),
-          constraintFiles: actualConstraintFiles.map((f) => path.join(reviewDir, f)),
-          fixVerifyFiles: actualFixVerifyFiles.map((f) => path.join(reviewDir, f)),
+          repos: repoInputs,
+          crossRepository: crossText === null ? null : { file: crossFile, items: parseReportItems(crossText) },
         });
+        await Bun.write(path.join(reviewDir, "SUMMARY.md"), summary);
 
-        const ok = await ctx.runChild("Collect reviews", prompt, { addDirs: [reviewDir], stepType: STEP_TYPES.COLLECT_REVIEWS, appendSystemPromptFile: await ensureSystemPrompt(wsPath, "collector") });
-        return ok;
+        const missing = repoInputs.filter((r) => !r.verification).map((r) => r.repoName);
+        ctx.emitResult(
+          missing.length > 0
+            ? `Review summary written; no completion verdict for ${missing.join(", ")}`
+            : "Review summary written",
+        );
+        return true;
       },
     },
   ];

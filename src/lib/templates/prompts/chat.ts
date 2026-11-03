@@ -65,7 +65,7 @@ export const TASK_README_EDIT =
 
 /** Completes a sentence naming that edit ("Step 3 is …"): why it stops at the heading and Goal. */
 export const TASK_README_SCOPE =
-  "the whole of what you write there, and it is a rough sketch grounded in the request — not a contract. Leave `## Non-Goal`, `## Assumptions`, `## Requirements` and `## Acceptance Criteria` as the template's comments, and leave the `TODO-*.md` files alone: the README verifier and the autonomous gate treat those sections as authoritative, and the pipeline's own phases write them. If the task turns out to need a real contract, say so and point the user at the `update-readme` operation.";
+  "the whole of what you write there, and it is a rough sketch grounded in the request — not a contract. Leave `## Non-Goal`, `## Assumptions`, `## Requirements` and `## Acceptance Criteria` as the template's comments, and leave the `TODO-*.md` files alone: the completion verifier and the autonomous gate treat those sections as authoritative, and the pipeline's own phases write them. If the task turns out to need a real contract, say so and point the user at the `update-readme` operation.";
 
 /**
  * System prompt for review-focused chat sessions.
@@ -131,7 +131,7 @@ ${ON_DEMAND_READING}`;
  * Edit against a request the session is already holding.
  *
  * It stops at those two. Non-Goal, Assumptions, Requirements and Acceptance
- * Criteria are the done-contract the README verifier and the autonomous gate
+ * Criteria are the done-contract the completion verifier and the autonomous gate
  * enforce, so filling them from a one-line note hands every later phase a
  * contract nobody wrote — the same reason `createQuickWorkspace` leaves them
  * as the template's comments.

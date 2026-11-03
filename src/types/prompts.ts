@@ -202,27 +202,20 @@ export interface CrossRepositoryReviewerInput {
   }[];
 }
 
-export interface TodoVerifierInput extends RepoPromptInput {
+export interface CompletionVerifierInput extends RepoPromptInput {
   baseBranch: string;
-  reviewTimestamp: string;
-  todoContent: string;
-  verifyFilePath: string;
-}
-
-export interface ReadmeVerifierInput extends RepoPromptInput {
-  baseBranch: string;
-  reviewTimestamp: string;
   readmeContent: string;
-  repoChanges: string;
-  verifyFilePath: string;
   /** Pre-rendered Acceptance Criteria checklist parsed from the README, or "" when absent. */
-  acceptanceCriteria?: string;
+  acceptanceCriteria: string;
+  /** The repository's TODO file, or "" when it has none. */
+  todoContent: string;
+  repoChanges: string;
   /**
-   * Report the Verify constraints phase wrote before this child started. Present
-   * so a criterion phrased as "the declared commands exit 0" is answered by
-   * reading it rather than by re-running lint/test/build.
+   * Report the Verify constraints phase wrote before this child started, so a
+   * criterion phrased as "the declared commands exit 0" is answered by reading
+   * it rather than by re-running lint/test/build.
    */
-  constraintReportPath?: string;
+  constraintReportPath: string;
 }
 
 export interface PRCreatorInput extends RepoPromptInput {
@@ -323,21 +316,6 @@ export interface UpdaterInput {
   instruction: string;
   interactive?: boolean;
   interject?: boolean;
-}
-
-export interface CollectorInput {
-  workspaceName: string;
-  reviewTimestamp: string;
-  reviewDir: string;
-  reviewFiles: string[];
-  verifyFiles: string[];
-  readmeVerifyFiles: string[];
-  constraintFiles: string[];
-  /**
-   * `VERIFY-FIXES-*` reports. Present only on a cycle whose predecessor asked
-   * for fixes, so absent on a first review.
-   */
-  fixVerifyFiles?: string[];
 }
 
 export interface InitAnalyzeAndReadmeInput {

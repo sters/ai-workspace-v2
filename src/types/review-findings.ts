@@ -4,7 +4,7 @@
  * comments.
  *
  * The markdown report stays the deliverable everything else reads (the
- * collector, the autonomous gate). This exists because a checkbox needs a
+ * review summary, the autonomous gate). This exists because a checkbox needs a
  * discrete object with a stable id, and a report's prose bullets have neither.
  */
 

@@ -114,7 +114,7 @@ Instead, identify the exact file (and line number or symbol) by reading the sour
 
 ### What Is Not a TODO Item
 
-Every item you write is paid for many times over: the executor re-reads the whole file once per batch, the TODO verifier audits each item against the diff, and the autonomous gate reads every file every cycle. Item count also decides how the executor's work is split — past the configured batch size the run splits into batches, and each boundary costs a fresh child several minutes re-establishing context. So an item that tells the executor nothing it would not otherwise do is not free; it is one of the most expensive things in the file.
+Every item you write is paid for many times over: the executor re-reads the whole file once per batch, the completion verifier audits each item against the diff, and the autonomous gate reads every file every cycle. Item count also decides how the executor's work is split — past the configured batch size the run splits into batches, and each boundary costs a fresh child several minutes re-establishing context. So an item that tells the executor nothing it would not otherwise do is not free; it is one of the most expensive things in the file.
 
 Two kinds of filler in particular do not belong in the list:
 

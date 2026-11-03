@@ -21,11 +21,9 @@ import { getPlannerSystemPrompt, getResearchPlannerSystemPrompt } from "@/lib/te
 import { getReviewerSystemPrompt } from "@/lib/templates/prompts/reviewer";
 import { getCodeReviewerSystemPrompt } from "@/lib/templates/prompts/code-reviewer";
 import { getCrossRepositoryReviewerSystemPrompt } from "@/lib/templates/prompts/cross-repository-reviewer";
-import { getTodoVerifierSystemPrompt } from "@/lib/templates/prompts/todo-verifier";
-import { getReadmeVerifierSystemPrompt } from "@/lib/templates/prompts/readme-verifier";
+import { getCompletionVerifierSystemPrompt } from "@/lib/templates/prompts/completion-verifier";
 import { getPRCreatorSystemPrompt } from "@/lib/templates/prompts/pr-creator";
 import { getPrCommentValidatorSystemPrompt } from "@/lib/templates/prompts/pr-comment-validator";
-import { getCollectorSystemPrompt } from "@/lib/templates/prompts/collector";
 import { getCoordinatorSystemPrompt } from "@/lib/templates/prompts/coordinator";
 import { getUpdaterSystemPrompt } from "@/lib/templates/prompts/updater";
 import {
@@ -73,13 +71,11 @@ describe("working-directory conventions", () => {
     researchPlanner: getResearchPlannerSystemPrompt(),
     reviewer: getReviewerSystemPrompt(),
     codeReviewer: getCodeReviewerSystemPrompt(),
-    todoVerifier: getTodoVerifierSystemPrompt(),
-    readmeVerifier: getReadmeVerifierSystemPrompt(),
+    completionVerifier: getCompletionVerifierSystemPrompt(),
     prCreator: getPRCreatorSystemPrompt(),
     prCommentValidator: getPrCommentValidatorSystemPrompt(),
   };
   const noCdPrompts: Record<string, string> = {
-    collector: getCollectorSystemPrompt(),
     coordinator: getCoordinatorSystemPrompt(),
     ...researchPrompts,
   };
@@ -111,9 +107,6 @@ describe("WRITTEN_DELIVERABLE_LENGTH", () => {
   const reportWriters: Record<string, string> = {
     codeReviewer: getCodeReviewerSystemPrompt(),
     crossRepositoryReviewer: getCrossRepositoryReviewerSystemPrompt(),
-    readmeVerifier: getReadmeVerifierSystemPrompt(),
-    todoVerifier: getTodoVerifierSystemPrompt(),
-    collector: getCollectorSystemPrompt(),
     // The TODO file is the most re-embedded deliverable in the pipeline: the
     // executor re-reads it once per batch, the verifier audits it, and the
     // autonomous gate reads every one of them each cycle.
