@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import type { CostGroup, RunCostSummary } from "@/lib/run-costs";
+import type { RunCostSummary } from "@/lib/run-costs";
+import { CostGroupTable, usd } from "./cost-group-table";
 import { Card } from "@/components/shared/containers/card";
 import { Button } from "@/components/shared/buttons/button";
 import { PageHeader } from "@/components/shared/feedback/page-header";
@@ -17,48 +18,6 @@ const RANGES = [
   { days: 0, label: "All" },
 ];
 
-const usd = (n: number) => `$${n.toFixed(2)}`;
-const minutes = (ms: number) => `${Math.round(ms / 60_000)}m`;
-const kTokens = (n: number) => `${Math.round(n / 1000)}k`;
-
-function GroupTable({ title, groups, total }: { title: string; groups: CostGroup[]; total: number }) {
-  return (
-    <Card>
-      <h2 className="mb-2 text-sm font-semibold">{title}</h2>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="text-xs text-muted-foreground">
-            <tr className="text-left">
-              <th className="py-1 pr-3 font-medium">Key</th>
-              <th className="py-1 pr-3 text-right font-medium">Cost</th>
-              <th className="py-1 pr-3 text-right font-medium">Share</th>
-              <th className="py-1 pr-3 text-right font-medium">Runs</th>
-              <th className="py-1 pr-3 text-right font-medium">$/run</th>
-              <th className="py-1 pr-3 text-right font-medium">Time</th>
-              <th className="py-1 pr-3 text-right font-medium" title="Output tokens per run">Out/run</th>
-              <th className="py-1 text-right font-medium" title="Cache-write tokens per run">Cache write/run</th>
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map((g) => (
-              <tr key={g.key} className="border-t border-border">
-                <td className="py-1 pr-3 font-mono text-xs">{g.key}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{usd(g.costUsd)}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{total > 0 ? `${Math.round((g.costUsd / total) * 100)}%` : "-"}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{g.runs}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{usd(g.costUsd / g.runs)}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{minutes(g.durationMs)}</td>
-                <td className="py-1 pr-3 text-right tabular-nums">{kTokens(g.outputTokens / g.runs)}</td>
-                <td className="py-1 text-right tabular-nums">{kTokens(g.cacheCreationTokens / g.runs)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Card>
-  );
-}
-
 export default function RunCostsPage() {
   const [days, setDays] = useState(30);
   const { data, error, isLoading } = useSWR<RunCostSummary>(`/api/run-costs?days=${days}`, fetcher);
@@ -68,7 +27,7 @@ export default function RunCostsPage() {
     <div>
       <PageHeader
         title="Run Costs"
-        description="What each pipeline step spent on Claude, from the cost the CLI reports per child run. Time is summed over runs, so parallel children overlap."
+        description="What each pipeline step and chat spent on Claude, from the cost the CLI reports. Time is summed over runs, so parallel children overlap; a chat counts its API time, recorded when it exits."
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -88,11 +47,11 @@ export default function RunCostsPage() {
           <div className="text-sm text-muted-foreground">
             {usd(total)} over {data.runs} runs in {data.operations} operations ({usd(total / data.operations)} per operation)
           </div>
-          <GroupTable title="By operation type" groups={data.byOperationType} total={total} />
-          <GroupTable title="By phase" groups={data.byPhase} total={total} />
-          <GroupTable title="By step type" groups={data.byStep} total={total} />
-          <GroupTable title="By model" groups={data.byModel} total={total} />
-          <GroupTable title="By effort" groups={data.byEffort} total={total} />
+          <CostGroupTable title="By operation type" groups={data.byOperationType} total={total} />
+          <CostGroupTable title="By phase" groups={data.byPhase} total={total} />
+          <CostGroupTable title="By step type" groups={data.byStep} total={total} />
+          <CostGroupTable title="By model" groups={data.byModel} total={total} />
+          <CostGroupTable title="By effort" groups={data.byEffort} total={total} />
           <Card>
             <h2 className="mb-2 text-sm font-semibold">Most expensive operations</h2>
             <div className="overflow-x-auto">
@@ -105,7 +64,11 @@ export default function RunCostsPage() {
                       <td className="py-1 pr-3">
                         <Link
                           className="underline"
-                          href={`/workspace/${encodeURIComponent(op.workspace)}/operations?operationId=${encodeURIComponent(op.operationId)}`}
+                          href={
+                            op.operationType === "chat"
+                              ? `/workspace/${encodeURIComponent(op.workspace)}`
+                              : `/workspace/${encodeURIComponent(op.workspace)}/operations?operationId=${encodeURIComponent(op.operationId)}`
+                          }
                         >
                           {op.workspace}
                         </Link>

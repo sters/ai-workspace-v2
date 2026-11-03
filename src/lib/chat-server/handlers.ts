@@ -18,6 +18,7 @@ import { trimBuffer } from "./buffer";
 import { getStore, nextSessionId, persistSessionCreated, persistSessionExited, persistSessionDeleted } from "./store";
 import { runGc } from "./gc";
 import { resolveSlackThread } from "./slack-thread";
+import { readChatCostBaseline, recordChatCost } from "./cost";
 
 type Ws = { send(data: string): void; data: WsData };
 
@@ -129,15 +130,20 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
   // history and waits.
   let opening: { leadingArgs: string[]; trailingArgs: string[]; agentName: string; cwd: string };
   let slack: { threadKey: string; cliSessionId: string } | null = null;
+  // A known CLI session id is what lets the chat's cost be read back from its transcript.
+  let cliSessionId: string;
   if (msg.slackThread) {
     const resolved = resolveSlackThread(msg.slackThread, msg.workspaceId, Date.now());
     if (!resolved.ok) return { ok: false, error: resolved.error };
     slack = { threadKey: msg.slackThread, cliSessionId: resolved.cliSessionId };
+    cliSessionId = resolved.cliSessionId;
     opening = { leadingArgs: ["--resume", resolved.cliSessionId], trailingArgs: [], agentName: "chat", cwd: workspacePath };
   } else {
     const built = buildChatOpening(msg, workspacePath);
-    opening = { leadingArgs: [], trailingArgs: [built.prompt], agentName: built.agentName, cwd: root };
+    cliSessionId = crypto.randomUUID();
+    opening = { leadingArgs: ["--session-id", cliSessionId], trailingArgs: [built.prompt], agentName: built.agentName, cwd: root };
   }
+  const costBaseline = slack ? await readChatCostBaseline(cliSessionId) : undefined;
 
   const sessionId = nextSessionId();
   if (ws) ws.data.sessionId = sessionId;
@@ -221,6 +227,8 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
       send(session.activeWs, { type: "exited", code });
     }
     void cleanupSessionSystemPrompt(systemPromptFile);
+    recordChatCost({ chatSessionId: sessionId, workspace: msg.workspaceId, agentName: opening.agentName }, cliSessionId, costBaseline)
+      .catch((err) => console.warn(`[chat-server] Failed to record cost for ${sessionId}:`, err));
   });
 
   console.log(

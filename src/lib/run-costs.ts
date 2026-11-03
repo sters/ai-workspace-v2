@@ -5,7 +5,9 @@ export interface CostGroup {
   costUsd: number;
   runs: number;
   durationMs: number;
+  inputTokens: number;
   outputTokens: number;
+  cacheReadTokens: number;
   cacheCreationTokens: number;
 }
 
@@ -48,11 +50,13 @@ function groupBy(runs: ClaudeRun[], key: (r: ClaudeRun) => string): CostGroup[] 
   const groups = new Map<string, CostGroup>();
   for (const r of runs) {
     const k = key(r);
-    const g = groups.get(k) ?? { key: k, costUsd: 0, runs: 0, durationMs: 0, outputTokens: 0, cacheCreationTokens: 0 };
+    const g = groups.get(k) ?? { key: k, costUsd: 0, runs: 0, durationMs: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
     g.costUsd += r.costUsd;
     g.runs += 1;
     g.durationMs += r.durationMs;
+    g.inputTokens += r.inputTokens;
     g.outputTokens += r.outputTokens;
+    g.cacheReadTokens += r.cacheReadTokens;
     g.cacheCreationTokens += r.cacheCreationTokens;
     groups.set(k, g);
   }

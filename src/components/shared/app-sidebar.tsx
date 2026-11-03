@@ -25,6 +25,7 @@ const UTILITY_ITEMS = [
   { label: "MCP Servers", href: "/utilities/mcp-servers" },
   { label: "Claude Version", href: "/utilities/claude-version" },
   { label: "Claude Usage", href: "/utilities/claude-usage" },
+  { label: "Run Costs", href: "/utilities/run-costs" },
   { label: "AIW Settings", href: "/utilities/aiw-settings" },
   { label: "Claude Settings", href: "/utilities/claude-settings" },
   { label: "Claude Auth", href: "/utilities/claude-auth" },

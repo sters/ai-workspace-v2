@@ -105,13 +105,24 @@ export const toolResultBlockSchema = z.object({
   content: z.unknown().optional(),
 });
 
-const modelUsageSchema = z.record(z.string(), z.object({
+export const modelUsageSchema = z.record(z.string(), z.object({
   inputTokens: z.number().default(0),
   outputTokens: z.number().default(0),
   cacheReadInputTokens: z.number().default(0),
   cacheCreationInputTokens: z.number().default(0),
   costUSD: z.number().default(0),
 }));
+
+/**
+ * The line Claude Code appends to a session transcript on exit. Its totals are
+ * cumulative over the session, resumes included. Undocumented CLI internals.
+ */
+export const transcriptCostStateSchema = z.object({
+  type: z.literal("cost-state"),
+  totalCostUSD: z.number(),
+  totalAPIDuration: z.number().default(0),
+  modelUsage: modelUsageSchema.default({}),
+});
 
 /** The cost-bearing fields of a stream-json `result` event. */
 export const resultUsageSchema = z.object({
