@@ -30,8 +30,11 @@ import { getConfig } from "./resolver";
  *                   where a smaller model scores clearly lower. Also the TODO
  *                   plan reviewer, where Haiku raised findings Opus did not and
  *                   took minutes where Opus took seconds.
- *   opus / high   — the autonomous gate: one short call whose wrong answer costs
- *                   a whole cycle.
+ *   sonnet / high — the autonomous gate: one short call over an already
+ *                   structured summary whose wrong answer costs a whole cycle.
+ *                   It gave opus / high's verdicts and reasons at a fifth to a
+ *                   third of the cost, in the least time; Haiku agreed too but
+ *                   took up to minutes on the critical path.
  *   haiku / high  — the completion verifier: on a long criteria list it found
  *                   the gaps opus / low passed, with the same verdicts as
  *                   `xhigh` in about half the time.
@@ -59,7 +62,8 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   // Its verdict reaches someone else's PR with nobody reading it first.
   [STEP_TYPES.GROUND_FINDING]: "opus",
   [STEP_TYPES.REVIEW_TODOS]: "opus",
-  [STEP_TYPES.AUTONOMOUS_GATE]: "opus",
+
+  [STEP_TYPES.AUTONOMOUS_GATE]: CLAUDE_MODELS.SONNET_5_5,
 
   [STEP_TYPES.VERIFY_COMPLETION]: CLAUDE_MODELS.HAIKU_5_5,
   [STEP_TYPES.VERIFY_FIXES]: CLAUDE_MODELS.HAIKU_5_5,
