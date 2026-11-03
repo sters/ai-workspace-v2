@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm, writeFile, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { collectSandboxOutcome, prepareSandbox, removeSandbox } from "@/lib/bench/execute-sandbox";
+import { collectSandboxOutcome, findPlanStart, prepareSandbox, removeSandbox } from "@/lib/bench/execute-sandbox";
 import { runGit } from "@/lib/workspace/git-exec";
 
 async function git(cwd: string, ...args: string[]) {
@@ -77,5 +77,21 @@ describe("execute bench sandbox", () => {
 
     expect(await git(worktree, "worktree", "list")).not.toContain(wt);
     expect(await git(worktree, "branch", "--list", "bench-a")).toBe("");
+  });
+
+  it("starts from the commit before the branch's first commit after the plan, even once the branch is merged into its base", async () => {
+    const at = (iso: string) => ({ GIT_COMMITTER_DATE: iso, GIT_AUTHOR_DATE: iso });
+    const commit = async (msg: string, iso: string) => {
+      await writeFile(path.join(worktree, "a.txt"), `${msg}\n`);
+      const r = Bun.spawnSync(["git", "commit", "-qam", msg], { cwd: worktree, env: { ...process.env, ...at(iso) } });
+      if (r.exitCode !== 0) throw new Error(r.stderr.toString());
+      return git(worktree, "rev-parse", "HEAD");
+    };
+    const planned = await commit("before plan", "2026-01-01T00:00:00Z");
+    await commit("execute 1", "2026-01-02T00:00:00Z");
+    await commit("execute 2", "2026-01-03T00:00:00Z");
+
+    expect(await findPlanStart(worktree, "2026-01-01T12:00:00Z")).toBe(planned);
+    expect(await findPlanStart(worktree, "2026-02-01T00:00:00Z")).toBeNull();
   });
 });

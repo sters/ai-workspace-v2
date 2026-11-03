@@ -21,7 +21,7 @@ import { readRepoGuidance, repoGuidancePath } from "@/lib/workspace/repo-guidanc
 import { buildConstraintReport, execConstraintCommand } from "@/lib/workspace/constraint-runner";
 import type { ConstraintExecResult } from "@/lib/workspace/constraint-runner";
 import { expandConstraintCommand, resolveConstraintScope, usesScope } from "@/lib/workspace/constraint-scope";
-import { collectSandboxOutcome, prepareSandbox, removeSandbox } from "./execute-sandbox";
+import { collectSandboxOutcome, findPlanStart, prepareSandbox, removeSandbox } from "./execute-sandbox";
 import { runAttempt } from "./run";
 import { summarizeBench } from "./summary";
 import type { BenchConfigSummary } from "./summary";
@@ -37,7 +37,7 @@ export interface ExecuteBenchInput {
   repo: string;
   /** Workspace commit whose README and TODO are the plan; defaults to the last init snapshot. */
   from?: string;
-  /** Repository commit to start from; defaults to the branch's merge-base with its base. */
+  /** Repository commit to start from; defaults to the one the branch's first commit after the plan was made on. */
   start?: string;
   configs: string[];
   repeats: number;
@@ -110,7 +110,9 @@ export async function runExecuteBench(input: ExecuteBenchInput): Promise<Execute
   if (!parseTodoItems(todoContent).some((i) => i.status !== "completed")) return { error: `${todoName} at ${from.slice(0, 8)} has nothing to do` };
 
   const baseBranch = await resolveRepoBaseBranch(parseReadmeMeta(readmeContent), repo);
-  const start = input.start ?? (await git(repo.worktreePath, "merge-base", "HEAD", `origin/${baseBranch}`));
+  const plannedAt = await git(wsPath, "log", "-n1", "--format=%cI", from);
+  const start = input.start ?? (await findPlanStart(repo.worktreePath, plannedAt));
+  if (!start) return { error: `${repo.repoName} has no commit after ${from.slice(0, 8)}; pass --start <repository commit>` };
   const constraints = parseConstraints(readmeContent).find((c) => c.repoName === repo.repoName)?.constraints ?? [];
   const guidancePath = repoGuidancePath(wsPath, repo.repoName);
   const guidanceFile = Bun.file(guidancePath);

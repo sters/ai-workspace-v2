@@ -65,3 +65,15 @@ export async function removeSandbox(sourceWorktree: string, worktree: string, br
   await git(sourceWorktree, "worktree", "remove", "--force", worktree);
   await git(sourceWorktree, "branch", "-D", branch);
 }
+
+/**
+ * The commit the planned TODO was carried out from: the parent of the oldest
+ * first-parent commit after `sinceIso`, the plan's snapshot time. Unlike the
+ * merge-base, it still holds once the branch has landed in its base. `null`
+ * when nothing was committed after the plan.
+ */
+export async function findPlanStart(worktree: string, sinceIso: string): Promise<string | null> {
+  const after = await git(worktree, "log", "--first-parent", "--reverse", "--format=%H", `--since=${sinceIso}`, "HEAD");
+  const first = after.split("\n")[0];
+  return first ? git(worktree, "rev-parse", `${first}^`) : null;
+}

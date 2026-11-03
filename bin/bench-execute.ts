@@ -8,8 +8,8 @@
  *
  * The plan is the README and TODO at `--from` (default: the workspace's last
  * `Init complete` snapshot); every attempt starts from `--start` (default: the
- * branch's merge-base with its base) in a sandbox worktree of the same clone,
- * removed afterwards. The real workspace and worktree are not touched. Writes:
+ * parent of the branch's first commit after that snapshot) in a sandbox
+ * worktree of the same clone, removed afterwards. The real workspace and worktree are not touched. Writes:
  *
  *   <out-dir>/prompt.md, baseline.constraints.md   the executor prompt; constraints at the start commit
  *   <out-dir>/answers/<pairing>_<n>.{json,patch,todo.md,constraints.md,result.md}
