@@ -90,6 +90,30 @@ interface RepoVerdict {
   findings: TodoReviewFinding[];
 }
 
+/** The plan reviewer child for one repository's TODO file. */
+export async function buildTodoReviewChild(input: {
+  workspace: string;
+  wsPath: string;
+  repo: { repoName: string; worktreePath: string };
+  readmeContent: string;
+  todoContent: string;
+}): Promise<GroupChild> {
+  return {
+    label: `review-${input.repo.repoName}`,
+    stepType: STEP_TYPES.REVIEW_TODOS,
+    prompt: buildReviewerPrompt({
+      workspaceName: input.workspace,
+      repoName: input.repo.repoName,
+      readmeContent: input.readmeContent,
+      todoContent: input.todoContent,
+      worktreePath: input.repo.worktreePath,
+    }),
+    jsonSchema: TODO_REVIEW_SCHEMA as unknown as Record<string, unknown>,
+    skipAskUserQuestion: true,
+    appendSystemPromptFile: await ensureSystemPrompt(input.wsPath, "reviewer"),
+  };
+}
+
 /**
  * Reviews each repository's TODO file before execution, then applies the verdict.
  *
@@ -137,19 +161,8 @@ export function buildReviewTodosPhase(input: {
         });
 
         children.push({
-          label: `review-${repo.repoName}`,
-          stepType: STEP_TYPES.REVIEW_TODOS,
-          prompt: buildReviewerPrompt({
-            workspaceName: input.workspace,
-            repoName: repo.repoName,
-            readmeContent,
-            todoContent,
-            worktreePath: repo.worktreePath,
-          }),
-          jsonSchema: TODO_REVIEW_SCHEMA as unknown as Record<string, unknown>,
+          ...(await buildTodoReviewChild({ workspace: input.workspace, wsPath: input.wsPath, repo, readmeContent, todoContent })),
           onResultText: (text) => { rawTexts.set(repo.repoName, text); },
-          skipAskUserQuestion: true,
-          appendSystemPromptFile: await ensureSystemPrompt(input.wsPath, "reviewer"),
         });
       }
 

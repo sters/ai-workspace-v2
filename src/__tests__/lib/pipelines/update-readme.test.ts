@@ -23,6 +23,7 @@ vi.mock("@/lib/pipelines/actions/ensure-repositories", () => ({
 // Dependencies of the criteria-feasibility phase this pipeline appends.
 vi.mock("@/lib/parsers/readme", () => ({
   parseAcceptanceCriteria: vi.fn(() => []),
+  renderAcceptanceCriteria: vi.fn(() => ""),
 }));
 vi.mock("@/lib/workspace/git", () => ({
   listWorkspaceRepos: vi.fn(() => [

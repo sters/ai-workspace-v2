@@ -1,7 +1,7 @@
 import { getReviewSessions, getReviewDetail, getTodos, getReadme } from "@/lib/workspace/reader";
 import { stripCompletedTodosFromWorkspace } from "@/lib/workspace/todo-cleanup";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
-import { readWorkspaceReadme, parseAcceptanceCriteria } from "@/lib/parsers/readme";
+import { readWorkspaceReadme, renderAcceptanceCriteria } from "@/lib/parsers/readme";
 import {
   syncReadmeRepositories,
   discoverConstraintsForNewRepos,
@@ -140,6 +140,77 @@ function parseDismissedFindings(raw: unknown): KnownFinding[] {
   });
 }
 
+/**
+ * The gate child for the workspace's latest review, or why there is nothing to
+ * judge. The loop state is the caller's: a gate outside a run passes its own.
+ */
+export async function buildAutonomousGateChild(
+  workspace: string,
+  loop: {
+    loopIteration: number;
+    maxLoops: number;
+    previousGateResults?: { cycle: number; reason: string; fixableIssues: string[] }[];
+    repositories?: AutonomousGateInput["repositories"];
+  },
+): Promise<{ child: GroupChild; reviewTimestamp: string } | { settledReason: string }> {
+  const sessions = await getReviewSessions(workspace);
+  if (sessions.length === 0) return { settledReason: "No review sessions found" };
+  const latest = sessions[0];
+
+  // Always let AI evaluate — even warnings/suggestions may be worth fixing
+  const reviewDetail = await getReviewDetail(workspace, latest.timestamp);
+  if (!reviewDetail) return { settledReason: "Could not read review details" };
+
+  const todoFiles: { repoName: string; content: string }[] = [];
+  for (const todo of await getTodos(workspace)) {
+    try {
+      todoFiles.push({ repoName: todo.repoName, content: await Bun.file(path.join(getWorkspaceDir(), workspace, todo.filename)).text() });
+    } catch {
+      // skip unreadable TODO files
+    }
+  }
+
+  const readmeContent = (await getReadme(workspace)) ?? "";
+  const wsPath = path.join(getWorkspaceDir(), workspace);
+  return {
+    reviewTimestamp: latest.timestamp,
+    child: {
+      label: "Autonomous Gate",
+      prompt: buildAutonomousGatePrompt({
+        workspaceName: workspace,
+        reviewSummary: reviewDetail.summary,
+        reviewFiles: reviewDetail.files,
+        todoFiles,
+        readmeContent,
+        acceptanceCriteria: renderAcceptanceCriteria(readmeContent),
+        loopIteration: loop.loopIteration,
+        maxLoops: loop.maxLoops,
+        previousGateResults: loop.previousGateResults,
+        knownFindings: await readKnownFindings(wsPath),
+        repositories: loop.repositories,
+      }),
+      jsonSchema: AUTONOMOUS_GATE_SCHEMA,
+      stepType: STEP_TYPES.AUTONOMOUS_GATE,
+      appendSystemPromptFile: await ensureSystemPrompt(wsPath, "autonomous-gate"),
+      skipAskUserQuestion: true,
+    },
+  };
+}
+
+/** The README clarity judge for a workspace, as the autonomous run starts it. */
+export async function buildReadmeClarityChild(ws: string): Promise<GroupChild> {
+  const readmeContent = (await getReadme(ws)) ?? "";
+  const wsPath = path.join(getWorkspaceDir(), ws);
+  return {
+    label: "README Clarity Gate",
+    prompt: buildReadmeClarityGatePrompt({ workspaceName: ws, readmeContent, acceptanceCriteria: renderAcceptanceCriteria(readmeContent) }),
+    jsonSchema: README_CLARITY_GATE_SCHEMA,
+    stepType: STEP_TYPES.README_CLARITY_GATE,
+    appendSystemPromptFile: await ensureSystemPrompt(wsPath, "readme-clarity-gate"),
+    skipAskUserQuestion: true,
+  };
+}
+
 async function runAutonomousGate(
   ctx: PhaseFunctionContext,
   workspace: string,
@@ -152,59 +223,14 @@ async function runAutonomousGate(
   // throw away the cycle's whole review — the most expensive phase of a cycle —
   // and hand the human a PR containing the run's own leftovers, since nothing
   // downstream reads the review either.
-  const sessions = await getReviewSessions(workspace);
-  if (sessions.length === 0) {
-    return settled("No review sessions found");
-  }
-
-  const latest = sessions[0];
-
-  // Always let AI evaluate — even warnings/suggestions may be worth fixing
-  const reviewDetail = await getReviewDetail(workspace, latest.timestamp);
-  if (!reviewDetail) {
-    return settled("Could not read review details");
-  }
-
-  const todoSummaries = await getTodos(workspace);
-  const todoFiles: { repoName: string; content: string }[] = [];
-  for (const todo of todoSummaries) {
-    const todoPath = path.join(getWorkspaceDir(), workspace, todo.filename);
-    try {
-      const content = await Bun.file(todoPath).text();
-      todoFiles.push({ repoName: todo.repoName, content });
-    } catch {
-      // skip unreadable TODO files
-    }
-  }
-
-  const readmeContent = (await getReadme(workspace)) ?? "";
-  const acceptanceCriteria = parseAcceptanceCriteria(readmeContent)
-    .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
-    .join("\n");
-
-  const wsPath = path.join(getWorkspaceDir(), workspace);
-
-  const prompt = buildAutonomousGatePrompt({
-    workspaceName: workspace,
-    reviewSummary: reviewDetail.summary,
-    reviewFiles: reviewDetail.files,
-    todoFiles,
-    readmeContent,
-    acceptanceCriteria,
-    loopIteration,
-    maxLoops,
-    previousGateResults,
-    knownFindings: await readKnownFindings(wsPath),
-    repositories,
-  });
+  const built = await buildAutonomousGateChild(workspace, { loopIteration, maxLoops, previousGateResults, repositories });
+  if ("settledReason" in built) return settled(built.settledReason);
+  const { child, reviewTimestamp } = built;
 
   let resultText = "";
-  const ok = await ctx.runChild("Autonomous Gate", prompt, {
-    jsonSchema: AUTONOMOUS_GATE_SCHEMA,
-    stepType: STEP_TYPES.AUTONOMOUS_GATE,
-    appendSystemPromptFile: await ensureSystemPrompt(wsPath, "autonomous-gate"),
+  const ok = await ctx.runChild(child.label, child.prompt, {
+    ...child,
     onResultText: (text) => { resultText = text; },
-    skipAskUserQuestion: true,
   });
 
   if (!ok || !resultText) {
@@ -225,7 +251,7 @@ async function runAutonomousGate(
         : [],
       unfinishedRepositories: parseRepositoryNames(parsed.unfinishedRepositories),
       dismissedFindings: parseDismissedFindings(parsed.dismissedFindings),
-      reviewTimestamp: latest.timestamp,
+      reviewTimestamp,
     };
   } catch {
     return settled("Failed to parse gate response");
@@ -714,21 +740,10 @@ export function buildAutonomousPipeline(input: {
           return false;
         }
 
-        const readmeContent = (await getReadme(ws)) ?? "";
-        const acceptanceCriteria = parseAcceptanceCriteria(readmeContent)
-          .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
-          .join("\n");
-
-        const wsPath = path.join(getWorkspaceDir(), ws);
         let resultText = "";
         const clarityChild: GroupChild = {
-          label: "README Clarity Gate",
-          prompt: buildReadmeClarityGatePrompt({ workspaceName: ws, readmeContent, acceptanceCriteria }),
-          jsonSchema: README_CLARITY_GATE_SCHEMA,
-          stepType: STEP_TYPES.README_CLARITY_GATE,
-          appendSystemPromptFile: await ensureSystemPrompt(wsPath, "readme-clarity-gate"),
+          ...(await buildReadmeClarityChild(ws)),
           onResultText: (text) => { resultText = text; },
-          skipAskUserQuestion: true,
         };
 
         const feasibility = await prepareCriteriaFeasibility(ws);

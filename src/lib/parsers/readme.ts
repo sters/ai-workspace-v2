@@ -98,6 +98,13 @@ export function parseAcceptanceCriteria(content: string): AcceptanceCriterion[] 
   return results;
 }
 
+/** The checklist as agents are given it: one `- [ ] (auto|manual) text` line per criterion. */
+export function renderAcceptanceCriteria(readmeContent: string): string {
+  return parseAcceptanceCriteria(readmeContent)
+    .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
+    .join("\n");
+}
+
 /**
  * The `- <Label>: \`<command>\`` lines of one repository's constraint block,
  * each optionally followed by ` (full: \`<command>\`)`.

@@ -12,6 +12,7 @@ vi.mock("@/lib/parsers/readme", () => ({
   parseReadmeMeta: vi.fn(() => ({ repositories: [] })),
   parseConstraints: vi.fn(() => []),
   parseAcceptanceCriteria: vi.fn(() => []),
+  renderAcceptanceCriteria: vi.fn(() => ""),
 }));
 
 vi.mock("@/lib/workspace", () => ({

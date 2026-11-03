@@ -57,6 +57,7 @@ vi.mock("@/lib/parsers/readme", () => ({
   })),
   denormalizeRepoPath: (s: string) => s.replace("___", ":"),
   parseAcceptanceCriteria: vi.fn(() => []),
+  renderAcceptanceCriteria: vi.fn(() => ""),
   parseConstraints: vi.fn(() => []),
 }));
 vi.mock("@/lib/pipelines/actions/setup-repository", () => ({

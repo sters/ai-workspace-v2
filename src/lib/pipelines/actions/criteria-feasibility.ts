@@ -1,6 +1,6 @@
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
-import { parseAcceptanceCriteria } from "@/lib/parsers/readme";
+import { parseAcceptanceCriteria, renderAcceptanceCriteria } from "@/lib/parsers/readme";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
 import { appendKnownFindings } from "@/lib/workspace/known-findings";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
@@ -49,9 +49,7 @@ export async function prepareCriteriaFeasibility(ws: string): Promise<{
     prompt: buildCriteriaFeasibilityPrompt({
       workspaceName: ws,
       readmeContent,
-      acceptanceCriteria: criteria
-        .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
-        .join("\n"),
+      acceptanceCriteria: renderAcceptanceCriteria(readmeContent),
       repos: repos.map((r) => ({ repoName: r.repoName, worktreePath: r.worktreePath })),
     }),
     jsonSchema: CRITERIA_FEASIBILITY_SCHEMA,

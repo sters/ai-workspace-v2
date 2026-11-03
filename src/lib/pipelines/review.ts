@@ -1,7 +1,7 @@
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { getReadme } from "@/lib/workspace/reader";
-import { parseReadmeMeta, parseConstraints, parseAcceptanceCriteria } from "@/lib/parsers/readme";
+import { parseReadmeMeta, parseConstraints, renderAcceptanceCriteria } from "@/lib/parsers/readme";
 import {
   listWorkspaceRepos,
   detectBaseBranch,
@@ -89,6 +89,76 @@ export interface ReviewPipelineInput {
   carryPostedFindings?: boolean;
 }
 
+type ChangeSummary = Awaited<ReturnType<typeof getRepoChanges>>;
+
+/** The branch, changed files, diff stat and commit log, as reviewers are given them. */
+export function formatRepoChanges(changes: ChangeSummary): string {
+  return `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`;
+}
+
+/** The README's base branch for the repository, or the one its worktree tracks. */
+export async function resolveRepoBaseBranch(
+  meta: ReturnType<typeof parseReadmeMeta>,
+  repo: { repoPath: string; repoName: string; worktreePath: string },
+): Promise<string> {
+  const metaRepo = meta.repositories.find((r) => r.path === repo.repoPath || r.alias === repo.repoName);
+  return metaRepo?.baseBranch ?? (await detectBaseBranch(repo.worktreePath));
+}
+
+/** A completion verifier's verdict, or undefined when the text is not one. */
+export function parseCompletionVerification(text: string): CompletionVerification | undefined {
+  try {
+    const parsed = completionVerificationSchema.safeParse(JSON.parse(text));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The completion verifier child for one repository. It reads the constraint
+ * report the review's `Verify constraints` phase writes into `reviewDir`, so a
+ * criterion phrased as "the declared commands exit 0" is answered from it
+ * instead of by re-running the build and test suite.
+ */
+export async function buildCompletionVerifierChild(input: {
+  workspace: string;
+  wsPath: string;
+  repo: { repoPath: string; repoName: string; worktreePath: string };
+  baseBranch: string;
+  readmeContent: string;
+  acceptanceCriteria: string;
+  repoChanges: string;
+  reviewDir: string;
+}): Promise<{ child: GroupChild; hasTodo: boolean }> {
+  const { repo } = input;
+  const todoFile = Bun.file(path.join(input.wsPath, `TODO-${repo.repoName}.md`));
+  const todoContent = (await todoFile.exists()) ? (await todoFile.text()).trim() : "";
+  const stem = repoReportStem(repo.repoPath, repo.repoName);
+  return {
+    hasTodo: todoContent !== "",
+    child: {
+      label: `verify-${repo.repoName}`,
+      stepType: STEP_TYPES.VERIFY_COMPLETION,
+      prompt: buildCompletionVerifierPrompt({
+        workspaceName: input.workspace,
+        repoPath: repo.repoPath,
+        repoName: repo.repoName,
+        baseBranch: input.baseBranch,
+        readmeContent: input.readmeContent,
+        acceptanceCriteria: input.acceptanceCriteria,
+        todoContent,
+        worktreePath: repo.worktreePath,
+        repoChanges: input.repoChanges,
+        constraintReportPath: path.join(input.reviewDir, `CONSTRAINTS-${stem}.md`),
+      }),
+      jsonSchema: COMPLETION_VERIFICATION_SCHEMA as unknown as Record<string, unknown>,
+      addDirs: [input.reviewDir],
+      appendSystemPromptFile: await ensureSystemPrompt(input.wsPath, "completion-verifier"),
+    },
+  };
+}
+
 /**
  * Budget for a review run as a sub-pipeline of one function phase.
  *
@@ -162,9 +232,7 @@ export async function buildReviewPipeline(
 
   // Pre-render the Acceptance Criteria checklist so the completion verifier gets an
   // unambiguous auto/manual split instead of re-parsing prose.
-  const acceptanceCriteria = parseAcceptanceCriteria(readmeContent)
-    .map((c) => `- [${c.checked ? "x" : " "}] (${c.kind}) ${c.text}`)
-    .join("\n");
+  const acceptanceCriteria = renderAcceptanceCriteria(readmeContent);
 
   const reviewChildren: GroupChild[] = [];
   const repoBaseBranches = new Map<string, string>();
@@ -181,10 +249,7 @@ export async function buildReviewPipeline(
   const currentHeads: Record<string, string> = {};
 
   for (const repo of boundaryRepos) {
-    const metaRepo = meta.repositories.find(
-      (r) => r.path === repo.repoPath || r.alias === repo.repoName,
-    );
-    const baseBranch = metaRepo?.baseBranch ?? (await detectBaseBranch(repo.worktreePath));
+    const baseBranch = await resolveRepoBaseBranch(meta, repo);
     repoBaseBranches.set(repo.repoName, baseBranch);
 
     const head = await captureRepoHead(repo.worktreePath);
@@ -192,7 +257,7 @@ export async function buildReviewPipeline(
 
     const sinceSha = previousBaseline?.heads[repo.repoName];
     const changes = await getRepoChanges(workspace, repo.repoPath, baseBranch, sinceSha);
-    const repoChangesText = `Branch: ${changes.currentBranch}\n\nChanged files:\n${changes.changedFiles}\n\nDiff stat:\n${changes.diffStat}\n\nCommit log:\n${changes.commitLog}`;
+    const repoChangesText = formatRepoChanges(changes);
     const reviewScope =
       changes.incremental && previousBaseline
         ? { ...changes.incremental, sinceTimestamp: previousBaseline.timestamp }
@@ -220,7 +285,6 @@ export async function buildReviewPipeline(
 
     const stem = repoReportStem(repo.repoPath, repo.repoName);
     const reviewFileName = `REVIEW-${stem}.md`;
-    const constraintFileName = `CONSTRAINTS-${stem}.md`;
 
     // Code reviewer. Runs on every review, including a round that only applies
     // the previous gate's asks: the fix diff is changed code and gets the same
@@ -283,41 +347,18 @@ export async function buildReviewPipeline(
       });
     }
 
-    const todoFile = Bun.file(path.join(wsPath, `TODO-${repo.repoName}.md`));
-    const todoContent = (await todoFile.exists()) ? (await todoFile.text()).trim() : "";
-
     // README requirements and TODO items in one agent: both halves read the same
     // diff and files to answer "was the planned work done". It returns data, and
     // the summary phase renders both reports from it.
+    const verifier = await buildCompletionVerifierChild({
+      workspace, wsPath, repo, baseBranch, readmeContent, acceptanceCriteria, repoChanges: repoChangesText, reviewDir,
+    });
     reviewChildren.push({
-      label: `verify-${repo.repoName}`,
-      stepType: STEP_TYPES.VERIFY_COMPLETION,
-      prompt: buildCompletionVerifierPrompt({
-        workspaceName: workspace,
-        repoPath: repo.repoPath,
-        repoName: repo.repoName,
-        baseBranch,
-        readmeContent,
-        acceptanceCriteria,
-        todoContent,
-        worktreePath: repo.worktreePath,
-        repoChanges: repoChangesText,
-        // Already written by the Verify constraints phase ahead of this group,
-        // so a criterion phrased as "the declared commands exit 0" is answered
-        // by reading it instead of re-running the build and test suite.
-        constraintReportPath: path.join(reviewDir, constraintFileName),
-      }),
-      jsonSchema: COMPLETION_VERIFICATION_SCHEMA as unknown as Record<string, unknown>,
+      ...verifier.child,
       onResultText: (text) => {
-        try {
-          const parsed = completionVerificationSchema.safeParse(JSON.parse(text));
-          if (parsed.success) verifications.set(repo.repoName, { data: parsed.data, hasTodo: todoContent !== "" });
-        } catch {
-          // Left unset: the summary reports the verifier as failed.
-        }
+        const data = parseCompletionVerification(text);
+        if (data) verifications.set(repo.repoName, { data, hasTodo: verifier.hasTodo });
       },
-      addDirs: [reviewDir],
-      appendSystemPromptFile: await ensureSystemPrompt(wsPath, "completion-verifier"),
     });
   }
 
