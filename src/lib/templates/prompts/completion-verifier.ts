@@ -56,13 +56,16 @@ export function getCompletionVerifierSystemPrompt(): string {
 
 ### Requirements (from the README)
 
-- The \`## Acceptance Criteria\` section is the **authoritative** list of what "done" means. When a parsed list is given in the user prompt, use it verbatim. Fold in \`## Goal\` / \`## Requirements\` only where they add a check the criteria do not already cover.
+- The \`## Acceptance Criteria\` section is the **authoritative** list of what "done" means. When a parsed list is given in the user prompt, use it verbatim, one entry per criterion. Add an entry from \`## Goal\` / \`## Requirements\` only for a check no criterion makes; a restatement of a criterion is not a new requirement.
 - **Linked resources**: fetch links that likely define work — tickets, issue comments, PR review comments — and add any requirement they hold that the README lacks. Skip purely informational links (designs, documentation).
 - **\`(auto)\` / \`(manual)\` tags** (untagged ⇒ \`auto\`): verify \`auto\` criteria yourself. A \`manual\` criterion needs a human (visual QA, staging sign-off); it is \`PENDING-HUMAN\`, a handoff rather than a failure — never \`UNSATISFIED\`.
 - **Constraint results come from the report, not a re-run.** A criterion phrased as "lint / test / build / typecheck passes" is answered by the constraint report named in the user prompt, written by a phase that ran every declared command and compared failures against the merge-base. Cite it. A command it marks \`PRE-EXISTING\` also fails on the merge-base, so the criterion is \`PARTIAL\` with that as the reason; \`NOT DECLARED\` means nothing ran — say so. Running one narrow test to confirm a specific behavior is fine; re-running the declared set is not.
 - Status: \`SATISFIED\` (fully met, with evidence), \`PARTIAL\` (say what is missing), \`UNSATISFIED\` (no evidence it was addressed), \`PENDING-HUMAN\` (manual).
+- **A gap someone decided to leave keeps its status and says so.** When the missing part is deferred by \`## Non-Goal\`, the TODO file's Notes, or a ticket or review comment, give the status the code earns and put \`deferred: <where it was decided>\` in \`notes\`. Whether a deferred gap holds the work is decided downstream, from that note.
 
 ### TODO items
+
+The TODO file in the user prompt is the whole list: one entry per item in it, in file order. Items an earlier cycle finished may have been removed from it; do not reconstruct them from git history or earlier versions of the file — the README requirements already cover that work.
 
 - Checked (\`[x]\`): \`VERIFIED\` when the change is there, \`UNVERIFIED\` when it is marked done without evidence, \`PARTIAL\` when part of it is.
 - Unchecked (\`[ ]\`): \`INCOMPLETE\` when not done, \`UNMARKED\` when done anyway, \`SKIPPED\` when the file records it as deliberately dropped.
@@ -70,7 +73,7 @@ export function getCompletionVerifierSystemPrompt(): string {
 
 ### Gathering evidence
 
-The changed files, diff stat and commit log are in the user prompt. Read the actual change with \`git diff\` (not \`--stat\` / \`--name-only\` / \`log\`, which you already have) only where an entry needs it. One look at a file usually settles several entries — the requirements and the TODO items describe the same work, so check them together rather than in two passes.
+The changed files, diff stat and commit log are in the user prompt. Read the actual change with \`git diff\` (not \`--stat\` / \`--name-only\` / \`log\`, which you already have) only where an entry needs it. One look at a file usually settles several entries — the requirements and the TODO items describe the same work, so check them together rather than in two passes. Stop once every entry has a status and its evidence; confirming a settled entry a second way adds nothing.
 
 ${REPO_SEARCH_EFFICIENCY}
 

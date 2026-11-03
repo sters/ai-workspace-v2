@@ -1,3 +1,4 @@
+import { STEP_TYPES } from "@/types/pipeline";
 import { describe, expect, it } from "vitest";
 import { migrateConfigContent, generateDefaultConfigContent } from "@/lib/config/migration";
 import { CONFIG_DEFAULTS, KNOWN_CONFIG_KEYS } from "@/lib/config/defaults";
@@ -107,14 +108,13 @@ describe("migration: model support", () => {
     expect(result).toContain("#   disableAccessLog");
   });
 
-  it("documents the five rungs of the model+effort ladder", () => {
+  it("documents the default pairing of every step type", () => {
     const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
-    expect(result).toMatch(/# {3}# {3}opus \/ medium —/);
-    // A smaller model above `low` in the docs would mean the ladder drifted from the code.
-    expect(result).not.toMatch(/(sonnet|haiku)[-\d]* \/ (medium|high)/);
-    // xhigh/max are config-only escape hatches, never advertised as defaults.
-    expect(result).not.toMatch(/opus \/ (xhigh|max)/);
-    // The bare aliases resolve to a previous generation, so no rung names them.
+    // A step type missing here means the hint block drifted from STEP_DEFAULT_MODELS.
+    const block = result.slice(result.indexOf("Built-in step defaults"), result.indexOf("Per-operation-type overrides"));
+    const named = new Set(block.match(/[a-z]+(?:-[a-z]+)+|\bexecute\b|\bresearch\b/g));
+    for (const step of Object.values(STEP_TYPES)) expect(named, step).toContain(step);
+    // The bare aliases resolve to a previous generation, so no pairing names them.
     expect(result).not.toMatch(/# {3}# {3}(sonnet|haiku) \//);
   });
 });

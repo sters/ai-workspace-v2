@@ -15,19 +15,30 @@ import { getConfig } from "./resolver";
  * agentic-coding benchmarks first), weighed against what a wrong answer from
  * the step costs: the cheapest pairing whose score holds for that kind of work.
  * A smaller model at a higher effort is often both cheaper and stronger than a
- * larger one at `low`; compare across models, not only within one. Re-check
- * when models or prices change, and confirm a change on real runs in Run Costs.
+ * larger one at `low`; compare across models, not only within one.
+ *
+ * Benchmarks price a task, not its wall clock. A higher effort can multiply the
+ * tokens a step generates — Haiku at `max` thinks tens of thousands of tokens
+ * where Opus at `medium` thinks hundreds — so a pairing that is cheap per task
+ * can still be many times slower, which matters on the critical path. Measure a
+ * candidate with `bun run bench` — cost, time and output tokens, and its
+ * answers read next to the current pairing's — before changing a default, and
+ * re-check when models or prices change.
  *
  * Currently that comes to:
  *   opus / medium — implementation, review and planning: the agentic-coding work
- *                   where a smaller model scores clearly lower.
+ *                   where a smaller model scores clearly lower. Also the TODO
+ *                   plan reviewer, where Haiku raised findings Opus did not and
+ *                   took minutes where Opus took seconds.
  *   opus / high   — the autonomous gate: one short call whose wrong answer costs
  *                   a whole cycle.
- *   haiku / max   — checking claims and lists against code, where it scores
- *                   level with opus / medium on agentic coding at a fraction of
- *                   the cost.
- *   haiku / xhigh — bounded lookups and mechanics, where opus / low costs four
- *                   times as much for the same score.
+ *   haiku / high  — the completion verifier: on a long criteria list it found
+ *                   the gaps opus / low passed, with the same verdicts as
+ *                   `xhigh` in about half the time.
+ *   haiku / xhigh — checking claims and lists against code, bounded lookups and
+ *                   mechanics: the same verdicts as opus at a few percent of
+ *                   the cost, at a latency that fits beside the parallel steps
+ *                   (`max` thinks several times longer for no measured gain).
  *   haiku / low   — reshaping text already handed over.
  *
  * The smaller models are pinned to full IDs because the CLI resolves the bare
@@ -47,11 +58,11 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.SUGGEST_WORKSPACE]: "opus",
   // Its verdict reaches someone else's PR with nobody reading it first.
   [STEP_TYPES.GROUND_FINDING]: "opus",
+  [STEP_TYPES.REVIEW_TODOS]: "opus",
   [STEP_TYPES.AUTONOMOUS_GATE]: "opus",
 
   [STEP_TYPES.VERIFY_COMPLETION]: CLAUDE_MODELS.HAIKU_5_5,
   [STEP_TYPES.VERIFY_FIXES]: CLAUDE_MODELS.HAIKU_5_5,
-  [STEP_TYPES.REVIEW_TODOS]: CLAUDE_MODELS.HAIKU_5_5,
   [STEP_TYPES.CRITERIA_FEASIBILITY]: CLAUDE_MODELS.HAIKU_5_5,
   [STEP_TYPES.VALIDATE_PR_COMMENT]: CLAUDE_MODELS.HAIKU_5_5,
 
@@ -92,14 +103,14 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   [STEP_TYPES.RESOLVE_CONFLICTS]: "medium",
   [STEP_TYPES.SUGGEST_WORKSPACE]: "medium",
   [STEP_TYPES.GROUND_FINDING]: "medium",
+  [STEP_TYPES.REVIEW_TODOS]: "medium",
 
   // Each checks an enumerated list or one stated claim against the code. A
   // `NOT LANDED` from verify-fixes is a hard loop reason for the gate.
-  [STEP_TYPES.VERIFY_COMPLETION]: "max",
-  [STEP_TYPES.VERIFY_FIXES]: "max",
-  [STEP_TYPES.REVIEW_TODOS]: "max",
-  [STEP_TYPES.CRITERIA_FEASIBILITY]: "max",
-  [STEP_TYPES.VALIDATE_PR_COMMENT]: "max",
+  [STEP_TYPES.VERIFY_COMPLETION]: "high",
+  [STEP_TYPES.VERIFY_FIXES]: "xhigh",
+  [STEP_TYPES.CRITERIA_FEASIBILITY]: "xhigh",
+  [STEP_TYPES.VALIDATE_PR_COMMENT]: "xhigh",
 
   [STEP_TYPES.DISCOVER_CONSTRAINTS]: "xhigh",
   [STEP_TYPES.DISCOVER_GUIDANCE]: "xhigh",
