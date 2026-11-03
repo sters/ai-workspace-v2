@@ -174,7 +174,7 @@ describe("migration: old config upgrade", () => {
     ].join("\n");
     const result = migrateConfigContent(input);
     expect(result).toContain("#   # Built-in step defaults");
-    expect(result).toContain("five rungs");
+    expect(result).toContain("cost-per-task");
     expect(result).toContain("#   #   model: sonnet");
     expect(result).toContain("#   #   effort: high");
     expect(result).toContain("#   #       effort: low");

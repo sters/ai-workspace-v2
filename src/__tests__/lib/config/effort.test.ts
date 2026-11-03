@@ -79,31 +79,6 @@ describe("resolveEffort", () => {
     expect(resolveEffort("review")).toBe("medium");
   });
 
-  // Which step sits on which rung is documented on STEP_DEFAULT_MODELS
-  // (model.ts); re-asserting each membership here only mirrors STEP_DEFAULT_*.
-  // What the tests below hold is the shape of the ladder, which a new step type
-  // cannot violate by accident.
-  it("uses exactly five rungs of one model+effort ladder", () => {
-    const rungs = new Set(
-      Object.values(STEP_TYPES).map(
-        (step) => `${STEP_DEFAULT_MODELS[step]}/${STEP_DEFAULT_EFFORTS[step]}`,
-      ),
-    );
-    expect([...rungs].sort()).toEqual([
-      "claude-haiku-5-5/low",
-      "claude-sonnet-5-5/low",
-      "opus/high",
-      "opus/low",
-      "opus/medium",
-    ]);
-  });
-
-  it("never declares xhigh or max as a code-level default", () => {
-    const levels = Object.values(STEP_DEFAULT_EFFORTS);
-    expect(levels).not.toContain("xhigh");
-    expect(levels).not.toContain("max");
-  });
-
   it("resolves a code-level step default when nothing is configured", () => {
     setConfig({});
     expect(resolveEffort("execute", "execute")).toBe("medium");

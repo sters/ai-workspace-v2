@@ -1,7 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { resolveModel, STEP_DEFAULT_EFFORTS, STEP_DEFAULT_MODELS } from "@/lib/config/model";
+import { resolveModel } from "@/lib/config/model";
 import { _resetConfig, _setConfigFilePath } from "@/lib/config/resolver";
-import type { StepType } from "@/types/pipeline";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -91,19 +90,6 @@ describe("resolveModel", () => {
       },
     });
     expect(resolveModel("review", "code-review", "haiku")).toBe("haiku");
-  });
-
-  it("reserves the smaller models for the low-effort bottom rungs", () => {
-    // Sonnet and haiku pair only with `low` effort; see the ladder invariant in
-    // `effort.test.ts`. Anything that needs thought goes to opus, so a smaller
-    // model here is a claim that the work needs no thought at all.
-    const smallerModelSteps = Object.keys(STEP_DEFAULT_MODELS).filter(
-      (step) => STEP_DEFAULT_MODELS[step as StepType] !== "opus",
-    );
-    expect(smallerModelSteps.length).toBeGreaterThan(0);
-    for (const step of smallerModelSteps) {
-      expect(STEP_DEFAULT_EFFORTS[step as StepType]).toBe("low");
-    }
   });
 
   it("falls back to global when operation type has no model", () => {
