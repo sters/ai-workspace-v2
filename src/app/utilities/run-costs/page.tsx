@@ -18,22 +18,35 @@ const RANGES = [
   { days: 0, label: "All" },
 ];
 
+const BASES = [
+  { basis: "1h", label: "List price, 1h cache", title: "Tokens at list rates, cache writes at 2x input: a subscription within its limits" },
+  { basis: "5m", label: "List price, 5m cache", title: "Tokens at list rates, cache writes at 1.25x input: an API key, or usage past a subscription's limits" },
+  { basis: "cli", label: "CLI reported", title: "The CLI's own figure, which can price a model at another model's rates" },
+];
+
 export default function RunCostsPage() {
   const [days, setDays] = useState(30);
-  const { data, error, isLoading } = useSWR<RunCostSummary>(`/api/run-costs?days=${days}`, fetcher);
+  const [basis, setBasis] = useState("1h");
+  const { data, error, isLoading } = useSWR<RunCostSummary>(`/api/run-costs?days=${days}&basis=${basis}`, fetcher);
   const total = data?.totalCostUsd ?? 0;
 
   return (
     <div>
       <PageHeader
         title="Run Costs"
-        description="What each pipeline step and chat spent on Claude, from the cost the CLI reports. Time is summed over runs, so parallel children overlap; a chat counts its API time, recorded when it exits."
+        description="What each pipeline step and chat spent on Claude, priced from its tokens at list rates (or as the CLI reported it). A run whose subagents used another model is priced at its costliest model's rates. Time is summed over runs, so parallel children overlap; a chat counts its API time, recorded when it exits."
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
         {RANGES.map((r) => (
           <Button key={r.days} variant={r.days === days ? "primary" : "outline-muted"} onClick={() => setDays(r.days)}>
             {r.label}
+          </Button>
+        ))}
+        <span className="mx-1 self-center text-muted-foreground">|</span>
+        {BASES.map((b) => (
+          <Button key={b.basis} title={b.title} variant={b.basis === basis ? "primary" : "outline-muted"} onClick={() => setBasis(b.basis)}>
+            {b.label}
           </Button>
         ))}
       </div>
@@ -47,6 +60,24 @@ export default function RunCostsPage() {
           <div className="text-sm text-muted-foreground">
             {usd(total)} over {data.runs} runs in {data.operations} operations ({usd(total / data.operations)} per operation)
           </div>
+          <CostGroupTable
+            title="By date"
+            groups={data.byDay}
+            total={total}
+            initialSort={{ column: 0, desc: true }}
+            expand={(g) => {
+              const day = data.byDay.find((d) => d.key === g.key)!.breakdown;
+              return (
+                <div className="grid gap-3">
+                  <CostGroupTable title="By operation type" groups={day.byOperationType} total={g.costUsd} />
+                  <CostGroupTable title="By phase" groups={day.byPhase} total={g.costUsd} />
+                  <CostGroupTable title="By step type" groups={day.byStep} total={g.costUsd} />
+                  <CostGroupTable title="By model" groups={day.byModel} total={g.costUsd} />
+                  <CostGroupTable title="By effort" groups={day.byEffort} total={g.costUsd} />
+                </div>
+              );
+            }}
+          />
           <CostGroupTable title="By operation type" groups={data.byOperationType} total={total} />
           <CostGroupTable title="By phase" groups={data.byPhase} total={total} />
           <CostGroupTable title="By step type" groups={data.byStep} total={total} />

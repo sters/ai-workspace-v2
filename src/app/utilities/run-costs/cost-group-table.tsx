@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
+import type { ReactNode } from "react";
 import type { CostGroup } from "@/lib/run-costs";
 import { Card } from "@/components/shared/containers/card";
 
@@ -28,8 +29,28 @@ const COLUMNS: Column[] = [
   { label: "Cache write/run", title: "Cache-write tokens per run", value: (g) => g.cacheCreationTokens / g.runs, render: (g) => kTokens(g.cacheCreationTokens / g.runs) },
 ];
 
-export function CostGroupTable({ title, groups, total }: { title: string; groups: CostGroup[]; total: number }) {
-  const [sort, setSort] = useState({ column: 1, desc: true });
+export function CostGroupTable({
+  title,
+  groups,
+  total,
+  initialSort = { column: 1, desc: true },
+  expand,
+}: {
+  title: string;
+  groups: CostGroup[];
+  total: number;
+  initialSort?: { column: number; desc: boolean };
+  /** When given, clicking a row shows this under it. */
+  expand?: (g: CostGroup) => ReactNode;
+}) {
+  const [sort, setSort] = useState(initialSort);
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
   const { value } = COLUMNS[sort.column];
   const sorted = [...groups].sort((a, b) => {
     const x = value(a);
@@ -65,16 +86,30 @@ export function CostGroupTable({ title, groups, total }: { title: string; groups
           </thead>
           <tbody>
             {sorted.map((g) => (
-              <tr key={g.key} className="border-t border-border">
-                {COLUMNS.map((c, i) => (
-                  <td
-                    key={c.label}
-                    className={`py-1 pr-3 last:pr-0 ${i === 0 ? "font-mono text-xs" : "text-right tabular-nums"}`}
-                  >
-                    {c.render(g, total)}
-                  </td>
-                ))}
-              </tr>
+              <Fragment key={g.key}>
+                <tr
+                  className={`border-t border-border ${expand ? "cursor-pointer hover:bg-accent" : ""}`}
+                  onClick={expand ? () => toggle(g.key) : undefined}
+                  aria-expanded={expand ? expanded.has(g.key) : undefined}
+                >
+                  {COLUMNS.map((c, i) => (
+                    <td
+                      key={c.label}
+                      className={`py-1 pr-3 last:pr-0 ${i === 0 ? "font-mono text-xs" : "text-right tabular-nums"}`}
+                    >
+                      {i === 0 && expand && (expanded.has(g.key) ? "▾ " : "▸ ")}
+                      {c.render(g, total)}
+                    </td>
+                  ))}
+                </tr>
+                {expand && expanded.has(g.key) && (
+                  <tr>
+                    <td colSpan={COLUMNS.length} className="py-2">
+                      {expand(g)}
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>

@@ -39,4 +39,14 @@ describe("CostGroupTable", () => {
     fireEvent.click(screen.getByRole("button", { name: /Key/ }));
     expect(rowKeys()).toEqual(["a-step", "b-step", "c-step"]);
   });
+
+  it("shows a row's detail when an expandable row is clicked, and hides it on a second click", () => {
+    render(<CostGroupTable title="t" groups={groups} total={15} expand={(g) => <p>detail of {g.key}</p>} />);
+    const row = () => screen.getAllByRole("row").find((r) => r.querySelector("td")?.textContent?.endsWith(" c-step"))!;
+    expect(screen.queryByText("detail of c-step")).not.toBeInTheDocument();
+    fireEvent.click(row());
+    expect(screen.getByText("detail of c-step")).toBeInTheDocument();
+    fireEvent.click(row());
+    expect(screen.queryByText("detail of c-step")).not.toBeInTheDocument();
+  });
 });

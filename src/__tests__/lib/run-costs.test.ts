@@ -57,6 +57,24 @@ describe("summarizeClaudeRuns", () => {
     expect(summary.byStep.map((g) => g.key)).toEqual(["code-review", "(phase) autonomous / Cycle N: Review"]);
   });
 
+  it("totals each local day, newest first, with that day's own breakdowns", () => {
+    // Noon UTC falls on the same calendar day in every timezone within ±11h.
+    const summary = summarizeClaudeRuns([
+      run({ createdAt: "2026-10-20T12:00:00.000Z", model: "claude-opus-5-5", costUsd: 1 }),
+      run({ createdAt: "2026-10-21T12:00:00.000Z", model: "claude-opus-5-5", costUsd: 2 }),
+      run({ createdAt: "2026-10-21T12:30:00.000Z", model: "claude-haiku-5-5", costUsd: 3 }),
+    ]);
+
+    expect(summary.byDay.map((d) => [d.key, d.costUsd, d.runs])).toEqual([
+      ["2026-10-21", 5, 2],
+      ["2026-10-20", 1, 1],
+    ]);
+    expect(summary.byDay[0].breakdown.byModel.map((g) => [g.key, g.costUsd])).toEqual([
+      ["claude-haiku-5-5", 3],
+      ["claude-opus-5-5", 2],
+    ]);
+  });
+
   it("ranks operations by their total cost", () => {
     const summary = summarizeClaudeRuns([
       run({ operationId: "a", costUsd: 1 }),
