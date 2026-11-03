@@ -12,6 +12,7 @@ import type { ClientMessage, WsData } from "@/types/chat-server";
 import { send } from "./handlers";
 import { GC_INTERVAL_MS, CHAT_WAITING_POLL_MS } from "./constants";
 import { getStore } from "./store";
+import { settleOrphanedChatCosts } from "./cost";
 import { runGc } from "./gc";
 import { notifyWaitingSessions } from "./waiting-notifier";
 import { handleStart, handleResume, handleInput, handleResize, handleKill, handleClose } from "./handlers";
@@ -30,6 +31,9 @@ export function startChatServer(port: number) {
     clearInterval(store.__chatGcTimer);
   }
   store.__chatGcTimer = setInterval(runGc, GC_INTERVAL_MS);
+
+  const live = new Set([...store.__chatSessions!.values()].filter((s) => !s.exited).map((s) => s.cliSessionId));
+  settleOrphanedChatCosts(live).catch((err) => console.warn("[chat-server] Failed to settle orphaned chat costs:", err));
 
   // Watch for sessions that stop working, so the sidebar's blue→muted flip also
   // reaches the user as a push notification.

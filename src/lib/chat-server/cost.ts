@@ -1,7 +1,7 @@
 import os from "node:os";
 import path from "node:path";
 import { globScan } from "@/lib/fs";
-import { insertClaudeRun } from "@/lib/db";
+import { insertClaudeRun, insertPendingChatCost, listPendingChatCostIds, takePendingChatCost } from "@/lib/db";
 import { transcriptCostStateSchema } from "@/lib/runtime-schemas";
 import { totalModelUsage } from "@/lib/parsers/run-usage";
 import type { RunUsage } from "@/lib/parsers/run-usage";
@@ -45,30 +45,44 @@ async function readSessionTotals(cliSessionId: string): Promise<SessionTotals | 
   return undefined;
 }
 
-/** Read before a chat (re)opens a CLI session, so its cost can be told from what came before. */
-export const readChatCostBaseline = readSessionTotals;
+/**
+ * Start tracking a chat's cost. A resumed session's transcript already holds
+ * the totals of its earlier runs, so those are kept as the baseline.
+ */
+export async function beginChatCost(
+  meta: { workspace: string; agentName: string },
+  cliSessionId: string,
+  opts: { resumed: boolean },
+): Promise<void> {
+  const baseline = opts.resumed ? await readSessionTotals(cliSessionId) : undefined;
+  insertPendingChatCost({
+    cliSessionId,
+    workspace: meta.workspace,
+    agentName: meta.agentName,
+    baseline: baseline ? JSON.stringify(baseline) : null,
+  });
+}
 
 /**
- * Record what a finished chat spent: the session's totals less the baseline
- * read when it started. Duration is API time, since a chat sits open idle.
+ * Record what a finished chat spent: its transcript's totals less the baseline.
+ * Duration is API time, since a chat sits open idle.
  */
-export async function recordChatCost(
-  meta: { chatSessionId: string; workspace: string; agentName: string },
-  cliSessionId: string,
-  baseline: SessionTotals | undefined,
-): Promise<void> {
+export async function settleChatCost(cliSessionId: string): Promise<void> {
+  const pending = takePendingChatCost(cliSessionId);
+  if (!pending) return;
   const after = await readSessionTotals(cliSessionId);
   if (!after) return;
+  const baseline = pending.baseline ? (JSON.parse(pending.baseline) as SessionTotals) : undefined;
   const minus = (k: keyof Omit<SessionTotals, "model">) => after[k] - (baseline?.[k] ?? 0);
   const costUsd = minus("costUsd");
   if (costUsd <= 0) return;
 
   insertClaudeRun({
-    operationId: meta.chatSessionId,
+    operationId: cliSessionId,
     operationType: "chat",
-    workspace: meta.workspace,
+    workspace: pending.workspace,
     phaseLabel: null,
-    childLabel: meta.agentName,
+    childLabel: pending.agentName,
     stepType: null,
     effort: null,
     model: after.model,
@@ -80,4 +94,14 @@ export async function recordChatCost(
     cacheReadTokens: minus("cacheReadTokens"),
     outputTokens: minus("outputTokens"),
   });
+}
+
+/**
+ * Settle chats whose exit this process never saw — the chat server stopped
+ * while they ran. Sessions still alive (a hot reload keeps them) stay pending.
+ */
+export async function settleOrphanedChatCosts(liveCliSessionIds: ReadonlySet<string>): Promise<void> {
+  for (const id of listPendingChatCostIds()) {
+    if (!liveCliSessionIds.has(id)) await settleChatCost(id);
+  }
 }

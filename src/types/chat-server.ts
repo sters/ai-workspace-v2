@@ -8,6 +8,8 @@ import type { TurnProgress } from "@/lib/chat-server/activity";
 export interface ChatSession {
   id: string;
   workspaceId: string;
+  /** The Claude CLI session this PTY runs, whose transcript holds the chat's cost. */
+  cliSessionId: string;
   proc: TerminalSubprocess;
   listeners: Set<DataListener>;
   exited: boolean;

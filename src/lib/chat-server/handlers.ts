@@ -18,7 +18,7 @@ import { trimBuffer } from "./buffer";
 import { getStore, nextSessionId, persistSessionCreated, persistSessionExited, persistSessionDeleted } from "./store";
 import { runGc } from "./gc";
 import { resolveSlackThread } from "./slack-thread";
-import { readChatCostBaseline, recordChatCost } from "./cost";
+import { beginChatCost, settleChatCost } from "./cost";
 
 type Ws = { send(data: string): void; data: WsData };
 
@@ -143,7 +143,7 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
     cliSessionId = crypto.randomUUID();
     opening = { leadingArgs: ["--session-id", cliSessionId], trailingArgs: [built.prompt], agentName: built.agentName, cwd: root };
   }
-  const costBaseline = slack ? await readChatCostBaseline(cliSessionId) : undefined;
+  await beginChatCost({ workspace: msg.workspaceId, agentName: opening.agentName }, cliSessionId, { resumed: slack !== null });
 
   const sessionId = nextSessionId();
   if (ws) ws.data.sessionId = sessionId;
@@ -182,6 +182,7 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
   const session: ChatSession = {
     id: sessionId,
     workspaceId: msg.workspaceId,
+    cliSessionId,
     proc,
     listeners,
     exited: false,
@@ -227,7 +228,7 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
       send(session.activeWs, { type: "exited", code });
     }
     void cleanupSessionSystemPrompt(systemPromptFile);
-    recordChatCost({ chatSessionId: sessionId, workspace: msg.workspaceId, agentName: opening.agentName }, cliSessionId, costBaseline)
+    settleChatCost(cliSessionId)
       .catch((err) => console.warn(`[chat-server] Failed to record cost for ${sessionId}:`, err));
   });
 

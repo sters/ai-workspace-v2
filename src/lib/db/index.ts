@@ -22,8 +22,8 @@ export {
 
 export { appendEvents, getEvents, _resetEventStatements } from "./events";
 
-export { insertClaudeRun, listClaudeRuns, _resetClaudeRunStatements } from "./claude-runs";
-export type { ClaudeRun, ClaudeRunInput } from "./claude-runs";
+export { insertClaudeRun, listClaudeRuns, insertPendingChatCost, takePendingChatCost, listPendingChatCostIds, _resetClaudeRunStatements } from "./claude-runs";
+export type { ClaudeRun, ClaudeRunInput, PendingChatCost } from "./claude-runs";
 
 export { bufferEvent, flushEvents, startAutoFlush, stopAutoFlush } from "./event-buffer";
 

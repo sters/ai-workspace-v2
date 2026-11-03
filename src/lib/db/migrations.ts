@@ -260,6 +260,19 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    version: 15,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE chat_cost_pending (
+          cli_session_id TEXT PRIMARY KEY,
+          workspace      TEXT NOT NULL,
+          agent_name     TEXT NOT NULL,
+          baseline_json  TEXT
+        );
+      `);
+    },
+  },
 ];
 
 /**
