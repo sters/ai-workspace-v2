@@ -43,11 +43,11 @@ export interface BenchResult {
 
 const ATTEMPT_TIMEOUT_MS = 20 * 60 * 1000;
 
-function runAttempt(id: string, prompt: string, options: RunClaudeOptions, ttl: CacheTtl): Promise<Omit<BenchAttemptResult, "label" | "config">> {
+export function runAttempt(id: string, prompt: string, options: RunClaudeOptions, ttl: CacheTtl, timeoutMs = ATTEMPT_TIMEOUT_MS): Promise<Omit<BenchAttemptResult, "label" | "config">> {
   return new Promise((resolve) => {
     const proc = runClaude(id, prompt, options);
     const usage: AttemptUsage = { costUsd: 0, durationMs: 0, outputTokens: 0, numTurns: 0 };
-    const timer = setTimeout(() => proc.kill(), ATTEMPT_TIMEOUT_MS);
+    const timer = setTimeout(() => proc.kill(), timeoutMs);
     proc.onEvent((event) => {
       if (event.type === "output") {
         const u = parseRunUsage(event.data);

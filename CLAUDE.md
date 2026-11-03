@@ -17,6 +17,7 @@ bun run lint                    # next typegen + tsc (tsconfig.typecheck.json) +
 bun run test                    # All tests
 bun --bun vitest run src/__tests__/lib/parsers/todo.test.ts  # Single file (--bun required for bun:sqlite)
 bun run bench --root ~/ai-workspace --workspace <ws> --step verify-completion --configs opus/medium,claude-haiku-5-5/xhigh  # billed; answers go to .ai-workspace/bench/, read and compare them; --list, --dry-run
+bun run bench:execute --root ~/ai-workspace --workspace <ws> --repo <worktree> --configs opus/medium,claude-sonnet-5-5/high  # billed; reruns the planned TODO from the merge-base in sandbox worktrees; writes patch, commits, TODO and constraint results per attempt
 ```
 
 ## Configuration
