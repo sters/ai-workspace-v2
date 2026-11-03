@@ -1,6 +1,9 @@
 import type { OperationType } from "@/types/operation";
 
-/** Operations whose `workspace` is a label (`deep-search`, `mcp:<server>`, …) rather than a workspace. */
+/**
+ * Operations that hold no workspace: their `workspace` is a label (`deep-search`,
+ * `mcp:<server>`, …), or, for a bench, a workspace it only reads.
+ */
 const NON_WORKSPACE_TYPES: ReadonlySet<OperationType> = new Set<OperationType>([
   "init",
   "mcp-auth",
@@ -11,6 +14,7 @@ const NON_WORKSPACE_TYPES: ReadonlySet<OperationType> = new Set<OperationType>([
   "prune-suggestions",
   "workspace-prune",
   "operation-prune",
+  "bench",
 ]);
 
 /**

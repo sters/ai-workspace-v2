@@ -58,7 +58,7 @@ describe("claude_runs backfill migration", () => {
     const db = new Database(":memory:");
     // Bring the schema to the version before claude_runs existed (14).
     runMigrations(db);
-    db.exec("DROP TABLE claude_runs; DROP TABLE chat_cost_pending; DELETE FROM schema_migrations WHERE version >= 14;");
+    db.exec("DROP TABLE claude_runs; DROP TABLE chat_cost_pending; DROP TABLE bench_runs; DELETE FROM schema_migrations WHERE version >= 14;");
 
     db.prepare("INSERT INTO operations (id, type, workspace, status, started_at) VALUES ('op-1', 'review', 'ws-1', 'completed', '2026-10-20T00:00:00Z')").run();
     const insertEvent = db.prepare("INSERT INTO operation_events (operation_id, type, data, timestamp, child_label, phase_label) VALUES ('op-1', ?, ?, ?, ?, ?)");

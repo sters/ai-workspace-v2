@@ -166,6 +166,29 @@ const archivedOnlyFlag = z
   .union([z.boolean(), z.enum(["true", "false"]).transform((v) => v === "true")])
   .default(true);
 
+const benchConfigSchema = z.object({
+  model: z.enum(["opus", "claude-sonnet-5-5", "claude-haiku-5-5"]),
+  effort: z.enum(["low", "medium", "high", "xhigh", "max"]),
+});
+
+/** A workspace or worktree directory name: used as a path segment, so no separators or `..`. */
+const pathSegment = z.string().min(1).refine((s) => !s.includes("..") && !/[\\/]/.test(s), "must be a plain name");
+
+export const benchSchema = z
+  .object({
+    workspace: pathSegment,
+    step: z.string().min(1),
+    repo: pathSegment.optional(),
+    configs: z.array(benchConfigSchema).min(1).max(15),
+    /** `<model>/<effort>` of one of `configs`. */
+    reference: z.string().min(1),
+    repeats: z.number().int().min(1).max(5),
+  })
+  .refine((b) => b.configs.some((c) => `${c.model}/${c.effort}` === b.reference), {
+    message: "reference must be one of configs",
+    path: ["reference"],
+  });
+
 export const workspacePruneSchema = z.object({
   days: z.coerce.number().positive().optional(),
   archivedOnly: archivedOnlyFlag,

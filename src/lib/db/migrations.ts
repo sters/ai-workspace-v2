@@ -273,6 +273,23 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 16,
+    up: (db) => {
+      // No foreign key to operations, like claude_runs: a bench outlives log pruning.
+      db.exec(`
+        CREATE TABLE bench_runs (
+          operation_id  TEXT PRIMARY KEY,
+          workspace     TEXT NOT NULL,
+          step          TEXT NOT NULL,
+          repo          TEXT,
+          reference     TEXT NOT NULL,
+          attempts_json TEXT NOT NULL,
+          created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+      `);
+    },
+  },
 ];
 
 /**

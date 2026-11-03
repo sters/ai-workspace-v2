@@ -26,6 +26,7 @@ const UTILITY_ITEMS = [
   { label: "Claude Version", href: "/utilities/claude-version" },
   { label: "Claude Usage", href: "/utilities/claude-usage" },
   { label: "Run Costs", href: "/utilities/run-costs" },
+  { label: "Bench", href: "/utilities/bench" },
   { label: "AIW Settings", href: "/utilities/aiw-settings" },
   { label: "Claude Settings", href: "/utilities/claude-settings" },
   { label: "Claude Auth", href: "/utilities/claude-auth" },
