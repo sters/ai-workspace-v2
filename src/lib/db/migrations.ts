@@ -1,4 +1,5 @@
 import type { Database } from "bun:sqlite";
+import { parseRunUsage } from "@/lib/parsers/run-usage";
 
 interface Migration {
   version: number;
@@ -208,6 +209,55 @@ const migrations: Migration[] = [
         ALTER TABLE slack_pending_notifications ADD COLUMN message_ts TEXT;
         ALTER TABLE slack_pending_notifications ADD COLUMN status_header TEXT;
       `);
+    },
+  },
+  {
+    version: 14,
+    up: (db) => {
+      // No foreign key to operations: the cost history outlives operation log pruning.
+      db.exec(`
+        CREATE TABLE claude_runs (
+          id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+          operation_id          TEXT NOT NULL,
+          operation_type        TEXT NOT NULL,
+          workspace             TEXT NOT NULL,
+          phase_label           TEXT,
+          child_label           TEXT,
+          step_type             TEXT,
+          effort                TEXT,
+          model                 TEXT,
+          cost_usd              REAL NOT NULL,
+          duration_ms           INTEGER NOT NULL,
+          num_turns             INTEGER NOT NULL,
+          input_tokens          INTEGER NOT NULL,
+          cache_creation_tokens INTEGER NOT NULL,
+          cache_read_tokens     INTEGER NOT NULL,
+          output_tokens         INTEGER NOT NULL,
+          created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE INDEX idx_claude_runs_created_at ON claude_runs(created_at);
+      `);
+
+      const insert = db.prepare(`
+        INSERT INTO claude_runs (operation_id, operation_type, workspace, phase_label, child_label, model,
+          cost_usd, duration_ms, num_turns, input_tokens, cache_creation_tokens, cache_read_tokens, output_tokens, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const events = db.query(`
+        SELECT e.operation_id, o.type, o.workspace, e.phase_label, e.child_label, e.data, e.timestamp
+        FROM operation_events e JOIN operations o ON o.id = e.operation_id
+        WHERE e.type = 'output' AND e.data LIKE '%"total_cost_usd"%'
+        ORDER BY e.id
+      `);
+      for (const row of events.iterate() as Iterable<{
+        operation_id: string; type: string; workspace: string; phase_label: string | null;
+        child_label: string | null; data: string; timestamp: string;
+      }>) {
+        const u = parseRunUsage(row.data);
+        if (!u) continue;
+        insert.run(row.operation_id, row.type, row.workspace, row.phase_label, row.child_label, u.model,
+          u.costUsd, u.durationMs, u.numTurns, u.inputTokens, u.cacheCreationTokens, u.cacheReadTokens, u.outputTokens, row.timestamp);
+      }
     },
   },
 ];

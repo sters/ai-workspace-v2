@@ -77,7 +77,7 @@ export async function runSinglePhase(
   const singleOpts: RunClaudeOptions | undefined = (phase.cwd || phase.addDirs || phase.allowedTools || phase.appendSystemPromptFile || model || effort)
     ? { cwd: phase.cwd, addDirs: phase.addDirs, allowedTools: phase.allowedTools, appendSystemPromptFile: phase.appendSystemPromptFile, model, effort }
     : undefined;
-  const result = await runChildWaitingOutUsageLimit(managed, childId, phase.label, () => runClaude(childId, phase.prompt, singleOpts), phaseExtra);
+  const result = await runChildWaitingOutUsageLimit(managed, childId, phase.label, () => runClaude(childId, phase.prompt, singleOpts), phaseExtra, { stepType: phase.stepType, effort });
   return result.success;
 }
 
@@ -104,7 +104,7 @@ export async function runGroupPhase(
         (child.cwd || child.addDirs || child.allowedTools || child.jsonSchema || child.skipAskUserQuestion || child.appendSystemPromptFile || model || effort)
           ? { cwd: child.cwd, addDirs: child.addDirs, allowedTools: child.allowedTools, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion, appendSystemPromptFile: child.appendSystemPromptFile, model, effort }
           : undefined;
-      const result = await runChildWaitingOutUsageLimit(managed, childId, child.label, () => runClaude(childId, child.prompt, claudeOpts), phaseExtra);
+      const result = await runChildWaitingOutUsageLimit(managed, childId, child.label, () => runClaude(childId, child.prompt, claudeOpts), phaseExtra, { stepType: child.stepType, effort });
       if (result.resultText && child.onResultText) {
         child.onResultText(result.resultText);
       }

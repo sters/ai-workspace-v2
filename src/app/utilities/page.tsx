@@ -40,6 +40,12 @@ const tools = [
       "Display current billing period usage from Claude Code CLI.",
   },
   {
+    href: "/utilities/run-costs",
+    name: "Run Costs",
+    description:
+      "Break down Claude spend by operation, phase, step, model and effort.",
+  },
+  {
     href: "/utilities/aiw-settings",
     name: "AIW Settings",
     description:

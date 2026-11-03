@@ -1,4 +1,7 @@
-import type { ClaudeProcess } from "@/types/claude";
+import type { ClaudeEffort, ClaudeProcess } from "@/types/claude";
+import type { StepType } from "@/types/pipeline";
+import { insertClaudeRun } from "@/lib/db";
+import { parseRunUsage } from "@/lib/parsers/run-usage";
 import type { OperationEvent } from "@/types/operation";
 import type { ManagedOperation, WireChildResult } from "./types";
 import { emitEvent, emitStatus } from "./events";
@@ -138,6 +141,37 @@ function parseRejectedResetsAt(data: string): number | undefined {
   return undefined;
 }
 
+/** What the caller resolved for a child, recorded alongside its cost. */
+export interface ChildRunInfo {
+  stepType?: StepType;
+  effort?: ClaudeEffort;
+}
+
+function recordRunCost(
+  managed: ManagedOperation,
+  childLabel: string,
+  data: string,
+  phaseExtra: { phaseLabel?: string } | undefined,
+  run: ChildRunInfo | undefined,
+): void {
+  const usage = parseRunUsage(data);
+  if (!usage) return;
+  try {
+    insertClaudeRun({
+      operationId: managed.operation.id,
+      operationType: managed.operation.type,
+      workspace: managed.operation.workspace,
+      phaseLabel: phaseExtra?.phaseLabel ?? null,
+      childLabel,
+      stepType: run?.stepType ?? null,
+      effort: run?.effort ?? null,
+      ...usage,
+    });
+  } catch (err) {
+    console.warn(`[wire-child] Failed to record run cost for ${childLabel}:`, err);
+  }
+}
+
 /**
  * Wire a child ClaudeProcess to the parent ManagedOperation.
  * Tags every event with childLabel (and optional phaseExtra) and updates child status on completion.
@@ -148,6 +182,7 @@ export function wireChild(
   childLabel: string,
   process: ClaudeProcess,
   phaseExtra?: { phaseIndex?: number; phaseLabel?: string; parentChildLabel?: string },
+  run?: ChildRunInfo,
 ): Promise<WireChildResult> {
   managed.childProcesses.set(childId, {
     process,
@@ -206,6 +241,8 @@ export function wireChild(
         ...phaseExtra,
       };
       emitEvent(managed, tagged);
+
+      if (event.type === "output") recordRunCost(managed, childLabel, event.data, phaseExtra, run);
 
       if (event.type === "output" && event.data.includes('"rate_limit_event"')) {
         rejectedResetsAt = parseRejectedResetsAt(event.data) ?? rejectedResetsAt;

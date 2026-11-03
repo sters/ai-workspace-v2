@@ -3,6 +3,7 @@ import type { ManagedOperation, WireChildResult } from "./types";
 import { emitStatus } from "./events";
 import { delay } from "./phase-helpers";
 import { wireChild } from "./wire-child";
+import type { ChildRunInfo } from "./wire-child";
 import { getConfig } from "@/lib/config";
 import { sendUsageLimitNotification } from "@/lib/web-push";
 
@@ -25,10 +26,11 @@ export async function runChildWaitingOutUsageLimit(
   childLabel: string,
   spawn: () => ClaudeProcess,
   phaseExtra?: { phaseIndex?: number; phaseLabel?: string; parentChildLabel?: string },
+  run?: ChildRunInfo,
 ): Promise<WireChildResult> {
   const signal = managed.abortController.signal;
   for (let waits = 0; ; waits++) {
-    const result = await wireChild(managed, childId, childLabel, spawn(), phaseExtra);
+    const result = await wireChild(managed, childId, childLabel, spawn(), phaseExtra, run);
     if (result.success || result.usageLimitResetsAt === undefined || signal.aborted) return result;
     if (!getConfig().operations.waitOutUsageLimit) return result;
 

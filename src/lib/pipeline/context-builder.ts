@@ -117,7 +117,7 @@ export function buildPhaseFunctionContext(
         (childOptions?.jsonSchema || childOptions?.cwd || childOptions?.addDirs || childOptions?.allowedTools || childOptions?.skipAskUserQuestion || childOptions?.appendSystemPromptFile || model || effort)
           ? { jsonSchema: childOptions?.jsonSchema, cwd: childOptions?.cwd, addDirs: childOptions?.addDirs, allowedTools: childOptions?.allowedTools, skipAskUserQuestion: childOptions?.skipAskUserQuestion, appendSystemPromptFile: childOptions?.appendSystemPromptFile, model, effort }
           : undefined;
-      const result = await runChildWaitingOutUsageLimit(managed, cid, label, () => runClaude(cid, prompt, claudeOpts), childPhaseExtra);
+      const result = await runChildWaitingOutUsageLimit(managed, cid, label, () => runClaude(cid, prompt, claudeOpts), childPhaseExtra, { stepType: childOptions?.stepType, effort });
       if (result.resultText && childOptions?.onResultText) {
         childOptions.onResultText(result.resultText);
       }
@@ -148,7 +148,7 @@ export function buildPhaseFunctionContext(
             (child.cwd || child.addDirs || child.allowedTools || child.jsonSchema || child.skipAskUserQuestion || child.appendSystemPromptFile || model || effort)
               ? { cwd: child.cwd, addDirs: child.addDirs, allowedTools: child.allowedTools, jsonSchema: child.jsonSchema, skipAskUserQuestion: child.skipAskUserQuestion, appendSystemPromptFile: child.appendSystemPromptFile, model, effort }
               : undefined;
-          const result = await runChildWaitingOutUsageLimit(managed, cid, child.label, () => runClaude(cid, child.prompt, claudeOpts), childPhaseExtra);
+          const result = await runChildWaitingOutUsageLimit(managed, cid, child.label, () => runClaude(cid, child.prompt, claudeOpts), childPhaseExtra, { stepType: child.stepType, effort });
           if (result.resultText && child.onResultText) {
             child.onResultText(result.resultText);
           }

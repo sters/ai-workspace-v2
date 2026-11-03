@@ -105,6 +105,25 @@ export const toolResultBlockSchema = z.object({
   content: z.unknown().optional(),
 });
 
+const modelUsageSchema = z.record(z.string(), z.object({
+  inputTokens: z.number().default(0),
+  outputTokens: z.number().default(0),
+  cacheReadInputTokens: z.number().default(0),
+  cacheCreationInputTokens: z.number().default(0),
+  costUSD: z.number().default(0),
+}));
+
+/** The cost-bearing fields of a stream-json `result` event. */
+export const resultUsageSchema = z.object({
+  type: z.literal("result"),
+  total_cost_usd: z.number(),
+  duration_ms: z.number().optional(),
+  num_turns: z.number().optional(),
+  modelUsage: modelUsageSchema.optional(),
+  /** Present when one process emits several results; `modelUsage` and `total_cost_usd` are then cumulative. */
+  model_usage_since_last_result: modelUsageSchema.optional(),
+});
+
 // ---------------------------------------------------------------------------
 // WebSocket ClientMessage (chat-server.ts)
 // ---------------------------------------------------------------------------
