@@ -329,6 +329,18 @@ describe("buildUpdateReadmePipeline", () => {
       expect(mockAppendKnownFindings).not.toHaveBeenCalled();
     });
 
+    it("runs the judge read-only over the worktrees", async () => {
+      const phase = await getFeasibilityPhase();
+      const ctx = ctxReturning({ infeasible: [], reason: "all achievable" });
+
+      await phase.fn(ctx);
+      const opts = vi.mocked(ctx.runChild).mock.calls[0][2]!;
+      // An empty list would fall back to the Edit / Write grant addDirs carries.
+      expect(opts.allowedTools?.length).toBeGreaterThan(0);
+      expect(opts.allowedTools!.some((t) => /^(Edit|Write)/.test(t) || t === "Bash(git:*)")).toBe(false);
+      expect(opts.addDirs).toEqual(["/x"]);
+    });
+
     it("skips the judge entirely when the README has no (auto) criteria", async () => {
       mockParseAcceptanceCriteria.mockReturnValue([
         { text: "Figma comparison", kind: "manual", checked: false },

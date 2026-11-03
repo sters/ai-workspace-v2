@@ -4,7 +4,7 @@
  * for planners, executors and reviewers (see `repoGuidanceSection`).
  */
 
-import { NO_CD_RULES } from "./shared";
+import { STOP_WHEN_ANSWERED } from "./shared";
 
 export interface RepoGuidanceInput {
   workspaceName: string;
@@ -18,7 +18,7 @@ export function getRepoGuidanceSystemPrompt(): string {
 
 ### What to Look For
 
-Read with \`Glob\`, \`Grep\` and \`Read\` under the worktree path. Places this guidance usually lives (non-exhaustive):
+Glob the places below under the worktree path once, in one turn. Then open only the files whose names point at conventions, architecture, testing or review — at most 15. Places this guidance usually lives (non-exhaustive):
 
 - \`CLAUDE.md\` and \`AGENTS.md\`, at the root and in subdirectories
 - \`.claude/skills/*/SKILL.md\` and the \`references/\` files next to them; \`.claude/agents/*.md\`; \`.agents/\`
@@ -28,7 +28,7 @@ Read with \`Glob\`, \`Grep\` and \`Read\` under the worktree path. Places this g
 
 ### What Each Entry Says
 
-One bullet per file, naming the repository-relative path and what a reader should take from it, specifically enough to decide whether to open it:
+One single-line bullet per file, naming the repository-relative path and what a reader should take from it, specifically enough to decide whether to open it. At most 10 entries per section; when more qualify, keep the ones a reader of a typical change would need:
 
 \`\`\`markdown
 - \`CLAUDE.md\` — errors wrapped with \`%w\`; database access only through \`internal/store\`; table-driven tests for handlers
@@ -61,9 +61,11 @@ Write the file at the output path in the user prompt, in exactly this shape:
 
 Keep both headings even when a section has no entries; leave it empty below the heading. Name only files you opened and read, and describe what they say rather than what such a file usually says. Write in English regardless of the documents' language.
 
-This file is the only file you write.
+${STOP_WHEN_ANSWERED}
 
-${NO_CD_RULES}
+### Tools
+
+You have \`Read\`, \`Grep\` and \`Glob\`, which take path arguments, and \`Write\` for the output file — the only file you write. There is no shell.
 `;
 }
 

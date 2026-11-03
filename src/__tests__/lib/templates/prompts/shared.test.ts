@@ -1,4 +1,5 @@
 import {
+  GIT_HISTORY_BOUNDS,
   NO_CD_RULES,
   NO_WORKSPACE_REFERENCES,
   RECURRING_FINDINGS_POLICY,
@@ -6,6 +7,7 @@ import {
   REVIEW_COVERAGE_POLICY,
   SCOPE_DISCIPLINE,
   SEVERITY_CALIBRATION,
+  STOP_WHEN_ANSWERED,
   SUBAGENT_DELEGATION_POLICY,
   WRITTEN_DELIVERABLE_LENGTH,
   repoGuidanceSection,
@@ -26,6 +28,10 @@ import { getPRCreatorSystemPrompt } from "@/lib/templates/prompts/pr-creator";
 import { getPrCommentValidatorSystemPrompt } from "@/lib/templates/prompts/pr-comment-validator";
 import { getCoordinatorSystemPrompt } from "@/lib/templates/prompts/coordinator";
 import { getUpdaterSystemPrompt } from "@/lib/templates/prompts/updater";
+import { getFixVerifierSystemPrompt } from "@/lib/templates/prompts/fix-verifier";
+import { getCriteriaFeasibilitySystemPrompt } from "@/lib/templates/prompts/criteria-feasibility";
+import { getRepoGuidanceSystemPrompt } from "@/lib/templates/prompts/repo-guidance";
+import { getSearchSystemPrompt } from "@/lib/templates/prompts/search";
 import {
   getResearchFindingsRepoSystemPrompt,
   getResearchFindingsCrossRepoSystemPrompt,
@@ -74,9 +80,11 @@ describe("working-directory conventions", () => {
     completionVerifier: getCompletionVerifierSystemPrompt(),
     prCreator: getPRCreatorSystemPrompt(),
     prCommentValidator: getPrCommentValidatorSystemPrompt(),
+    fixVerifier: getFixVerifierSystemPrompt(),
   };
   const noCdPrompts: Record<string, string> = {
     coordinator: getCoordinatorSystemPrompt(),
+    criteriaFeasibility: getCriteriaFeasibilitySystemPrompt(),
     ...researchPrompts,
   };
 
@@ -93,6 +101,15 @@ describe("working-directory conventions", () => {
       expect(prompt).toContain(NO_CD_RULES);
     },
   );
+
+  it("gives the guidance discoverer, which has no shell, neither convention", () => {
+    // Its child is granted only Write / Edit on its output file; a Bash rule
+    // sends it after a tool every call of which is denied.
+    const prompt = getRepoGuidanceSystemPrompt();
+    expect(prompt).not.toContain(NO_CD_RULES);
+    expect(prompt).not.toMatch(/first Bash tool call MUST be `cd` alone/);
+    expect(prompt).not.toContain("Bash");
+  });
 
   it("never mixes the two conventions in one prompt", () => {
     for (const [name, prompt] of Object.entries({ ...cdPrompts, ...noCdPrompts })) {
@@ -129,6 +146,13 @@ describe("REPO_SEARCH_EFFICIENCY", () => {
 
   it("is applied to the PR comment validator, which explores to check one claim", () => {
     expect(getPrCommentValidatorSystemPrompt()).toContain(REPO_SEARCH_EFFICIENCY);
+  });
+
+  it.each(Object.entries({
+    fixVerifier: getFixVerifierSystemPrompt(),
+    criteriaFeasibility: getCriteriaFeasibilitySystemPrompt(),
+  }))("is applied to %s, which explores to settle a fixed list", (_name, prompt) => {
+    expect(prompt).toContain(REPO_SEARCH_EFFICIENCY);
   });
 
   it("does not contradict the worktree cd rule it travels with", () => {
@@ -170,6 +194,47 @@ describe("REPO_SEARCH_EFFICIENCY", () => {
       prompt.indexOf("### Searching the Repository"),
     );
   });
+});
+
+describe("GIT_HISTORY_BOUNDS", () => {
+  const historyReaders: Record<string, string> = {
+    fixVerifier: getFixVerifierSystemPrompt(),
+    prCommentValidator: getPrCommentValidatorSystemPrompt(),
+    prCreator: getPRCreatorSystemPrompt(),
+    completionVerifier: getCompletionVerifierSystemPrompt(),
+  };
+
+  it.each(Object.entries(historyReaders))(
+    "%s bounds the git history it reads",
+    (_name, prompt) => {
+      expect(prompt).toContain(GIT_HISTORY_BOUNDS);
+    },
+  );
+
+  it("agrees with the PR creator that a TODO item missing from the file is finished", () => {
+    // The PR creator replies to a review thread as addressed when its TODO item
+    // is absent; the fragment must not tell a verifier that absence means anything else.
+    expect(getPRCreatorSystemPrompt()).toMatch(/absent from the file\*\* → complete/);
+    expect(GIT_HISTORY_BOUNDS).toMatch(/no longer in the TODO file was finished/);
+  });
+});
+
+describe("STOP_WHEN_ANSWERED", () => {
+  const answerSeekers: Record<string, string> = {
+    criteriaFeasibility: getCriteriaFeasibilitySystemPrompt(),
+    fixVerifier: getFixVerifierSystemPrompt(),
+    prCommentValidator: getPrCommentValidatorSystemPrompt(),
+    repoGuidance: getRepoGuidanceSystemPrompt(),
+    search: getSearchSystemPrompt(),
+    completionVerifier: getCompletionVerifierSystemPrompt(),
+  };
+
+  it.each(Object.entries(answerSeekers))(
+    "%s states when to stop gathering evidence",
+    (_name, prompt) => {
+      expect(prompt).toContain(STOP_WHEN_ANSWERED);
+    },
+  );
 });
 
 describe("SUBAGENT_DELEGATION_POLICY", () => {

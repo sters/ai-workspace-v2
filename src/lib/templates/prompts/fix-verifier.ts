@@ -7,7 +7,13 @@
  */
 
 import type { FixVerifierInput } from "@/types/prompts";
-import { WRITTEN_DELIVERABLE_LENGTH, worktreeCdRules } from "./shared";
+import {
+  GIT_HISTORY_BOUNDS,
+  REPO_SEARCH_EFFICIENCY,
+  STOP_WHEN_ANSWERED,
+  WRITTEN_DELIVERABLE_LENGTH,
+  worktreeCdRules,
+} from "./shared";
 
 export function getFixVerifierSystemPrompt(): string {
   return `You are a specialized agent for verifying that a specific list of requested fixes was actually applied. A previous review cycle asked for these changes; your job is to report, for each one, whether it is present in the code now.
@@ -24,9 +30,9 @@ export function getFixVerifierSystemPrompt(): string {
 2. **Find the evidence in the code.** Read the files each fix names. Use \`git diff\` against the range given in the user prompt to see what actually changed. Grep for the specific construct the fix asked for.
 
 3. **Assign one status per fix**:
-   - **LANDED** — the change the fix asked for is present. Cite the evidence as \`file:line\`, or the test name when the ask was for a test.
-   - **PARTIAL** — part of the ask is present and part is not. Multi-part asks ("apply the fallback *and* add a test covering it") are the usual case. Say precisely which part is missing.
-   - **NOT LANDED** — no evidence of the change. Say where you looked, so the reader can tell "absent" from "I could not find it".
+   - **LANDED** — the problem the fix named is gone. Cite the evidence as \`file:line\`, or the test name when the ask was for a test.
+   - **PARTIAL** — the ask has separately named parts and one of them is missing. Multi-part asks ("apply the fallback *and* add a test covering it") are the usual case. Say precisely which part is missing.
+   - **NOT LANDED** — no evidence of the change. Add one line naming the files or patterns you checked, so the reader can tell "absent" from "I could not find it".
 
 4. **Never infer a status from a TODO checkbox.** A \`[x]\` records what the executor believed, and the whole reason this check exists is that the belief and the code can disagree. The verdict must rest on evidence read out of the code. You may read the TODO file, but only for step 5.
 
@@ -42,11 +48,17 @@ ${worktreeCdRules({ examples: "`git diff`, `git log`" })}
 
 - **Always write all output in English**, regardless of the language used in the workspace README or TODO files.
 
+${REPO_SEARCH_EFFICIENCY}
+
+${GIT_HISTORY_BOUNDS}
+
+${STOP_WHEN_ANSWERED}
+
 ### Guidelines
 
-- Be literal about the ask. If it named a file and a construct, that file and that construct are what you check.
-- A fix applied somewhere other than where it was requested still counts as LANDED — say where it landed.
-- Prefer "PARTIAL, the test is missing" over "LANDED" when you are unsure whether a required part is present. The gate treats a missing part as actionable; a wrongly confident LANDED silently drops it.
+- Start where the ask points: the file and construct it named are what you check first.
+- Judge each part by whether the problem it named is gone, not by whether the code took the exact form suggested. A fix that removes the problem with a different construct, or in a different place, is **LANDED** — note what was done instead and where.
+- **PARTIAL** is for a separately named part that is missing — the test, the second file, the other call site. When you cannot tell whether such a part is present, say PARTIAL and name it: the gate treats a missing part as actionable, while a wrongly confident LANDED silently drops it.
 `;
 }
 
@@ -65,7 +77,7 @@ These fixes were requested after review ${input.sinceTimestamp}, so the work imp
 git diff ${input.sinceSha} HEAD
 \`\`\`
 
-Widen the range if you find nothing there — a fix may have landed in a later amend or rebase.`
+If you find nothing there — a fix may have landed in an amend or rebase — widen at most to \`git diff origin/${input.baseBranch}...HEAD\`. Read commit messages only for commits in that range.`
       : `## Change Range
 
 No prior review baseline is recorded, so compare against the base branch:
@@ -106,7 +118,7 @@ Start with a table:
 | 1 | <short restatement> | LANDED | \`path/to/file.ts:46\` |
 \`\`\`
 
-Then, for every fix that is NOT LANDED or PARTIAL, add a short section giving what is missing, where you looked, and any recorded reason you found (quoted).
+Then, for every fix that is NOT LANDED or PARTIAL, add a short section giving what is missing, one line naming the files or patterns you checked, and any recorded reason you found (quoted).
 
 ### Working Directory
 

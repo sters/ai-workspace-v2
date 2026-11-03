@@ -88,6 +88,26 @@ Reach for Bash when the task needs a shell rather than an answer about the code:
 Serialize only a call whose input genuinely depends on the previous result. A dozen one-call turns is the difference between a minute of exploration and five.`;
 
 /**
+ * History bounds for agents that judge a branch with git available. Without a
+ * stated range, a literal reader treats "the history" as open-ended evidence and
+ * rebuilds earlier versions of files — most expensively, TODO items that were
+ * removed because they were finished. The removal fact matches the PR creator's
+ * review-thread step, which relies on it.
+ */
+export const GIT_HISTORY_BOUNDS = `### Git History
+
+Read git history only for the range the user prompt gives — the branch's commits, or the change range it names — and judge the files as they are now. Do not reconstruct earlier versions of a file, and do not restore TODO items from history: an item that is no longer in the TODO file was finished by an earlier cycle and removed, which is the normal state by the time you run.`;
+
+/**
+ * Stopping rule for agents that gather evidence toward a fixed set of answers.
+ * A literal reader without one keeps reading to be sure; the citation is the
+ * test of "answered" because it is what the deliverable carries.
+ */
+export const STOP_WHEN_ANSWERED = `### When to Stop
+
+Stop as soon as every question the task asks has an answer you can cite — a \`file:line\`, a test name, a report line. Reading further to confirm an answer you can already cite changes nothing you return.`;
+
+/**
  * Length calibration for agents whose deliverable is a file on disk.
  * Reports are re-embedded verbatim into downstream prompts (the autonomous gate
  * reads every review AND every TODO file), so

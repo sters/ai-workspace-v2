@@ -1,4 +1,5 @@
 import path from "node:path";
+import { READ_ONLY_TOOLS } from "@/lib/claude/read-only-tools";
 import { getWorkspaceDir } from "@/lib/config";
 import { parseAcceptanceCriteria, renderAcceptanceCriteria } from "@/lib/parsers/readme";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
@@ -55,6 +56,7 @@ export async function prepareCriteriaFeasibility(ws: string): Promise<{
     jsonSchema: CRITERIA_FEASIBILITY_SCHEMA,
     stepType: STEP_TYPES.CRITERIA_FEASIBILITY,
     addDirs: repos.map((r) => r.worktreePath),
+    allowedTools: READ_ONLY_TOOLS,
     appendSystemPromptFile: await ensureSystemPrompt(wsPath, "criteria-feasibility"),
     onResultText: (text) => { resultText = text; },
     skipAskUserQuestion: true,

@@ -10,6 +10,7 @@ import { BENCH_STEPS } from "./steps";
 import { summarizeBench } from "./summary";
 import type { AttemptUsage, BenchAttempt, BenchConfigSummary } from "./summary";
 import { runClaude } from "@/lib/claude";
+import { READ_ONLY_TOOLS } from "@/lib/claude/read-only-tools";
 import { parseRunUsage } from "@/lib/parsers/run-usage";
 import { priceRun } from "@/lib/pricing";
 import type { CacheTtl } from "@/lib/pricing";
@@ -40,12 +41,6 @@ export interface BenchResult {
   attempts: BenchAttemptResult[];
 }
 
-/**
- * What a bench child may use. It replaces the Edit / Write grant `addDirs` would
- * add, so a verifier that reads a review directory cannot change it; git is
- * limited to commands that only read.
- */
-const READ_ONLY_TOOLS = ["Read", "Grep", "Glob", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git show:*)", "Bash(git status:*)"];
 const ATTEMPT_TIMEOUT_MS = 20 * 60 * 1000;
 
 function runAttempt(id: string, prompt: string, options: RunClaudeOptions, ttl: CacheTtl): Promise<Omit<BenchAttemptResult, "label" | "config">> {

@@ -8,7 +8,7 @@
  */
 
 import type { CompletionVerifierInput } from "@/types/prompts";
-import { REPO_SEARCH_EFFICIENCY, worktreeCdRules } from "./shared";
+import { GIT_HISTORY_BOUNDS, REPO_SEARCH_EFFICIENCY, STOP_WHEN_ANSWERED, worktreeCdRules } from "./shared";
 
 export const COMPLETION_VERIFICATION_SCHEMA = {
   type: "object",
@@ -65,7 +65,7 @@ export function getCompletionVerifierSystemPrompt(): string {
 
 ### TODO items
 
-The TODO file in the user prompt is the whole list: one entry per item in it, in file order. Items an earlier cycle finished may have been removed from it; do not reconstruct them from git history or earlier versions of the file — the README requirements already cover that work.
+The TODO file in the user prompt is the whole list: one entry per item in it, in file order. Items an earlier cycle finished may have been removed from it (see **Git History** below); the README requirements already cover that work.
 
 - Checked (\`[x]\`): \`VERIFIED\` when the change is there, \`UNVERIFIED\` when it is marked done without evidence, \`PARTIAL\` when part of it is.
 - Unchecked (\`[ ]\`): \`INCOMPLETE\` when not done, \`UNMARKED\` when done anyway, \`SKIPPED\` when the file records it as deliberately dropped.
@@ -73,7 +73,11 @@ The TODO file in the user prompt is the whole list: one entry per item in it, in
 
 ### Gathering evidence
 
-The changed files, diff stat and commit log are in the user prompt. Read the actual change with \`git diff\` (not \`--stat\` / \`--name-only\` / \`log\`, which you already have) only where an entry needs it. One look at a file usually settles several entries — the requirements and the TODO items describe the same work, so check them together rather than in two passes. Stop once every entry has a status and its evidence; confirming a settled entry a second way adds nothing.
+The changed files, diff stat and commit log are in the user prompt. Read the actual change with \`git diff\` (not \`--stat\` / \`--name-only\` / \`log\`, which you already have) only where an entry needs it. One look at a file usually settles several entries — the requirements and the TODO items describe the same work, so check them together rather than in two passes.
+
+${STOP_WHEN_ANSWERED}
+
+${GIT_HISTORY_BOUNDS}
 
 ${REPO_SEARCH_EFFICIENCY}
 

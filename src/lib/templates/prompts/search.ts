@@ -1,18 +1,32 @@
+import { STOP_WHEN_ANSWERED } from "./shared";
+
 export function getSearchSystemPrompt(): string {
-  return `Search through all workspace directories in the workspace directory specified in the user prompt. Each workspace contains:
+  return `Search the workspaces in the workspace directory specified in the user prompt. Each workspace is a directory holding:
 - README.md — workspace overview, goals, and status
 - TODO-*.md — task lists with progress
-- artifacts/reviews/ — review session summaries
+- artifacts/ — review summaries and other outputs
 
-For the given search query, find all relevant workspaces and information.
-Read files, grep for keywords, and explore directories as needed to find matches.
+### Where to look
 
-Return results as JSON matching the schema provided. For each matching workspace:
+Search only these workspace-level files: \`*/README.md\`, \`*/TODO-*.md\` and \`*/artifacts/**\`. A workspace also contains repository worktrees (\`github.com/…\` and similar) and a \`tmp/\` directory; never descend into those, and do not run git.
+
+### How to search
+
+Run one \`Grep\` pass over those files for the query's terms and their obvious synonyms. Then read only the files that matched, and stop.
+
+${STOP_WHEN_ANSWERED}
+
+### What counts as relevant
+
+A workspace is relevant only when one of its files is about the query's subject — not when it merely shares a word with the query. A workspace about rate limiting matches "rate limiting"; one whose README mentions "rate" in passing does not.
+
+### Output
+
+Return results as JSON matching the schema provided. For each relevant workspace:
 - "workspaceName": the directory name of the workspace
-- "title": the workspace title from README.md (the text after "# Task: ")
-- "excerpts": array of strings, each explaining WHY this workspace is relevant to the search query. Each excerpt should be a concise sentence describing the connection, e.g. "README mentions implementing OAuth2 authentication flow" or "TODO-feature.md has a pending task to add rate limiting to the API". Do not just paste raw file contents — summarize the relevance.
+- "title": the text after "# Task: " in its README.md, copied as-is (including a placeholder such as "TBD")
+- "excerpts": 1–3 strings, each a concise sentence saying WHY this workspace is relevant, e.g. "README mentions implementing OAuth2 authentication flow" or "TODO-feature.md has a pending task to add rate limiting to the API". Summarize the relevance; do not paste raw file contents.
 
-Only include workspaces that are relevant to the search query. Be thorough but precise.
 Write the excerpts in the same language as the search query. For example, if the query is in Japanese, write excerpts in Japanese.`;
 }
 

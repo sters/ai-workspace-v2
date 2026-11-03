@@ -19,7 +19,7 @@
  */
 
 import type { CriteriaFeasibilityInput } from "@/types/prompts";
-import { NO_CD_RULES } from "./shared";
+import { NO_CD_RULES, REPO_SEARCH_EFFICIENCY, STOP_WHEN_ANSWERED } from "./shared";
 
 /** Phase label (set in `src/lib/pipelines/autonomous.ts`). */
 export const CRITERIA_FEASIBILITY_PHASE_LABEL = "Check criteria feasibility";
@@ -62,17 +62,23 @@ export function getCriteriaFeasibilitySystemPrompt(): string {
 
 A separate check already decided the README is clear enough to implement. You are not re-judging clarity, wording, or scope — only achievability against the code as it actually exists.
 
+**Read-only.** You read code and report; you edit nothing and run only read-only \`git\` commands (\`diff\`, \`log\`, \`show\`, \`status\`).
+
 ### What you are checking
 
 Only \`(auto)\` criteria. \`(manual)\` criteria are human handoffs by design — visual QA, staging sign-off, a decision from a spec owner — and are never your concern.
 
-For each \`(auto)\` criterion, read enough of the repositories to answer one question: is there a change **within these repositories** that would satisfy it?
+For each \`(auto)\` criterion, answer one question: is there a change **within these repositories** that would satisfy it?
+
+Per criterion, find the module that would change. If within a few lookups you find no file owned outside the listed worktrees that blocks it, it is feasible — move on to the next.
+
+Read only inside the listed worktrees. A vendored or generated contract file there (a checked-in schema, proto, or generated client) is the evidence for what the upstream carries — do not look past it to upstream repositories, module caches or the network.
 
 ### Infeasible — report it
 
 - Satisfying it requires a change to something these repositories do not own: another team's schema, proto, API response shape, database, or external service. The classic case is a criterion about data the upstream contract does not carry, or carries in a shape that loses the information (a repeated field collapsed to a single value, a field that is not exposed at all).
 - The data it describes does not exist anywhere reachable from this code.
-- It contradicts a constraint documented in the README or the repositories themselves, so satisfying one half necessarily breaks the other.
+- It contradicts a constraint the repositories themselves document (or the README's \`## Repository Constraints\`), so satisfying one half necessarily breaks the other.
 
 For each, name the concrete blocker: the file, symbol, or schema that would have to change, and why it sits outside these repositories.
 
@@ -80,7 +86,8 @@ For each, name the concrete blocker: the file, symbol, or schema that would have
 
 - Merely hard, large, or unstarted work. Nothing is implemented yet; that is the point of the run.
 - Work needing a refactor, a new test, a new file, or a new dependency inside these repositories.
-- Something you could not confirm either way in the time you had.
+- Something you could not confirm either way within those few lookups.
+- A conflict with the README's \`## Non-Goal\` or \`## Assumptions\`. That is a contract question the clarity check owns, not a blocker in the code.
 
 ### When unsure, treat it as feasible
 
@@ -88,7 +95,11 @@ The asymmetry matters. A wrong "infeasible" silently deletes real work from the 
 
 An empty \`infeasible\` list is the expected, healthy result.
 
+${STOP_WHEN_ANSWERED}
+
 ${NO_CD_RULES}
+
+${REPO_SEARCH_EFFICIENCY}
 
 ### Language
 
@@ -106,7 +117,7 @@ export function buildCriteriaFeasibilityPrompt(input: CriteriaFeasibilityInput):
 
   return `# Acceptance Criteria Feasibility Check: ${input.workspaceName}
 
-Decide which \`(auto)\` acceptance criteria below cannot be satisfied by any change within the repositories listed. Read their source as needed.
+Decide which \`(auto)\` acceptance criteria below cannot be satisfied by any change within the repositories listed. Read only inside these worktrees.
 
 ## Repositories
 

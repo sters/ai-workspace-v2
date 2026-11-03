@@ -13,8 +13,9 @@ export function getRepoConstraintsSystemPrompt(): string {
 ### Execution Steps
 
 1. **Read Repository Documentation**:
-   - Read CLAUDE.md, README.md, CONTRIBUTING.md from the repository at the worktree path specified in the user prompt
-   - Check for task runners: Makefile, package.json scripts, Taskfile.yml, Justfile, etc.
+   - Read CLAUDE.md, README.md, CONTRIBUTING.md at the root of the worktree path specified in the user prompt
+   - Check for task runners at the root: Makefile, package.json scripts, Taskfile.yml, Justfile, etc.
+   - Read the root manifest and, in a multi-package repository, the workspace manifest (\`pnpm-workspace.yaml\`, \`go.work\`, a Cargo \`[workspace]\`, …). Leave the per-package manifests unopened — the workspace manifest is enough for step 4.
 
 2. **Identify the Toolchain (language-agnostic)**:
    The agent that later runs the constraint commands needs the right tool versions and the right dependency manager. Detect these — do NOT assume a default. This is NOT node-specific; apply the same logic to whatever language(s) the repo uses.
@@ -36,30 +37,33 @@ export function getRepoConstraintsSystemPrompt(): string {
    - Lint commands (e.g., \`make lint\`, \`npm run lint\`, \`golangci-lint run\`)
    - Test commands (e.g., \`make test\`, \`npm run test\`, \`go test ./...\`)
    - Build / type-check commands (e.g., \`make build\`, \`tsc --noEmit\`)
-   - Any other quality gates documented as required before committing or pushing
+   - The labels are \`Toolchain\`, \`Install\`, \`Lint\`, \`Test\`, \`Build\` and \`Typecheck\`. Add another label only for a gate the repository's docs say must pass before committing or pushing.
 
 4. **Decide How Far Each Command Reaches**:
    These commands run on every review cycle, and the executor runs them after each batch of changes. A command that covers the whole repository is fine for a single package, and too slow in a large monorepo or multi-module repository, where a typical change touches one corner of it. Judge from what the repository actually has, not from the list below. Any layout counts, and the list is not exhaustive:
    - **Signs of a repository that is costly to cover whole**: several packages or modules with their own manifests (workspaces in \`package.json\` / \`pnpm-workspace.yaml\`, \`go.work\` or nested \`go.mod\`, a Cargo workspace, Gradle subprojects, a Bazel / Pants / Buck tree), or a monorepo task runner (turbo, nx, lerna, moon, rush).
+   - **Scope only when those signs are present.** Without them, record the whole-repository form and skip the rest of this step.
    - **When a narrower form exists, record it** with a placeholder that is filled in when the command runs:
      - \`${BASE_PLACEHOLDER}\` — the merge-base commit with the base branch. Prefer it whenever the tooling has its own change detection, because that tooling also follows the dependency graph to the packages that depend on what changed. For example \`pnpm --filter "...[${BASE_PLACEHOLDER}]" lint\`, \`turbo run test --filter=...[${BASE_PLACEHOLDER}]\`, \`nx affected -t lint --base=${BASE_PLACEHOLDER}\`, \`golangci-lint run --new-from-rev=${BASE_PLACEHOLDER} ./...\`.
      - \`${CHANGED_FILES_PLACEHOLDER}\` — the files the branch added or modified, shell-quoted and space-separated, relative to the repository root. Use it for a tool that takes a file list and checks each file on its own (a linter or formatter, e.g. \`pnpm exec eslint ${CHANGED_FILES_PLACEHOLDER}\`). The command is skipped when no file is in scope.
    - **Give every scoped command its whole-repository form** as \`(full: \`<command>\`)\` on the same line. It runs when the merge-base cannot be resolved.
    - **Keep the whole-repository form alone** when narrowing would hide what the command exists to catch. A file-list type checker or build misses the breakage a change causes in the files that depend on it. Keep it too when no narrower form is supported, or when the repository is small enough that a full run is already quick. A narrow command that misses regressions does more harm than a slow one.
    - Write the scoped form only from flags and filters the tool or task runner documents. If you cannot tell whether the repository's version supports one, keep the full form.
+   - When the task runner has no scoped form but the tool it wraps does, the scoped direct-tool command wins, with the task runner's command as its \`(full: …)\` form.
 
 5. **Probe the Invocation You Are About to Record** (REQUIRED — record only invocations you have seen resolve):
    Later phases run these commands through a plain non-interactive \`sh -c\` in the worktree: no login shell, no shell profile, no version-manager hook. A bare tool name that works in an interactive terminal can resolve there to a **different runtime than the repo pins** — a shim, a system-wide install — or to nothing at all. A command recorded from documentation alone is a guess, and a wrong one is expensive: the constraint verification phase reports every command as failing, and each later agent re-derives the working invocation from scratch.
    - For each distinct tool you plan to record (\`pnpm\`, \`go\`, \`make\`, \`uv\`, …), run **one cheap probe** of the exact invocation form: \`<invocation> --version\` (or \`go version\`, \`make --version\`, whatever that tool answers to). Batch the probes together — they take about a second each.
    - Compare what the probe reports against the version pins you found in step 2. A probe that succeeds but reports a version the pins contradict is a **failed** probe.
    - When a bare invocation fails or reports the wrong version, use the version manager's exec form for that tool and probe again — e.g. \`mise exec node@<pinned> -- pnpm\`, \`asdf exec\`, \`poetry run\`, \`bundle exec\`, \`nix develop -c\`. Record the form that passed, applied to **every** command that needs it, so \`Lint\` becomes \`mise exec node@22.22.0 -- pnpm --filter app lint\`.
-   - **Probe the tool, never the work.** \`pnpm --version\` and \`go version\` cost a second; \`pnpm install\`, \`make build\` and the test suite cost minutes and belong to later phases, which compare their failures against the merge-base before they count as anything. Do not run the lint / test / build / install commands themselves.
+   - **Probe the tool, never the work.** Probes are \`--version\`-style only. \`pnpm --version\` and \`go version\` cost a second; the toolchain and install commands (\`mise install\`, \`pyenv install\`, \`corepack enable\`, \`npm install\`, \`uv sync\`, … non-exhaustive), \`make build\` and the test suite cost minutes and belong to later phases, which compare their failures against the merge-base before they count as anything. Record those commands; never run them.
+   - A probe that is denied or fails counts as failed: move on to the exec form above, or to the fallback below. Do not retry the same probe.
    - If no invocation resolves, still record the repo's documented command and add nothing else — a wrong command that is honestly the repo's own is more useful than a fabricated prefix.
 
 6. **Update Workspace README**:
    - Read the workspace README at the path specified in the user prompt
    - Append the discovered constraints to the \`## Repository Constraints\` section
-   - Use the format specified in the user prompt for each repository
+   - Use the format in **Output Format** below
    - If no meaningful constraints are found, do NOT add anything
    - Preserve all existing content in the README
 
@@ -103,7 +107,7 @@ After that, run commands as separate Bash calls. Do NOT use \`git -C\`.
 ### Guidelines
 
 1. Only report constraints that are clearly documented or discoverable from the repository
-2. Prefer task runner commands (e.g., \`make lint\`) over direct tool invocation
+2. Prefer task runner commands (e.g., \`make lint\`) over direct tool invocation, except for a scoped direct-tool form step 4 chose
 3. Probe tool invocations (\`--version\`-style checks, per step 5) but never run the lint / test / build / install commands themselves
 4. Do NOT modify any files other than the workspace README
 `;
