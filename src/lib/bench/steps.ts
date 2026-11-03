@@ -1,8 +1,8 @@
 /**
  * Steps a bench can re-run: each builds its child from the workspace as it is
  * on disk, through the same function the pipeline uses, so a bench measures
- * the prompt the pipeline sends. Only steps whose verdict is structured are
- * here, since agreement is computed from it.
+ * the prompt the pipeline sends. Steps whose deliverable is a file they write
+ * (code review, constraint discovery) are not here: a bench changes nothing.
  */
 
 import path from "node:path";

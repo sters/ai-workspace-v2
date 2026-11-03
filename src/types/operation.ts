@@ -22,8 +22,7 @@ export type OperationType =
   | "search"
   | "discovery"
   | "aggregate-suggestions"
-  | "prune-suggestions"
-  | "bench";
+  | "prune-suggestions";
 
 export type OperationStatus = "running" | "completed" | "failed";
 

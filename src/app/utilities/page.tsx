@@ -46,12 +46,6 @@ const tools = [
       "Break down Claude spend by operation, phase, step, model and effort.",
   },
   {
-    href: "/utilities/bench",
-    name: "Bench",
-    description:
-      "Re-run one step under several model / effort pairings and compare cost and agreement.",
-  },
-  {
     href: "/utilities/aiw-settings",
     name: "AIW Settings",
     description:

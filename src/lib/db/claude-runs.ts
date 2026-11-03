@@ -77,16 +77,6 @@ export function listClaudeRuns(sinceIso: string): ClaudeRun[] {
   return stmts(getDb()).listSince.all(sinceIso) as ClaudeRun[];
 }
 
-export function listClaudeRunsForOperation(operationId: string): ClaudeRun[] {
-  return getDb()
-    .prepare(`SELECT id, operation_id AS operationId, operation_type AS operationType, workspace, phase_label AS phaseLabel,
-      child_label AS childLabel, step_type AS stepType, effort, model, cost_usd AS costUsd, duration_ms AS durationMs,
-      num_turns AS numTurns, input_tokens AS inputTokens, cache_creation_tokens AS cacheCreationTokens,
-      cache_read_tokens AS cacheReadTokens, output_tokens AS outputTokens, created_at AS createdAt
-      FROM claude_runs WHERE operation_id = ?`)
-    .all(operationId) as ClaudeRun[];
-}
-
 /** A chat whose cost is recorded when it exits; `baseline` is opaque JSON owned by the caller. */
 export interface PendingChatCost {
   cliSessionId: string;

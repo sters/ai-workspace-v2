@@ -290,6 +290,12 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 17,
+    up: (db) => {
+      db.exec("DROP TABLE IF EXISTS bench_runs");
+    },
+  },
 ];
 
 /**

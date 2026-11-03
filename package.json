@@ -15,7 +15,8 @@
     "test": "bun --bun vitest run",
     "test:watch": "bun --bun vitest",
     "next-server": "bun run bin/next-server.ts",
-    "chat-server": "bun run bin/chat-server.ts"
+    "chat-server": "bun run bin/chat-server.ts",
+    "bench": "bun --bun bin/bench.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
