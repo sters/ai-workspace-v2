@@ -49,7 +49,7 @@ describe("AppSidebar", () => {
 
     // Labels are gone, but the destinations remain as links with accessible names
     expect(screen.queryByText("New Workspace")).not.toBeInTheDocument();
-    expect(screen.queryByText("Quick (no AI)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Suggestions")).not.toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "New Workspace" }),
     ).toHaveAttribute("href", "/new");
@@ -97,7 +97,7 @@ describe("AppSidebar", () => {
       "/utilities/claude-usage",
     );
     // Only the hovered section opens
-    expect(screen.queryByText("Quick (no AI)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Suggestions")).not.toBeInTheDocument();
 
     await user.unhover(screen.getByRole("link", { name: "Utilities" }));
     expect(screen.queryByText("Claude Usage")).not.toBeInTheDocument();
@@ -114,7 +114,7 @@ describe("AppSidebar", () => {
     // The element that closes on mouse leave has to contain the sub-items,
     // or moving the pointer onto one of them dismisses the flyout.
     expect(icon.parentElement).toContainElement(
-      screen.getByRole("link", { name: "Quick (no AI)" }),
+      screen.getByRole("link", { name: "Suggestions" }),
     );
   });
 
@@ -128,10 +128,10 @@ describe("AppSidebar", () => {
     await user.tab();
     await user.tab();
     expect(screen.getByRole("link", { name: "New Workspace" })).toHaveFocus();
-    expect(screen.getByRole("link", { name: "Quick (no AI)" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Suggestions" })).toBeVisible();
 
     await user.tab();
-    expect(screen.getByRole("link", { name: "Quick (no AI)" })).toHaveFocus();
+    expect(screen.getByRole("link", { name: "Suggestions" })).toHaveFocus();
   });
 
   it("closes the flyout once focus leaves the section", async () => {
@@ -142,14 +142,13 @@ describe("AppSidebar", () => {
     await user.tab();
     await user.tab();
     await user.tab();
-    expect(screen.getByText("Quick (no AI)")).toBeInTheDocument();
+    expect(screen.getByText("Suggestions")).toBeInTheDocument();
 
-    // Past the flyout's own links, into Utilities
-    await user.tab();
+    // Past the flyout's own link, into Utilities
     await user.tab();
     await user.tab();
     expect(screen.getByRole("link", { name: "Utilities" })).toHaveFocus();
-    expect(screen.queryByText("Quick (no AI)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Suggestions")).not.toBeInTheDocument();
     expect(screen.getByText("Claude Usage")).toBeInTheDocument();
   });
 

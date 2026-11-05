@@ -3,12 +3,19 @@
 import { useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
 import { InitSplitButton } from "./init-split-button";
+import { useStartChat } from "./start-chat";
 import { StatusText } from "@/components/shared/feedback/status-text";
+import { Input } from "@/components/shared/forms";
 import { RepositoryPicker } from "@/components/shared/forms/repository-picker";
 import { SnippetPicker } from "@/components/shared/forms/snippet-picker";
 import { postJson } from "@/lib/api";
 import { SELECTED_REPOS_HEADING, withSelectedRepositories } from "@/lib/task-description";
 import type { OperationType } from "@/types/operation";
+
+/** Repository paths or PR URLs as typed: whitespace- or comma-separated. */
+function parseExtraRepositories(raw: string): string[] {
+  return raw.split(/[\s,]+/).filter(Boolean);
+}
 
 /** The routes answer a refusal with `{ error }`; anything else is shown as it came. */
 function refusalReason(raw: string): string {
@@ -31,13 +38,19 @@ export function NewWorkspaceForm({
   const { mutate } = useSWRConfig();
   const [description, setDescription] = useState(initialDescription);
   const [selected, setSelected] = useState<string[]>([]);
+  const [extra, setExtra] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState(false);
 
-  const composed = useMemo(
-    () => withSelectedRepositories(description, selected),
-    [description, selected],
+  const repositories = useMemo(
+    () => [...new Set([...selected, ...parseExtraRepositories(extra)])],
+    [selected, extra],
   );
+  const composed = useMemo(
+    () => withSelectedRepositories(description, repositories),
+    [description, repositories],
+  );
+  const chat = useStartChat({ note: description, repositories });
 
   const toggle = (repoPath: string) => {
     setSelected((prev) =>
@@ -66,6 +79,7 @@ export function NewWorkspaceForm({
     }
     setDescription("");
     setSelected([]);
+    setExtra("");
     setConfirmed(true);
     mutate((key) => typeof key === "string" && key.startsWith("/api/operations"), undefined, {
       revalidate: true,
@@ -94,22 +108,51 @@ export function NewWorkspaceForm({
           rows={6}
           autoFocus
         />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Start autonomous has Claude work out the task type, repositories and name, plan, and
+          carry the work through. Start chat only creates the workspace and a branch per
+          repository, keeps this text verbatim as the README&apos;s Initial Request, and hands it to
+          an interactive chat — or, for a PR review, starts the review. A PR URL among the
+          repositories checks out that PR&apos;s branch and may stand in for the text.
+        </p>
       </div>
 
       <div>
         <RepositoryPicker
           selected={selected}
           onToggle={toggle}
-          emptyHint="No repository has been cloned yet. Name one in the description and it will be cloned."
+          emptyHint="No repository has been cloned yet. Add one below and it will be cloned."
         />
-        <p className="mt-1 text-xs text-muted-foreground">
-          Optional. Ticked repositories are appended to the description under{" "}
-          <code className="font-mono">{SELECTED_REPOS_HEADING}</code>, which is where the run reads
-          them from — so a repository named in the description works just as well.
-        </p>
+
+        <div className="mt-2">
+          <label htmlFor="new-extra" className="mb-1 block text-xs font-medium">
+            Add repository
+          </label>
+          <Input
+            id="new-extra"
+            value={extra}
+            onChange={(e) => setExtra(e.target.value)}
+            placeholder="github.com/org/repo or https://github.com/org/repo/pull/123 — separate several with spaces"
+            className="w-full"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Not cloned yet, the same repository twice with a <code>:alias</code> suffix for a
+            second worktree, or a PR URL. Start autonomous appends these and the ticked ones to
+            the description under <code className="font-mono">{SELECTED_REPOS_HEADING}</code>, so
+            for it a repository named in the description works just as well; Start chat needs at
+            least one here.
+          </p>
+        </div>
       </div>
 
-      <InitSplitButton description={composed} start={start} />
+      {chat.options}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <InitSplitButton description={composed} start={start} />
+        {chat.button}
+      </div>
+
+      {chat.feedback}
 
       {error && <StatusText variant="error">Failed to start: {error}</StatusText>}
       {confirmed && <StatusText>Started — it is listed under Recent New Operations below.</StatusText>}

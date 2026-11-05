@@ -9,7 +9,8 @@ vi.mock("@/hooks/use-repositories", () => ({
   useRepositories: () => mockUseRepositories(),
 }));
 
-vi.mock("@/lib/api", () => ({
+vi.mock("@/lib/api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/api")>()),
   postJson: (...a: unknown[]) => mockPostJson(...a),
 }));
 
@@ -22,7 +23,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
-import { QuickCreateForm } from "@/components/operation/quick-create-form";
+import { NewWorkspaceForm } from "@/components/operation/new-workspace-form";
 import { peekChatHandoff } from "@/lib/chat-handoff";
 
 function setRepositories(repos: { repoPath: string; repoName: string; baseBranch: string }[]) {
@@ -53,11 +54,11 @@ function ok(overrides: Record<string, unknown> = {}) {
 }
 
 function fillName(value: string) {
-  fireEvent.change(screen.getByLabelText(/name/i), { target: { value } });
+  fireEvent.change(screen.getByLabelText(/^name/i), { target: { value } });
 }
 
 function fillNote(value: string) {
-  fireEvent.change(screen.getByLabelText(/what you want to do/i), { target: { value } });
+  fireEvent.change(screen.getByLabelText(/task description/i), { target: { value } });
 }
 
 const PR_URL = "https://github.com/acme/web/pull/42";
@@ -87,9 +88,9 @@ beforeEach(() => {
   setRepositories([WEB, API]);
 });
 
-describe("QuickCreateForm", () => {
+describe("NewWorkspaceForm: Start chat", () => {
   it("previews the directory and branch the name will produce", () => {
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     expect(screen.queryByText(/^feature\//)).not.toBeInTheDocument();
 
     fillName("Login Crash");
@@ -100,7 +101,7 @@ describe("QuickCreateForm", () => {
   });
 
   it("warns when the name has nothing ASCII to slug", () => {
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillName("ログイン時のクラッシュ");
 
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -109,13 +110,13 @@ describe("QuickCreateForm", () => {
   });
 
   it("does not warn about a name that asked for `workspace`", () => {
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillName("workspace tidy up");
     expect(screen.queryByText(/nothing that survives/i)).not.toBeInTheDocument();
   });
 
   it("follows the task type into the preview", () => {
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillName("retry");
     fireEvent.change(screen.getByLabelText(/task type/i), { target: { value: "bugfix" } });
 
@@ -124,8 +125,8 @@ describe("QuickCreateForm", () => {
   });
 
   it("needs something to name the workspace and a repository before it can create", () => {
-    render(<QuickCreateForm />);
-    const button = screen.getByRole("button", { name: /create workspace/i });
+    render(<NewWorkspaceForm />);
+    const button = screen.getByRole("button", { name: /start chat/i });
     expect(button).toBeDisabled();
 
     fillName("login crash");
@@ -136,9 +137,9 @@ describe("QuickCreateForm", () => {
   });
 
   it("takes the note alone, so the name does not have to be typed twice", () => {
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-    const button = screen.getByRole("button", { name: /create workspace/i });
+    const button = screen.getByRole("button", { name: /start chat/i });
     expect(button).toBeDisabled();
 
     fillNote("Fix the login crash\nthe refresh path 500s");
@@ -150,22 +151,22 @@ describe("QuickCreateForm", () => {
   });
 
   it("lets a typed name override the note for the preview", () => {
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillNote("Fix the login crash");
     fillName("token refresh");
 
     const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
     expect(screen.getByText(`feature-token-refresh-${stamp}`)).toBeInTheDocument();
-    expect(screen.queryByText(/named from the note/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/named from the description/i)).not.toBeInTheDocument();
   });
 
   it("posts the ticked repositories with the name, type and note", async () => {
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillName("login crash");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
     fireEvent.change(screen.getByLabelText(/task type/i), { target: { value: "bugfix" } });
     fillNote("crash on submit");
-    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
 
     await waitFor(() => expect(mockPostJson).toHaveBeenCalled());
     expect(mockPostJson).toHaveBeenCalledWith("/api/workspaces", {
@@ -176,13 +177,23 @@ describe("QuickCreateForm", () => {
     });
   });
 
+  it("hands the chat the description as typed, not the run's repository list", async () => {
+    render(<NewWorkspaceForm />);
+    fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+    fillNote("crash on submit");
+    fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
+
+    await waitFor(() => expect(mockPostJson).toHaveBeenCalled());
+    expect(mockPostJson.mock.calls[0][1].note).toBe("crash on submit");
+  });
+
   it("adds a repository that is not cloned yet from the free-text field", async () => {
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillName("n");
     fireEvent.change(screen.getByLabelText(/add repository/i), {
       target: { value: " github.com/acme/infra  github.com/acme/tools " },
     });
-    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
 
     await waitFor(() => expect(mockPostJson).toHaveBeenCalled());
     expect(mockPostJson.mock.calls[0][1].repositories).toEqual([
@@ -192,11 +203,11 @@ describe("QuickCreateForm", () => {
   });
 
   it("follows the server into the chat it started on the note", async () => {
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
     fillNote("fix the login crash\nthe refresh path 500s");
-    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
 
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith("/workspace/bugfix-login-crash-20260911/chat/interactive"),
@@ -208,10 +219,10 @@ describe("QuickCreateForm", () => {
 
   it("opens the chat when nothing was started, as when only a name was given", async () => {
     mockPostJson.mockResolvedValue(ok({ start: { kind: "none" } }));
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
 
     await waitFor(() =>
       expect(mockPush).toHaveBeenCalledWith(
@@ -224,10 +235,10 @@ describe("QuickCreateForm", () => {
   it("does not pull the user back once they have left the form", async () => {
     let settle: (value: unknown) => void = () => {};
     mockPostJson.mockReturnValue(new Promise((resolve) => (settle = resolve)));
-    const { unmount } = render(<QuickCreateForm />);
+    const { unmount } = render(<NewWorkspaceForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
 
     unmount();
     settle(ok());
@@ -240,11 +251,11 @@ describe("QuickCreateForm", () => {
     mockPostJson.mockResolvedValue(
       ok({ start: { kind: "failed", what: "chat", error: "Chat server unreachable" } }),
     );
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
     fillNote("fix the login crash");
-    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
 
     await waitFor(() => expect(screen.getByText(/chat server unreachable/i)).toBeInTheDocument());
     expect(mockPush).not.toHaveBeenCalled();
@@ -259,11 +270,11 @@ describe("QuickCreateForm", () => {
         start: { kind: "none" },
       }),
     );
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
     fillNote("fix the login crash");
-    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
 
     await waitFor(() => expect(screen.getByText(/no such remote/)).toBeInTheDocument());
     expect(mockPush).not.toHaveBeenCalled();
@@ -281,10 +292,10 @@ describe("QuickCreateForm", () => {
 
   it("reports a rejected request without claiming a workspace exists", async () => {
     mockPostJson.mockResolvedValue({ ok: false, error: "name is required" });
-    render(<QuickCreateForm />);
+    render(<NewWorkspaceForm />);
     fillName("n");
     fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-    fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+    fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
 
     await waitFor(() => expect(screen.getByText(/name is required/)).toBeInTheDocument());
     expect(mockPush).not.toHaveBeenCalled();
@@ -292,10 +303,10 @@ describe("QuickCreateForm", () => {
 
   describe("a second click never creates a second workspace", () => {
     function ready() {
-      render(<QuickCreateForm />);
+      render(<NewWorkspaceForm />);
       fillName("login crash");
       fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-      return screen.getByRole("button", { name: /create workspace/i });
+      return screen.getByRole("button", { name: /start chat/i });
     }
 
     it("says it is creating while the request is in flight", async () => {
@@ -365,8 +376,8 @@ describe("QuickCreateForm", () => {
 
   describe("a PR URL as a repository", () => {
     it("needs no name or note, since the workspace is named from the PR's title", () => {
-      render(<QuickCreateForm />);
-      const button = screen.getByRole("button", { name: /create workspace/i });
+      render(<NewWorkspaceForm />);
+      const button = screen.getByRole("button", { name: /start chat/i });
       expect(button).toBeDisabled();
 
       addRepository(PR_URL);
@@ -377,10 +388,10 @@ describe("QuickCreateForm", () => {
 
     it("follows the server into the review it started", async () => {
       mockPostJson.mockResolvedValue(okWithPr());
-      render(<QuickCreateForm />);
+      render(<NewWorkspaceForm />);
       addRepository(PR_URL);
       chooseType("review");
-      fireEvent.click(screen.getByRole("button", { name: /create workspace and review/i }));
+      fireEvent.click(screen.getByRole("button", { name: /start review/i }));
 
       await waitFor(() =>
         expect(mockPush).toHaveBeenCalledWith(
@@ -394,10 +405,10 @@ describe("QuickCreateForm", () => {
       mockPostJson.mockResolvedValue(
         okWithPr({ kind: "failed", what: "review", error: "Too many concurrent operations" }),
       );
-      render(<QuickCreateForm />);
+      render(<NewWorkspaceForm />);
       addRepository(PR_URL);
       chooseType("review");
-      const button = screen.getByRole("button", { name: /create workspace and review/i });
+      const button = screen.getByRole("button", { name: /start review/i });
       fireEvent.click(button);
 
       await waitFor(() =>
@@ -428,7 +439,7 @@ describe("QuickCreateForm", () => {
     it("keeps the button disabled and shows how far it has got", () => {
       setRepositories([WEB]);
       mockUseQuickCreates.mockReturnValue({ quickCreates: [RUNNING] });
-      render(<QuickCreateForm />);
+      render(<NewWorkspaceForm />);
       fillName("another one");
       fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
 
@@ -439,12 +450,12 @@ describe("QuickCreateForm", () => {
     it("offers the way into its chat once it finishes, without following it there unasked", () => {
       setRepositories([WEB]);
       mockUseQuickCreates.mockReturnValue({ quickCreates: [RUNNING] });
-      const { rerender } = render(<QuickCreateForm />);
+      const { rerender } = render(<NewWorkspaceForm />);
 
       mockUseQuickCreates.mockReturnValue({
         quickCreates: [{ ...RUNNING, state: "done", start: { kind: "chat", sessionId: "chat-1" } }],
       });
-      rerender(<QuickCreateForm />);
+      rerender(<NewWorkspaceForm />);
 
       expect(screen.getByRole("link", { name: /open its chat/i })).toHaveAttribute(
         "href",
@@ -457,19 +468,19 @@ describe("QuickCreateForm", () => {
       setRepositories([WEB]);
       let settle: (value: unknown) => void = () => {};
       mockPostJson.mockReturnValue(new Promise((resolve) => (settle = resolve)));
-      const { rerender } = render(<QuickCreateForm />);
+      const { rerender } = render(<NewWorkspaceForm />);
       fillName("login crash");
       fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-      fireEvent.click(screen.getByRole("button", { name: /create workspace/i }));
+      fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
 
       mockUseQuickCreates.mockReturnValue({ quickCreates: [RUNNING] });
-      rerender(<QuickCreateForm />);
+      rerender(<NewWorkspaceForm />);
       settle({ ok: false, error: "Error: disk full" });
       await waitFor(() => expect(screen.getByText(/disk full/)).toBeInTheDocument());
       mockUseQuickCreates.mockReturnValue({
         quickCreates: [{ ...RUNNING, state: "failed", error: "Error: disk full" }],
       });
-      rerender(<QuickCreateForm />);
+      rerender(<NewWorkspaceForm />);
 
       expect(screen.getAllByText(/disk full/)).toHaveLength(1);
     });
@@ -479,7 +490,7 @@ describe("QuickCreateForm", () => {
       mockUseQuickCreates.mockReturnValue({
         quickCreates: [{ ...RUNNING, state: "done", start: { kind: "chat", sessionId: "chat-1" } }],
       });
-      render(<QuickCreateForm />);
+      render(<NewWorkspaceForm />);
 
       expect(screen.queryByRole("link", { name: /open its chat/i })).toBeNull();
       expect(screen.queryByText(/fetching latest/)).toBeNull();

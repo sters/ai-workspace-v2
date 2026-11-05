@@ -4,8 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/shared/buttons";
-import { Input, Textarea } from "@/components/shared/forms";
-import { RepositoryPicker } from "@/components/shared/forms/repository-picker";
+import { Input } from "@/components/shared/forms";
 import { Spinner } from "@/components/shared/feedback";
 import { postJson } from "@/lib/api";
 import { chatPagePath, stashChatHandoff } from "@/lib/chat-handoff";
@@ -35,11 +34,6 @@ interface QuickCreateResponse {
   start: QuickCreateStart;
 }
 
-/** Repository paths or PR URLs as typed: whitespace- or comma-separated. */
-function parseExtraRepositories(raw: string): string[] {
-  return raw.split(/[\s,]+/).filter(Boolean);
-}
-
 /**
  * Hand the note to the chat as its task, for the chat started by hand when the
  * server's start did not happen. It travels as a chat handoff rather than in
@@ -56,14 +50,17 @@ function operationHref(workspace: string, operationId: string): string {
   return `/workspace/${encodeURIComponent(workspace)}/operations?${new URLSearchParams({ operationId })}`;
 }
 
-export function QuickCreateForm() {
+/**
+ * Quick-creates a workspace from `note` and `repositories` — no README
+ * analysis, no planning — and opens a chat on the note, or a review when the
+ * task is a PR review. The caller owns the request; this owns the naming
+ * options, the button and what the create reports.
+ */
+export function useStartChat({ note, repositories: chosen }: { note: string; repositories: string[] }) {
   const router = useRouter();
 
   const [name, setName] = useState("");
   const [taskType, setTaskType] = useState<(typeof TASK_TYPES)[number]>("feature");
-  const [selected, setSelected] = useState<string[]>([]);
-  const [extra, setExtra] = useState("");
-  const [note, setNote] = useState("");
   /**
    * A workspace whose repositories did not all set up, or whose chat or review
    * did not start, with the note as it read when it was sent: the textarea
@@ -125,11 +122,6 @@ export function QuickCreateForm() {
       ? quickCreates.find((q) => q.state !== "running" && watched.includes(q.id))
       : undefined;
 
-  const chosen = useMemo(
-    () => [...new Set([...selected, ...parseExtraRepositories(extra)])],
-    [selected, extra],
-  );
-
   /** What the workspace ends up called: the typed name, or the note's first line. */
   const effectiveName = useMemo(() => quickWorkspaceName(name, note), [name, note]);
   const hasPr = useMemo(() => chosen.some((repo) => parsePrUrl(repo) !== null), [chosen]);
@@ -160,12 +152,6 @@ export function QuickCreateForm() {
         sanitizeSlug(effectiveName) === "workspace" && !/workspace/i.test(effectiveName),
     };
   }, [effectiveName, name, taskType]);
-
-  const toggle = (repoPath: string) => {
-    setSelected((prev) =>
-      prev.includes(repoPath) ? prev.filter((p) => p !== repoPath) : [...prev, repoPath],
-    );
-  };
 
   const create = async () => {
     setFailure(null);
@@ -215,201 +201,167 @@ export function QuickCreateForm() {
     );
   };
 
-  return (
-    <div className="w-full space-y-4">
-      <div>
-        <label htmlFor="quick-note" className="mb-1 block text-xs font-medium">
-          What you want to do
-        </label>
-        <Textarea
-          id="quick-note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="e.g. Fix the login crash on token expiry — the refresh path 500s instead of retrying."
-          rows={4}
-          autoFocus
-        />
-        <p className="mt-1 text-xs text-muted-foreground">
-          Kept verbatim in the README&apos;s Initial Request, and handed to the chat this opens as
-          its request, which starts on it straight away. Optional when a PR URL is among the
-          repositories: its title and description are recorded instead.
-        </p>
-      </div>
-
-      <div>
-        <label htmlFor="quick-name" className="mb-1 block text-xs font-medium">
-          Name (optional)
-        </label>
-        <Input
-          id="quick-name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. login-crash — leave blank to use the note's first line"
-          className="w-full"
-        />
-        <p className="mt-1 text-xs text-muted-foreground">
-          Becomes the README title verbatim. Its ASCII slug names the workspace directory and
-          every branch. Leave it blank and the first line of the note below is used.
-        </p>
-        {namedFromPr && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            Named from the PR&apos;s title, which is read when the workspace is created.
-          </p>
-        )}
-        {preview && (
-          <div className="mt-1 space-y-0.5 text-xs">
-            {preview.derived && (
-              <p className="text-muted-foreground">
-                Named from the note: <code className="font-mono">{preview.title}</code>
-              </p>
-            )}
-            <p className="text-muted-foreground">
-              Workspace <code className="font-mono">{preview.workspace}</code>
-              {" · "}branch <code className="font-mono">{preview.branch}</code>
+  return {
+    options: (
+      <details className="rounded-md border px-2 py-1.5">
+        <summary className="cursor-pointer text-xs font-medium">Start chat options</summary>
+        <div className="mt-2 space-y-4">
+          <div>
+            <label htmlFor="quick-name" className="mb-1 block text-xs font-medium">
+              Name (optional)
+            </label>
+            <Input
+              id="quick-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. login-crash — leave blank to use the description's first line"
+              className="w-full"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Becomes the README title verbatim. Its ASCII slug names the workspace directory and
+              every branch. Leave it blank and the first line of the description is used.
             </p>
-            {hasPr && (
-              <p className="text-muted-foreground">
-                A PR&apos;s worktree checks out the PR&apos;s own branch instead.
+            {namedFromPr && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Named from the PR&apos;s title, which is read when the workspace is created.
               </p>
             )}
-            {preview.collapsed && (
-              <p className="text-amber-700 dark:text-amber-400">
-                The name has nothing that survives slugging, so the directory and branch fall
-                back to <code className="font-mono">workspace</code>. Add an ASCII name to make
-                the branch say what it is.
+            {preview && (
+              <div className="mt-1 space-y-0.5 text-xs">
+                {preview.derived && (
+                  <p className="text-muted-foreground">
+                    Named from the description: <code className="font-mono">{preview.title}</code>
+                  </p>
+                )}
+                <p className="text-muted-foreground">
+                  Workspace <code className="font-mono">{preview.workspace}</code>
+                  {" · "}branch <code className="font-mono">{preview.branch}</code>
+                </p>
+                {hasPr && (
+                  <p className="text-muted-foreground">
+                    A PR&apos;s worktree checks out the PR&apos;s own branch instead.
+                  </p>
+                )}
+                {preview.collapsed && (
+                  <p className="text-amber-700 dark:text-amber-400">
+                    The name has nothing that survives slugging, so the directory and branch fall
+                    back to <code className="font-mono">workspace</code>. Add an ASCII name to make
+                    the branch say what it is.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="quick-task-type" className="mb-1 block text-xs font-medium">
+              Task type
+            </label>
+            <select
+              id="quick-task-type"
+              value={taskType}
+              onChange={(e) => setTaskType(e.target.value as (typeof TASK_TYPES)[number])}
+              className="rounded-md border bg-background px-2 py-1.5 text-sm"
+            >
+              {TASK_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+            </select>
+            {taskType === "review" && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {hasPr
+                  ? "Starts a review of the PR once the workspace exists, instead of a chat."
+                  : "Add a PR URL below to have it reviewed on creation; without one this opens a chat."}
               </p>
             )}
           </div>
-        )}
-      </div>
-
-      <div>
-        <label htmlFor="quick-task-type" className="mb-1 block text-xs font-medium">
-          Task type
-        </label>
-        <select
-          id="quick-task-type"
-          value={taskType}
-          onChange={(e) => setTaskType(e.target.value as (typeof TASK_TYPES)[number])}
-          className="rounded-md border bg-background px-2 py-1.5 text-sm"
-        >
-          {TASK_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-        {taskType === "review" && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {hasPr
-              ? "Starts a review of the PR once the workspace exists, instead of a chat."
-              : "Add a PR URL below to have it reviewed on creation; without one this opens a chat."}
-          </p>
-        )}
-      </div>
-
-      <div>
-        <RepositoryPicker
-          selected={selected}
-          onToggle={toggle}
-          emptyHint="No repository has been cloned yet. Type a path below and it will be cloned."
-        />
-
-        <div className="mt-2">
-          <label htmlFor="quick-extra" className="mb-1 block text-xs font-medium">
-            Add repository
-          </label>
-          <Input
-            id="quick-extra"
-            value={extra}
-            onChange={(e) => setExtra(e.target.value)}
-            placeholder="github.com/org/repo or https://github.com/org/repo/pull/123 — separate several with spaces"
-            className="w-full"
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Not cloned yet, the same repository twice with a <code>:alias</code> suffix for a
-            second worktree, or a PR URL to check out that PR&apos;s branch.
-          </p>
         </div>
-      </div>
-
-      <Button
-        onClick={create}
-        disabled={
-          (!effectiveName && !hasPr) || chosen.length === 0 || status !== "idle" || running !== undefined
-        }
-      >
-        {status === "creating" || running ? (
-          <>
-            <Spinner />
-            Creating workspace…
-          </>
-        ) : reviewsOnCreate ? (
-          "Create workspace and review"
-        ) : (
-          "Create workspace"
-        )}
-      </Button>
-
-      {running && <QuickCreateLog progress={running} />}
-
-      {finished && <FinishedQuickCreate progress={finished} />}
-
-      {failure && (
-        <div
-          role="alert"
-          className="rounded-md bg-red-50 p-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200"
+      </details>
+    ),
+    button: (
+        <Button
+          variant="secondary"
+          onClick={create}
+          disabled={
+            (!effectiveName && !hasPr) || chosen.length === 0 || status !== "idle" || running !== undefined
+          }
         >
-          {failure}
-        </div>
-      )}
-
-      {created && (
-        <div
-          role="alert"
-          className="space-y-2 rounded-md bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-        >
-          {created.response.start.kind === "failed" ? (
-            <p>
-              Workspace <code className="font-mono">{created.response.workspace}</code> was created,
-              but its {created.response.start.what} could not start: {created.response.start.error}
-            </p>
-          ) : (
+          {status === "creating" || running ? (
             <>
-              <p>
-                Workspace <code className="font-mono">{created.response.workspace}</code> was
-                created, but {created.response.problems.length} repositor
-                {created.response.problems.length === 1 ? "y" : "ies"} could not be set up. Only
-                the worktrees that exist are declared in its README.
-              </p>
-              <ul className="space-y-1">
-                {created.response.problems.map((problem) => (
-                  <li key={problem.repository} className="font-mono text-xs">
-                    {problem.repository}: {problem.error}
-                  </li>
-                ))}
-              </ul>
+              <Spinner />
+              Creating workspace…
             </>
+          ) : reviewsOnCreate ? (
+            "Start review"
+          ) : (
+            "Start chat"
           )}
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <Link
-              href={chatPagePath(created.response.workspace)}
-              onClick={() => handOverToChat(created.response.workspace, created.task)}
-              className="font-medium underline"
-            >
-              Start a chat on it anyway
-            </Link>
-            <Link
-              href={`/workspace/${encodeURIComponent(created.response.workspace)}`}
-              className="underline"
-            >
-              Open the workspace
-            </Link>
+        </Button>
+    ),
+    feedback: (
+      <>
+        {running && <QuickCreateLog progress={running} />}
+
+        {finished && <FinishedQuickCreate progress={finished} />}
+
+        {failure && (
+          <div
+            role="alert"
+            className="rounded-md bg-red-50 p-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200"
+          >
+            {failure}
           </div>
-        </div>
-      )}
-    </div>
-  );
+        )}
+
+        {created && (
+          <div
+            role="alert"
+            className="space-y-2 rounded-md bg-amber-50 p-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+          >
+            {created.response.start.kind === "failed" ? (
+              <p>
+                Workspace <code className="font-mono">{created.response.workspace}</code> was created,
+                but its {created.response.start.what} could not start: {created.response.start.error}
+              </p>
+            ) : (
+              <>
+                <p>
+                  Workspace <code className="font-mono">{created.response.workspace}</code> was
+                  created, but {created.response.problems.length} repositor
+                  {created.response.problems.length === 1 ? "y" : "ies"} could not be set up. Only
+                  the worktrees that exist are declared in its README.
+                </p>
+                <ul className="space-y-1">
+                  {created.response.problems.map((problem) => (
+                    <li key={problem.repository} className="font-mono text-xs">
+                      {problem.repository}: {problem.error}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <Link
+                href={chatPagePath(created.response.workspace)}
+                onClick={() => handOverToChat(created.response.workspace, created.task)}
+                className="font-medium underline"
+              >
+                Start a chat on it anyway
+              </Link>
+              <Link
+                href={`/workspace/${encodeURIComponent(created.response.workspace)}`}
+                className="underline"
+              >
+                Open the workspace
+              </Link>
+            </div>
+          </div>
+        )}
+      </>
+    ),
+  };
 }
 
 /** The tail of a running create's setup output: git is the slow part, and it says where it is. */

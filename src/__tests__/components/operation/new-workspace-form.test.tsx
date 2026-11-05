@@ -8,6 +8,14 @@ vi.mock("@/hooks/use-repositories", () => ({
   useRepositories: () => mockUseRepositories(),
 }));
 
+vi.mock("@/hooks/use-quick-creates", () => ({
+  useQuickCreates: () => ({ quickCreates: [] }),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 import { NewWorkspaceForm } from "@/components/operation/new-workspace-form";
 
 const WEB = { repoPath: "github.com/acme/web", repoName: "web", baseBranch: "main" };
@@ -54,6 +62,21 @@ describe("NewWorkspaceForm", () => {
         "Add retry logic to the payment path\n\n## Selected Repos\n- github.com/acme/api\n- github.com/acme/web",
       startWith: "init",
     });
+  });
+
+  it("lists the typed repositories with the ticked ones", async () => {
+    render(<NewWorkspaceForm />);
+    describeTask("Add retry logic");
+    fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
+    fireEvent.change(screen.getByLabelText(/add repository/i), {
+      target: { value: "github.com/acme/infra github.com/acme/web" },
+    });
+    submit();
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(sentBody().description).toBe(
+      "Add retry logic\n\n## Selected Repos\n- github.com/acme/web\n- github.com/acme/infra",
+    );
   });
 
   it("sends the description untouched when nothing is ticked", async () => {

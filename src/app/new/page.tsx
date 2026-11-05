@@ -13,7 +13,7 @@ function NewWorkspacePageContent() {
     <div>
       <PageHeader
         title="New Workspace"
-        description="Describe the task, ticket, or feature. Claude will determine the task type, repositories, and workspace name automatically."
+        description="Describe the task, ticket, or feature. Start autonomous plans and carries it through; Start chat just creates the workspace and opens an interactive chat on it."
       />
 
       <NewWorkspaceForm initialDescription={searchParams.get("description") ?? ""} />

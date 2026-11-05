@@ -55,7 +55,6 @@ const NAV_SECTIONS: NavSection[] = [
     icon: FolderPlus,
     match: ["/suggestions"],
     children: [
-      { label: "Quick (no AI)", href: "/new/quick" },
       { label: "Suggestions", href: "/suggestions" },
     ],
   },
