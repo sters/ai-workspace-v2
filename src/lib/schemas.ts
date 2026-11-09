@@ -1,6 +1,7 @@
 import z from "zod";
 import { parsePrUrl } from "./github-pr-url";
 import { quickWorkspaceName } from "./naming";
+import { verificationStepDraftSchema } from "./runtime-schemas";
 
 /** Interaction level enum — shared between client and server. */
 export const interactionLevelEnum = z.enum(["low", "mid", "high"]);
@@ -319,3 +320,26 @@ export const chatStartPromptUpdateSchema = chatStartPromptCreateSchema.extend({
 export const chatStartPromptDeleteSchema = z.object({
   id: z.coerce.number().int().positive("id is required"),
 });
+
+/** Draft verification scenarios, or (with `scenarioId`) rewrite the rest of one. */
+export const planVerificationSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  scenarioId: z.string().optional(),
+  instruction: z.string().optional(),
+});
+
+/** An action on one verification scenario from the Verify tab. */
+export const verificationActionSchema = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("run") }),
+  z.object({ action: z.literal("abort") }),
+  z.object({
+    action: z.literal("answer"),
+    stepId: z.string().min(1),
+    verdict: z.enum(["ok", "ng"]),
+    note: z.string().optional(),
+    values: z.record(z.string(), z.string()).optional(),
+  }),
+  z.object({ action: z.literal("rerun"), stepId: z.string().min(1) }),
+  z.object({ action: z.literal("skip"), stepId: z.string().min(1) }),
+  z.object({ action: z.literal("edit"), steps: z.array(verificationStepDraftSchema) }),
+]);

@@ -50,6 +50,7 @@ import {
   getPrCommentValidatorSystemPrompt,
   getFindingGrounderSystemPrompt,
   getConflictResolverSystemPrompt,
+  getVerificationPlannerSystemPrompt,
 } from "@/lib/templates/prompts";
 
 const SYSTEM_PROMPTS: Record<string, () => string> = {
@@ -80,6 +81,7 @@ const SYSTEM_PROMPTS: Record<string, () => string> = {
   "pr-comment-validator.md": getPrCommentValidatorSystemPrompt,
   "finding-grounder.md": getFindingGrounderSystemPrompt,
   "conflict-resolver.md": getConflictResolverSystemPrompt,
+  "verification-planner.md": getVerificationPlannerSystemPrompt,
   "create-todo-planner.md": getCreateTodoPlannerSystemPrompt,
   "workspace-suggester.md": getWorkspaceSuggesterSystemPrompt,
   "chat.md": getChatSystemPrompt,

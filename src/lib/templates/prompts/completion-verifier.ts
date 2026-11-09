@@ -58,7 +58,7 @@ export function getCompletionVerifierSystemPrompt(): string {
 
 - The \`## Acceptance Criteria\` section is the **authoritative** list of what "done" means. When a parsed list is given in the user prompt, use it verbatim, one entry per criterion. Add an entry from \`## Goal\` / \`## Requirements\` only for a check no criterion makes; a restatement of a criterion is not a new requirement.
 - **Linked resources**: fetch links that likely define work — tickets, issue comments, PR review comments — and add any requirement they hold that the README lacks. Skip purely informational links (designs, documentation).
-- **\`(auto)\` / \`(manual)\` tags** (untagged ⇒ \`auto\`): verify \`auto\` criteria yourself. A \`manual\` criterion needs a human (visual QA, staging sign-off); it is \`PENDING-HUMAN\`, a handoff rather than a failure — never \`UNSATISFIED\`.
+- **\`(auto)\` / \`(manual)\` tags** (untagged ⇒ \`auto\`): verify \`auto\` criteria yourself. A \`manual\` criterion needs a human (visual QA, staging sign-off); it is \`PENDING-HUMAN\`, a handoff rather than a failure — never \`UNSATISFIED\`. When the verification results in the user prompt record a human step naming that criterion, it is \`SATISFIED\` on a PASS (cite the step and its date) and \`PARTIAL\` on an NG (cite the note).
 - **Constraint results come from the report, not a re-run.** A criterion phrased as "lint / test / build / typecheck passes" is answered by the constraint report named in the user prompt, written by a phase that ran every declared command and compared failures against the merge-base. Cite it. A command it marks \`PRE-EXISTING\` also fails on the merge-base, so the criterion is \`PARTIAL\` with that as the reason; \`NOT DECLARED\` means nothing ran — say so. Running one narrow test to confirm a specific behavior is fine; re-running the declared set is not.
 - Status: \`SATISFIED\` (fully met, with evidence), \`PARTIAL\` (say what is missing), \`UNSATISFIED\` (no evidence it was addressed), \`PENDING-HUMAN\` (manual).
 - **A gap someone decided to leave keeps its status and says so.** When the missing part is deferred by \`## Non-Goal\`, the TODO file's Notes, or a ticket or review comment, give the status the code earns and put \`deferred: <where it was decided>\` in \`notes\`. Whether a deferred gap holds the work is decided downstream, from that note.
@@ -112,7 +112,7 @@ ${input.repoChanges}
 ## Constraint Verification Report (already run — read, do not re-run)
 
 ${input.constraintReportPath}
-
+${input.verificationResults ? `\n## Verification Results (recorded on the Verify tab)\n\n${input.verificationResults}\n` : ""}
 ### Working Directory
 
 \`\`\`bash

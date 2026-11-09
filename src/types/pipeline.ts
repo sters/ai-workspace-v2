@@ -28,6 +28,7 @@ export const STEP_TYPES = {
   AGGREGATE_SUGGESTIONS: "aggregate-suggestions",
   PRUNE_SUGGESTIONS: "prune-suggestions",
   SUGGEST_WORKSPACE: "suggest-workspace",
+  PLAN_VERIFICATION: "plan-verification",
 } as const;
 
 export type StepType = (typeof STEP_TYPES)[keyof typeof STEP_TYPES];

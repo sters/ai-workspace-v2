@@ -143,7 +143,7 @@ ${worktreeCdRules({
 - For new PRs: use draft mode unless Draft is explicitly false
 - For existing PRs: never change the draft/ready state — leave it as the user set it
 - Follow repository's PR template exactly if one exists
-- With no PR Template, the body is \`## Summary\` + \`## Related Resources\` and nothing else
+- With no PR Template, the body is \`## Summary\` + \`## Related Resources\` and nothing else — plus \`## Verification\` when the user prompt has Verification Results
 - A title given in \`## PR Title\` is used verbatim; otherwise compose one (under 70 characters) describing this PR's diff, not the task; either way the shape is \`[<ticket>] <title>\`, or \`<title>\` with no ticket
 - Cover the whole branch, not just the latest commit — as one description of the result, never a per-commit list
 - Always include full ticket URLs (not just IDs)
@@ -231,7 +231,12 @@ ${input.repoChanges}
 ${existingPRSection}
 ${titleSection}
 ${prTemplateSection}
-${reviewThreadsSection}
+${reviewThreadsSection}${input.verificationResults ? `## Verification Results
+
+What was checked in the running software, step by step. Where the template has a testing or verification section, fill it from these; with no template, add a short \`## Verification\` section listing what passed. Leave out step ids, dates and anything marked SKIPPED.
+
+${input.verificationResults}
+` : ""}
 ### Working Directory
 
 \`\`\`bash

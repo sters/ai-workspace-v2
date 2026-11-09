@@ -24,6 +24,7 @@ const BASE_TABS = [
   { label: "Research", segment: "research", href: "research", taskType: "research" },
   { label: "Artifacts", segment: "artifacts", href: "artifacts" },
   { label: "Changes", segment: "changes", href: "changes" },
+  { label: "Verify", segment: "verify", href: "verify" },
   { label: "History", segment: "history", href: "history" },
   { label: "Operations", segment: "operations", href: "operations" },
   { label: "Chat", segment: "chat", href: "chat/interactive" },

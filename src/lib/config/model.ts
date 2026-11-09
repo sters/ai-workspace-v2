@@ -62,6 +62,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   // Its verdict reaches someone else's PR with nobody reading it first.
   [STEP_TYPES.GROUND_FINDING]: "opus",
   [STEP_TYPES.REVIEW_TODOS]: "opus",
+  [STEP_TYPES.PLAN_VERIFICATION]: "opus",
 
   [STEP_TYPES.AUTONOMOUS_GATE]: CLAUDE_MODELS.SONNET_5_5,
 
@@ -108,6 +109,7 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   [STEP_TYPES.SUGGEST_WORKSPACE]: "medium",
   [STEP_TYPES.GROUND_FINDING]: "medium",
   [STEP_TYPES.REVIEW_TODOS]: "medium",
+  [STEP_TYPES.PLAN_VERIFICATION]: "medium",
 
   // Each checks an enumerated list or one stated claim against the code. A
   // `NOT LANDED` from verify-fixes is a hard loop reason for the gate.

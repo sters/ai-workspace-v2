@@ -17,6 +17,7 @@ import {
 import { getWorkspaceDir } from "@/lib/config";
 import { buildPRCreatorPrompt } from "@/lib/templates";
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
+import { readVerificationResults } from "@/lib/verification/store";
 import { selectRepos } from "@/lib/workspace/select-repos";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
@@ -47,6 +48,7 @@ export async function buildCreatePrPipeline(input: {
     return names.length > 0 ? names : undefined;
   };
 
+  const verificationResults = await readVerificationResults(wsPath);
   const children = await Promise.all(repos.map(async (repo) => {
     const metaRepo = meta.repositories.find(
       (r) => r.path === repo.repoPath || r.alias === repo.repoName,
@@ -94,6 +96,7 @@ export async function buildCreatePrPipeline(input: {
       ...(!existingPR.exists && ticketRef && { ticketRef }),
       ...(!existingPR.exists && { sameRepoSiblings: sameRepoSiblings(repo) }),
       ...(prReviewThreads && { prReviewThreads, todoFilePath }),
+      ...(verificationResults && { verificationResults }),
     });
 
     return {

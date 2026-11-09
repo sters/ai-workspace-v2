@@ -216,6 +216,8 @@ export interface CompletionVerifierInput extends RepoPromptInput {
    * it rather than by re-running lint/test/build.
    */
   constraintReportPath: string;
+  /** Verdicts recorded on the Verify tab's scenarios (`renderVerificationResults`), or "" when there are none. */
+  verificationResults?: string;
 }
 
 export interface PRCreatorInput extends RepoPromptInput {
@@ -244,6 +246,8 @@ export interface PRCreatorInput extends RepoPromptInput {
   sameRepoSiblings?: string[];
   /** Body of the TODO file's `## PR Review Threads` section, when it has one. */
   prReviewThreads?: string;
+  /** Verdicts recorded on the Verify tab's scenarios (`renderVerificationResults`), or "" when there are none. */
+  verificationResults?: string;
   /** Absolute TODO file path — only set alongside `prReviewThreads`, which is what needs it. */
   todoFilePath?: string;
 }
@@ -360,6 +364,20 @@ export interface ReadmeClarityGateInput {
   readmeContent: string;
   /** Pre-rendered Acceptance Criteria checklist parsed from the README, or "" when absent. */
   acceptanceCriteria?: string;
+}
+
+export interface VerificationPlannerInput {
+  workspaceName: string;
+  workspacePath: string;
+  readmeContent: string;
+  /** Each worktree with its rendered changes against the base branch. */
+  repos: { repoName: string; worktreePath: string; baseBranch: string; changes: string }[];
+  /** Titles of the scenarios that already exist, so a new plan does not repeat them. */
+  existingTitles: string[];
+  /** What the person asked for, if anything. */
+  instruction?: string;
+  /** Set to rewrite the remainder of this scenario instead of planning new ones. */
+  replan?: { scenarioJson: string };
 }
 
 export interface CriteriaFeasibilityInput {

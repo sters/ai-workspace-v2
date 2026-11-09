@@ -1,4 +1,5 @@
 import path from "node:path";
+import { readVerificationResults } from "@/lib/verification/store";
 import { getWorkspaceDir } from "@/lib/config";
 import { getReadme } from "@/lib/workspace/reader";
 import { parseReadmeMeta, parseConstraints, renderAcceptanceCriteria } from "@/lib/parsers/readme";
@@ -151,6 +152,7 @@ export async function buildCompletionVerifierChild(input: {
         worktreePath: repo.worktreePath,
         repoChanges: input.repoChanges,
         constraintReportPath: path.join(input.reviewDir, `CONSTRAINTS-${stem}.md`),
+        verificationResults: await readVerificationResults(input.wsPath),
       }),
       jsonSchema: COMPLETION_VERIFICATION_SCHEMA as unknown as Record<string, unknown>,
       addDirs: [input.reviewDir],

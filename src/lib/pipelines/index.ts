@@ -16,3 +16,4 @@ export { buildAutonomousPipeline } from "./autonomous";
 export { buildDiscoveryPipeline } from "./discovery";
 export { buildAggregateSuggestionsPipeline } from "./aggregate-suggestions";
 export { buildPruneSuggestionsPipeline } from "./prune-suggestions";
+export { buildPlanVerificationPipeline } from "./plan-verification";

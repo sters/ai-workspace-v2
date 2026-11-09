@@ -19,6 +19,7 @@ import type {
 } from "@/types/pull-request";
 import type { ReviewFindingsResult } from "@/types/review-findings";
 import type { ReviewFreshnessResult } from "@/types/review-freshness";
+import type { VerificationScenario } from "@/types/verification";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";
 import { fetcher } from "@/lib/api";
 
@@ -350,5 +351,26 @@ export function useReviewDetail(name: string, timestamp: string | null) {
     files: data?.files,
     isLoading,
     error,
+  };
+}
+
+/** Polled fast while a scenario is running, so each step's result shows as it lands. */
+const VERIFICATION_ACTIVE_REFRESH_MS = 1500;
+
+export function useVerificationScenarios(name: string) {
+  const { data, error, isLoading, mutate } = useSWR<{ scenarios: VerificationScenario[] }>(
+    name ? `/api/workspaces/${encodeURIComponent(name)}/verification` : null,
+    fetcher,
+    {
+      refreshInterval: (latest) =>
+        latest?.scenarios.some((s) => s.status === "running") ? VERIFICATION_ACTIVE_REFRESH_MS : SWR_REFRESH_INTERVAL,
+    },
+  );
+
+  return {
+    scenarios: data?.scenarios ?? [],
+    isLoading,
+    error,
+    refresh: mutate,
   };
 }

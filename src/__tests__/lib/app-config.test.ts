@@ -562,7 +562,7 @@ describe("migrateConfigContent", () => {
       "#   #   opus / medium — analyze-readme, plan-todo, plan-todo-from-review,",
       "#   #           execute, code-review, coordinate-todos, research, update-todo,",
       "#   #           update-readme, resolve-conflicts, suggest-workspace,",
-      "#   #           ground-finding, review-todos",
+      "#   #           ground-finding, review-todos, plan-verification",
       "#   #   claude-sonnet-5-5 / high — autonomous-gate",
       "#   #   claude-haiku-5-5 / high  — verify-completion",
       "#   #   claude-haiku-5-5 / xhigh — verify-fixes, criteria-feasibility,",

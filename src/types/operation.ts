@@ -11,6 +11,7 @@ export type OperationType =
   | "validate-pr-comments"
   | "post-review-findings"
   | "resolve-base-conflicts"
+  | "plan-verification"
   | "create-todo"
   | "delete"
   | "workspace-prune"

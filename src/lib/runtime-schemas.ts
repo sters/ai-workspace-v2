@@ -253,3 +253,80 @@ export const operationEventSchema = z.object({
   phaseIndex: z.number().optional(),
   phaseLabel: z.string().optional(),
 }).passthrough();
+
+// ---------------------------------------------------------------------------
+// Verification scenarios (artifacts/verification/<id>.json, planner output)
+// ---------------------------------------------------------------------------
+
+const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** A step before it runs, as the planner or the Verify tab's editor writes it. */
+export const verificationStepDraftSchema = z.object({
+  title: z.string().min(1),
+  actor: z.enum(["claude", "human"]),
+  repo: z.string().min(1).optional(),
+  command: z.string().min(1).optional(),
+  background: z.boolean().optional(),
+  readyCommand: z.string().min(1).optional(),
+  outputs: z.array(z.string().regex(VARIABLE_NAME)).optional(),
+  instructions: z.string().min(1).optional(),
+  inputs: z.array(z.object({
+    name: z.string().regex(VARIABLE_NAME),
+    label: z.string().min(1),
+    options: z.array(z.string().min(1)).min(1).optional(),
+  })).optional(),
+  expected: z.string().optional(),
+  criteria: z.array(z.string()).optional(),
+  teardown: z.boolean().optional(),
+}).superRefine((s, ctx) => {
+  if (s.actor === "claude" && !s.command) {
+    ctx.addIssue({ code: "custom", message: `Claude step "${s.title}" needs a command` });
+  }
+  if (s.actor === "human" && !s.instructions) {
+    ctx.addIssue({ code: "custom", message: `Human step "${s.title}" needs instructions` });
+  }
+  if (s.actor === "human" && s.teardown) {
+    ctx.addIssue({ code: "custom", message: `Teardown step "${s.title}" must be a Claude step` });
+  }
+});
+
+export const verificationPlanSchema = z.object({
+  scenarios: z.array(z.object({
+    title: z.string().min(1),
+    summary: z.string(),
+    steps: z.array(verificationStepDraftSchema).min(1),
+  })),
+});
+
+const verificationStepSchema = z.intersection(verificationStepDraftSchema, z.object({
+  id: z.string(),
+  status: z.enum(["pending", "running", "waiting", "passed", "failed", "skipped"]),
+  revision: z.number(),
+  result: z.object({
+    at: z.string(),
+    exitCode: z.number().nullable().optional(),
+    output: z.string().optional(),
+    durationMs: z.number().optional(),
+    note: z.string().optional(),
+    values: z.record(z.string(), z.string()).optional(),
+  }).optional(),
+}));
+
+export const verificationScenarioSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  status: z.enum(["ready", "running", "waiting", "failed", "passed", "aborted"]),
+  revision: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  variables: z.record(z.string(), z.string()),
+  steps: z.array(verificationStepSchema),
+  processes: z.array(z.object({
+    stepId: z.string(),
+    pid: z.number(),
+    command: z.string(),
+    logFile: z.string(),
+    startedAt: z.string(),
+  })),
+});
