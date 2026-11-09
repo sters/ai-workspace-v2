@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
 import { useChatSession } from "@/hooks/use-chat-session";
 import { fetcher } from "@/lib/api";
@@ -7,6 +8,7 @@ import type { WorkspaceSlackThread } from "@/lib/chat-server/slack-thread";
 import { Button } from "../shared/buttons/button";
 import { StartChatButton } from "./start-chat-button";
 import { StatusText } from "../shared/feedback/status-text";
+import { Textarea } from "../shared/forms/textarea";
 
 export function ChatTerminal({
   workspaceId,
@@ -43,6 +45,8 @@ export function ChatTerminal({
     onHandoffDelivered,
   });
 
+  const [message, setMessage] = useState("");
+
   // Polled so the button frees up once a Slack turn in flight finishes.
   const { data: slackData } = useSWR<{ slackThread: WorkspaceSlackThread | null }>(
     `/api/workspaces/${encodeURIComponent(workspaceId)}/slack-thread`,
@@ -71,7 +75,7 @@ export function ChatTerminal({
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b px-4 py-2">
         {state === "idle" && (
-          <StartChatButton label="Start Chat" onStart={openSession} />
+          <StartChatButton label="Start Chat" message={message} onStart={openSession} />
         )}
         {state === "connecting" && (
           <StatusText>Connecting...</StatusText>
@@ -109,15 +113,21 @@ export function ChatTerminal({
 
       {state === "idle" && (
         <div className="flex flex-1 items-center justify-center">
-          <div className="text-center">
+          <div className="w-full max-w-xl px-4 text-center">
             <p className="mb-2 text-lg font-medium">
               Interactive Chat
             </p>
             <p className="mb-4 text-sm text-muted-foreground">
               Start an interactive Claude session to discuss this workspace
             </p>
+            <Textarea
+              className="mb-3 min-h-[4lh]"
+              placeholder="First message (optional)"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+            />
             <div className="flex items-center justify-center gap-2">
-              <StartChatButton label="Start Chat" onStart={openSession} />
+              <StartChatButton label="Start Chat" message={message} onStart={openSession} />
               {continueSlackButton}
             </div>
           </div>
