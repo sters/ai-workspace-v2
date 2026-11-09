@@ -258,6 +258,16 @@ ${input.guidance.trim()}
 }
 
 /**
+ * For every agent that writes, changes or reviews code. The CLI already lists
+ * the available skills with their descriptions (the user's, and those of any
+ * `--add-dir` directory), so this names no skill: it makes choosing from that
+ * list part of starting on code, which the listing alone does not.
+ */
+export const LISTED_SKILLS = `### Skills Listed for This Session
+
+Your session lists the skills available to you, each with a description. Before you start on code — writing, changing or reviewing it — load the ones whose description bears on that work. A skill written as an interactive procedure (it sets up its own worktree, posts PR comments, approves, files tickets) contributes its criteria and checklists; leave its steps and scripts unrun unless your own instructions call for them.`;
+
+/**
  * Toolchain provisioning, for agents that run a repository's own build / test /
  * lint commands (the executor and the targeted fix applier). Shared because a
  * missing toolchain is the failure both of them hit first, and "resolve it, do

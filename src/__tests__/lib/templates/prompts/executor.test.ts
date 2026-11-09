@@ -13,11 +13,10 @@ describe("getExecutorSystemPrompt", () => {
     expect(prompt).not.toMatch(/push[^\n]*unless (explicitly )?requested/i);
   });
 
-  // A user-level CLAUDE.md that says "load skill X before writing code" reaches
-  // the executor but was ignored unless the executor's own steps asked for it.
-  it("loads the skills standing instructions require before the first edit, as part of step 1", () => {
+  // Listing the skills alone did not get them loaded; step 1 has to ask for it.
+  it("loads the listed skills before the first edit, as part of step 1", () => {
     const step1 = getExecutorSystemPrompt().split("2. **Work through TODO items")[0];
-    expect(step1).toMatch(/standing instructions/);
+    expect(step1).toMatch(/Skills Listed for This Session/);
     expect(step1).toMatch(/before the first edit/);
   });
 });

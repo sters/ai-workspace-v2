@@ -22,7 +22,7 @@
  * no lint / test / build — the pull request's own CI does, on the pushed merge.
  */
 
-import { REPO_SEARCH_EFFICIENCY, SCOPE_DISCIPLINE, worktreeCdRules } from "./shared";
+import { LISTED_SKILLS, REPO_SEARCH_EFFICIENCY, SCOPE_DISCIPLINE, worktreeCdRules } from "./shared";
 import type { ConflictResolverInput } from "@/types/prompts";
 
 export function getConflictResolverSystemPrompt(): string {
@@ -70,6 +70,8 @@ git diff --cached --stat
 \`\`\`
 
 The first must be empty except for files you are deliberately leaving unresolved.
+
+${LISTED_SKILLS}
 
 ${SCOPE_DISCIPLINE}
 

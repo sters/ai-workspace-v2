@@ -11,7 +11,7 @@
  */
 
 import type { SelectableRepository } from "@/types/workspace";
-import { TASK_README_EDIT, TASK_README_SCOPE } from "./chat";
+import { CODE_WORK_GUIDANCE, TASK_README_EDIT, TASK_README_SCOPE } from "./chat";
 import {
   SLACK_DESTRUCTIVE_LIMIT,
   SLACK_MEMORY_POLICY,
@@ -112,6 +112,8 @@ TWO HARD LIMITS — forbidden even when the user explicitly asks. Explain briefl
 2. ${SLACK_DESTRUCTIVE_LIMIT}
 
 AN OPERATION MAY BE RUNNING. When a message says an operation is running on this workspace, that turn is read-only: the operation is editing the same worktrees. Read and answer, and tell the user any change has to wait until it finishes.
+
+${CODE_WORK_GUIDANCE}
 
 ${SLACK_MEMORY_POLICY}
 

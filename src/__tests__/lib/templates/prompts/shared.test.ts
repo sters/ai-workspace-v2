@@ -1,5 +1,6 @@
 import {
   GIT_HISTORY_BOUNDS,
+  LISTED_SKILLS,
   NO_CD_RULES,
   NO_WORKSPACE_REFERENCES,
   RECURRING_FINDINGS_POLICY,
@@ -38,6 +39,16 @@ import {
   getResearchRecommendationsSystemPrompt,
   getResearchIntegrationSystemPrompt,
 } from "@/lib/templates/prompts/researcher";
+import {
+  getChatSystemPrompt,
+  getDiscussionChatSystemPrompt,
+  getResearchChatSystemPrompt,
+  getReviewChatSystemPrompt,
+  getStartPromptChatSystemPrompt,
+  getTaskChatSystemPrompt,
+} from "@/lib/templates/prompts/chat";
+import { getSlackWorkspaceChatSystemPrompt } from "@/lib/templates/prompts/slack-workspace-chat";
+import { getConflictResolverSystemPrompt } from "@/lib/templates/prompts/conflict-resolver";
 
 const researchPrompts: Record<string, string> = {
   researchFindingsRepo: getResearchFindingsRepoSystemPrompt(),
@@ -435,5 +446,31 @@ describe("repoGuidanceSection", () => {
   it.each(Object.entries(consumers))("%s carries the guidance it is given", (_name, build) => {
     expect(build(GUIDANCE)).toContain(GUIDANCE);
     expect(build(undefined)).not.toContain("Repository Guidance");
+  });
+});
+
+// The CLI lists every available skill with its description, and agents that
+// write or review code still loaded almost none of them until told to.
+describe("LISTED_SKILLS", () => {
+  const chats: Record<string, string> = {
+    chat: getChatSystemPrompt(),
+    reviewChat: getReviewChatSystemPrompt(),
+    researchChat: getResearchChatSystemPrompt(),
+    taskChat: getTaskChatSystemPrompt(),
+    discussionChat: getDiscussionChatSystemPrompt(),
+    startPromptChat: getStartPromptChatSystemPrompt(),
+    slackWorkspaceChat: getSlackWorkspaceChatSystemPrompt(),
+  };
+
+  it.each(Object.entries({ ...chats, executor: getExecutorSystemPrompt(), conflictResolver: getConflictResolverSystemPrompt() }))(
+    "%s carries it",
+    (_name, prompt) => {
+      expect(prompt).toContain(LISTED_SKILLS);
+    },
+  );
+
+  // Chats get no Repository Guidance section, so they need the path to find it.
+  it.each(Object.entries(chats))("%s points at the workspace's repo guidance", (_name, prompt) => {
+    expect(prompt).toContain("artifacts/repo-guidance/");
   });
 });

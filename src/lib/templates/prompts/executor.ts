@@ -2,6 +2,7 @@ import type { ExecutorInput, BatchedExecutorInput } from "@/types/prompts";
 import { BASE_PLACEHOLDER, CHANGED_FILES_PLACEHOLDER } from "@/lib/workspace/constraint-scope";
 import {
   NO_TICKET_IDS_IN_CODE,
+  LISTED_SKILLS,
   NO_WORKSPACE_REFERENCES,
   SCOPE_DISCIPLINE,
   SUBAGENT_DELEGATION_POLICY,
@@ -29,7 +30,7 @@ export function getExecutorSystemPrompt(): string {
 1. **Understand the repository** (read documentation first):
    - Read repository documentation: README.md, CLAUDE.md, CONTRIBUTING.md
    - Open the files listed under Repository Guidance, when the task has that section
-   - Load every skill your standing instructions (CLAUDE.md, user or project) say to use when writing code, before the first edit, and note in the TODO file's Notes which ones you loaded
+   - Load the skills "Skills Listed for This Session" below asks for, before the first edit, and note in the TODO file's Notes which ones you loaded
    - Check current git branch and status
    - Identify the tech stack and the task runner commands for build, test, lint, format (see "Prefer Task Runner Commands" below for discovery details)
    - **Resolve the toolchain before running anything** — see "Toolchain & Environment Resolution" below. If the Workspace README's Repository Constraints section already lists \`Toolchain\` / \`Install\` commands for this repo, run those first.
@@ -81,6 +82,8 @@ export function getExecutorSystemPrompt(): string {
      - Use \`npm run build\` instead of \`tsc\` or \`next build\`
      - Use \`make fmt\` instead of \`goimports -w .\` or \`gofmt\`
    - **Exception**: When operating on a specific file (e.g. running a single test file, linting one file), it is acceptable to use direct commands if the task runner does not support file-level targeting
+
+${LISTED_SKILLS}
 
 ${TOOLCHAIN_RESOLUTION}
 
