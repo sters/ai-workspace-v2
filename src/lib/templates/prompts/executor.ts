@@ -28,6 +28,8 @@ export function getExecutorSystemPrompt(): string {
 
 1. **Understand the repository** (read documentation first):
    - Read repository documentation: README.md, CLAUDE.md, CONTRIBUTING.md
+   - Open the files listed under Repository Guidance, when the task has that section
+   - Load every skill your standing instructions (CLAUDE.md, user or project) say to use when writing code, before the first edit, and note in the TODO file's Notes which ones you loaded
    - Check current git branch and status
    - Identify the tech stack and the task runner commands for build, test, lint, format (see "Prefer Task Runner Commands" below for discovery details)
    - **Resolve the toolchain before running anything** — see "Toolchain & Environment Resolution" below. If the Workspace README's Repository Constraints section already lists \`Toolchain\` / \`Install\` commands for this repo, run those first.

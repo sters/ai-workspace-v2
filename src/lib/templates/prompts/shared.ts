@@ -242,10 +242,14 @@ export function repoGuidanceSection(input: {
 }): string {
   if (!input.guidance || input.guidance.trim() === "") return "";
   const what = input.use === "review" ? "how changes to it are reviewed" : "how changes to it are made";
+  const record =
+    input.use === "review"
+      ? "a `Repository Guidance` section of the review report"
+      : "the TODO file's Notes section";
   return `
 ${input.heading ?? "##"} Repository Guidance
 
-This repository documents ${what} in the files below. Paths are relative to \`${input.worktreePath}\`. Read the ones that bear on this change and hold the work to what they say.
+This repository documents ${what} in the files below. Paths are relative to \`${input.worktreePath}\`. Before you start, open every file listed below — each line is a pointer to the file, not a substitute for it — and hold the work to the parts that bear on this change. Then record, in ${record}, one line per file: the criteria you applied, or why none bore on this change.
 
 Some of them are skills: procedures written for an interactive session that set up their own worktree, post PR comments, approve, or file tickets. Take their criteria, checklists and lenses, leave their steps and scripts unrun, and post nothing anywhere — this task's own instructions say what to produce and where.
 

@@ -397,6 +397,17 @@ describe("repoGuidanceSection", () => {
     expect(section).toMatch(/post nothing/);
   });
 
+  // A one-line summary of each file reads as if it were the file, so agents
+  // skipped opening them; the per-file record is what makes skipping visible.
+  it.each([
+    ["review", /review report/],
+    ["implementation", /TODO file's Notes/],
+  ] as const)("asks a %s agent to open every file first and record what it took, in its own output", (use, where) => {
+    const section = repoGuidanceSection({ worktreePath: "/wt/web", guidance: GUIDANCE, use });
+    expect(section).toMatch(/Before you start, open every file listed below/);
+    expect(section).toMatch(where);
+  });
+
   it.each([undefined, "", "  \n"])("renders nothing for guidance %p", (guidance) => {
     expect(repoGuidanceSection({ worktreePath: "/wt/web", guidance, use: "review" })).toBe("");
   });
