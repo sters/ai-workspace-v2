@@ -2,9 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { OperationLogProps } from "@/types/components";
-import { parseStreamEvent, enrichPermissionDenials } from "@/lib/parsers/stream";
+import { eventsToLogEntries } from "@/lib/parsers/stream";
 import { parsePhaseUpdatesFromEntries } from "@/lib/parse-phase-updates";
-import type { LogEntry } from "@/types/claude";
 import { buildDisplayNodes, groupByChildLabel, groupByPhase, findPendingAsk } from "./display-nodes";
 import { ChildGroupSection, SubAgentSection, PhaseGroupSection } from "./sections";
 import { EntryRow } from "./entries";
@@ -19,61 +18,7 @@ export function OperationLog({
   // null = auto mode (follow latest running phase), number/"all" = user-selected
   const [userSelectedTab, setUserSelectedTab] = useState<number | "all" | null>(null);
 
-  const entries = useMemo(() => {
-    const result: LogEntry[] = [];
-    for (const event of events) {
-      if (event.type === "output") {
-        const parsed = parseStreamEvent(event.data);
-        for (const entry of parsed) {
-          if (event.childLabel) entry.childLabel = event.childLabel;
-          if (event.parentChildLabel) entry.parentChildLabel = event.parentChildLabel;
-          if (event.phaseIndex != null) entry.phaseIndex = event.phaseIndex;
-          if (event.phaseLabel) entry.phaseLabel = event.phaseLabel;
-        }
-        result.push(...parsed);
-      } else if (event.type === "error") {
-        result.push({
-          kind: "error",
-          content: event.data,
-          childLabel: event.childLabel,
-          parentChildLabel: event.parentChildLabel,
-          phaseIndex: event.phaseIndex,
-          phaseLabel: event.phaseLabel,
-        });
-      } else if (event.type === "complete") {
-        try {
-          const d = JSON.parse(event.data);
-          result.push({
-            kind: "complete",
-            exitCode: d.exitCode ?? -1,
-            childLabel: event.childLabel,
-            parentChildLabel: event.parentChildLabel,
-            phaseIndex: event.phaseIndex,
-            phaseLabel: event.phaseLabel,
-          });
-        } catch {
-          result.push({
-            kind: "complete",
-            exitCode: -1,
-            childLabel: event.childLabel,
-            parentChildLabel: event.parentChildLabel,
-            phaseIndex: event.phaseIndex,
-            phaseLabel: event.phaseLabel,
-          });
-        }
-      } else if (event.type === "status") {
-        result.push({
-          kind: "system",
-          content: event.data,
-          childLabel: event.childLabel,
-          parentChildLabel: event.parentChildLabel,
-          phaseIndex: event.phaseIndex,
-          phaseLabel: event.phaseLabel,
-        });
-      }
-    }
-    return enrichPermissionDenials(result);
-  }, [events]);
+  const entries = useMemo(() => eventsToLogEntries(events), [events]);
 
   // Derive live phase statuses from __phaseUpdate events in the stream
   const livePhases = useMemo(

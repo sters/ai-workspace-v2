@@ -161,6 +161,16 @@ MCP servers are loaded from two sources:
 
 These configurations can be viewed and edited from the Settings / MCP Servers page in the Web UI.
 
+## MCP Server
+
+The web server also serves MCP itself, over Streamable HTTP at `/api/mcp`, so another Claude Code session (or any MCP client) can drive ai-workspace while the server is running:
+
+```bash
+claude mcp add --transport http ai-workspace http://localhost:3741/api/mcp
+```
+
+Tools: `list_workspaces`, `get_workspace`, `archive_workspace`, `autonomous`, `init_only`, `update_todo`, `execute`, `review`, `create_pr`, `list_operations`, `get_operation`, `answer_question`, `kill_operation`. `autonomous` with only a `description` matches the web UI's Start autonomous (init, then the execute / review loop, then PRs); `init_only` matches Init only. Tools that start an operation return its id at once; poll `get_operation` until it is no longer `running`, and answer its `pendingQuestion` with `answer_question` when it asks one. Requests carrying a non-local `Origin` are refused; there is no other authentication, so the endpoint has the same exposure as the rest of the local API.
+
 ## Development
 
 ```bash

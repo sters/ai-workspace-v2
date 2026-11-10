@@ -368,3 +368,60 @@ export function extractResultSummary(
     ...(found.length > 1 && { results: found.reverse() }),
   };
 }
+
+/** Flatten an operation's raw events into the log entries the log view and pending-ask lookup read. */
+export function eventsToLogEntries(events: OperationEvent[]): LogEntry[] {
+  const result: LogEntry[] = [];
+  for (const event of events) {
+    if (event.type === "output") {
+      const parsed = parseStreamEvent(event.data);
+      for (const entry of parsed) {
+        if (event.childLabel) entry.childLabel = event.childLabel;
+        if (event.parentChildLabel) entry.parentChildLabel = event.parentChildLabel;
+        if (event.phaseIndex != null) entry.phaseIndex = event.phaseIndex;
+        if (event.phaseLabel) entry.phaseLabel = event.phaseLabel;
+      }
+      result.push(...parsed);
+    } else if (event.type === "error") {
+      result.push({
+        kind: "error",
+        content: event.data,
+        childLabel: event.childLabel,
+        parentChildLabel: event.parentChildLabel,
+        phaseIndex: event.phaseIndex,
+        phaseLabel: event.phaseLabel,
+      });
+    } else if (event.type === "complete") {
+      try {
+        const d = JSON.parse(event.data);
+        result.push({
+          kind: "complete",
+          exitCode: d.exitCode ?? -1,
+          childLabel: event.childLabel,
+          parentChildLabel: event.parentChildLabel,
+          phaseIndex: event.phaseIndex,
+          phaseLabel: event.phaseLabel,
+        });
+      } catch {
+        result.push({
+          kind: "complete",
+          exitCode: -1,
+          childLabel: event.childLabel,
+          parentChildLabel: event.parentChildLabel,
+          phaseIndex: event.phaseIndex,
+          phaseLabel: event.phaseLabel,
+        });
+      }
+    } else if (event.type === "status") {
+      result.push({
+        kind: "system",
+        content: event.data,
+        childLabel: event.childLabel,
+        parentChildLabel: event.parentChildLabel,
+        phaseIndex: event.phaseIndex,
+        phaseLabel: event.phaseLabel,
+      });
+    }
+  }
+  return enrichPermissionDenials(result);
+}
