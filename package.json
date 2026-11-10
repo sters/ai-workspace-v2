@@ -17,7 +17,8 @@
     "next-server": "bun run bin/next-server.ts",
     "chat-server": "bun run bin/chat-server.ts",
     "bench": "bun --bun bin/bench.ts",
-    "bench:execute": "bun --bun bin/bench-execute.ts"
+    "bench:execute": "bun --bun bin/bench-execute.ts",
+    "harvest-lessons": "bun --bun bin/harvest-lessons.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

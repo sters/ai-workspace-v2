@@ -321,6 +321,22 @@ export const chatStartPromptDeleteSchema = z.object({
   id: z.coerce.number().int().positive("id is required"),
 });
 
+/** Archive toggle; `closeOpenPrs` is required to archive a workspace with open PRs. */
+export const archiveWorkspaceSchema = z.object({
+  closeOpenPrs: z.boolean().optional(),
+});
+
+/** Distill a workspace's outcome into candidate repository lessons. */
+export const harvestLessonsSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+});
+
+/** Review or edit one repository lesson. */
+export const repoLessonUpdateSchema = z.object({
+  status: z.enum(["candidate", "approved", "rejected"]).optional(),
+  text: z.string().trim().min(1).optional(),
+});
+
 /** Draft verification scenarios, or (with `scenarioId`) rewrite the rest of one. */
 export const planVerificationSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),

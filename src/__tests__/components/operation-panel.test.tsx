@@ -138,6 +138,50 @@ describe("OperationPanel archive button", () => {
     expect(onArchived).not.toHaveBeenCalled();
   });
 
+  it("lists open PRs and archives only after the close is confirmed", async () => {
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 409,
+        json: async () => ({
+          error: "open PRs",
+          openPullRequests: [{ repoName: "widgets", url: "https://github.com/acme/widgets/pull/7", title: "Add widgets" }],
+        }),
+      })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ archived: true }) });
+    const onArchived = vi.fn();
+    render(
+      <OperationPanel workspaceName="ws-alpha" workspacePath="/tmp/ws" onArchived={onArchived} />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: /^Archive$/ }));
+    expect(await screen.findByText(/Add widgets/)).toBeInTheDocument();
+    expect(onArchived).not.toHaveBeenCalled();
+    expect(mockShowToast).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: /Close PRs and archive/ }));
+    expect(fetchMock).toHaveBeenLastCalledWith("/api/workspaces/ws-alpha/archive", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ closeOpenPrs: true }),
+    });
+    await waitFor(() => expect(onArchived).toHaveBeenCalled());
+  });
+
+  it("drops the pending archive when cancelled", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 409,
+      json: async () => ({ error: "open PRs", openPullRequests: [{ repoName: "widgets", url: "u", title: "Add widgets" }] }),
+    });
+    render(<OperationPanel workspaceName="ws-alpha" workspacePath="/tmp/ws" onArchived={vi.fn()} />);
+
+    await userEvent.click(screen.getByRole("button", { name: /^Archive$/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /^Cancel$/ }));
+    expect(screen.queryByText(/Add widgets/)).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("omits the archive button when no handler is given", () => {
     render(<OperationPanel workspaceName="ws-alpha" workspacePath="/tmp/ws" />);
 

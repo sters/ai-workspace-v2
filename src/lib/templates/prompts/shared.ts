@@ -258,6 +258,31 @@ ${input.guidance.trim()}
 }
 
 /**
+ * Render a repository's approved lessons as a user-prompt section, or "" when
+ * there are none. Each lesson was distilled from how people reacted to earlier
+ * work in this repository and approved by a human, so it carries more weight
+ * than a guess — but it is still a heuristic and never outranks the task.
+ */
+export function repoLessonsSection(input: {
+  lessons: string | undefined;
+  use: "implementation" | "review";
+  heading?: string;
+}): string {
+  if (!input.lessons || input.lessons.trim() === "") return "";
+  const how =
+    input.use === "review"
+      ? "Hold the change to the ones that bear on it, and name the lesson when a finding rests on it."
+      : "Follow the ones that bear on this change.";
+  return `
+${input.heading ?? "##"} Repository Lessons
+
+Lessons from earlier work in this repository: what reviewers asked for, what people changed after aiw handed work over, and findings that kept recurring. A person approved each one. ${how} Where one conflicts with the README or the TODO, those win; note the conflict rather than resolving it silently.
+
+${input.lessons.trim()}
+`;
+}
+
+/**
  * For every agent that writes, changes or reviews code. The CLI already lists
  * the available skills with their descriptions (the user's, and those of any
  * `--add-dir` directory), so this names no skill: it makes choosing from that

@@ -1,11 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Archive, ChevronDown } from "lucide-react";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { WorkspaceCard } from "./workspace-card";
 import { StatusText } from "../shared/feedback/status-text";
+import { showToast } from "../shared/feedback/toast";
+import { useArchiveToggle } from "@/hooks/use-archive-toggle";
+import { ArchiveOpenPrsConfirm } from "../workspace/archive-open-prs-confirm";
+
+function reportArchiveError(err: unknown) {
+  showToast(err instanceof Error ? err.message : "Failed to archive workspace", "error");
+}
 
 export function WorkspaceList() {
   const [showAll, setShowAll] = useState(false);
@@ -21,15 +28,8 @@ export function WorkspaceList() {
     operations.filter((op) => op.hasPendingAsk).map((op) => op.workspace),
   );
 
-  const handleArchiveToggle = useCallback(
-    async (name: string) => {
-      await fetch(`/api/workspaces/${encodeURIComponent(name)}/archive`, {
-        method: "POST",
-      });
-      refresh();
-    },
-    [refresh],
-  );
+  const archive = useArchiveToggle(() => void refresh());
+  const handleArchiveToggle = (name: string) => archive.toggle(name).catch(reportArchiveError);
 
   if (isLoading) {
     return (
@@ -67,6 +67,13 @@ export function WorkspaceList() {
 
   return (
     <div className="space-y-3">
+      {archive.openPrs && (
+        <ArchiveOpenPrsConfirm
+          prs={archive.openPrs}
+          onConfirm={() => archive.confirmClose().catch(reportArchiveError)}
+          onCancel={archive.cancel}
+        />
+      )}
       {activeWorkspaces.map((ws) => (
         <WorkspaceCard
           key={ws.name}

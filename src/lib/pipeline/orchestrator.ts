@@ -72,7 +72,8 @@ export function startOperationPipeline(
   // Persist to SQLite first — if this fails, no memory orphan
   insertOperation(operation);
   startAutoFlush(id);
-  if (type !== "delete") unarchiveWorkspace(workspace);
+  // Harvesting runs because the workspace was just archived.
+  if (type !== "delete" && type !== "harvest-lessons") unarchiveWorkspace(workspace);
 
   operations.set(id, managed);
   emitStatus(managed, `Starting pipeline with ${phases.length} phases`);

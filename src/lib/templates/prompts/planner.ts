@@ -5,6 +5,7 @@ import {
   WRITTEN_DELIVERABLE_LENGTH,
   worktreeCdRules,
   repoGuidanceSection,
+  repoLessonsSection,
 } from "./shared";
 
 const PLANNER_CD_RULES = worktreeCdRules({ examples: "`git status`, `git diff`, etc." });
@@ -252,7 +253,7 @@ ${input.interactive ? "## Mode: interactive" : ""}
 ## Workspace README
 
 ${input.readmeContent}
-${instructionSection}${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "implementation" })}
+${instructionSection}${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "implementation" })}${repoLessonsSection({ lessons: input.repoLessons, use: "implementation" })}
 
 ## TODO Template
 

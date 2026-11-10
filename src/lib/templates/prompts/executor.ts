@@ -9,6 +9,7 @@ import {
   TOOLCHAIN_RESOLUTION,
   worktreeCdRules,
   repoGuidanceSection,
+  repoLessonsSection,
 } from "./shared";
 
 export function getExecutorSystemPrompt(): string {
@@ -171,7 +172,7 @@ export function buildExecutorPrompt(input: ExecutorInput): string {
 ## Workspace README
 
 ${input.readmeContent}
-${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "implementation" })}
+${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "implementation" })}${repoLessonsSection({ lessons: input.repoLessons, use: "implementation" })}
 ## TODO File (TODO-${input.repoName}.md)
 
 ${input.todoContent}
@@ -208,7 +209,7 @@ export function buildBatchedExecutorPrompt(input: BatchedExecutorInput): string 
 ## Workspace README
 
 ${input.readmeContent}
-${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "implementation" })}
+${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "implementation" })}${repoLessonsSection({ lessons: input.repoLessons, use: "implementation" })}
 ## Current Batch (${input.batchIndex + 1} of ${input.totalBatches})
 
 ${input.batchTodoContent}

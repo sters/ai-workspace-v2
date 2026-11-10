@@ -8,7 +8,7 @@ import {
   OVERRIDABLE_SETTINGS_KEYS,
 } from "./defaults";
 
-const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "suggest", "hooks", "slack"]);
+const SECTION_NAMES = new Set(["server", "claude", "operations", "chat", "suggest", "watcher", "hooks", "slack"]);
 
 /** Generate default config file content with comments. */
 export function generateDefaultConfigContent(): string {
@@ -51,6 +51,10 @@ export function generateDefaultConfigContent(): string {
     "",
     "# suggest:",
     "#   enabled: true                  # false disables the post-operation workspace-suggestion feature",
+    "",
+    "# watcher:",
+    "#   enabled: true                  # false stops polling workspace PRs (no LLM calls; gh only)",
+    "#   intervalMinutes: 15            # minutes between full sweeps; notifications, base-branch moves and pending CI are checked every minute",
     "",
     "# hooks:",
     "#   sessionStartGitContext: true   # inject git branch+status into SessionStart",
@@ -185,7 +189,7 @@ const TYPE_OVERRIDE_HINT_LINES = [
   "#   #           execute, code-review, coordinate-todos, research, update-todo,",
   "#   #           update-readme, resolve-conflicts, suggest-workspace,",
   "#   #           ground-finding, review-todos, plan-verification",
-  "#   #   claude-sonnet-5-5 / high — autonomous-gate",
+  "#   #   claude-sonnet-5-5 / high — autonomous-gate, distill-lessons",
   "#   #   claude-haiku-5-5 / high  — verify-completion",
   "#   #   claude-haiku-5-5 / xhigh — verify-fixes, criteria-feasibility,",
   "#   #           validate-pr-comment, discover-constraints, discover-guidance,",

@@ -9,6 +9,8 @@ import { showToast } from "../shared/feedback/toast";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { useOpeners } from "@/hooks/use-openers";
+import { useArchiveToggle } from "@/hooks/use-archive-toggle";
+import { ArchiveOpenPrsConfirm } from "./archive-open-prs-confirm";
 import { openWith } from "@/lib/api";
 import {
   Play,
@@ -69,26 +71,15 @@ export function OperationPanel({
     })),
   }));
 
-  const toggleArchive = async () => {
-    try {
-      const res = await fetch(
-        `/api/workspaces/${encodeURIComponent(workspaceName)}/archive`,
-        { method: "POST" },
-      );
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? `HTTP ${res.status}`);
-      }
-      onArchived?.();
-    } catch (err) {
-      showToast(
-        err instanceof Error
-          ? err.message
-          : `Failed to ${archived ? "unarchive" : "archive"} workspace`,
-        "error",
-      );
-    }
-  };
+  const archive = useArchiveToggle(() => onArchived?.());
+  const reportArchiveError = (err: unknown) =>
+    showToast(
+      err instanceof Error
+        ? err.message
+        : `Failed to ${archived ? "unarchive" : "archive"} workspace`,
+      "error",
+    );
+  const toggleArchive = () => archive.toggle(workspaceName).catch(reportArchiveError);
 
   const body = (extra?: Record<string, string>) => ({
     workspace: workspacePath,
@@ -181,6 +172,13 @@ export function OperationPanel({
           </Button>
         </div>
       </div>
+      {archive.openPrs && (
+        <ArchiveOpenPrsConfirm
+          prs={archive.openPrs}
+          onConfirm={() => archive.confirmClose().catch(reportArchiveError)}
+          onCancel={archive.cancel}
+        />
+      )}
       {isRunning && runningOp && (
         <p className="text-sm text-muted-foreground">
           <span className={`inline-block h-2 w-2 animate-pulse rounded-full mr-1.5 ${runningOp.hasPendingAsk ? "bg-orange-500" : runningOp.usageLimitWaitUntil ? "bg-amber-500" : "bg-blue-500"}`} />

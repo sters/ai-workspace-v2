@@ -8,6 +8,7 @@ import {
   knownFindingsSection,
   worktreeCdRules,
   repoGuidanceSection,
+  repoLessonsSection,
 } from "./shared";
 
 export function getCodeReviewerSystemPrompt(): string {
@@ -160,7 +161,7 @@ export function buildCodeReviewerPrompt(input: CodeReviewerInput): string {
 ## Workspace README
 
 ${input.readmeContent}
-${knownFindingsSection(input.knownFindings)}${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "review" })}
+${knownFindingsSection(input.knownFindings)}${repoGuidanceSection({ worktreePath: input.worktreePath, guidance: input.repoGuidance, use: "review" })}${repoLessonsSection({ lessons: input.repoLessons, use: "review" })}
 ${changesSection(input)}
 
 ## Review Report Template

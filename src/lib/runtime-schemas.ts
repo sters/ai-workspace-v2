@@ -330,3 +330,17 @@ export const verificationScenarioSchema = z.object({
     startedAt: z.string(),
   })),
 });
+
+// ---------------------------------------------------------------------------
+// Lesson distiller structured output
+// ---------------------------------------------------------------------------
+
+export const runtimeDistilledLessonsSchema = z.object({
+  lessons: z.array(z.object({
+    action: z.enum(["new", "reinforce", "merge"]),
+    section: z.enum(["implementation", "review"]),
+    text: z.string(),
+    targetIds: z.array(z.string()),
+    evidence: z.array(z.object({ url: z.string().optional(), note: z.string() })),
+  })),
+});

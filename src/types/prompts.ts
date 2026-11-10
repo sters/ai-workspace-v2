@@ -18,6 +18,8 @@ export interface ExecutorInput extends RepoPromptInput {
   workspacePath: string;
   /** This repository's discovered guidance section (`artifacts/repo-guidance/`), bullets only. */
   repoGuidance?: string;
+  /** This repository's approved lessons for the matching section, bullets only. */
+  repoLessons?: string;
 }
 
 export interface BatchedExecutorInput extends ExecutorInput {
@@ -37,6 +39,8 @@ export interface PlannerInput extends RepoPromptInput {
   instruction?: string;
   /** This repository's discovered guidance section (`artifacts/repo-guidance/`), bullets only. */
   repoGuidance?: string;
+  /** This repository's approved lessons for the matching section, bullets only. */
+  repoLessons?: string;
 }
 
 export interface CoordinatorInput {
@@ -107,6 +111,8 @@ export interface CodeReviewerInput extends RepoPromptInput {
   reviewScope?: ReviewScope;
   /** This repository's discovered guidance section (`artifacts/repo-guidance/`), bullets only. */
   repoGuidance?: string;
+  /** This repository's approved lessons for the matching section, bullets only. */
+  repoLessons?: string;
 }
 
 /**
@@ -199,6 +205,8 @@ export interface CrossRepositoryReviewerInput {
     reviewScope?: ReviewScope;
     /** This repository's discovered guidance section (`artifacts/repo-guidance/`), bullets only. */
     repoGuidance?: string;
+    /** This repository's approved review lessons, bullets only. */
+    repoLessons?: string;
   }[];
 }
 

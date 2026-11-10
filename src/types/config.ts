@@ -73,6 +73,14 @@ export interface AppConfig {
     enabled: boolean;
   };
 
+  /** The PR watcher process, which records what happens on each workspace's PRs. */
+  watcher: {
+    /** When false, the pr-watcher process is not spawned. */
+    enabled: boolean;
+    /** Minutes between full sweeps of every unarchived workspace's PRs; signals are checked every minute in between. */
+    intervalMinutes: number;
+  };
+
   /** Auto-managed Claude Code hooks written into .claude/settings.local.json. */
   hooks: {
     /** Inject `git branch` + `git status --short` as SessionStart additionalContext. */

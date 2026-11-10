@@ -13,6 +13,7 @@ import {
   WRITTEN_DELIVERABLE_LENGTH,
   knownFindingsSection,
   repoGuidanceSection,
+  repoLessonsSection,
 } from "./shared";
 
 export function getCrossRepositoryReviewerSystemPrompt(): string {
@@ -141,7 +142,7 @@ export function buildCrossRepositoryReviewerPrompt(input: CrossRepositoryReviewe
 
 Changes${anyScope ? " (whole branch)" : ""}:
 
-${r.repoChanges}${anyScope ? `\n\n${newWorkBlock(r.reviewScope)}` : ""}${repoGuidanceSection({ worktreePath: r.worktreePath, guidance: r.repoGuidance, use: "review", heading: "####" })}`,
+${r.repoChanges}${anyScope ? `\n\n${newWorkBlock(r.reviewScope)}` : ""}${repoGuidanceSection({ worktreePath: r.worktreePath, guidance: r.repoGuidance, use: "review", heading: "####" })}${repoLessonsSection({ lessons: r.repoLessons, use: "review", heading: "####" })}`,
     )
     .join("\n\n---\n\n");
 

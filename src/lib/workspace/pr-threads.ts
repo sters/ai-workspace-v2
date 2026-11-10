@@ -86,7 +86,7 @@ export const REVIEW_THREADS_QUERY = `query($owner:String!,$name:String!,$number:
 }`;
 
 const PR_VIEW_FIELDS =
-  "number,url,title,state,isDraft,headRefName,headRefOid,baseRefName,author,updatedAt";
+  "number,url,title,state,isDraft,headRefName,headRefOid,baseRefName,author,updatedAt,mergeable";
 
 export interface PrLocator {
   host: string;
@@ -144,6 +144,7 @@ export function parsePrView(
     baseRefName: typeof json.baseRefName === "string" ? json.baseRefName : "",
     author: login(json.author),
     updatedAt: typeof json.updatedAt === "string" ? json.updatedAt : "",
+    mergeable: typeof json.mergeable === "string" ? json.mergeable : "UNKNOWN",
     threads: [],
     checks: emptyChecks(),
   };

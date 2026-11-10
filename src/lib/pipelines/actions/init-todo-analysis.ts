@@ -16,6 +16,7 @@ import type { PipelinePhase } from "@/types/pipeline";
 import type { InteractionLevel } from "@/types/prompts";
 import { getTimeoutDefaults } from "@/lib/pipeline-manager";
 import { readRepoGuidance } from "@/lib/workspace/repo-guidance";
+import { readRepoLessons } from "@/lib/lessons";
 import { buildCommitSnapshotPhase } from "./commit-snapshot";
 import { buildCoordinateTodosPhase } from "./coordinate-todos";
 import { buildDiscoverConstraintsPhase } from "./discover-constraints";
@@ -130,6 +131,7 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
         const plannerAgent = meta.taskType === "research" ? "research-planner" : "planner";
         const plannerPromptFile = await ensureSystemPrompt(wp, plannerAgent);
         const guidance = await Promise.all(rs.map((repo) => readRepoGuidance(wp, repo.repoName)));
+        const lessons = await Promise.all(rs.map((repo) => readRepoLessons(repo, "implementation")));
         const children = rs.map((repo, i) => ({
           label: `plan-${repo.repoName}`,
           stepType: STEP_TYPES.PLAN_TODO,
@@ -143,6 +145,7 @@ export function buildInitTodoAnalysisPhases(input: InitTodoAnalysisInput): Pipel
             interactive: interactionLevel === "high",
             instruction: input.instruction?.(),
             repoGuidance: guidance[i]?.implementation,
+            repoLessons: lessons[i],
           }),
           addDirs: [wp],
           appendSystemPromptFile: plannerPromptFile,

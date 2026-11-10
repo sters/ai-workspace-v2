@@ -21,9 +21,9 @@ vi.mock("@/lib/workspace/reader", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   getWorkspaceSummary: (name: string) => mockWorkspaceSummary(name),
 }));
-vi.mock("@/lib/db/archives", async (importOriginal) => ({
+vi.mock("@/lib/workspace/archive", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  archiveWorkspace: (name: string) => mockArchive(name),
+  archiveWorkspaceWithPrs: (name: string, opts: unknown) => mockArchive(name, opts),
 }));
 
 import { handleMcpMessage } from "@/lib/mcp/protocol";
@@ -176,9 +176,20 @@ describe("MCP tools", () => {
 
   it("archive_workspace archives by bare name even when given a path", async () => {
     mockWorkspaceSummary.mockResolvedValue({ name: "ws" });
+    mockArchive.mockResolvedValue({ closed: [], warnings: [], harvest: { operationId: "op-9" } });
     const { data } = await callTool("archive_workspace", { workspace: "/root/workspace/ws" });
-    expect(mockArchive).toHaveBeenCalledWith("ws");
-    expect(data).toEqual({ workspace: "ws", archived: true });
+    expect(mockArchive).toHaveBeenCalledWith("ws", { closeOpenPrs: undefined });
+    expect(data).toEqual({ workspace: "ws", archived: true, closed: [], warnings: [], harvest: { operationId: "op-9" } });
+  });
+
+  it("archive_workspace reports open PRs as an error instead of closing them unasked", async () => {
+    const { OpenPullRequestsError } = await import("@/lib/workspace/archive");
+    mockWorkspaceSummary.mockResolvedValue({ name: "ws" });
+    const open = [{ repoName: "widgets", url: "https://github.com/acme/widgets/pull/7", title: "t" }];
+    mockArchive.mockRejectedValue(new OpenPullRequestsError(open));
+    const { data, isError } = await callTool("archive_workspace", { workspace: "ws" });
+    expect(isError).toBe(true);
+    expect(data).toMatchObject({ openPullRequests: open });
   });
 
   it("autonomous starts with init when startWith is omitted, like the web UI's default button", async () => {

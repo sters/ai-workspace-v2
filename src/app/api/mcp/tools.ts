@@ -2,7 +2,8 @@ import z from "zod";
 import type { McpTool } from "@/lib/mcp/protocol";
 import type { OperationEvent, OperationListItem } from "@/types/operation";
 import { resolveWorkspaceName } from "@/lib/config";
-import { archiveWorkspace, unarchiveWorkspace } from "@/lib/db/archives";
+import { unarchiveWorkspace } from "@/lib/db/archives";
+import { archiveWorkspaceWithPrs, OpenPullRequestsError } from "@/lib/workspace/archive";
 import { getOperation, getOperationEvents, getOperationSummaries } from "@/lib/pipeline-manager";
 import { readOperationLog } from "@/lib/operation-store";
 import { eventsToLogEntries, extractResultSummary } from "@/lib/parsers/stream";
@@ -12,6 +13,7 @@ import {
   autonomousSchema,
   createPrSchema,
   executeSchema,
+  harvestLessonsSchema,
   initSchema,
   operationAnswerSchema,
   operationKillSchema,
@@ -23,6 +25,7 @@ import { POST as postAutonomous } from "../operations/autonomous/route";
 import { POST as postExecute } from "../operations/execute/route";
 import { POST as postReview } from "../operations/review/route";
 import { POST as postCreatePr } from "../operations/create-pr/route";
+import { POST as postHarvestLessons } from "../operations/harvest-lessons/route";
 import { POST as postUpdateTodo } from "../operations/update-todo/route";
 import { POST as postAnswer } from "../operations/answer/route";
 import { POST as postKill } from "../operations/kill/route";
@@ -141,15 +144,27 @@ export const MCP_TOOLS: McpTool[] = [
   },
   {
     name: "archive_workspace",
-    description: "Archive a workspace (hidden from list_workspaces by default), or restore it with archived: false.",
-    input: workspaceInput.extend({ archived: z.boolean().default(true) }),
+    description:
+      "Archive a workspace (hidden from list_workspaces by default), or restore it with archived: false. " +
+      "Archiving is refused while the workspace has open pull requests unless closeOpenPrs is true, which closes them and deletes their branches. " +
+      "Archiving also starts harvest_lessons on the workspace.",
+    input: workspaceInput.extend({ archived: z.boolean().default(true), closeOpenPrs: z.boolean().optional() }),
     call: async (args) => {
-      const { workspace, archived } = args as { workspace: string; archived: boolean };
+      const { workspace, archived, closeOpenPrs } = args as { workspace: string; archived: boolean; closeOpenPrs?: boolean };
       const name = resolveWorkspaceName(workspace);
       if (!(await getWorkspaceSummary(name))) return { data: `Workspace not found: ${name}`, isError: true };
-      if (archived) archiveWorkspace(name);
-      else unarchiveWorkspace(name);
-      return { data: { workspace: name, archived } };
+      if (!archived) {
+        unarchiveWorkspace(name);
+        return { data: { workspace: name, archived } };
+      }
+      try {
+        return { data: { workspace: name, archived, ...(await archiveWorkspaceWithPrs(name, { closeOpenPrs })) } };
+      } catch (err) {
+        if (err instanceof OpenPullRequestsError) {
+          return { data: { error: err.message, openPullRequests: err.pullRequests }, isError: true };
+        }
+        throw err;
+      }
     },
   },
   routeTool(
@@ -184,6 +199,13 @@ export const MCP_TOOLS: McpTool[] = [
     `Review a workspace's changes against its README and TODOs; repository narrows it to one. ${STARTS_OPERATION}`,
     reviewSchema,
     postReview,
+  ),
+  routeTool(
+    "harvest_lessons",
+    "Distill a workspace's outcome (PR comments, commits people added, a rejected PR, recurring review findings) into candidate lessons " +
+      `for its repositories. Archiving starts this on its own; candidates wait for a person to approve them. ${STARTS_OPERATION}`,
+    harvestLessonsSchema,
+    postHarvestLessons,
   ),
   routeTool(
     "create_pr",

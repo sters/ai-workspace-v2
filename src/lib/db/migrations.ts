@@ -296,6 +296,62 @@ const migrations: Migration[] = [
       db.exec("DROP TABLE IF EXISTS bench_runs");
     },
   },
+  {
+    version: 18,
+    up: (db) => {
+      // No foreign keys to workspaces: events and lessons outlive the workspace
+      // they came from, and lessons are keyed by clone, not by workspace.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS pr_watch (
+          workspace     TEXT NOT NULL,
+          repo_name     TEXT NOT NULL,
+          pr_url        TEXT NOT NULL,
+          state         TEXT NOT NULL,
+          head_sha      TEXT NOT NULL,
+          ci            TEXT NOT NULL,
+          mergeable     TEXT NOT NULL,
+          seen_comments TEXT NOT NULL,
+          checked_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          PRIMARY KEY (workspace, repo_name)
+        );
+
+        CREATE TABLE IF NOT EXISTS pr_events (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          workspace   TEXT NOT NULL,
+          repo_name   TEXT NOT NULL,
+          pr_url      TEXT NOT NULL,
+          kind        TEXT NOT NULL,
+          author      TEXT,
+          body        TEXT NOT NULL,
+          url         TEXT,
+          occurred_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_pr_events_ws ON pr_events(workspace, occurred_at);
+
+        CREATE TABLE IF NOT EXISTS repo_lessons (
+          id               TEXT PRIMARY KEY,
+          repo_key         TEXT NOT NULL,
+          section          TEXT NOT NULL,
+          text             TEXT NOT NULL,
+          status           TEXT NOT NULL,
+          evidence_json    TEXT NOT NULL,
+          replaces_json    TEXT NOT NULL DEFAULT '[]',
+          source_workspace TEXT NOT NULL,
+          created_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+        CREATE INDEX IF NOT EXISTS idx_repo_lessons_repo ON repo_lessons(repo_key, status);
+
+        CREATE TABLE IF NOT EXISTS lesson_findings (
+          repo_key  TEXT NOT NULL,
+          workspace TEXT NOT NULL,
+          summary   TEXT NOT NULL,
+          kind      TEXT NOT NULL,
+          PRIMARY KEY (repo_key, workspace, summary)
+        );
+      `);
+    },
+  },
 ];
 
 /**

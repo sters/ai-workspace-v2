@@ -146,6 +146,8 @@ export interface WorkspacePullRequest {
   baseRefName: string;
   author: string;
   updatedAt: string;
+  /** MERGEABLE / CONFLICTING / UNKNOWN (GitHub still computing). */
+  mergeable?: string;
   threads: PrReviewThread[];
   /** CI on the PR's head commit, read in the same round trip as the threads. */
   checks: PrChecksSummary;

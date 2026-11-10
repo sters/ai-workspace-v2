@@ -58,7 +58,7 @@ Entries are cumulative — remove one only when the underlying decision changes.
 `;
 
 /** `- **[kind]** (cycle N) summary` + a `Why not acted on:` sub-bullet. */
-const ENTRY_PATTERN = /^-\s+\*\*\[[a-z-]+\]\*\*\s*(?:\(cycle \d+\)\s*)?(.+)$/gm;
+const ENTRY_PATTERN = /^-\s+\*\*\[([a-z-]+)\]\*\*\s*(?:\(cycle \d+\)\s*)?(.+)$/gm;
 
 function oneLine(text: string): string {
   return text.replace(/\s+/g, " ").trim();
@@ -90,15 +90,14 @@ export function renderKnownFinding(finding: KnownFinding): string {
   return `- **[${finding.kind}]**${cycle} ${oneLine(finding.summary)}\n  - Why not acted on: ${reason}`;
 }
 
+export function parseKnownFindings(content: string): { kind: string; summary: string }[] {
+  return [...content.matchAll(ENTRY_PATTERN)]
+    .map((m) => ({ kind: m[1], summary: m[2].trim() }))
+    .filter((f) => f.summary !== "");
+}
+
 export function parseKnownFindingSummaries(content: string): string[] {
-  const summaries: string[] = [];
-  ENTRY_PATTERN.lastIndex = 0;
-  let match;
-  while ((match = ENTRY_PATTERN.exec(content)) !== null) {
-    const summary = match[1].trim();
-    if (summary) summaries.push(summary);
-  }
-  return summaries;
+  return parseKnownFindings(content).map((f) => f.summary);
 }
 
 /** Ledger content, or `""` when the workspace has no ledger yet. */

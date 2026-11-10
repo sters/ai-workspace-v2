@@ -46,6 +46,12 @@ const tools = [
       "Break down Claude spend by operation, phase, step, model and effort.",
   },
   {
+    href: "/utilities/repo-lessons",
+    name: "Repo Lessons",
+    description:
+      "Review lessons distilled from finished workspaces; approved ones reach agents working in that repository.",
+  },
+  {
     href: "/utilities/aiw-settings",
     name: "AIW Settings",
     description:

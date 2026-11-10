@@ -1,5 +1,6 @@
 "use client";
 
+import { PrEventTimeline } from "./pr-event-timeline";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, MessageSquare, RefreshCw } from "lucide-react";
@@ -400,6 +401,7 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
 
   return (
     <div className="space-y-4 pb-24">
+      <PrEventTimeline workspaceName={workspaceName} />
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-medium">

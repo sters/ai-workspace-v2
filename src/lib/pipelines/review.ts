@@ -25,6 +25,7 @@ import {
 import { ensureSystemPrompt } from "@/lib/workspace/prompts";
 import { readKnownFindings } from "@/lib/workspace/known-findings";
 import { readRepoGuidance } from "@/lib/workspace/repo-guidance";
+import { readRepoLessons } from "@/lib/lessons";
 import { findingsFilePath } from "@/lib/workspace/review-findings";
 import {
   buildReviewSummary,
@@ -265,6 +266,7 @@ export async function buildReviewPipeline(
         ? { ...changes.incremental, sinceTimestamp: previousBaseline.timestamp }
         : undefined;
     const repoGuidance = (await readRepoGuidance(wsPath, repo.repoName))?.review;
+    const repoLessons = await readRepoLessons(repo, "review");
 
     // Same range the code reviewer gets. The cross-repo reviewer applies a
     // different rule to it (a boundary is in scope when *either* side moved, and
@@ -278,6 +280,7 @@ export async function buildReviewPipeline(
       repoChanges: repoChangesText,
       reviewScope,
       repoGuidance,
+      repoLessons,
     });
 
     // A repository an autonomous cycle finished stops here. Its head is in the
@@ -311,6 +314,7 @@ export async function buildReviewPipeline(
         knownFindings,
         reviewScope,
         repoGuidance,
+        repoLessons,
       }),
       addDirs: [reviewDir],
       appendSystemPromptFile: await ensureSystemPrompt(wsPath, "code-reviewer"),

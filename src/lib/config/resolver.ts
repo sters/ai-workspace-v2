@@ -286,6 +286,14 @@ export function mergeConfig(
     suggest: {
       enabled: pick(env.suggest?.enabled, file.suggest?.enabled, defaults.suggest.enabled),
     },
+    watcher: {
+      enabled: pick(env.watcher?.enabled, file.watcher?.enabled, defaults.watcher.enabled),
+      intervalMinutes: pick(
+        env.watcher?.intervalMinutes,
+        file.watcher?.intervalMinutes,
+        defaults.watcher.intervalMinutes,
+      ),
+    },
     hooks: {
       sessionStartGitContext: pick(
         env.hooks?.sessionStartGitContext,

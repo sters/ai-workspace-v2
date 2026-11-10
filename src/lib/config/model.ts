@@ -65,6 +65,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.PLAN_VERIFICATION]: "opus",
 
   [STEP_TYPES.AUTONOMOUS_GATE]: CLAUDE_MODELS.SONNET_5_5,
+  [STEP_TYPES.DISTILL_LESSONS]: CLAUDE_MODELS.SONNET_5_5,
 
   [STEP_TYPES.VERIFY_COMPLETION]: CLAUDE_MODELS.HAIKU_5_5,
   [STEP_TYPES.VERIFY_FIXES]: CLAUDE_MODELS.HAIKU_5_5,
@@ -91,6 +92,8 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // Decides whether to run another cycle from an already-structured summary; a
   // wrong answer burns a cycle or stops with work unfinished.
   [STEP_TYPES.AUTONOMOUS_GATE]: "high",
+  // Once per archived workspace, and a human reads every candidate it writes.
+  [STEP_TYPES.DISTILL_LESSONS]: "high",
 
   [STEP_TYPES.ANALYZE_README]: "medium",
   [STEP_TYPES.PLAN_TODO]: "medium",
