@@ -10,14 +10,14 @@ const SERVER_ENV_KEYS = [
   "NODE",
   "NODE_ENV",
   "NODE_OPTIONS",
-  "AIW_PORT",
-  "AIW_CHAT_PORT",
-  "AIW_WORKSPACE_ROOT",
-  "AIW_DISABLE_ACCESS_LOG",
 ] as const;
 
-/** Key prefixes to strip (e.g. NEXT_*, npm_*). */
-const SERVER_ENV_PREFIXES = ["NEXT_", "__NEXT_", "npm_"] as const;
+/**
+ * Key prefixes to strip (e.g. NEXT_*, npm_*). `AIW_` covers the server's own
+ * settings, secrets such as the Slack tokens among them: agents run in these
+ * children and can read their environment.
+ */
+const SERVER_ENV_PREFIXES = ["NEXT_", "__NEXT_", "npm_", "AIW_"] as const;
 
 export function getCleanEnv(
   extra?: Record<string, string | undefined>,
