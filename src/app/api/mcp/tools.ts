@@ -1,6 +1,6 @@
 import z from "zod";
 import type { McpTool } from "@/lib/mcp/protocol";
-import type { OperationListItem } from "@/types/operation";
+import type { OperationEvent, OperationListItem } from "@/types/operation";
 import { resolveWorkspaceName } from "@/lib/config";
 import { archiveWorkspace, unarchiveWorkspace } from "@/lib/db/archives";
 import { getOperation, getOperationEvents, getOperationSummaries } from "@/lib/pipeline-manager";
@@ -55,14 +55,38 @@ const INTERACTION_LEVEL =
 
 const workspaceInput = z.object({ workspace: z.string().min(1, "workspace is required") });
 
+const RECENT_STATUS_LINES = 8;
+const STATUS_LINE_MAX_CHARS = 500;
+
+/**
+ * The last progress and error lines, newest last. A failed run's reason lives
+ * only here; `__`-prefixed status events are internal phase markers.
+ */
+function recentStatus(events: OperationEvent[]): string[] {
+  const lines: string[] = [];
+  for (let i = events.length - 1; i >= 0 && lines.length < RECENT_STATUS_LINES; i--) {
+    const { type, data, childLabel } = events[i];
+    const label = childLabel ? `${childLabel}: ` : "";
+    let line: string | undefined;
+    if (type === "status" && !data.startsWith("__")) line = `${label}${data}`;
+    else if (type === "error") line = `error: ${label}${data}`;
+    if (line) lines.push(line.length > STATUS_LINE_MAX_CHARS ? `${line.slice(0, STATUS_LINE_MAX_CHARS)}…` : line);
+  }
+  return lines.reverse();
+}
+
 async function getOperationStatus(operationId: string) {
   const summary = getOperationSummaries().find((op) => op.id === operationId);
   if (summary) {
-    const ask = summary.hasPendingAsk ? findPendingAsk(eventsToLogEntries(getOperationEvents(operationId))) : null;
+    const live = getOperationEvents(operationId);
+    // A finished operation's in-memory events are cleared; its log is on disk.
+    const events = live.length > 0 ? live : (readOperationLog(operationId)?.events ?? []);
+    const ask = summary.hasPendingAsk ? findPendingAsk(eventsToLogEntries(events)) : null;
     return {
       data: {
         ...summary,
         phases: getOperation(operationId)?.phases,
+        recentStatus: recentStatus(events),
         ...(ask && {
           pendingQuestion: { toolUseId: ask.toolId, questions: ask.questions, allowFreeText: ask.allowFreeText },
         }),
@@ -71,7 +95,13 @@ async function getOperationStatus(operationId: string) {
   }
   const stored = readOperationLog(operationId);
   if (!stored) return { data: `Operation not found: ${operationId}`, isError: true };
-  return { data: { ...stored.operation, resultSummary: extractResultSummary(stored.events) } };
+  return {
+    data: {
+      ...stored.operation,
+      resultSummary: extractResultSummary(stored.events),
+      recentStatus: recentStatus(stored.events),
+    },
+  };
 }
 
 const LIST_INPUT_MAX_CHARS = 200;
@@ -186,7 +216,7 @@ export const MCP_TOOLS: McpTool[] = [
   {
     name: "get_operation",
     description:
-      "Read an operation's status, phases and final result. While it waits on a question it carries pendingQuestion; answer it with answer_question.",
+      "Read an operation's status, phases, final result and recentStatus (its last progress and error lines, which say why a failed run stopped). While it waits on a question it carries pendingQuestion; answer it with answer_question.",
     input: z.object({ operationId: z.string().min(1, "operationId is required") }),
     call: async (args) => getOperationStatus((args as { operationId: string }).operationId),
   },

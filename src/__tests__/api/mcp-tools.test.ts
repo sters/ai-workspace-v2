@@ -137,6 +137,30 @@ describe("MCP tools", () => {
     expect(todo.sections).toEqual([{ heading: "Tasks", items: [item], notes: [] }]);
   });
 
+  it("get_operation carries the last status and error lines, which say why a run failed", async () => {
+    const ev = (type: OperationEvent["type"], data: string, childLabel?: string): OperationEvent => ({
+      type, operationId: "op-3", data, timestamp: "t", childLabel,
+    });
+    mockReadLog.mockReturnValue({
+      operation: { id: "op-3", type: "autonomous", workspace: "ws", status: "failed", startedAt: "t" },
+      events: [
+        ev("status", "Phase 1/2: Execute", "Execute"),
+        ev("output", JSON.stringify({ type: "assistant", message: { content: [] } })),
+        ev("status", '__phaseUpdate:{"index":0}'),
+        ev("error", "git push rejected", "repo"),
+        ev("status", "Phase 1 failed, aborting pipeline"),
+      ],
+    });
+
+    const { data } = await callTool("get_operation", { operationId: "op-3" });
+
+    expect((data as { recentStatus: string[] }).recentStatus).toEqual([
+      "Execute: Phase 1/2: Execute",
+      "error: repo: git push rejected",
+      "Phase 1 failed, aborting pipeline",
+    ]);
+  });
+
   it("get_operation is an error for an unknown id", async () => {
     mockReadLog.mockReturnValue(null);
     const { isError } = await callTool("get_operation", { operationId: "nope" });
