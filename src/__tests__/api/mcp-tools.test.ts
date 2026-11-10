@@ -102,6 +102,41 @@ describe("MCP tools", () => {
     expect(data).toMatchObject({ id: "op-2", status: "completed" });
   });
 
+  it("list_operations leaves result bodies to get_operation and shortens long inputs", async () => {
+    mockSummaries.mockReturnValue(
+      Array.from({ length: 3 }, (_, i) => ({
+        id: `op-${i}`,
+        type: "autonomous" as const,
+        workspace: "ws",
+        status: "running" as const,
+        startedAt: `2026-01-0${i + 1}T00:00:00Z`,
+        inputs: { description: "x".repeat(5000) },
+        resultSummary: { content: "long result" },
+      })),
+    );
+
+    const { data } = await callTool("list_operations", { status: "running", limit: 2 });
+
+    const ops = data as { id: string; inputs: { description: string }; resultSummary?: unknown }[];
+    expect(ops).toHaveLength(2);
+    expect(ops[0].resultSummary).toBeUndefined();
+    expect(ops[0].inputs.description.length).toBeLessThan(500);
+  });
+
+  it("get_workspace lists each TODO item once, under its section", async () => {
+    const item = { text: "Do it", status: "pending", indent: 0, children: [] };
+    mockWorkspaceSummary.mockResolvedValue({
+      name: "ws",
+      todos: [{ filename: "TODO-repo.md", items: [item], sections: [{ heading: "Tasks", items: [item], notes: [] }] }],
+    });
+
+    const { data } = await callTool("get_workspace", { workspace: "ws" });
+
+    const todo = (data as { todos: Record<string, unknown>[] }).todos[0];
+    expect(todo.items).toBeUndefined();
+    expect(todo.sections).toEqual([{ heading: "Tasks", items: [item], notes: [] }]);
+  });
+
   it("get_operation is an error for an unknown id", async () => {
     mockReadLog.mockReturnValue(null);
     const { isError } = await callTool("get_operation", { operationId: "nope" });

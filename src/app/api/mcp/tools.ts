@@ -1,5 +1,6 @@
 import z from "zod";
 import type { McpTool } from "@/lib/mcp/protocol";
+import type { OperationListItem } from "@/types/operation";
 import { resolveWorkspaceName } from "@/lib/config";
 import { archiveWorkspace, unarchiveWorkspace } from "@/lib/db/archives";
 import { getOperation, getOperationEvents, getOperationSummaries } from "@/lib/pipeline-manager";
@@ -73,6 +74,19 @@ async function getOperationStatus(operationId: string) {
   return { data: { ...stored.operation, resultSummary: extractResultSummary(stored.events) } };
 }
 
+const LIST_INPUT_MAX_CHARS = 200;
+
+function toListEntry({ resultSummary: _result, inputs, ...op }: OperationListItem) {
+  if (!inputs) return op;
+  const shortened = Object.fromEntries(
+    Object.entries(inputs).map(([key, value]) => [
+      key,
+      value.length > LIST_INPUT_MAX_CHARS ? `${value.slice(0, LIST_INPUT_MAX_CHARS)}…` : value,
+    ]),
+  );
+  return { ...op, inputs: shortened };
+}
+
 export const MCP_TOOLS: McpTool[] = [
   {
     name: "list_workspaces",
@@ -90,7 +104,9 @@ export const MCP_TOOLS: McpTool[] = [
     call: async (args) => {
       const name = resolveWorkspaceName((args as { workspace: string }).workspace);
       const summary = await getWorkspaceSummary(name);
-      return summary ? { data: summary } : { data: `Workspace not found: ${name}`, isError: true };
+      if (!summary) return { data: `Workspace not found: ${name}`, isError: true };
+      // `sections` holds every item again, under its heading and with its notes.
+      return { data: { ...summary, todos: summary.todos.map(({ items: _items, ...todo }) => todo) } };
     },
   },
   {
@@ -147,18 +163,24 @@ export const MCP_TOOLS: McpTool[] = [
   ),
   {
     name: "list_operations",
-    description: "List operations, running ones first. status narrows it to running or recently finished ones.",
+    description:
+      "List operations, running ones first, newest first within that. status narrows it to running or recently finished ones. " +
+      "Inputs are shortened and results left out; get_operation has both in full.",
     input: z.object({
       workspace: z.string().optional(),
       status: z.enum(["running", "completed"]).optional(),
+      limit: z.number().int().min(1).max(200).default(20),
     }),
     call: async (args) => {
-      const { workspace, status } = args as { workspace?: string; status?: string };
+      const { workspace, status, limit } = args as { workspace?: string; status?: string; limit: number };
       const url = new URL("http://localhost/api/operations");
       if (workspace) url.searchParams.set("workspace", resolveWorkspaceName(workspace));
       if (status) url.searchParams.set("status", status);
+      url.searchParams.set("limit", String(limit));
       const response = listOperations(new Request(url));
-      return { data: await response.json(), isError: !response.ok };
+      if (!response.ok) return { data: await response.json(), isError: true };
+      const operations = (await response.json()) as OperationListItem[];
+      return { data: operations.slice(0, limit).map(toListEntry) };
     },
   },
   {
