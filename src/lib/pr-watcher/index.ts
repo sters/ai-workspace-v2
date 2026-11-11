@@ -9,7 +9,8 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { getArchivedNameSet } from "@/lib/db/archives";
-import { getPrSnapshot, savePrObservation } from "@/lib/db/pr-watch";
+import { getPrHandledAt, getPrSnapshot, listPrEvents, listPrSnapshots, savePrObservation } from "@/lib/db/pr-watch";
+import { findRunningOpsByWorkspace } from "@/lib/pipeline/store";
 import { pathExists } from "@/lib/fs";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
 import { runGit } from "@/lib/workspace/git-exec";
@@ -19,6 +20,7 @@ import type { WorkspacePullRequest } from "@/types/pull-request";
 import type { WorkspaceRepo } from "@/types/workspace";
 import { observePr } from "./observe";
 import type { Notification, WatchTarget } from "./scheduler";
+import { computePrSuggestions, NO_SUGGESTIONS, type PrSuggestions } from "./suggestions";
 
 const TERMINAL_STATES = new Set(["MERGED", "CLOSED"]);
 
@@ -92,4 +94,30 @@ export async function readNotifications(sinceIso: string): Promise<Notification[
 export async function readBaseSha(worktreePath: string, base: string): Promise<string | null> {
   const r = await runGit(["ls-remote", "origin", `refs/heads/${base}`], worktreePath);
   return r.ok ? r.out.split(/\s/)[0] || null : null;
+}
+
+const selfLogin = globalThis as typeof globalThis & { __aiwGhLogin?: Promise<string | null> };
+
+/** The gh user's login, read once per process; null when gh cannot say. */
+function ghLogin(): Promise<string | null> {
+  selfLogin.__aiwGhLogin ??= execArgs(["gh", "api", "user", "--jq", ".login"]).then(
+    (out) => out.trim() || null,
+    () => {
+      selfLogin.__aiwGhLogin = undefined;
+      return null;
+    },
+  );
+  return selfLogin.__aiwGhLogin;
+}
+
+/** Proposals for a workspace; none while an operation runs on it, since the PRs are about to change. */
+export async function getWorkspacePrSuggestions(workspace: string): Promise<PrSuggestions> {
+  if (findRunningOpsByWorkspace(workspace).length > 0) return NO_SUGGESTIONS;
+  return computePrSuggestions({
+    snapshots: listPrSnapshots(workspace),
+    events: listPrEvents(workspace),
+    handledAt: getPrHandledAt(workspace),
+    self: await ghLogin(),
+    now: Date.now(),
+  });
 }

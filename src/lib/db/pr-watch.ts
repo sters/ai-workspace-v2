@@ -16,7 +16,26 @@ export function getPrSnapshot(workspace: string, repoName: string): PrWatchSnaps
   const row = getDb()
     .query("SELECT * FROM pr_watch WHERE workspace = ? AND repo_name = ?")
     .get(workspace, repoName) as SnapshotRow | null;
-  if (!row) return null;
+  return row ? toSnapshot(row) : null;
+}
+
+export function listPrSnapshots(workspace: string): PrWatchSnapshot[] {
+  const rows = getDb().query("SELECT * FROM pr_watch WHERE workspace = ? ORDER BY repo_name").all(workspace) as SnapshotRow[];
+  return rows.map(toSnapshot);
+}
+
+export function getPrHandledAt(workspace: string): string | null {
+  const row = getDb().query("SELECT handled_at FROM pr_handled WHERE workspace = ?").get(workspace) as
+    | { handled_at: string }
+    | null;
+  return row?.handled_at ?? null;
+}
+
+export function markPrHandled(workspace: string, at: string = new Date().toISOString()): void {
+  getDb().query("INSERT OR REPLACE INTO pr_handled (workspace, handled_at) VALUES (?, ?)").run(workspace, at);
+}
+
+function toSnapshot(row: SnapshotRow): PrWatchSnapshot {
   let seen: unknown;
   try {
     seen = JSON.parse(row.seen_comments);

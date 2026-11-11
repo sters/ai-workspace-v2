@@ -55,15 +55,15 @@ export const REVIEW_THREADS_QUERY = `query($owner:String!,$name:String!,$number:
           path
           line
           comments(first:${MAX_COMMENTS_PER_THREAD}){
-            nodes{ url author{login} body createdAt }
+            nodes{ url author{login __typename} body createdAt }
           }
         }
       }
       comments(last:${MAX_CONVERSATION}){
-        nodes{ id url author{login} body createdAt isMinimized }
+        nodes{ id url author{login __typename} body createdAt isMinimized }
       }
       reviews(last:${MAX_CONVERSATION}){
-        nodes{ id url author{login} body createdAt state isMinimized }
+        nodes{ id url author{login __typename} body createdAt state isMinimized }
       }
       commits(last:1){
         nodes{
@@ -108,9 +108,12 @@ export function parsePrLocator(url: string): PrLocator | null {
   return { host: match[1], owner: match[2], repo: match[3], number: Number(match[4]) };
 }
 
+/** A bot's login gets `[bot]`, as GitHub's REST API spells it, so people and bots can be told apart downstream. */
 function login(author: unknown): string {
-  const name = (author as { login?: unknown } | null)?.login;
-  return typeof name === "string" && name !== "" ? name : "(unknown)";
+  const a = author as { login?: unknown; __typename?: unknown } | null;
+  const name = a?.login;
+  if (typeof name !== "string" || name === "") return "(unknown)";
+  return a?.__typename === "Bot" && !name.endsWith("[bot]") ? `${name}[bot]` : name;
 }
 
 export function parsePrView(

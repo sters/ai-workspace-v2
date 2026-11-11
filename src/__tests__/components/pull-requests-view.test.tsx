@@ -9,6 +9,7 @@ import type {
 } from "@/types/pull-request";
 import type { OperationType } from "@/types/operation";
 import { blocksOperation } from "@/lib/operation-conflict";
+import { SWRConfig } from "swr";
 
 function zeroCounts(): Record<PrCheckState, number> {
   return {
@@ -833,6 +834,49 @@ describe("PullRequestsView", () => {
       fireEvent.click(screen.getByRole("button", { name: "Triage" }));
 
       expect(mockStartAndNavigate.mock.calls[0][1]).toMatchObject({ repo: "widgets" });
+    });
+  });
+
+  describe("the watcher's suggestions", () => {
+    const suggestionsUrl = "/api/workspaces/feat/pr-suggestions";
+    const renderWith = (suggestions: unknown) => {
+      mockFetch.mockImplementation(async (url: string, init?: RequestInit) => ({
+        ok: true,
+        json: async () => (url === suggestionsUrl && !init?.method ? suggestions : { ok: true }),
+      }));
+      render(
+        <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+          <PullRequestsView workspaceName="feat" />
+        </SWRConfig>,
+      );
+    };
+
+    it("selects the proposed comment for triage and marks the proposal handled, starting nothing", async () => {
+      setData();
+      renderWith({
+        triage: { commentUrls: ["https://github.com/acme/widgets/pull/42#discussion_r1"], failingRepos: [] },
+        conflicts: [],
+        archive: false,
+      });
+      fireEvent.click(await screen.findByRole("button", { name: "Select for triage" }));
+
+      expect(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ })).toBeChecked();
+      expect(mockFetch).toHaveBeenCalledWith(suggestionsUrl, { method: "DELETE" });
+      expect(mockStartAndNavigate).not.toHaveBeenCalled();
+    });
+
+    it("offers no triage for a proposed comment that has since been resolved", async () => {
+      setData();
+      renderWith({
+        triage: { commentUrls: ["https://github.com/acme/widgets/pull/42#discussion_r2"], failingRepos: [] },
+        conflicts: ["widgets"],
+        archive: false,
+      });
+      await screen.findByRole("button", { name: "Resolve conflicts" });
+      expect(screen.queryByRole("button", { name: "Select for triage" })).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: "Resolve conflicts" }));
+      expect(mockStartAndNavigate).toHaveBeenCalledWith("resolve-base-conflicts", { workspace: "feat", repo: "widgets" });
     });
   });
 });

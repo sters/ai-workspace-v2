@@ -23,6 +23,24 @@ function LessonCandidatesNotice() {
   );
 }
 
+function PrSuggestionsNotice() {
+  const { data } = useSWR<{ workspaces: string[] }>("/api/pr-suggestions", fetcher, { refreshInterval: 60_000 });
+  if (!data?.workspaces.length) return null;
+  return (
+    <Callout variant="info" className="mb-4 text-sm">
+      Suggested actions on pull requests:{" "}
+      {data.workspaces.map((name, i) => (
+        <span key={name}>
+          {i > 0 && ", "}
+          <Link href={`/workspace/${encodeURIComponent(name)}/pull-requests`} className="underline">
+            {name}
+          </Link>
+        </span>
+      ))}
+    </Callout>
+  );
+}
+
 function DashboardContent() {
   useDocumentTitle("Dashboard");
   const [searchActive, setSearchActive] = useState(false);
@@ -32,6 +50,7 @@ function DashboardContent() {
       <PageHeader title="Workspaces" />
 
       <LessonCandidatesNotice />
+      <PrSuggestionsNotice />
 
       <WorkspaceSearch onSearchActiveChange={setSearchActive} />
 

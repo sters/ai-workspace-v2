@@ -1,6 +1,12 @@
 "use client";
 
+import useSWR from "swr";
 import { PrEventTimeline } from "./pr-event-timeline";
+import { PrSuggestionsCallout } from "./pr-suggestions";
+import { ArchiveOpenPrsConfirm } from "./archive-open-prs-confirm";
+import { useArchiveToggle } from "@/hooks/use-archive-toggle";
+import { fetcher } from "@/lib/api";
+import type { PrSuggestions } from "@/lib/pr-watcher/suggestions";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExternalLink, MessageSquare, RefreshCw } from "lucide-react";
@@ -228,6 +234,38 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
   }, [selectedIds, selectedCheckKeys, threadsById, failuresByKey]);
   const triageBusy = scopedRepo ? isRepoBusy(workspaceName, scopedRepo) : isRunning;
 
+  const suggestionsUrl = `/api/workspaces/${encodeURIComponent(workspaceName)}/pr-suggestions`;
+  const { data: suggestionsData, mutate: refreshSuggestions } = useSWR<PrSuggestions>(suggestionsUrl, fetcher, {
+    refreshInterval: 60_000,
+  });
+  const suggestions = Array.isArray(suggestionsData?.conflicts) ? suggestionsData : undefined;
+  const archive = useArchiveToggle(() => router.push("/"));
+
+  // The proposal names comments by permalink and checks by repository; the
+  // selection is by thread id and check key, and only what is still on the tab.
+  const triagePick = useMemo(() => {
+    const urls = new Set(suggestions?.triage?.commentUrls ?? []);
+    const failing = new Set(suggestions?.triage?.failingRepos ?? []);
+    const threadIds = [...threadsById.values()]
+      .filter(({ thread }) => !thread.isResolved && thread.comments.some((c) => urls.has(c.url)))
+      .map(({ thread }) => thread.id);
+    const checkKeys = [...failuresByKey.entries()]
+      .filter(([, { pr }]) => failing.has(pr.repoName))
+      .map(([key]) => key);
+    return { threadIds, checkKeys };
+  }, [suggestions, threadsById, failuresByKey]);
+
+  const markHandled = async () => {
+    await fetch(suggestionsUrl, { method: "DELETE" });
+    void refreshSuggestions();
+  };
+
+  const selectTriage = () => {
+    setSelectedIds((prev) => new Set([...prev, ...triagePick.threadIds]));
+    setSelectedCheckKeys((prev) => new Set([...prev, ...triagePick.checkKeys]));
+    void markHandled();
+  };
+
   // A thread that scrolled out of view because the resolved filter changed is
   // still selected, so the counts are taken from the selections themselves.
   const selectedCount = selectedIds.size + selectedCheckKeys.size;
@@ -401,6 +439,25 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
 
   return (
     <div className="space-y-4 pb-24">
+      {suggestions && (
+        <PrSuggestionsCallout
+          suggestions={suggestions}
+          triageCount={{ comments: triagePick.threadIds.length, checks: triagePick.checkKeys.length }}
+          disabled={isRunning}
+          onSelectTriage={selectTriage}
+          onDismissTriage={() => void markHandled()}
+          onResolveConflicts={() =>
+            void startAndNavigate("resolve-base-conflicts", {
+              workspace: workspaceName,
+              ...(suggestions.conflicts.length === 1 && { repo: suggestions.conflicts[0] }),
+            })
+          }
+          onArchive={() => void archive.toggle(workspaceName)}
+        />
+      )}
+      {archive.openPrs && (
+        <ArchiveOpenPrsConfirm prs={archive.openPrs} onConfirm={archive.confirmClose} onCancel={archive.cancel} />
+      )}
       <PrEventTimeline workspaceName={workspaceName} />
       <div className="flex items-center justify-between">
         <div>

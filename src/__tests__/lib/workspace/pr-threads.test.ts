@@ -83,6 +83,16 @@ describe("parsePrView", () => {
     expect(parsePrView("{oops", { repoName: "w", repoPath: "p", worktreePath: "/w" })).toBeNull();
   });
 
+  it("marks a bot author so it can be told from a person", () => {
+    const raw = JSON.stringify({
+      data: { repository: { pullRequest: { reviewThreads: { nodes: [{
+        id: "PRRT_bot", isResolved: false, isOutdated: false, path: "a.ts", line: 1,
+        comments: { nodes: [{ url: "u", author: { login: "lint-helper", __typename: "Bot" }, body: "b", createdAt: "" }] },
+      }] } } } },
+    });
+    expect(parseReviewThreads(raw)[0].comments[0].author).toBe("lint-helper[bot]");
+  });
+
   it("falls back to a placeholder author when gh omits it", () => {
     const noAuthor = JSON.stringify({
       number: 1,

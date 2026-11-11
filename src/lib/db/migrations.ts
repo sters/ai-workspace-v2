@@ -352,6 +352,18 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 19,
+    up: (db) => {
+      // When a workspace's PR suggestions were last taken or dismissed.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS pr_handled (
+          workspace  TEXT PRIMARY KEY,
+          handled_at TEXT NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 /**
