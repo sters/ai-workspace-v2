@@ -41,13 +41,23 @@ describe("computePrSuggestions", () => {
     expect(s.triage).toBeNull();
   });
 
-  it("leaves out comments by bots and by the user aiw acts as", () => {
+  it("leaves out a bot's conversation comments and the user aiw acts as", () => {
     const s = computePrSuggestions({
       ...base,
       snapshots: [snap("widgets")],
-      events: [ev("comment", ago(30), { author: "lint-helper[bot]" }), ev("comment", ago(30), { author: "me" })],
+      events: [
+        ev("comment", ago(30), { author: "lint-helper[bot]", url: "https://github.com/acme/widgets/pull/1#issuecomment-1" }),
+        ev("comment", ago(30), { author: "me" }),
+      ],
     });
     expect(s.triage).toBeNull();
+  });
+
+  it("includes a review bot's reviews and inline comments", () => {
+    const review = ev("comment", ago(30), { author: "review-helper[bot]", url: "https://github.com/acme/widgets/pull/1#pullrequestreview-2" });
+    const inline = ev("comment", ago(30), { author: "review-helper[bot]", url: "https://github.com/acme/widgets/pull/1#discussion_r3" });
+    const s = computePrSuggestions({ ...base, snapshots: [snap("widgets")], events: [review, inline] });
+    expect(s.triage?.commentUrls).toEqual([review.url, inline.url]);
   });
 
   it("leaves out what came before the workspace was last handled", () => {
@@ -68,6 +78,12 @@ describe("computePrSuggestions", () => {
     expect(
       computePrSuggestions({ ...base, snapshots: [snap("widgets")], events: [ev("ci-failing", ago(10))] }).triage,
     ).toBeNull();
+  });
+
+  it("includes CI that was failing before the watcher recorded it, until the workspace is handled", () => {
+    const failing = [snap("widgets", { ci: "failing" })];
+    expect(computePrSuggestions({ ...base, snapshots: failing, events: [] }).triage).toEqual({ commentUrls: [], failingRepos: ["widgets"] });
+    expect(computePrSuggestions({ ...base, handledAt: ago(5), snapshots: failing, events: [] }).triage).toBeNull();
   });
 
   it("proposes resolving conflicts on open PRs only", () => {

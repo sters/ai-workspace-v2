@@ -16,8 +16,8 @@ export function ciState(checks: PrChecksSummary): PrCiState {
  * events to record and the snapshot to store.
  *
  * A first sighting records the comments already there (they are material for
- * lessons) but no transitions, since there is no earlier state to transition
- * from. `pending` CI and `UNKNOWN` mergeability are GitHub still computing, not
+ * lessons) and CI that is already failing (so it can be triaged), but no other
+ * transitions, since there is no earlier state to transition from. `pending` CI and `UNKNOWN` mergeability are GitHub still computing, not
  * a state of their own: the snapshot keeps the last settled value so the next
  * settled one is compared against it.
  */
@@ -51,13 +51,17 @@ export function observePr(
   const settledCi = ci === "pending" && base ? base.ci : ci;
   const settledMergeable = mergeable === "UNKNOWN" && base ? base.mergeable : mergeable;
 
+  const ciFailing = () => {
+    const failing = pr.checks.checks.filter((c) => c.state === "failure").map((c) => c.name);
+    event("ci-failing", `CI failing${failing.length ? `: ${failing.join(", ")}` : ""}`);
+  };
+
+  if (!base && settledCi === "failing") ciFailing();
   if (base) {
     if (pr.headSha && pr.headSha !== base.headSha) event("push", `Head moved to ${pr.headSha.slice(0, 12)}`);
     if (settledCi !== base.ci) {
-      if (settledCi === "failing") {
-        const failing = pr.checks.checks.filter((c) => c.state === "failure").map((c) => c.name);
-        event("ci-failing", `CI failing${failing.length ? `: ${failing.join(", ")}` : ""}`);
-      } else if (settledCi === "passing") {
+      if (settledCi === "failing") ciFailing();
+      else if (settledCi === "passing") {
         event("ci-passing", "CI passing");
       }
     }

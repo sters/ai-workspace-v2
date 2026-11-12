@@ -66,11 +66,16 @@ function snapshotOf(p: WorkspacePullRequest, seen: string[] = []): PrWatchSnapsh
 
 describe("observePr", () => {
   it("records existing comments but no state transitions on first sight", () => {
-    const { events, snapshot } = observePr(null, pr({ threads: [thread("u1")], checks: checks({ failure: 1 }) }), "ws", NOW);
+    const { events, snapshot } = observePr(null, pr({ threads: [thread("u1")], mergeable: "CONFLICTING" }), "ws", NOW);
     expect(events.map((e) => e.kind)).toEqual(["comment"]);
     expect(events[0]).toMatchObject({ author: "alice", url: "u1", occurredAt: "2026-01-01T10:00:00Z" });
-    expect(snapshot.ci).toBe("failing");
     expect(snapshot.seenComments).toEqual(["u1"]);
+  });
+
+  it("records CI that is already failing on first sight, so it can be triaged", () => {
+    const { events, snapshot } = observePr(null, pr({ checks: checks({ failure: 1 }) }), "ws", NOW);
+    expect(events.map((e) => e.kind)).toEqual(["ci-failing"]);
+    expect(snapshot.ci).toBe("failing");
   });
 
   it("emits only comments it has not seen", () => {
