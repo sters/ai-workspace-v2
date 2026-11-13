@@ -12,6 +12,7 @@ function lesson(overrides: Partial<RepoLesson>): RepoLesson {
     text: "Regenerate the client after changing `schema.sql`.",
     status: "candidate",
     evidence: [{ workspace: "feature-orders", note: "A person regenerated it", url: "https://example.com/c/1" }],
+    challenges: [],
     replaces: [],
     sourceWorkspace: "feature-orders",
     createdAt: "2026-11-01T00:00:00.000Z",
@@ -66,5 +67,29 @@ describe("RepoLessonsBrowser", () => {
     const details = screen.getByText(/Evidence \(1\)/).closest("details");
     expect(details).not.toHaveAttribute("open");
     expect(within(details!).getByText(/A person regenerated it/)).toBeInTheDocument();
+  });
+
+  it("lists disputed approved lessons first and lets a person keep one", async () => {
+    const onChanged = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue(new Response("{}"));
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <RepoLessonsBrowser
+        lessons={[
+          lesson({ id: "a1", status: "approved", text: "Undisputed" }),
+          lesson({ id: "a2", status: "approved", text: "Disputed one", challenges: [{ workspace: "fix-orders", note: "Reviewer undid it" }] }),
+        ]}
+        onChanged={onChanged}
+      />,
+    );
+    const rows = screen.getAllByRole("listitem").filter((li) => li.querySelector("button"));
+    expect(within(rows[0]).getByText("Disputed one")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("Reviewer undid it")).toBeVisible();
+    expect(within(rows[1]).queryByRole("button", { name: "Keep" })).not.toBeInTheDocument();
+
+    await userEvent.click(within(rows[0]).getByRole("button", { name: "Keep" }));
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ dismissChallenges: true });
+    expect(onChanged).toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

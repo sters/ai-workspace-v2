@@ -15,6 +15,7 @@ interface LessonRow {
   text: string;
   status: string;
   evidence_json: string;
+  challenges_json: string;
   replaces_json: string;
   source_workspace: string;
   created_at: string;
@@ -38,6 +39,7 @@ function toLesson(row: LessonRow): RepoLesson {
     text: row.text,
     status: row.status as LessonStatus,
     evidence: parseArray<LessonEvidence>(row.evidence_json),
+    challenges: parseArray<LessonEvidence>(row.challenges_json),
     replaces: parseArray<string>(row.replaces_json),
     sourceWorkspace: row.source_workspace,
     createdAt: row.created_at,
@@ -81,9 +83,15 @@ export function listLessons(filter: { repoKey?: string; status?: LessonStatus } 
   return rows.map(toLesson);
 }
 
-export function countCandidateLessons(): number {
-  const row = getDb().query("SELECT COUNT(*) AS n FROM repo_lessons WHERE status = 'candidate'").get() as { n: number };
-  return row.n;
+/** Lessons waiting for a person: candidates, and approved lessons something has challenged. */
+export function countLessonsAwaitingReview(): { candidates: number; disputed: number } {
+  return getDb()
+    .query(
+      `SELECT COUNT(*) FILTER (WHERE status = 'candidate') AS candidates,
+              COUNT(*) FILTER (WHERE status = 'approved' AND challenges_json != '[]') AS disputed
+       FROM repo_lessons`,
+    )
+    .get() as { candidates: number; disputed: number };
 }
 
 /** Approving a merge supersedes the lessons it replaces, in the same transaction. */
@@ -102,8 +110,14 @@ export function setLessonStatus(id: string, status: LessonStatus): RepoLesson | 
   return getLesson(id);
 }
 
+/** Rewriting a lesson answers its challenges, so they are cleared with it. */
 export function updateLessonText(id: string, text: string): RepoLesson | null {
-  getDb().query(`UPDATE repo_lessons SET text = ?, updated_at = ${NOW} WHERE id = ?`).run(text, id);
+  getDb().query(`UPDATE repo_lessons SET text = ?, challenges_json = '[]', updated_at = ${NOW} WHERE id = ?`).run(text, id);
+  return getLesson(id);
+}
+
+export function dismissLessonChallenges(id: string): RepoLesson | null {
+  getDb().query(`UPDATE repo_lessons SET challenges_json = '[]', updated_at = ${NOW} WHERE id = ?`).run(id);
   return getLesson(id);
 }
 
@@ -111,6 +125,12 @@ function addEvidence(lesson: RepoLesson, evidence: LessonEvidence[]): void {
   getDb()
     .query(`UPDATE repo_lessons SET evidence_json = ?, updated_at = ${NOW} WHERE id = ?`)
     .run(JSON.stringify([...lesson.evidence, ...evidence]), lesson.id);
+}
+
+function addChallenges(lesson: RepoLesson, challenges: LessonEvidence[]): void {
+  getDb()
+    .query(`UPDATE repo_lessons SET challenges_json = ?, updated_at = ${NOW} WHERE id = ?`)
+    .run(JSON.stringify([...lesson.challenges, ...challenges]), lesson.id);
 }
 
 /** Lowercase letters and digits only, so punctuation and case drift still match. */
@@ -127,8 +147,8 @@ export function applyDistilledLessons(
   repoKey: string,
   workspace: string,
   distilled: DistilledLesson[],
-): { added: number; reinforced: number; dropped: number } {
-  const result = { added: 0, reinforced: 0, dropped: 0 };
+): { added: number; reinforced: number; challenged: number; dropped: number } {
+  const result = { added: 0, reinforced: 0, challenged: 0, dropped: 0 };
   const db = getDb();
   db.transaction(() => {
     for (const d of distilled) {
@@ -136,6 +156,17 @@ export function applyDistilledLessons(
       const byId = new Map(existing.map((l) => [l.id, l]));
       const evidence = d.evidence.map((e) => ({ workspace, ...e }));
       const live = (l: RepoLesson | undefined) => l && (l.status === "approved" || l.status === "candidate");
+
+      if (d.action === "challenge") {
+        const target = byId.get(d.targetIds[0] ?? "");
+        if (target?.status !== "approved" || evidence.length === 0) {
+          result.dropped++;
+          continue;
+        }
+        addChallenges(target, evidence);
+        result.challenged++;
+        continue;
+      }
 
       if (d.action === "reinforce") {
         const target = byId.get(d.targetIds[0] ?? "");

@@ -337,7 +337,7 @@ export const verificationScenarioSchema = z.object({
 
 export const runtimeDistilledLessonsSchema = z.object({
   lessons: z.array(z.object({
-    action: z.enum(["new", "reinforce", "merge"]),
+    action: z.enum(["new", "reinforce", "merge", "challenge"]),
     section: z.enum(["implementation", "review"]),
     text: z.string(),
     targetIds: z.array(z.string()),

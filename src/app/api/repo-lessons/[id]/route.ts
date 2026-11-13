@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getLesson, setLessonStatus, updateLessonText } from "@/lib/db/repo-lessons";
+import { dismissLessonChallenges, getLesson, setLessonStatus, updateLessonText } from "@/lib/db/repo-lessons";
 import { writeLessonsFile } from "@/lib/lessons";
 import { repoLessonUpdateSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
@@ -16,6 +16,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   if (parsed.data.text) updateLessonText(id, parsed.data.text);
   if (parsed.data.status) setLessonStatus(id, parsed.data.status);
+  if (parsed.data.dismissChallenges) dismissLessonChallenges(id);
   await writeLessonsFile(lesson.repoKey);
   return NextResponse.json(getLesson(id));
 }

@@ -10,12 +10,16 @@ import useSWR from "swr";
 import { Callout } from "@/components/shared/containers/callout";
 import { fetcher } from "@/lib/api";
 
-function LessonCandidatesNotice() {
-  const { data } = useSWR<{ candidates: number }>("/api/repo-lessons?count=candidates", fetcher);
-  if (!data?.candidates) return null;
+function LessonReviewNotice() {
+  const { data } = useSWR<{ candidates: number; disputed: number }>("/api/repo-lessons?count=review", fetcher);
+  if (!data?.candidates && !data?.disputed) return null;
+  const parts = [
+    data.candidates > 0 && `${data.candidates} repository lesson${data.candidates === 1 ? "" : "s"} waiting for review`,
+    data.disputed > 0 && `${data.disputed} approved lesson${data.disputed === 1 ? "" : "s"} disputed`,
+  ].filter(Boolean);
   return (
     <Callout variant="info" className="mb-4 text-sm">
-      {data.candidates} repository lesson{data.candidates === 1 ? "" : "s"} waiting for review —{" "}
+      {parts.join(", ")} —{" "}
       <Link href="/utilities/repo-lessons" className="underline">
         Repo Lessons
       </Link>
@@ -31,7 +35,7 @@ function DashboardContent() {
     <div className="mx-auto w-full max-w-6xl">
       <PageHeader title="Workspaces" />
 
-      <LessonCandidatesNotice />
+      <LessonReviewNotice />
 
       <WorkspaceSearch onSearchActiveChange={setSearchActive} />
 

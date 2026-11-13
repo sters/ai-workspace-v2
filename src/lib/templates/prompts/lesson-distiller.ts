@@ -11,9 +11,9 @@ export const LESSON_DISTILLATION_SCHEMA = {
         properties: {
           action: {
             type: "string",
-            enum: ["new", "reinforce", "merge"],
+            enum: ["new", "reinforce", "merge", "challenge"],
             description:
-              "new: a lesson no listed one covers. reinforce: the material repeats one listed approved or candidate lesson. merge: one lesson replacing several approved ones.",
+              "new: a lesson no listed one covers. reinforce: the material repeats one listed approved or candidate lesson. merge: one lesson replacing one or more approved ones. challenge: the material shows one approved lesson led the work wrong.",
           },
           section: {
             type: "string",
@@ -22,12 +22,12 @@ export const LESSON_DISTILLATION_SCHEMA = {
           },
           text: {
             type: "string",
-            description: "The lesson as one imperative sentence a future agent can act on, with the reason after a dash. Empty for reinforce.",
+            description: "The lesson as one imperative sentence a future agent can act on, with the reason after a dash. Empty for reinforce and challenge.",
           },
           targetIds: {
             type: "array",
             items: { type: "string" },
-            description: "reinforce: exactly the one id it repeats. merge: the approved ids it replaces. new: empty.",
+            description: "reinforce: exactly the one id it repeats. merge: the approved ids it replaces. challenge: exactly the one approved id it disputes. new: empty.",
           },
           evidence: {
             type: "array",
@@ -120,6 +120,15 @@ A lesson is a repository-specific practice that someone's reaction showed aiw go
 - aiw's own review raised the same kind of finding here in more than one workspace: either agents keep making that mistake (an implementation lesson), or reviewers keep flagging something this repository accepts (a review lesson: what not to flag).
 
 Good lessons name the concrete practice and why, e.g. "Add a down migration next to every schema change — reviewers reject irreversible migrations." or "Do not flag missing null checks on values from the config loader — it validates them at startup." Leave out one-off bugs in this change, task-specific decisions, generic advice any codebase shares, and taste no one expressed. Proposing nothing is a normal outcome.
+
+## When an approved lesson was wrong
+
+Approved lessons were in front of the agents that did this work, so the material can also show one of them misleading them: a reviewer asked to undo what the lesson told the agent to do, a person's commit reverted it, or aiw's review flagged code the lesson asked for. Then:
+
+- Use \`challenge\` with that lesson's id, and evidence saying what went wrong. A person decides whether to keep, reword or reject it.
+- When the material also shows what the lesson should say instead, add a \`merge\` whose only target is that id, with the corrected text.
+
+Challenge only on a reaction against the practice itself, not when the work merely happened to touch the same area.
 
 ## Avoid duplicates
 

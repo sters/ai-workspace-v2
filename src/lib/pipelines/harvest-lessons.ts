@@ -78,7 +78,7 @@ export function buildHarvestLessonsPipeline(workspace: string): PipelinePhase[] 
                 return;
               }
               const r = applyDistilledLessons(material.repoKey, workspace, parsed.data.lessons);
-              lines.push(`[${material.repoName}] ${r.added} new candidate(s), ${r.reinforced} reinforced, ${r.dropped} dropped`);
+              lines.push(`[${material.repoName}] ${r.added} new candidate(s), ${r.reinforced} reinforced, ${r.challenged} challenged, ${r.dropped} dropped`);
             },
           };
         });

@@ -3,9 +3,12 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import {
   applyDistilledLessons,
+  countLessonsAwaitingReview,
+  dismissLessonChallenges,
   insertLesson,
   listLessons,
   setLessonStatus,
+  updateLessonText,
 } from "@/lib/db/repo-lessons";
 
 const REPO = "github.com/acme/widgets";
@@ -49,7 +52,7 @@ describe("db/repo-lessons", () => {
       { action: "reinforce", section: "implementation", text: "", targetIds: [id], evidence: [{ note: "x" }] },
       { action: "new", section: "implementation", text: "prefer TABS", targetIds: [], evidence: [{ note: "y" }] },
     ]);
-    expect(result).toEqual({ added: 0, reinforced: 0, dropped: 2 });
+    expect(result).toEqual({ added: 0, reinforced: 0, challenged: 0, dropped: 2 });
     expect(listLessons({ repoKey: REPO })[0].evidence).toEqual([]);
   });
 
@@ -91,5 +94,45 @@ describe("db/repo-lessons", () => {
       { action: "reinforce", section: "review", text: "", targetIds: [other], evidence: [{ note: "n" }] },
     ]);
     expect(dropped).toBe(1);
+  });
+
+  it("records counter-evidence on an approved lesson without changing what agents get", () => {
+    const id = insertLesson({ repoKey: REPO, section: "implementation", text: "Wrap every call in a retry", sourceWorkspace: "ws-0", evidence: [] });
+    setLessonStatus(id, "approved");
+    const { challenged } = applyDistilledLessons(REPO, "ws-1", [
+      { action: "challenge", section: "implementation", text: "", targetIds: [id], evidence: [{ note: "reviewer removed the retry", url: "u2" }] },
+    ]);
+    expect(challenged).toBe(1);
+    const lesson = byText("Wrap every call in a retry");
+    expect(lesson.status).toBe("approved");
+    expect(lesson.evidence).toEqual([]);
+    expect(lesson.challenges).toEqual([{ workspace: "ws-1", note: "reviewer removed the retry", url: "u2" }]);
+    expect(countLessonsAwaitingReview()).toEqual({ candidates: 0, disputed: 1 });
+  });
+
+  it("drops a challenge of a lesson that is not approved, or one without evidence", () => {
+    const candidate = insertLesson({ repoKey: REPO, section: "review", text: "C", sourceWorkspace: "ws-0", evidence: [] });
+    const approved = insertLesson({ repoKey: REPO, section: "review", text: "D", sourceWorkspace: "ws-0", evidence: [] });
+    setLessonStatus(approved, "approved");
+    const { dropped } = applyDistilledLessons(REPO, "ws-1", [
+      { action: "challenge", section: "review", text: "", targetIds: [candidate], evidence: [{ note: "n" }] },
+      { action: "challenge", section: "review", text: "", targetIds: [approved], evidence: [] },
+    ]);
+    expect(dropped).toBe(2);
+    expect(byText("D").challenges).toEqual([]);
+  });
+
+  it("clears a lesson's challenges when a person keeps it or rewrites it", () => {
+    const id = insertLesson({ repoKey: REPO, section: "review", text: "E", sourceWorkspace: "ws-0", evidence: [] });
+    setLessonStatus(id, "approved");
+    const challenge = { action: "challenge" as const, section: "review" as const, text: "", targetIds: [id], evidence: [{ note: "n" }] };
+
+    applyDistilledLessons(REPO, "ws-1", [challenge]);
+    dismissLessonChallenges(id);
+    expect(byText("E").challenges).toEqual([]);
+
+    applyDistilledLessons(REPO, "ws-2", [challenge]);
+    updateLessonText(id, "E, reworded");
+    expect(byText("E, reworded").challenges).toEqual([]);
   });
 });

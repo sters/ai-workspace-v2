@@ -364,6 +364,14 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 20,
+    up: (db) => {
+      const columns = db.query("SELECT name FROM pragma_table_info('repo_lessons')").all() as { name: string }[];
+      if (columns.some((c) => c.name === "challenges_json")) return;
+      db.exec("ALTER TABLE repo_lessons ADD COLUMN challenges_json TEXT NOT NULL DEFAULT '[]'");
+    },
+  },
 ];
 
 /**

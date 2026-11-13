@@ -21,6 +21,11 @@ export interface RepoLesson {
   text: string;
   status: LessonStatus;
   evidence: LessonEvidence[];
+  /**
+   * Signs that following this approved lesson went wrong. They change nothing
+   * agents get; a person keeps, rewrites or rejects the lesson, which clears them.
+   */
+  challenges: LessonEvidence[];
   /** Approved lessons this one replaces when it is approved. */
   replaces: string[];
   sourceWorkspace: string;
@@ -30,11 +35,11 @@ export interface RepoLesson {
 
 /** One entry of the distiller's structured output. */
 export interface DistilledLesson {
-  action: "new" | "reinforce" | "merge";
+  action: "new" | "reinforce" | "merge" | "challenge";
   section: LessonSection;
-  /** The lesson text; unused for `reinforce`. */
+  /** The lesson text; unused for `reinforce` and `challenge`. */
   text: string;
-  /** `reinforce`: the one lesson it repeats. `merge`: the approved lessons it replaces. */
+  /** `reinforce`: the one lesson it repeats. `merge`: the approved lessons it replaces. `challenge`: the one approved lesson it disputes. */
   targetIds: string[];
   evidence: { url?: string; note: string }[];
 }

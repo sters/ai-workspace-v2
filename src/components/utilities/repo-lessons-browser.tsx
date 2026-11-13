@@ -7,9 +7,11 @@ import { MarkdownRenderer } from "@/components/shared/content/markdown-renderer"
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { showToast } from "@/components/shared/feedback/toast";
 import { cn } from "@/lib/utils";
-import type { LessonStatus, RepoLesson } from "@/types/repo-lessons";
+import type { LessonEvidence, LessonStatus, RepoLesson } from "@/types/repo-lessons";
 
-async function patchLesson(id: string, body: { status?: LessonStatus; text?: string }) {
+type LessonPatch = { status?: LessonStatus; text?: string; dismissChallenges?: true };
+
+async function patchLesson(id: string, body: LessonPatch) {
   const res = await fetch(`/api/repo-lessons/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -19,6 +21,30 @@ async function patchLesson(id: string, body: { status?: LessonStatus; text?: str
     const err = (await res.json().catch(() => null)) as { error?: string } | null;
     throw new Error(err?.error ?? `HTTP ${res.status}`);
   }
+}
+
+function EvidenceList({ title, items, sourceWorkspace, open }: { title: string; items: LessonEvidence[]; sourceWorkspace: string; open?: boolean }) {
+  if (items.length === 0) return null;
+  return (
+    <details open={open} className="text-xs text-muted-foreground">
+      <summary className="cursor-pointer select-none hover:text-foreground">
+        {title} ({items.length})
+      </summary>
+      <ul className="mt-1 list-disc space-y-1 pl-5">
+        {items.map((e, i) => (
+          <li key={i}>
+            {e.workspace !== sourceWorkspace && <span className="font-medium">{e.workspace}: </span>}
+            {e.note}{" "}
+            {e.url && (
+              <a href={e.url} target="_blank" rel="noreferrer" className="underline">
+                link
+              </a>
+            )}
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
 }
 
 function LessonRow({
@@ -33,7 +59,8 @@ function LessonRow({
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(lesson.text);
 
-  const act = (body: { status?: LessonStatus; text?: string }) =>
+  const disputed = lesson.status === "approved" && lesson.challenges.length > 0;
+  const act = (body: LessonPatch) =>
     patchLesson(lesson.id, body)
       .then(() => {
         setEditing(false);
@@ -47,6 +74,11 @@ function LessonRow({
         <span className="rounded bg-muted px-1.5 py-0.5 font-medium text-foreground">{lesson.section}</span>
         <span className="truncate">{lesson.sourceWorkspace}</span>
         <span>{lesson.createdAt.slice(0, 10)}</span>
+        {disputed && (
+          <span className="rounded bg-amber-100 px-1.5 py-0.5 font-medium text-amber-900 dark:bg-amber-900/40 dark:text-amber-200">
+            Disputed ({lesson.challenges.length})
+          </span>
+        )}
         <div className="ml-auto flex gap-1.5">
           {editing ? (
             <>
@@ -59,6 +91,11 @@ function LessonRow({
             </>
           ) : (
             <>
+              {disputed && (
+                <Button variant="outline" onClick={() => act({ dismissChallenges: true })}>
+                  Keep
+                </Button>
+              )}
               {lesson.status !== "approved" && (
                 <Button variant="outline" onClick={() => act({ status: "approved" })}>
                   Approve
@@ -97,33 +134,19 @@ function LessonRow({
           Replaces: {lesson.replaces.map((id) => byId.get(id)?.text ?? id).join(" / ")}
         </p>
       )}
-      {lesson.evidence.length > 0 && (
-        <details className="text-xs text-muted-foreground">
-          <summary className="cursor-pointer select-none hover:text-foreground">
-            Evidence ({lesson.evidence.length})
-          </summary>
-          <ul className="mt-1 list-disc space-y-1 pl-5">
-            {lesson.evidence.map((e, i) => (
-              <li key={i}>
-                {e.workspace !== lesson.sourceWorkspace && <span className="font-medium">{e.workspace}: </span>}
-                {e.note}{" "}
-                {e.url && (
-                  <a href={e.url} target="_blank" rel="noreferrer" className="underline">
-                    link
-                  </a>
-                )}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+      {disputed && <EvidenceList title="Against" items={lesson.challenges} sourceWorkspace={lesson.sourceWorkspace} open />}
+      <EvidenceList title="Evidence" items={lesson.evidence} sourceWorkspace={lesson.sourceWorkspace} />
     </li>
   );
 }
 
 const TABS: { status: LessonStatus; title: string; hint: string }[] = [
   { status: "candidate", title: "Candidates", hint: "Waiting for a decision. Nothing here reaches agents." },
-  { status: "approved", title: "Approved", hint: "Given to the planner, executor and reviewers." },
+  {
+    status: "approved",
+    title: "Approved",
+    hint: "Given to the planner, executor and reviewers. Disputed ones stay in use until you keep, edit or reject them.",
+  },
   { status: "rejected", title: "Rejected", hint: "Never proposed again." },
 ];
 
@@ -137,7 +160,9 @@ export function RepoLessonsBrowser({ lessons, onChanged }: { lessons: RepoLesson
   const shown = lessons.filter((l) => l.status === selected);
   const repos = [...new Set(shown.map((l) => l.repoKey))].sort();
   const repo = selectedRepo !== null && repos.includes(selectedRepo) ? selectedRepo : repos[0];
-  const items = shown.filter((l) => l.repoKey === repo);
+  const items = shown
+    .filter((l) => l.repoKey === repo)
+    .sort((a, b) => Number(b.challenges.length > 0) - Number(a.challenges.length > 0));
 
   return (
     <div className="space-y-4">

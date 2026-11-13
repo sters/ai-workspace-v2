@@ -335,6 +335,8 @@ export const harvestLessonsSchema = z.object({
 export const repoLessonUpdateSchema = z.object({
   status: z.enum(["candidate", "approved", "rejected"]).optional(),
   text: z.string().trim().min(1).optional(),
+  /** Keep the lesson as it is despite its challenges. */
+  dismissChallenges: z.literal(true).optional(),
 });
 
 /** Draft verification scenarios, or (with `scenarioId`) rewrite the rest of one. */
