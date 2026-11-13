@@ -83,7 +83,7 @@ describe("POST /api/operations/update-readme", () => {
     );
   });
 
-  it("interject=true with running autonomous: kills, awaits, starts update-readme, schedules re-kick", async () => {
+  it("interject=true with running autonomous: kills, awaits, hands the interrupted run to the pipeline", async () => {
     mockKillAndAwait.mockResolvedValue({
       wasAutonomous: true,
       autonomousInputs: { description: "task" },
@@ -98,14 +98,11 @@ describe("POST /api/operations/update-readme", () => {
 
     expect(mockAcquireInterject).toHaveBeenCalledWith("ws-a");
     expect(mockKillAndAwait).toHaveBeenCalledWith("ws-a");
+    // The pipeline's follow-up phase decides where the run restarts from.
     expect(mockBuildUpdateReadmePipeline).toHaveBeenCalledWith(
-      expect.objectContaining({ interject: true }),
+      expect.objectContaining({ interject: true, interruptedAutonomous: { description: "task" } }),
     );
-    expect(mockScheduleAutonomousRekick).toHaveBeenCalledWith(
-      "readme-op",
-      "ws-a",
-      { description: "task" },
-    );
+    expect(mockScheduleAutonomousRekick).not.toHaveBeenCalled();
     expect(mockReleaseInterject).toHaveBeenCalledWith("ws-a");
   });
 
@@ -120,7 +117,9 @@ describe("POST /api/operations/update-readme", () => {
     expect(response.status).toBe(200);
 
     expect(mockKillAndAwait).toHaveBeenCalled();
-    expect(mockScheduleAutonomousRekick).not.toHaveBeenCalled();
+    expect(mockBuildUpdateReadmePipeline).toHaveBeenCalledWith(
+      expect.not.objectContaining({ interruptedAutonomous: expect.anything() }),
+    );
   });
 
   it("returns 409 when acquireInterject returns false", async () => {

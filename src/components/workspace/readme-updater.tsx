@@ -22,7 +22,7 @@ export function ReadmeUpdater({
       <p className="mb-2 text-sm font-medium">Update README</p>
       {canInterject && (
         <p className="mb-2 rounded border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs text-amber-900 dark:text-amber-200">
-          An operation is currently running. Submitting will interrupt it, update README, then restart autonomous from execute.
+          An operation is currently running. Submitting will interrupt it, update README, then restart autonomous — from update-todo when the change moves the plan, otherwise from execute.
         </p>
       )}
       <UpdateForm

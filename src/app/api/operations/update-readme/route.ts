@@ -4,7 +4,6 @@ import {
   acquireInterject,
   releaseInterject,
   killAndAwait,
-  scheduleAutonomousRekick,
 } from "@/lib/pipeline/interject";
 import { resolveWorkspaceName } from "@/lib/config";
 import { buildUpdateReadmePipeline } from "@/lib/pipelines/update-readme";
@@ -38,16 +37,13 @@ export async function POST(request: Request) {
         instruction,
         interactionLevel,
         interject: true,
+        ...(wasAutonomous && autonomousInputs && { interruptedAutonomous: autonomousInputs }),
       });
       const operation = startOperationPipeline("update-readme", workspace, phases, undefined, {
         instruction,
         interactionLevel,
         interject: "true",
       });
-
-      if (wasAutonomous && autonomousInputs) {
-        scheduleAutonomousRekick(operation.id, workspace, autonomousInputs);
-      }
 
       return NextResponse.json(operation);
     } catch (err) {

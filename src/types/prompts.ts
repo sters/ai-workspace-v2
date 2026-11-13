@@ -388,6 +388,14 @@ export interface VerificationPlannerInput {
   replan?: { scenarioJson: string };
 }
 
+export interface ReadmeFollowUpInput {
+  workspaceName: string;
+  instruction: string;
+  previousReadme: string;
+  currentReadme: string;
+  todos: { filename: string; content: string }[];
+}
+
 export interface CriteriaFeasibilityInput {
   workspaceName: string;
   readmeContent: string;

@@ -30,8 +30,18 @@ vi.mock("@/lib/workspace/git", () => ({
     { repoPath: "github.com/acme/repo", repoName: "repo", worktreePath: "/x" },
   ]),
 }));
+const mockGetReadme = vi.fn(async () => "# README");
+const mockGetTodos = vi.fn(async () => [] as { filename: string }[]);
 vi.mock("@/lib/workspace/reader", () => ({
-  getReadme: vi.fn(async () => "# README"),
+  getReadme: (...a: unknown[]) => mockGetReadme(...(a as [])),
+  getTodos: (...a: unknown[]) => mockGetTodos(...(a as [])),
+}));
+
+const mockScheduleAutonomousRekick = vi.fn();
+const mockScheduleUpdateTodo = vi.fn();
+vi.mock("@/lib/pipeline/interject", () => ({
+  scheduleAutonomousRekick: (...a: unknown[]) => mockScheduleAutonomousRekick(...a),
+  scheduleUpdateTodo: (...a: unknown[]) => mockScheduleUpdateTodo(...a),
 }));
 vi.mock("@/lib/workspace/known-findings", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/workspace/known-findings")>();
@@ -92,9 +102,9 @@ describe("buildUpdateReadmePipeline", () => {
     mockDiscoverConstraints.mockResolvedValue(true);
   });
 
-  it("returns 'Update README', then 'Ensure repositories', then the feasibility judge", async () => {
+  it("returns 'Update README', 'Ensure repositories', the feasibility judge, then the follow-up judge", async () => {
     const phases = await buildUpdateReadmePipeline({ workspace: "test-ws", instruction: "add section" });
-    expect(phases).toHaveLength(3);
+    expect(phases).toHaveLength(4);
     expect(phases[0].kind).toBe("single");
     if (phases[0].kind !== "single") throw new Error("expected single");
     expect(phases[0].label).toBe("Update README");
@@ -105,6 +115,7 @@ describe("buildUpdateReadmePipeline", () => {
     expect(phases[2].kind).toBe("function");
     if (phases[2].kind !== "function") throw new Error("expected function");
     expect(phases[2].label).toBe("Check criteria feasibility");
+    expect(phases[3].label).toBe("Decide follow-up");
   });
 
   it("judges feasibility on the interject path too", async () => {
@@ -350,6 +361,121 @@ describe("buildUpdateReadmePipeline", () => {
 
       expect(await phase.fn(ctx)).toBe(true);
       expect(ctx.runChild).not.toHaveBeenCalled();
+    });
+  });
+  describe("follow-up judge", () => {
+    async function getFollowUpPhase(extra?: { interruptedAutonomous?: Record<string, string> }) {
+      const phases = await buildUpdateReadmePipeline({ workspace: "test-ws", instruction: "drop the CSV export", ...extra });
+      const phase = phases.find((p) => p.label === "Decide follow-up");
+      if (!phase || phase.kind !== "function") throw new Error("follow-up phase not found");
+      return phase;
+    }
+
+    function ctxReturning(verdict: unknown) {
+      return createMockCtx({
+        runChild: vi.fn(async (label, _prompt, opts) => {
+          if (opts?.onResultText && label === "README Follow-up") {
+            opts.onResultText(typeof verdict === "string" ? verdict : JSON.stringify(verdict));
+          }
+          return true;
+        }),
+      });
+    }
+
+    beforeEach(() => {
+      mockScheduleAutonomousRekick.mockReset();
+      mockScheduleUpdateTodo.mockReset();
+    });
+
+    it("shows the judge the README before and after the update and the TODO files", async () => {
+      // Read at build time, before the updater runs.
+      mockFileText.mockResolvedValue("# README\nold goal");
+      const phase = await getFollowUpPhase();
+      mockGetReadme.mockResolvedValueOnce("# README\nnew goal");
+      mockGetTodos.mockResolvedValueOnce([{ filename: "TODO-repo.md" }]);
+      mockFileText.mockResolvedValue("- [ ] build CSV export");
+      const ctx = ctxReturning({ updateTodo: true, autonomous: true, reason: "r" });
+
+      await phase.fn(ctx);
+      const prompt = vi.mocked(ctx.runChild).mock.calls[0][1];
+      expect(prompt).toContain("old goal");
+      expect(prompt).toContain("new goal");
+      expect(prompt).toContain("- [ ] build CSV export");
+    });
+
+    it("restarts autonomous from update-todo with a re-plan instruction when the plan moved", async () => {
+      const phase = await getFollowUpPhase();
+      const ctx = ctxReturning({ updateTodo: true, autonomous: true, reason: "export removed" });
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockScheduleAutonomousRekick).toHaveBeenCalledWith(
+        "test-op",
+        "test-ws",
+        { instruction: expect.stringContaining("export removed") },
+        "update-todo",
+      );
+      expect(mockScheduleUpdateTodo).not.toHaveBeenCalled();
+    });
+
+    it("starts autonomous from execute when only implementation is left", async () => {
+      const phase = await getFollowUpPhase();
+      const ctx = ctxReturning({ updateTodo: false, autonomous: true, reason: "" });
+
+      await phase.fn(ctx);
+      expect(mockScheduleAutonomousRekick).toHaveBeenCalledWith("test-op", "test-ws", {}, "execute");
+    });
+
+    it("re-plans TODOs alone when no implementation should run", async () => {
+      const phase = await getFollowUpPhase();
+      const ctx = ctxReturning({ updateTodo: true, autonomous: false, reason: "" });
+
+      await phase.fn(ctx);
+      expect(mockScheduleUpdateTodo).toHaveBeenCalledWith("test-op", "test-ws", expect.stringContaining("drop the CSV export"));
+      expect(mockScheduleAutonomousRekick).not.toHaveBeenCalled();
+    });
+
+    it("starts nothing when the change needs no follow-up", async () => {
+      const phase = await getFollowUpPhase();
+      const ctx = ctxReturning({ updateTodo: false, autonomous: false, reason: "typo" });
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockScheduleAutonomousRekick).not.toHaveBeenCalled();
+      expect(mockScheduleUpdateTodo).not.toHaveBeenCalled();
+    });
+
+    it("always restarts an interrupted autonomous run, keeping its inputs", async () => {
+      const phase = await getFollowUpPhase({ interruptedAutonomous: { description: "task", maxLoops: "3" } });
+      const ctx = ctxReturning({ updateTodo: false, autonomous: false, reason: "typo" });
+
+      await phase.fn(ctx);
+      expect(mockScheduleAutonomousRekick).toHaveBeenCalledWith(
+        "test-op",
+        "test-ws",
+        { description: "task", maxLoops: "3" },
+        "execute",
+      );
+    });
+
+    it("restarts an interrupted run from update-todo when the judge gives no verdict", async () => {
+      const phase = await getFollowUpPhase({ interruptedAutonomous: { description: "task" } });
+      const ctx = ctxReturning("not json");
+
+      await phase.fn(ctx);
+      expect(mockScheduleAutonomousRekick).toHaveBeenCalledWith(
+        "test-op",
+        "test-ws",
+        expect.objectContaining({ description: "task" }),
+        "update-todo",
+      );
+    });
+
+    it("starts nothing on an idle workspace when the judge gives no verdict", async () => {
+      const phase = await getFollowUpPhase();
+      const ctx = createMockCtx();
+
+      expect(await phase.fn(ctx)).toBe(true);
+      expect(mockScheduleAutonomousRekick).not.toHaveBeenCalled();
+      expect(mockScheduleUpdateTodo).not.toHaveBeenCalled();
     });
   });
 });

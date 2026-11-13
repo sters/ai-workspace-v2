@@ -22,6 +22,7 @@ export const STEP_TYPES = {
   AUTONOMOUS_GATE: "autonomous-gate",
   README_CLARITY_GATE: "readme-clarity-gate",
   CRITERIA_FEASIBILITY: "criteria-feasibility",
+  README_FOLLOW_UP: "readme-follow-up",
   VALIDATE_PR_COMMENT: "validate-pr-comment",
   GROUND_FINDING: "ground-finding",
   RESOLVE_CONFLICTS: "resolve-conflicts",

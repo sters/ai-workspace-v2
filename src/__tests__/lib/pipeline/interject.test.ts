@@ -20,11 +20,17 @@ vi.mock("@/lib/pipelines/autonomous", () => ({
   buildAutonomousPipeline: (...a: unknown[]) => mockBuildAutonomousPipeline(...a),
 }));
 
+const mockBuildUpdateTodoPipeline = vi.fn(async () => [{ kind: "single" }]);
+vi.mock("@/lib/pipelines/update-todo", () => ({
+  buildUpdateTodoPipeline: (...a: unknown[]) => mockBuildUpdateTodoPipeline(...a),
+}));
+
 import {
   acquireInterject,
   releaseInterject,
   killAndAwait,
   scheduleAutonomousRekick,
+  scheduleUpdateTodo,
 } from "@/lib/pipeline/interject";
 import { interjectsInFlight } from "@/lib/pipeline/store";
 
@@ -181,5 +187,56 @@ describe("scheduleAutonomousRekick", () => {
 
     expect(errSpy).toHaveBeenCalled();
     errSpy.mockRestore();
+  });
+});
+
+describe("scheduleAutonomousRekick startWith", () => {
+  it("restarts from the requested step", async () => {
+    let listener: ((event: { type: string; data: string }) => void) | undefined;
+    mockSubscribeToOperation.mockImplementation((_id, l) => {
+      listener = l;
+      return () => {};
+    });
+
+    scheduleAutonomousRekick("update-op", "ws-a", { instruction: "re-plan" }, "update-todo");
+    listener!({ type: "complete", data: JSON.stringify({ exitCode: 0 }) });
+    await flushPromises();
+
+    expect(mockBuildAutonomousPipeline).toHaveBeenCalledWith(
+      expect.objectContaining({ startWith: "update-todo", instruction: "re-plan" }),
+    );
+    expect(mockStartOperationPipeline).toHaveBeenCalledWith(
+      "autonomous",
+      "ws-a",
+      expect.anything(),
+      undefined,
+      expect.objectContaining({ startWith: "update-todo" }),
+    );
+  });
+});
+
+describe("scheduleUpdateTodo", () => {
+  it("starts update-todo only after the source op succeeds", async () => {
+    let listener: ((event: { type: string; data: string }) => void) | undefined;
+    mockSubscribeToOperation.mockImplementation((_id, l) => {
+      listener = l;
+      return () => {};
+    });
+
+    scheduleUpdateTodo("update-op", "ws-a", "re-plan");
+    listener!({ type: "complete", data: JSON.stringify({ exitCode: 1 }) });
+    await flushPromises();
+    expect(mockStartOperationPipeline).not.toHaveBeenCalled();
+
+    listener!({ type: "complete", data: JSON.stringify({ exitCode: 0 }) });
+    await flushPromises();
+    expect(mockBuildUpdateTodoPipeline).toHaveBeenCalledWith({ workspace: "ws-a", instruction: "re-plan" });
+    expect(mockStartOperationPipeline).toHaveBeenCalledWith(
+      "update-todo",
+      "ws-a",
+      expect.anything(),
+      undefined,
+      { instruction: "re-plan" },
+    );
   });
 });

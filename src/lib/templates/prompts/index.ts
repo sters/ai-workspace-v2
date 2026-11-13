@@ -51,6 +51,12 @@ export {
   CRITERIA_FEASIBILITY_SCHEMA,
   CRITERIA_FEASIBILITY_PHASE_LABEL,
 } from "./criteria-feasibility";
+export {
+  getReadmeFollowUpSystemPrompt,
+  buildReadmeFollowUpPrompt,
+  README_FOLLOW_UP_SCHEMA,
+  README_FOLLOW_UP_PHASE_LABEL,
+} from "./readme-follow-up";
 export { getWorkspaceSuggesterSystemPrompt, buildWorkspaceSuggesterPrompt, WORKSPACE_SUGGESTION_SCHEMA } from "./workspace-suggester";
 export { getDiscoverySystemPrompt, buildDiscoveryPrompt, DISCOVERY_SCHEMA } from "./discovery";
 export { buildSuggestionAggregatorPrompt, SUGGESTION_AGGREGATION_SCHEMA } from "./suggestion-aggregator";
