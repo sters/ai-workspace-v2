@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   Archive,
   ChevronDown,
+  Lightbulb,
   Loader2,
   MessageCircleQuestion,
   Terminal,
@@ -18,6 +19,7 @@ import { useWorkspaces } from "@/hooks/use-workspaces";
 import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useChatSessions, type ChatActivity } from "@/hooks/use-chat-sessions";
 import { useUsageLimitStops } from "@/hooks/use-usage-limit-stops";
+import { usePrSuggestionWorkspaces } from "@/hooks/use-pr-suggestions";
 import { cn } from "@/lib/utils";
 
 /**
@@ -82,6 +84,7 @@ function WorkspaceRow({
   isAsking,
   chatActivity,
   usageLimitStop,
+  hasSuggestions,
   archived,
 }: {
   workspace: WorkspaceListItem;
@@ -93,6 +96,8 @@ function WorkspaceRow({
   chatActivity?: ChatActivity;
   /** Set when the latest operation here died on a Claude usage limit. */
   usageLimitStop?: UsageLimitStop;
+  /** The watcher proposes something on this workspace's PRs. */
+  hasSuggestions?: boolean;
   archived?: boolean;
 }) {
   const { name, title, overallProgress, totalCompleted, totalItems } =
@@ -125,6 +130,14 @@ function WorkspaceRow({
         className="absolute inset-0"
       />
       <div className="pointer-events-none relative flex items-center gap-1.5">
+        {hasSuggestions && (
+          <Indicator
+            href={`${base}/pull-requests`}
+            label="Suggested actions on pull requests"
+            icon={Lightbulb}
+            className="text-amber-500"
+          />
+        )}
         {isAsking ? (
           <Indicator
             href={operationHref}
@@ -167,12 +180,24 @@ function WorkspaceRow({
         )}
         <span
           className={cn(
-            "truncate text-sm",
+            "min-w-0 flex-1 truncate text-sm",
             active ? "font-semibold" : "font-medium",
           )}
         >
           {title}
         </span>
+        <div
+          className="h-1 w-8 shrink-0 overflow-hidden rounded-full bg-secondary"
+          title={`${totalCompleted}/${totalItems} items`}
+        >
+          <div
+            className={cn(
+              "h-full rounded-full",
+              overallProgress === 100 ? "bg-green-500" : "bg-blue-500",
+            )}
+            style={{ width: `${overallProgress}%` }}
+          />
+        </div>
       </div>
       {name !== title && (
         // The directory the workspace lives in, which is what git branches and
@@ -183,20 +208,6 @@ function WorkspaceRow({
           {name}
         </div>
       )}
-      <div className="pointer-events-none relative mt-1 flex items-center gap-2">
-        <div className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
-          <div
-            className={cn(
-              "h-full rounded-full",
-              overallProgress === 100 ? "bg-green-500" : "bg-blue-500",
-            )}
-            style={{ width: `${overallProgress}%` }}
-          />
-        </div>
-        <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-          {totalCompleted}/{totalItems}
-        </span>
-      </div>
     </div>
   );
 }
@@ -213,6 +224,7 @@ export function WorkspaceSidebar() {
   const { runningWorkspaces, operations } = useRunningOperations();
   const { chatActivity } = useChatSessions();
   const { usageLimitStops } = useUsageLimitStops();
+  const suggestionWorkspaces = usePrSuggestionWorkspaces();
 
   // The operation a row's indicator opens, preferring one that is waiting for
   // an answer: with several running, that is the one the user is being asked
@@ -243,6 +255,7 @@ export function WorkspaceSidebar() {
       isAsking={linkedOperations.get(ws.name)?.hasPendingAsk}
       chatActivity={chatActivity.get(ws.name)}
       usageLimitStop={usageLimitStops.get(ws.name)}
+      hasSuggestions={suggestionWorkspaces.has(ws.name)}
       archived={archived}
     />
   );

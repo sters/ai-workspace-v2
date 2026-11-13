@@ -22,26 +22,17 @@ import {
   ArchiveRestore,
 } from "lucide-react";
 
-export function OperationPanel({
+export function OperationActions({
   workspaceName,
   workspacePath,
   repositories,
-  archived,
-  onArchived,
 }: {
   workspaceName: string;
   workspacePath: string;
   /** Repository metadata from workspace README for "Open in editor" dropdown. */
   repositories?: { alias: string; path: string }[];
-  archived?: boolean;
-  /**
-   * Called after the archive state was toggled, so the caller can re-read it.
-   * The button is omitted without it — a toggle nothing re-reads leaves the
-   * label stating the opposite of the truth.
-   */
-  onArchived?: () => void;
 }) {
-  const { operations, isWorkspaceRunning, isRepoBusy } = useRunningOperations();
+  const { isWorkspaceRunning, isRepoBusy } = useRunningOperations();
   const isRunning = isWorkspaceRunning(workspaceName);
   const startAndNavigate = useStartAndNavigate(workspaceName);
   const { openers } = useOpeners();
@@ -71,130 +62,169 @@ export function OperationPanel({
     })),
   }));
 
-  const archive = useArchiveToggle(() => onArchived?.());
-  const reportArchiveError = (err: unknown) =>
+  const body = (extra?: Record<string, string>) => ({
+    workspace: workspacePath,
+    ...extra,
+  });
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <SplitButton
+        label={<><Play className="h-3.5 w-3.5" /> Start autonomous</>}
+        onClick={() =>
+          startAndNavigate("autonomous", body({ startWith: "execute" }))
+        }
+        disabled={isRunning}
+        items={[
+          {
+            label: "Execute only",
+            onClick: () => startAndNavigate("execute", body()),
+          },
+        ]}
+      />
+      <SplitButton
+        variant="secondary"
+        label={<><ClipboardCheck className="h-3.5 w-3.5" /> Review</>}
+        onClick={() => startAndNavigate("review", body())}
+        disabled={isRunning}
+        items={[
+          {
+            // Fetches and fast-forwards each worktree first, so a PR that
+            // moved since checkout is reviewed as it now stands. Not the
+            // default: on a workspace the pipeline is writing to, moving HEAD
+            // is the wrong thing to do.
+            label: "Re-review (fetch PR updates first)",
+            onClick: () =>
+              startAndNavigate("review", body({ refreshFromRemote: "true" })),
+          },
+        ]}
+      />
+      <RepositoryActionButton
+        label={<><GitPullRequest className="h-3.5 w-3.5" /> Create PR</>}
+        onClick={() => startAndNavigate("create-pr", body())}
+        disabled={isRunning}
+        repositories={repositories}
+        onRepoClick={(repo) =>
+          startAndNavigate("create-pr", body({ repository: repo.path }))
+        }
+        isRepoDisabled={(repo) => isRepoBusy(workspaceName, repo.path)}
+      />
+      {openerMenuItems.length > 0 && (
+        <DropdownMenu
+          ariaLabel="Open in..."
+          trigger={
+            <>
+              <FolderOpen className="h-3.5 w-3.5" /> Open in...
+            </>
+          }
+          items={openerMenuItems}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Archive / unarchive and delete, with the open-PR confirmation archiving may need. */
+export function WorkspaceManageButtons({
+  workspaceName,
+  workspacePath,
+  archived,
+  archive,
+  onArchiveError,
+}: {
+  workspaceName: string;
+  workspacePath: string;
+  archived?: boolean;
+  /**
+   * The archive toggle, owned by the caller so a suggestion can start the same
+   * confirmation. The button is omitted without it — a toggle nothing re-reads
+   * leaves the label stating the opposite of the truth.
+   */
+  archive?: ReturnType<typeof useArchiveToggle>;
+  onArchiveError?: (err: unknown) => void;
+}) {
+  const { isWorkspaceRunning } = useRunningOperations();
+  const startAndNavigate = useStartAndNavigate(workspaceName);
+  const report = onArchiveError ?? (() => {});
+
+  return (
+    <>
+      {archive && (
+        <Button variant="secondary" onClick={() => archive.toggle(workspaceName).catch(report)}>
+          {archived ? (
+            <>
+              <ArchiveRestore className="h-3.5 w-3.5" /> Unarchive
+            </>
+          ) : (
+            <>
+              <Archive className="h-3.5 w-3.5" /> Archive
+            </>
+          )}
+        </Button>
+      )}
+      <Button
+        variant="destructive"
+        onClick={() =>
+          startAndNavigate("delete", { workspace: workspacePath })
+        }
+        disabled={isWorkspaceRunning(workspaceName)}
+      >
+        <Trash2 className="h-3.5 w-3.5" /> Delete workspace
+      </Button>
+    </>
+  );
+}
+
+export function useWorkspaceArchive(archived: boolean | undefined, onArchived: () => void) {
+  const archive = useArchiveToggle(onArchived);
+  const reportError = (err: unknown) =>
     showToast(
       err instanceof Error
         ? err.message
         : `Failed to ${archived ? "unarchive" : "archive"} workspace`,
       "error",
     );
-  const toggleArchive = () => archive.toggle(workspaceName).catch(reportArchiveError);
+  return { archive, reportError };
+}
 
-  const body = (extra?: Record<string, string>) => ({
-    workspace: workspacePath,
-    ...extra,
-  });
-
-  // Find the running operation for this workspace to link to
-  const runningOp = isRunning
-    ? operations.find(
-        (op) => op.status === "running" && op.workspace === workspaceName
-      )
-    : undefined;
-
+export function ArchiveConfirm({
+  archive,
+  onError,
+}: {
+  archive: ReturnType<typeof useArchiveToggle>;
+  onError: (err: unknown) => void;
+}) {
+  if (!archive.openPrs) return null;
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <SplitButton
-          label={<><Play className="h-3.5 w-3.5" /> Start autonomous</>}
-          onClick={() =>
-            startAndNavigate("autonomous", body({ startWith: "execute" }))
-          }
-          disabled={isRunning}
-          items={[
-            {
-              label: "Execute only",
-              onClick: () => startAndNavigate("execute", body()),
-            },
-          ]}
-        />
-        <SplitButton
-          variant="secondary"
-          label={<><ClipboardCheck className="h-3.5 w-3.5" /> Review</>}
-          onClick={() => startAndNavigate("review", body())}
-          disabled={isRunning}
-          items={[
-            {
-              // Fetches and fast-forwards each worktree first, so a PR that
-              // moved since checkout is reviewed as it now stands. Not the
-              // default: on a workspace the pipeline is writing to, moving HEAD
-              // is the wrong thing to do.
-              label: "Re-review (fetch PR updates first)",
-              onClick: () =>
-                startAndNavigate("review", body({ refreshFromRemote: "true" })),
-            },
-          ]}
-        />
-        <RepositoryActionButton
-          label={<><GitPullRequest className="h-3.5 w-3.5" /> Create PR</>}
-          onClick={() => startAndNavigate("create-pr", body())}
-          disabled={isRunning}
-          repositories={repositories}
-          onRepoClick={(repo) =>
-            startAndNavigate("create-pr", body({ repository: repo.path }))
-          }
-          isRepoDisabled={(repo) => isRepoBusy(workspaceName, repo.path)}
-        />
-        {openerMenuItems.length > 0 && (
-          <DropdownMenu
-            ariaLabel="Open in..."
-            trigger={
-              <>
-                <FolderOpen className="h-3.5 w-3.5" /> Open in...
-              </>
-            }
-            items={openerMenuItems}
-          />
-        )}
-        <div className="ml-auto flex items-center gap-2">
-          {onArchived && (
-            <Button variant="secondary" onClick={toggleArchive}>
-              {archived ? (
-                <>
-                  <ArchiveRestore className="h-3.5 w-3.5" /> Unarchive
-                </>
-              ) : (
-                <>
-                  <Archive className="h-3.5 w-3.5" /> Archive
-                </>
-              )}
-            </Button>
-          )}
-          <Button
-            variant="destructive"
-            onClick={() =>
-              startAndNavigate("delete", { workspace: workspacePath })
-            }
-            disabled={isRunning}
-          >
-            <Trash2 className="h-3.5 w-3.5" /> Delete workspace
-          </Button>
-        </div>
-      </div>
-      {archive.openPrs && (
-        <ArchiveOpenPrsConfirm
-          prs={archive.openPrs}
-          onConfirm={() => archive.confirmClose().catch(reportArchiveError)}
-          onCancel={archive.cancel}
-        />
-      )}
-      {isRunning && runningOp && (
-        <p className="text-sm text-muted-foreground">
-          <span className={`inline-block h-2 w-2 animate-pulse rounded-full mr-1.5 ${runningOp.hasPendingAsk ? "bg-orange-500" : runningOp.usageLimitWaitUntil ? "bg-amber-500" : "bg-blue-500"}`} />
-          {runningOp.hasPendingAsk
-            ? "Waiting for input"
-            : runningOp.usageLimitWaitUntil
-              ? `Waiting for the usage limit to reset (${new Date(runningOp.usageLimitWaitUntil).toLocaleTimeString()})`
-              : "Operation running"} &mdash;{" "}
-          <Link
-            href={`/workspace/${encodeURIComponent(workspaceName)}/operations?operationId=${encodeURIComponent(runningOp.id)}`}
-            className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-          >
-            {runningOp.hasPendingAsk ? "Answer now" : "View running operation"}
-          </Link>
-        </p>
-      )}
-    </div>
+    <ArchiveOpenPrsConfirm
+      prs={archive.openPrs}
+      onConfirm={() => archive.confirmClose().catch(onError)}
+      onCancel={archive.cancel}
+    />
+  );
+}
+
+/** What the running operation on this workspace is doing, linked to it. */
+export function RunningOperationNotice({ workspaceName }: { workspaceName: string }) {
+  const { operations } = useRunningOperations();
+  const runningOp = operations.find(
+    (op) => op.status === "running" && op.workspace === workspaceName,
+  );
+  if (!runningOp) return null;
+  return (
+    <p className="text-sm text-muted-foreground">
+      <span className={`inline-block h-2 w-2 animate-pulse rounded-full mr-1.5 ${runningOp.hasPendingAsk ? "bg-orange-500" : runningOp.usageLimitWaitUntil ? "bg-amber-500" : "bg-blue-500"}`} />
+      {runningOp.hasPendingAsk
+        ? "Waiting for input"
+        : runningOp.usageLimitWaitUntil
+          ? `Waiting for the usage limit to reset (${new Date(runningOp.usageLimitWaitUntil).toLocaleTimeString()})`
+          : "Operation running"} &mdash;{" "}
+      <Link
+        href={`/workspace/${encodeURIComponent(workspaceName)}/operations?operationId=${encodeURIComponent(runningOp.id)}`}
+        className="text-blue-600 underline hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+      >
+        {runningOp.hasPendingAsk ? "Answer now" : "View running operation"}
+      </Link>
+    </p>
   );
 }

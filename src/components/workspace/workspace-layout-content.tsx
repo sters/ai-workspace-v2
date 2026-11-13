@@ -8,7 +8,13 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { Card } from "@/components/shared/containers/card";
 import { ProgressBar } from "@/components/shared/feedback/progress-bar";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
-import { OperationPanel } from "@/components/workspace/operation-panel";
+import {
+  ArchiveConfirm,
+  RunningOperationNotice,
+  WorkspaceManageButtons,
+  useWorkspaceArchive,
+} from "@/components/workspace/operation-panel";
+import { WorkspaceSuggestions } from "@/components/workspace/pr-suggestions";
 import { cn } from "@/lib/utils";
 import { fetcher } from "@/lib/api";
 import type { WorkspaceSlackThread } from "@/lib/chat-server/slack-thread";
@@ -48,6 +54,7 @@ export function WorkspaceLayoutContent({
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { archive, reportError: reportArchiveError } = useWorkspaceArchive(workspace?.archived, () => refresh());
 
   // Redirect ?action= and ?operationId= to the Operations tab
   useEffect(() => {
@@ -113,11 +120,11 @@ export function WorkspaceLayoutContent({
           &larr; Back
         </Link>
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold">{workspace.meta.title}</h1>
             <p className="text-sm text-muted-foreground">{decodedName}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
             {workspace.archived && (
               <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                 Archived
@@ -138,31 +145,37 @@ export function WorkspaceLayoutContent({
                 {workspace.meta.ticketId}
               </span>
             )}
+            <WorkspaceManageButtons
+              workspaceName={decodedName}
+              workspacePath={workspace.path}
+              archived={workspace.archived}
+              archive={archive}
+              onArchiveError={reportArchiveError}
+            />
           </div>
         </div>
       </div>
 
-      <Card className="mb-6">
-        <div className="mb-2 flex items-center justify-between text-sm">
-          <span>
-            Overall Progress: {workspace.totalCompleted}/{workspace.totalItems}{" "}
-            items
-          </span>
-          <span className="text-muted-foreground">
-            {workspace.meta.repositories.length} repositories
-          </span>
-        </div>
-        <ProgressBar value={workspace.overallProgress} />
-      </Card>
-
-      <div className="mb-6">
-        <OperationPanel
-          workspaceName={decodedName}
-          workspacePath={workspace.path}
-          repositories={workspace.meta.repositories}
-          archived={workspace.archived}
-          onArchived={() => refresh()}
-        />
+      <div className="mb-4 space-y-2">
+        <ArchiveConfirm archive={archive} onError={reportArchiveError} />
+        <Card className="space-y-1 py-2">
+          <div className="flex items-center gap-4 text-sm">
+            <span className="shrink-0">
+              Overall Progress: {workspace.totalCompleted}/{workspace.totalItems} items
+            </span>
+            <span className="shrink-0 text-muted-foreground">
+              {workspace.meta.repositories.length} repositories
+            </span>
+            <ProgressBar value={workspace.overallProgress} className="flex-1" />
+          </div>
+          <RunningOperationNotice workspaceName={decodedName} />
+        </Card>
+        {!workspace.archived && (
+          <WorkspaceSuggestions
+            workspaceName={decodedName}
+            onArchive={() => void archive.toggle(decodedName).catch(reportArchiveError)}
+          />
+        )}
       </div>
 
       <div className="mb-4 flex border-b">

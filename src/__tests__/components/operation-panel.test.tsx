@@ -41,9 +41,39 @@ vi.mock("@/components/shared/feedback/toast", () => ({
   showToast: (...args: unknown[]) => mockShowToast(...args),
 }));
 
-import { OperationPanel } from "@/components/workspace/operation-panel";
+import {
+  ArchiveConfirm,
+  OperationActions,
+  WorkspaceManageButtons,
+  useWorkspaceArchive,
+} from "@/components/workspace/operation-panel";
 
-describe("OperationPanel Create PR", () => {
+function ManageButtons({
+  workspaceName,
+  archived,
+  onArchived,
+}: {
+  workspaceName: string;
+  workspacePath: string;
+  archived?: boolean;
+  onArchived?: () => void;
+}) {
+  const { archive, reportError } = useWorkspaceArchive(archived, () => onArchived?.());
+  return (
+    <>
+      <WorkspaceManageButtons
+        workspaceName={workspaceName}
+        workspacePath="/tmp/ws"
+        archived={archived}
+        archive={onArchived ? archive : undefined}
+        onArchiveError={reportError}
+      />
+      <ArchiveConfirm archive={archive} onError={reportError} />
+    </>
+  );
+}
+
+describe("OperationActions Create PR", () => {
   afterEach(() => {
     busyRepo = undefined;
   });
@@ -51,7 +81,7 @@ describe("OperationPanel Create PR", () => {
   it("keeps the repositories without a running operation selectable while the workspace is busy", async () => {
     busyRepo = "github.com/acme/widgets";
     render(
-      <OperationPanel
+      <OperationActions
         workspaceName="ws"
         workspacePath="/tmp/ws"
         repositories={[
@@ -72,7 +102,7 @@ describe("OperationPanel Create PR", () => {
   });
 });
 
-describe("OperationPanel archive button", () => {
+describe("WorkspaceManageButtons archive button", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -88,7 +118,7 @@ describe("OperationPanel archive button", () => {
   it("posts to the archive route and reports back when clicked", async () => {
     const onArchived = vi.fn();
     render(
-      <OperationPanel
+      <ManageButtons
         workspaceName="ws alpha"
         workspacePath="/tmp/ws"
         onArchived={onArchived}
@@ -106,7 +136,7 @@ describe("OperationPanel archive button", () => {
 
   it("offers to unarchive an archived workspace", () => {
     render(
-      <OperationPanel
+      <ManageButtons
         workspaceName="ws-alpha"
         workspacePath="/tmp/ws"
         archived
@@ -125,7 +155,7 @@ describe("OperationPanel archive button", () => {
     });
     const onArchived = vi.fn();
     render(
-      <OperationPanel
+      <ManageButtons
         workspaceName="ws-alpha"
         workspacePath="/tmp/ws"
         onArchived={onArchived}
@@ -151,7 +181,7 @@ describe("OperationPanel archive button", () => {
       .mockResolvedValueOnce({ ok: true, json: async () => ({ archived: true }) });
     const onArchived = vi.fn();
     render(
-      <OperationPanel workspaceName="ws-alpha" workspacePath="/tmp/ws" onArchived={onArchived} />,
+      <ManageButtons workspaceName="ws-alpha" workspacePath="/tmp/ws" onArchived={onArchived} />,
     );
 
     await userEvent.click(screen.getByRole("button", { name: /^Archive$/ }));
@@ -174,7 +204,7 @@ describe("OperationPanel archive button", () => {
       status: 409,
       json: async () => ({ error: "open PRs", openPullRequests: [{ repoName: "widgets", url: "u", title: "Add widgets" }] }),
     });
-    render(<OperationPanel workspaceName="ws-alpha" workspacePath="/tmp/ws" onArchived={vi.fn()} />);
+    render(<ManageButtons workspaceName="ws-alpha" workspacePath="/tmp/ws" onArchived={vi.fn()} />);
 
     await userEvent.click(screen.getByRole("button", { name: /^Archive$/ }));
     await userEvent.click(await screen.findByRole("button", { name: /^Cancel$/ }));
@@ -183,7 +213,7 @@ describe("OperationPanel archive button", () => {
   });
 
   it("omits the archive button when no handler is given", () => {
-    render(<OperationPanel workspaceName="ws-alpha" workspacePath="/tmp/ws" />);
+    render(<ManageButtons workspaceName="ws-alpha" workspacePath="/tmp/ws" />);
 
     expect(screen.queryByRole("button", { name: /Archive/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Delete workspace/ })).toBeInTheDocument();

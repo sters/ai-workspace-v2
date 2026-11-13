@@ -5,6 +5,7 @@ import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useReadme, useWorkspace } from "@/hooks/use-workspace";
 import { ReadmeViewer } from "@/components/workspace/readme-viewer";
 import { ReadmeUpdater } from "@/components/workspace/readme-updater";
+import { OperationActions } from "@/components/workspace/operation-panel";
 
 export default function WorkspaceOverviewPage({
   params,
@@ -20,10 +21,17 @@ export default function WorkspaceOverviewPage({
   return (
     <div className="space-y-6">
       {workspace && (
-        <ReadmeUpdater
-          workspaceName={decodedName}
-          workspacePath={workspace.path}
-        />
+        <>
+          <OperationActions
+            workspaceName={decodedName}
+            workspacePath={workspace.path}
+            repositories={workspace.meta.repositories}
+          />
+          <ReadmeUpdater
+            workspaceName={decodedName}
+            workspacePath={workspace.path}
+          />
+        </>
       )}
       <ReadmeViewer content={readme} />
     </div>

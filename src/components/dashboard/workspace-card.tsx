@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, ArchiveRestore, Loader2, MessageCircleQuestion } from "lucide-react";
+import { Archive, ArchiveRestore, Lightbulb, Loader2, MessageCircleQuestion } from "lucide-react";
 import type { WorkspaceListItem } from "@/types/workspace";
 import { cardVariants } from "../shared/containers/card";
 import { ProgressBar } from "../shared/feedback/progress-bar";
@@ -20,6 +20,7 @@ export function WorkspaceCard({
   workspace,
   isRunning,
   isAsking,
+  hasSuggestions,
   archived,
   onArchive,
   children,
@@ -27,6 +28,8 @@ export function WorkspaceCard({
   workspace: WorkspaceListItem;
   isRunning?: boolean;
   isAsking?: boolean;
+  /** The watcher proposes something on this workspace's PRs. */
+  hasSuggestions?: boolean;
   archived?: boolean;
   onArchive?: () => void;
   children?: React.ReactNode;
@@ -44,6 +47,11 @@ export function WorkspaceCard({
       >
         <div className="flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-2">
+            {hasSuggestions && (
+              <span title="Suggested actions on pull requests" className="shrink-0">
+                <Lightbulb className="h-4 w-4 text-amber-500" aria-label="Suggested actions on pull requests" />
+              </span>
+            )}
             {isAsking ? (
               <MessageCircleQuestion className="h-4 w-4 shrink-0 animate-pulse text-orange-500" />
             ) : isRunning ? (
@@ -57,7 +65,11 @@ export function WorkspaceCard({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="text-xs tabular-nums text-muted-foreground">
+              {totalCompleted}/{totalItems}
+            </span>
+            <ProgressBar value={overallProgress} showLabel={false} className="w-20" />
             <StatusBadge label={taskType} />
           </div>
         </div>
@@ -67,13 +79,6 @@ export function WorkspaceCard({
           <span>{repoCount} repos</span>
           <span>Created: {formatShortDate(date)}</span>
           <span>Updated: {formatShortDate(lastModified)}</span>
-        </div>
-
-        <div className="mt-2 flex items-center gap-2">
-          <ProgressBar value={overallProgress} showLabel={false} className="flex-1" />
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {totalCompleted}/{totalItems} items
-          </span>
         </div>
 
         {children}

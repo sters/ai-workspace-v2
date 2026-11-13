@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Archive, ChevronDown } from "lucide-react";
 import { useWorkspaces } from "@/hooks/use-workspaces";
 import { useRunningOperations } from "@/hooks/use-running-operations";
+import { usePrSuggestionWorkspaces } from "@/hooks/use-pr-suggestions";
 import { WorkspaceCard } from "./workspace-card";
 import { StatusText } from "../shared/feedback/status-text";
 import { showToast } from "../shared/feedback/toast";
@@ -23,6 +24,7 @@ export function WorkspaceList() {
       includeArchived: showArchived,
     });
   const { runningWorkspaces, operations } = useRunningOperations();
+  const suggestionWorkspaces = usePrSuggestionWorkspaces();
 
   const askingWorkspaces = new Set(
     operations.filter((op) => op.hasPendingAsk).map((op) => op.workspace),
@@ -80,6 +82,7 @@ export function WorkspaceList() {
           workspace={ws}
           isRunning={runningWorkspaces.has(ws.name)}
           isAsking={askingWorkspaces.has(ws.name)}
+          hasSuggestions={suggestionWorkspaces.has(ws.name)}
           onArchive={() => handleArchiveToggle(ws.name)}
         />
       ))}

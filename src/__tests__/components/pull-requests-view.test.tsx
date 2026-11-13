@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import type {
   PrCheck,
   PrCheckState,
@@ -48,8 +48,12 @@ vi.mock("@/hooks/use-start-and-navigate", () => ({
 }));
 
 const mockPush = vi.fn();
+let mockSearch = new URLSearchParams();
+const mockReplace = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, replace: mockReplace }),
+  useSearchParams: () => mockSearch,
+  usePathname: () => "/workspace/feat/pull-requests",
 }));
 
 vi.mock("@/hooks/use-workspace", () => ({
@@ -851,32 +855,35 @@ describe("PullRequestsView", () => {
       );
     };
 
-    it("selects the proposed comment for triage and marks the proposal handled, starting nothing", async () => {
+    afterEach(() => {
+      mockSearch = new URLSearchParams();
+    });
+
+    it("selects the proposed comment on arrival from Select for triage and marks it handled, starting nothing", async () => {
+      mockSearch = new URLSearchParams("triage=select");
       setData();
       renderWith({
         triage: { commentUrls: ["https://github.com/acme/widgets/pull/42#discussion_r1"], failingRepos: [] },
         conflicts: [],
         archive: false,
       });
-      fireEvent.click(await screen.findByRole("button", { name: "Select for triage" }));
 
-      expect(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ })).toBeChecked();
+      await waitFor(() => expect(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ })).toBeChecked());
       expect(mockFetch).toHaveBeenCalledWith(suggestionsUrl, { method: "DELETE" });
+      expect(mockReplace).toHaveBeenCalledWith("/workspace/feat/pull-requests", { scroll: false });
       expect(mockStartAndNavigate).not.toHaveBeenCalled();
     });
 
-    it("offers no triage for a proposed comment that has since been resolved", async () => {
+    it("selects nothing without the query", async () => {
       setData();
       renderWith({
-        triage: { commentUrls: ["https://github.com/acme/widgets/pull/42#discussion_r2"], failingRepos: [] },
-        conflicts: ["widgets"],
+        triage: { commentUrls: ["https://github.com/acme/widgets/pull/42#discussion_r1"], failingRepos: [] },
+        conflicts: [],
         archive: false,
       });
-      await screen.findByRole("button", { name: "Resolve conflicts" });
-      expect(screen.queryByRole("button", { name: "Select for triage" })).not.toBeInTheDocument();
-
-      fireEvent.click(screen.getByRole("button", { name: "Resolve conflicts" }));
-      expect(mockStartAndNavigate).toHaveBeenCalledWith("resolve-base-conflicts", { workspace: "feat", repo: "widgets" });
+      await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(suggestionsUrl));
+      expect(screen.getByRole("checkbox", { name: /src\/cache\.ts:88/ })).not.toBeChecked();
+      expect(mockFetch).not.toHaveBeenCalledWith(suggestionsUrl, { method: "DELETE" });
     });
   });
 });

@@ -1,14 +1,10 @@
 "use client";
 
-import useSWR from "swr";
 import { PrEventTimeline } from "./pr-event-timeline";
-import { PrSuggestionsCallout } from "./pr-suggestions";
-import { ArchiveOpenPrsConfirm } from "./archive-open-prs-confirm";
-import { useArchiveToggle } from "@/hooks/use-archive-toggle";
-import { fetcher } from "@/lib/api";
-import type { PrSuggestions } from "@/lib/pr-watcher/suggestions";
-import { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { SELECT_TRIAGE_PARAM } from "./pr-suggestions";
+import { usePrSuggestions } from "@/hooks/use-pr-suggestions";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ExternalLink, MessageSquare, RefreshCw } from "lucide-react";
 import { usePullRequests, type RepoPullRequestState } from "@/hooks/use-workspace";
 import { useRunningOperations } from "@/hooks/use-running-operations";
@@ -234,12 +230,9 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
   }, [selectedIds, selectedCheckKeys, threadsById, failuresByKey]);
   const triageBusy = scopedRepo ? isRepoBusy(workspaceName, scopedRepo) : isRunning;
 
-  const suggestionsUrl = `/api/workspaces/${encodeURIComponent(workspaceName)}/pr-suggestions`;
-  const { data: suggestionsData, mutate: refreshSuggestions } = useSWR<PrSuggestions>(suggestionsUrl, fetcher, {
-    refreshInterval: 60_000,
-  });
-  const suggestions = Array.isArray(suggestionsData?.conflicts) ? suggestionsData : undefined;
-  const archive = useArchiveToggle(() => router.push("/"));
+  const { suggestions, markHandled } = usePrSuggestions(workspaceName);
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   // The proposal names comments by permalink and checks by repository; the
   // selection is by thread id and check key, and only what is still on the tab.
@@ -255,16 +248,19 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
     return { threadIds, checkKeys };
   }, [suggestions, threadsById, failuresByKey]);
 
-  const markHandled = async () => {
-    await fetch(suggestionsUrl, { method: "DELETE" });
-    void refreshSuggestions();
-  };
-
-  const selectTriage = () => {
+  // Arriving from the header's "Select for triage": once the PRs and the
+  // proposal are read, fill the selection, mark the proposal handled, and drop
+  // the query so a reload does not select again.
+  const wantsTriage = searchParams.get(SELECT_TRIAGE_PARAM) === "select";
+  const prsLoaded = !isLoading && repos.every((r) => !r.isLoading);
+  useEffect(() => {
+    if (!wantsTriage || !prsLoaded || !suggestions) return;
     setSelectedIds((prev) => new Set([...prev, ...triagePick.threadIds]));
     setSelectedCheckKeys((prev) => new Set([...prev, ...triagePick.checkKeys]));
-    void markHandled();
-  };
+    if (suggestions.triage) void markHandled();
+    router.replace(pathname, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per arrival
+  }, [wantsTriage, prsLoaded, suggestions]);
 
   // A thread that scrolled out of view because the resolved filter changed is
   // still selected, so the counts are taken from the selections themselves.
@@ -439,25 +435,6 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
 
   return (
     <div className="space-y-4 pb-24">
-      {suggestions && (
-        <PrSuggestionsCallout
-          suggestions={suggestions}
-          triageCount={{ comments: triagePick.threadIds.length, checks: triagePick.checkKeys.length }}
-          disabled={isRunning}
-          onSelectTriage={selectTriage}
-          onDismissTriage={() => void markHandled()}
-          onResolveConflicts={() =>
-            void startAndNavigate("resolve-base-conflicts", {
-              workspace: workspaceName,
-              ...(suggestions.conflicts.length === 1 && { repo: suggestions.conflicts[0] }),
-            })
-          }
-          onArchive={() => void archive.toggle(workspaceName)}
-        />
-      )}
-      {archive.openPrs && (
-        <ArchiveOpenPrsConfirm prs={archive.openPrs} onConfirm={archive.confirmClose} onCancel={archive.cancel} />
-      )}
       <PrEventTimeline workspaceName={workspaceName} />
       <div className="flex items-center justify-between">
         <div>
