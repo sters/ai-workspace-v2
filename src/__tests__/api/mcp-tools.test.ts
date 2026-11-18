@@ -71,6 +71,24 @@ describe("MCP tools", () => {
     }
   });
 
+  it("refuses to write README or TODO files while an operation runs on the workspace", async () => {
+    // The operation rewrites these files; one of the two writes would be lost.
+    mockSummaries.mockReturnValue([
+      { id: "op-9", type: "execute", workspace: "ws", status: "running", startedAt: "2026-01-01T00:00:00Z" },
+    ]);
+    mockWorkspaceSummary.mockResolvedValue({ name: "ws" });
+    const item = { tag: "API", title: "Return 404", target: "a.ts:1", action: "Return 404" };
+
+    for (const [tool, args] of [
+      ["write_readme_sections", { workspace: "ws", goal: "Unknown ids get a 404." }],
+      ["add_todo_items", { workspace: "ws", repository: "api", section: "Tasks", items: [item] }],
+    ] as const) {
+      const { data, isError } = await callTool(tool, args);
+      expect(isError).toBe(true);
+      expect(JSON.stringify(data)).toContain("op-9");
+    }
+  });
+
   it("get_operation reports a running operation's unanswered question with its toolUseId", async () => {
     mockSummaries.mockReturnValue([
       { id: "op-1", type: "execute", workspace: "ws", status: "running", startedAt: "2026-01-01T00:00:00Z", hasPendingAsk: true },

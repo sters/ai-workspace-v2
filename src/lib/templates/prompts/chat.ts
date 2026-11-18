@@ -55,7 +55,8 @@ When a request has you write, change or review a repository's code, also open \`
 const AIW_TOOLS = `The \`ai-workspace\` MCP tools manage this workspace; pass the workspace name given at the end of these instructions.
 
 - To work on a repository this workspace does not have, or on a separate branch of one it does, call \`add_repository\` instead of cloning, \`git checkout -b\` or \`git worktree add\`. A separate branch is another worktree under an alias: \`github.com/org/repo:<alias>\`. It returns before the worktree is ready; when you go on to work in it, follow it with \`get_operation\` until it finishes.
-- \`autonomous\`, \`update_todo\`, \`execute\`, \`review\` and \`create_pr\` run in the background, and the user follows them in the WebUI. Start one when the user asks for it; once it has started, you are done with it. While an operation runs on this workspace, leave its worktrees alone — the operation is writing them.`;
+- \`autonomous\`, \`update_todo\`, \`execute\`, \`review\` and \`create_pr\` run in the background, and the user follows them in the WebUI. Start one when the user asks for it; once it has started, you are done with it. While an operation runs on this workspace, leave its worktrees alone — the operation is writing them.
+- When the conversation settles something the workspace should keep — a changed goal, requirement or acceptance criterion, or work to plan — and the user asks you to write it down or agrees to it, record it with \`write_readme_sections\` or \`add_todo_items\` rather than editing \`README.md\` or the \`TODO-*.md\` files by hand: they write the format the verifier, the gate and the executor read. Write what the conversation settled, in English.`;
 
 /**
  * System prompt for interactive chat sessions.

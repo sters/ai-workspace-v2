@@ -1,14 +1,18 @@
 import z from "zod";
 import type { McpTool } from "@/lib/mcp/protocol";
 import type { OperationEvent, OperationListItem } from "@/types/operation";
-import { resolveWorkspaceName } from "@/lib/config";
+import { getWorkspaceDir, resolveWorkspaceName } from "@/lib/config";
 import { unarchiveWorkspace } from "@/lib/db/archives";
 import { archiveWorkspaceWithPrs, OpenPullRequestsError } from "@/lib/workspace/archive";
 import { getOperation, getOperationEvents, getOperationSummaries } from "@/lib/pipeline-manager";
 import { readOperationLog } from "@/lib/operation-store";
 import { eventsToLogEntries, extractResultSummary } from "@/lib/parsers/stream";
 import { findPendingAsk } from "@/components/operation/log/display-nodes";
-import { getWorkspaceSummary, listWorkspaceItems } from "@/lib/workspace/reader";
+import path from "node:path";
+import { parseReadmeMeta } from "@/lib/parsers/readme";
+import { commitWorkspaceSnapshot, listWorkspaceRepos } from "@/lib/workspace";
+import { getReadme, getWorkspaceSummary, listWorkspaceItems } from "@/lib/workspace/reader";
+import { appendTodoItems, replaceReadmeSections } from "@/lib/workspace/workspace-files";
 import {
   addRepositorySchema,
   autonomousSchema,
@@ -59,6 +63,69 @@ const INTERACTION_LEVEL =
   "interactionLevel (low / mid / high) sets how readily the agents stop to ask; omitted, the configured default applies.";
 
 const workspaceInput = z.object({ workspace: z.string().min(1, "workspace is required") });
+
+const sectionText = (what: string) => z.string().optional().describe(`Markdown body of the section, replacing it whole: ${what}`);
+
+const readmeSectionsInput = workspaceInput.extend({
+  title: z.string().optional().describe("The `# Task:` title, under 70 characters; every pull request reuses it verbatim."),
+  goal: sectionText("what must be true once the task is done."),
+  nonGoal: sectionText(
+    "exclusions grounded in the request, and actions agents must not take on their own (release, infra / DB changes, anything irreversible).",
+  ),
+  assumptions: sectionText("`- (assumption) …` items for what could not be confirmed, so a person can catch a wrong guess."),
+  context: sectionText("background — why the task exists, what was found."),
+  requirements: sectionText("specific functional / technical requirements."),
+  acceptanceCriteria: z
+    .array(
+      z.object({
+        kind: z
+          .enum(["auto", "manual"])
+          .describe("auto: an agent can prove it with evidence (exit code, code presence, API behavior). manual: needs a person; agents never attempt it."),
+        text: z.string().min(1).describe("One objectively checkable condition."),
+      }),
+    )
+    .optional()
+    .describe("The whole checklist that defines done, replacing the current one. A criterion restated with the same text keeps its checked state."),
+  relatedResources: sectionText("links."),
+});
+
+const todoItemsInput = workspaceInput.extend({
+  repository: z.string().min(1).describe("The worktree: its directory name (TODO-<name>.md) or its path as the README lists it."),
+  section: z
+    .string()
+    .min(1)
+    .describe("The `##` heading to append under, e.g. `Implementation Tasks`; created before Verification / Finalize / Notes when missing."),
+  items: z
+    .array(
+      z.object({
+        tag: z.string().min(1).describe("Short area label rendered as **[tag]**, e.g. API, Test, Docs."),
+        title: z.string().min(1).describe("One atomic change; \"… and also …\" is two items."),
+        target: z.string().min(1).describe("path:line, or path + the exact symbol — never \"the relevant module\"."),
+        action: z.string().min(1).describe("The concrete recipe: the import, the call, the literal to change."),
+        verify: z
+          .string()
+          .optional()
+          .describe("One check that passes or fails, as narrow as the item allows (the one test, not the suite). Required for code changes."),
+        pattern: z.string().optional().describe("Only when the convention is non-obvious: existing code to mirror, path:line."),
+        why: z.string().optional().describe("Only when the action does not make it obvious: what stays broken without this item."),
+      }),
+    )
+    .min(1),
+});
+
+/**
+ * Checks shared by the file-writing tools. A running operation rewrites README
+ * and TODO files, so writing beside it loses one of the two edits.
+ */
+async function writableWorkspace(workspace: string): Promise<{ name: string } | { error: string }> {
+  const name = resolveWorkspaceName(workspace);
+  const running = getOperationSummaries().find((op) => op.workspace === name && op.status === "running");
+  if (running) {
+    return { error: `Operation ${running.id} (${running.type}) is running on ${name}; write once it has finished.` };
+  }
+  if (!(await getWorkspaceSummary(name))) return { error: `Workspace not found: ${name}` };
+  return { name };
+}
 
 const RECENT_STATUS_LINES = 8;
 const STATUS_LINE_MAX_CHARS = 500;
@@ -211,6 +278,50 @@ export const MCP_TOOLS: McpTool[] = [
     addRepositorySchema,
     postAddRepository,
   ),
+  {
+    name: "write_readme_sections",
+    description:
+      "Rewrite sections of a workspace's README — the contract the verifier and the autonomous gate hold the work to — and commit it. " +
+      "Each section given replaces that section whole; the rest of the README is left as it is. Write only what was settled: a guess goes under assumptions. " +
+      "Repositories are added with add_repository, and Repository Constraints are written by discovery. Refused while an operation runs on the workspace.",
+    input: readmeSectionsInput,
+    call: async (args) => {
+      const { workspace, ...sections } = args as z.infer<typeof readmeSectionsInput>;
+      const target = await writableWorkspace(workspace);
+      if ("error" in target) return { data: target.error, isError: true };
+      const file = path.join(getWorkspaceDir(), target.name, "README.md");
+      await Bun.write(file, replaceReadmeSections(await Bun.file(file).text(), sections));
+      const written = Object.keys(sections).filter((k) => sections[k as keyof typeof sections] !== undefined);
+      await commitWorkspaceSnapshot(target.name, `Update README: ${written.join(", ")}`);
+      return { data: { workspace: target.name, file: "README.md", updated: written } };
+    },
+  },
+  {
+    name: "add_todo_items",
+    description:
+      "Append pending items to a worktree's TODO-<repo>.md and commit it; execute picks them up. A missing file is started from the task type's template. " +
+      "Leave out what is not an item: reading docs, and the README's Repository Constraints commands (the executor and the review run them all). " +
+      "Refused while an operation runs on the workspace.",
+    input: todoItemsInput,
+    call: async (args) => {
+      const { workspace, repository, section, items } = args as z.infer<typeof todoItemsInput>;
+      const target = await writableWorkspace(workspace);
+      if ("error" in target) return { data: target.error, isError: true };
+      const repos = await listWorkspaceRepos(target.name);
+      const repo = repos.find((r) => r.repoName === repository || r.repoPath === repository);
+      if (!repo) {
+        return { data: `No worktree ${repository} in ${target.name}; it has: ${repos.map((r) => r.repoName).join(", ") || "none"}`, isError: true };
+      }
+      const wsPath = path.join(getWorkspaceDir(), target.name);
+      const filename = `TODO-${repo.repoName}.md`;
+      const file = Bun.file(path.join(wsPath, filename));
+      const content = (await file.exists()) ? await file.text() : null;
+      const { taskType } = parseReadmeMeta((await getReadme(target.name)) ?? "");
+      await Bun.write(file, appendTodoItems(content, { repoName: repo.repoName, taskType, section, items }));
+      await commitWorkspaceSnapshot(target.name, `Add ${items.length} TODO item(s) to ${filename}`);
+      return { data: { workspace: target.name, file: filename, added: items.length, created: content === null } };
+    },
+  },
   routeTool(
     "harvest_lessons",
     "Distill a workspace's outcome (PR comments, commits people added, a rejected PR, recurring review findings) into candidate lessons " +
