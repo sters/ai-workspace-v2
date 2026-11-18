@@ -8,6 +8,7 @@ export type OperationType =
   | "create-pr"
   | "update-todo"
   | "update-readme"
+  | "add-repository"
   | "validate-pr-comments"
   | "check-pr-triage"
   | "post-review-findings"

@@ -157,8 +157,16 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
     { workspaceId: msg.workspaceId },
   );
 
-  const chatModel = getConfig().chat.model;
-  const modelArgs = chatModel ? ["--model", chatModel] : [];
+  const config = getConfig();
+  const modelArgs = config.chat.model ? ["--model", config.chat.model] : [];
+  // This server's own MCP endpoint, so a chat can start operations and add repositories.
+  // `--mcp-config` takes any number of values: keep a flag after it, or it reads the prompt as one.
+  const mcpArgs = [
+    "--mcp-config",
+    JSON.stringify({
+      mcpServers: { "ai-workspace": { type: "http", url: `http://localhost:${config.server.port}/api/mcp` } },
+    }),
+  ];
 
   // The browser's xterm is the real viewport, so the PTY is born its size;
   // at any other size Claude's TUI draws boxes and status lines at a width the
@@ -169,7 +177,7 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
   let proc;
   try {
     proc = spawnClaudeTerminal({
-      args: [...opening.leadingArgs, "--append-system-prompt-file", systemPromptFile, ...modelArgs, ...opening.trailingArgs],
+      args: [...opening.leadingArgs, ...mcpArgs, "--append-system-prompt-file", systemPromptFile, ...modelArgs, ...opening.trailingArgs],
       cwd: opening.cwd,
       listeners,
       ...(size && { cols: size.cols, rows: size.rows }),

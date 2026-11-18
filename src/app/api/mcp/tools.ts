@@ -10,6 +10,7 @@ import { eventsToLogEntries, extractResultSummary } from "@/lib/parsers/stream";
 import { findPendingAsk } from "@/components/operation/log/display-nodes";
 import { getWorkspaceSummary, listWorkspaceItems } from "@/lib/workspace/reader";
 import {
+  addRepositorySchema,
   autonomousSchema,
   createPrSchema,
   executeSchema,
@@ -25,6 +26,7 @@ import { POST as postAutonomous } from "../operations/autonomous/route";
 import { POST as postExecute } from "../operations/execute/route";
 import { POST as postReview } from "../operations/review/route";
 import { POST as postCreatePr } from "../operations/create-pr/route";
+import { POST as postAddRepository } from "../operations/add-repository/route";
 import { POST as postHarvestLessons } from "../operations/harvest-lessons/route";
 import { POST as postUpdateTodo } from "../operations/update-todo/route";
 import { POST as postAnswer } from "../operations/answer/route";
@@ -199,6 +201,15 @@ export const MCP_TOOLS: McpTool[] = [
     `Review a workspace's changes against its README and TODOs; repository narrows it to one. ${STARTS_OPERATION}`,
     reviewSchema,
     postReview,
+  ),
+  routeTool(
+    "add_repository",
+    "Add a repository's worktree to an existing workspace and declare it in the README; its constraints are discovered too. " +
+      "repository is a path like github.com/org/repo, cloned when it is not on disk. For another worktree of a repository the workspace already has " +
+      "(work on a separate branch), suffix an alias: github.com/org/repo:<alias>. A new branch is cut from baseBranch (default: the repository's default branch); " +
+      `branch checks out an existing remote branch instead. ${STARTS_OPERATION}`,
+    addRepositorySchema,
+    postAddRepository,
   ),
   routeTool(
     "harvest_lessons",

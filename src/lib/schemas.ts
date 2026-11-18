@@ -332,6 +332,19 @@ export const archiveWorkspaceSchema = z.object({
 });
 
 /** Distill a workspace's outcome into candidate repository lessons. */
+/** Repository paths and branch names reach git through a shell, so only plain ones pass. */
+const GIT_REF = /^[\w.-]+(\/[\w.-]+)*$/;
+
+export const addRepositorySchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+  repository: z
+    .string()
+    .trim()
+    .regex(/^[\w.-]+(\/[\w.-]+)+(:[\w.-]+)?$/, "repository must be a path like github.com/org/repo, optionally with :alias"),
+  baseBranch: z.string().trim().regex(GIT_REF, "baseBranch must be a branch name").optional(),
+  branch: z.string().trim().regex(GIT_REF, "branch must be a branch name").optional(),
+});
+
 export const harvestLessonsSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
 });

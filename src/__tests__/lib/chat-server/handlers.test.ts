@@ -76,7 +76,7 @@ vi.mock("@/lib/db/slack-sessions", () => ({
 const SLACK_MAX_TURN_MS = 60_000;
 
 function setChatModel(model: ClaudeModel | null) {
-  mockGetConfig.mockReturnValue({ chat: { model }, slack: { chatMaxTurnMs: SLACK_MAX_TURN_MS } });
+  mockGetConfig.mockReturnValue({ chat: { model }, slack: { chatMaxTurnMs: SLACK_MAX_TURN_MS }, server: { port: 4321 } });
 }
 
 let mockPtyResize: ReturnType<typeof vi.fn>;
@@ -143,6 +143,19 @@ describe("handleStart", () => {
     const promptIdx = opts.args.indexOf("init-prompt-body");
     expect(modelIdx).toBeGreaterThanOrEqual(0);
     expect(promptIdx).toBeGreaterThan(modelIdx + 1);
+  });
+
+  it("connects the session to this server's MCP endpoint without swallowing the prompt", async () => {
+    await startSession();
+
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    const idx = opts.args.indexOf("--mcp-config");
+    expect(JSON.parse(opts.args[idx + 1])).toEqual({
+      mcpServers: { "ai-workspace": { type: "http", url: "http://localhost:4321/api/mcp" } },
+    });
+    // --mcp-config takes any number of values, so it must be followed by
+    // another flag; otherwise the positional prompt is read as a config.
+    expect(opts.args[idx + 2]).toMatch(/^--/);
   });
 
   it("omits --model when chat.model is null (CLI default)", async () => {

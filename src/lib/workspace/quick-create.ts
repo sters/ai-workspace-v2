@@ -34,7 +34,7 @@
 import { pathExists } from "@/lib/fs";
 import path from "node:path";
 import { quickWorkspaceName } from "@/lib/naming";
-import { denormalizeRepoPath, type RepoConstraint } from "@/lib/parsers/readme";
+import { denormalizeRepoPath, parseReadmeMeta, type RepoConstraint } from "@/lib/parsers/readme";
 import { parsePrUrl, type PrUrlInfo } from "@/lib/github-pr-url";
 import type { SetupRepositoryResult } from "@/types/pipeline";
 import type { SelectableRepository } from "@/types/workspace";
@@ -210,6 +210,27 @@ function replaceSection(content: string, heading: string, body: string): string 
   return `${content.slice(0, afterHeading)}\n\n${body}\n${content.slice(end)}`;
 }
 
+function repositoryLine(repo: SetupRepositoryResult): string {
+  return `- **${repo.repoName}**: \`${denormalizeRepoPath(repo.repoPath)}\` (base: \`${repo.baseBranch}\`)`;
+}
+
+/**
+ * Add one worktree to the README's `## Repositories` section, after the ones
+ * already there. The template's placeholder comment goes; a repository the
+ * section already declares is left as it is.
+ */
+export function declareRepository(content: string, repo: SetupRepositoryResult): string {
+  if (parseReadmeMeta(content).repositories.some((r) => r.path === repo.repoPath)) return content;
+  const heading = "## Repositories";
+  const start = content.indexOf(`${heading}\n`);
+  const next = start < 0 ? null : content.slice(start + heading.length).match(/\n## |\n# /);
+  const current = start < 0
+    ? ""
+    : content.slice(start + heading.length, next ? start + heading.length + next.index! : content.length);
+  const kept = current.split("\n").filter((line) => line.trim() && !/^<!--.*-->$/.test(line.trim()));
+  return replaceSection(content, heading, [...kept, repositoryLine(repo)].join("\n"));
+}
+
 /**
  * Fill the two README sections this path knows the answer to: the title and
  * the repository table. Everything else is left exactly as the template wrote
@@ -225,12 +246,7 @@ export function fillQuickReadme(
     : `# Task: ${title}\n\n${content}`;
 
   const body = input.repositories.length > 0
-    ? input.repositories
-        .map(
-          (repo) =>
-            `- **${repo.repoName}**: \`${denormalizeRepoPath(repo.repoPath)}\` (base: \`${repo.baseBranch}\`)`,
-        )
-        .join("\n")
+    ? input.repositories.map(repositoryLine).join("\n")
     : "<!-- No worktree was created. Add repositories here and run update-readme to set them up. -->";
 
   return replaceSection(titled, "## Repositories", body);

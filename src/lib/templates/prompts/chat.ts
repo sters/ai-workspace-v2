@@ -47,6 +47,17 @@ export const CODE_WORK_GUIDANCE = `${LISTED_SKILLS}
 When a request has you write, change or review a repository's code, also open \`artifacts/repo-guidance/<repository>.md\` first (the repository's path as the README lists it, e.g. \`artifacts/repo-guidance/github.com/org/repo.md\`), when it exists. It lists the files where that repository documents how its code is written (\`## Implementation\`) and reviewed (\`## Review\`); open the ones under the section that matches the work and hold it to them.`;
 
 /**
+ * Chat sessions are connected to this server's MCP endpoint (`spawnSession`).
+ * Without being told, a session cuts branches inside the worktree it is in,
+ * which the workspace never learns about, and edits worktrees an operation it
+ * started is writing.
+ */
+const AIW_TOOLS = `The \`ai-workspace\` MCP tools manage this workspace; pass the workspace name given at the end of these instructions.
+
+- To work on a repository this workspace does not have, or on a separate branch of one it does, call \`add_repository\` instead of cloning, \`git checkout -b\` or \`git worktree add\`. A separate branch is another worktree under an alias: \`github.com/org/repo:<alias>\`. It returns before the worktree is ready; when you go on to work in it, follow it with \`get_operation\` until it finishes.
+- \`autonomous\`, \`update_todo\`, \`execute\`, \`review\` and \`create_pr\` run in the background, and the user follows them in the WebUI. Start one when the user asks for it; once it has started, you are done with it. While an operation runs on this workspace, leave its worktrees alone — the operation is writing them.`;
+
+/**
  * System prompt for interactive chat sessions.
  * Bounds the first turn to cd + one README read + a one-line acknowledgement,
  * so startup neither investigates on its own initiative nor reports back.
@@ -63,6 +74,8 @@ Your first turn consists of exactly three things:
 Treat what you read as silent reference: it is there so you have the workspace's goal and plan in hand, not as a topic to open with. Summarizing it, further investigating (Read/Grep/Glob, git status, git log, gh pr, ls), and proposing next steps all belong to later turns, only once the user asks — that is what the rest of the conversation is for.
 
 ${CODE_WORK_GUIDANCE}
+
+${AIW_TOOLS}
 
 ${REPLY_LANGUAGE}
 
@@ -99,6 +112,8 @@ That acknowledgement is all the first turn produces. Reach for the per-repositor
 
 ${CODE_WORK_GUIDANCE}
 
+${AIW_TOOLS}
+
 ${REPLY_LANGUAGE}
 
 ${ON_DEMAND_READING}`;
@@ -121,6 +136,8 @@ Your first turn consists of exactly three things:
 That acknowledgement is all the first turn produces. Reach for the per-repository research reports beside the summary, or for the code itself (Read/Glob/Grep, git status, git log, gh pr), once the user's question calls for them.
 
 ${CODE_WORK_GUIDANCE}
+
+${AIW_TOOLS}
 
 ${REPLY_LANGUAGE}
 
@@ -173,6 +190,8 @@ Ask the user when a decision is genuinely theirs — an ambiguity in the request
 
 ${CODE_WORK_GUIDANCE}
 
+${AIW_TOOLS}
+
 ${REPLY_LANGUAGE}
 
 ${ON_DEMAND_READING}`;
@@ -204,6 +223,8 @@ For example, for one comment: "1. The reviewer says the early return at cache.ts
 What happens next is the user's to decide. Making a change, replying on or resolving a review thread, and reading a check's full log all wait until the user asks for them; a reply on the pull request is published under the user's name.
 
 ${CODE_WORK_GUIDANCE}
+
+${AIW_TOOLS}
 
 ${REPLY_LANGUAGE}
 
@@ -240,6 +261,8 @@ The user prompt ends with a \`${START_PROMPT_HEADING}\` section — an instructi
 Pushing, opening or merging a pull request, and replying on one wait until the user asks for them, unless the saved instruction itself asks for them.
 
 ${CODE_WORK_GUIDANCE}
+
+${AIW_TOOLS}
 
 ${REPLY_LANGUAGE}
 

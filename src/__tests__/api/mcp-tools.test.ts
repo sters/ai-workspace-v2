@@ -56,9 +56,19 @@ describe("MCP tools", () => {
       result: { tools: { name: string; inputSchema: { type: string } }[] };
     };
     expect(res.result.tools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(["init_only", "autonomous", "execute", "review", "create_pr", "list_workspaces", "archive_workspace"]),
+      expect.arrayContaining(["init_only", "autonomous", "execute", "review", "create_pr", "add_repository", "list_workspaces", "archive_workspace"]),
     );
     for (const tool of res.result.tools) expect(tool.inputSchema.type).toBe("object");
+  });
+
+  it("add_repository refuses a repository or branch that is not a plain path", async () => {
+    // The values reach git through a shell.
+    for (const args of [
+      { workspace: "ws", repository: "github.com/acme/web\"; rm -rf ~; \"" },
+      { workspace: "ws", repository: "github.com/acme/web", branch: "$(id)" },
+    ]) {
+      expect((await callTool("add_repository", args)).isError).toBe(true);
+    }
   });
 
   it("get_operation reports a running operation's unanswered question with its toolUseId", async () => {

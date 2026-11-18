@@ -19,7 +19,7 @@ vi.mock("@/lib/workspace/git", () => ({
   listAllRepositories: () => mockListAllRepositories(),
 }));
 
-import { createQuickWorkspace, fillQuickReadme, type QuickCreateDeps } from "@/lib/workspace/quick-create";
+import { createQuickWorkspace, declareRepository, fillQuickReadme, type QuickCreateDeps } from "@/lib/workspace/quick-create";
 import { parseConstraints, parseReadmeMeta } from "@/lib/parsers/readme";
 import { buildReadmeContent } from "@/lib/templates";
 
@@ -87,6 +87,35 @@ function stageWorkspace(): string {
 beforeEach(() => {
   mockSetupWorkspace.mockReset();
   mockCommitWorkspaceSnapshot.mockReset();
+});
+
+describe("declareRepository", () => {
+  const template = buildReadmeContent("d", "bugfix", "N/A", "2026-09-11");
+
+  it("adds the repository after the ones already declared", () => {
+    const withWeb = fillQuickReadme(template, { title: "t", repositories: [repoResult("github.com/acme/web")] });
+    const declared = declareRepository(withWeb, repoResult("github.com/acme/web___variant-a", "develop"));
+
+    expect(parseReadmeMeta(declared).repositories).toEqual([
+      { alias: "web", path: "github.com/acme/web", baseBranch: "main" },
+      { alias: "web___variant-a", path: "github.com/acme/web___variant-a", baseBranch: "develop" },
+    ]);
+    expect(declared).toContain("## Goal\n");
+  });
+
+  it("replaces the template's placeholder in an empty section", () => {
+    const declared = declareRepository(template, repoResult("github.com/acme/web"));
+
+    const section = declared.slice(declared.indexOf("## Repositories"), declared.indexOf("## Goal"));
+    expect(section).not.toContain("<!--");
+    expect(parseReadmeMeta(declared).repositories).toHaveLength(1);
+  });
+
+  it("leaves a repository the README already declares alone", () => {
+    const withWeb = fillQuickReadme(template, { title: "t", repositories: [repoResult("github.com/acme/web")] });
+
+    expect(declareRepository(withWeb, repoResult("github.com/acme/web"))).toBe(withWeb);
+  });
 });
 
 describe("fillQuickReadme", () => {
