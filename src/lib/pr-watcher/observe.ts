@@ -1,7 +1,13 @@
-import type { PrChecksSummary, WorkspacePullRequest } from "@/types/pull-request";
+import type { PrChecksSummary, PrReviewThread, WorkspacePullRequest } from "@/types/pull-request";
 import type { PrCiState, PrEventInput, PrEventKind, PrWatchSnapshot } from "@/types/pr-watch";
 
 const MAX_BODY_CHARS = 4000;
+
+function settledIn(thread: PrReviewThread, self: string | null): string[] {
+  if (thread.isResolved) return thread.comments.map((c) => c.url);
+  const lastReply = self === null ? -1 : thread.comments.findLastIndex((c) => c.author === self);
+  return thread.comments.slice(0, lastReply + 1).map((c) => c.url);
+}
 
 export function ciState(checks: PrChecksSummary): PrCiState {
   if (!checks.reported) return "none";
@@ -26,6 +32,7 @@ export function observePr(
   pr: WorkspacePullRequest,
   workspace: string,
   now: string,
+  self: string | null = null,
 ): { events: PrEventInput[]; snapshot: PrWatchSnapshot } {
   const base = prev && prev.prUrl === pr.url ? prev : null;
   const events: PrEventInput[] = [];
@@ -87,6 +94,7 @@ export function observePr(
       ci: settledCi,
       mergeable: settledMergeable,
       seenComments: [...seen],
+      settledComments: pr.threads.flatMap((t) => settledIn(t, self)),
     },
   };
 }

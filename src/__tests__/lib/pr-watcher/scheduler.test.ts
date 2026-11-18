@@ -134,8 +134,13 @@ describe("watch scheduler", () => {
     prs.widgets = pr(widgets, 1, { checks: failing });
     expect(await widgetsReadsAt([8, 9, 10, 11, 12, 13, 14, 15])).toEqual([15]);
     expect(listPrEvents("ws").map((e) => e.kind)).toEqual(["ci-failing"]);
-    // Settled: no more backoff reads before the next sweep.
-    expect(await widgetsReadsAt([16, 17, 18, 20, 25])).toEqual([]);
+    // Still failing on the same head: keep rechecking at the capped interval so a re-run that passes is seen.
+    expect(await widgetsReadsAt([16, 17, 18, 20, 23])).toEqual([23]);
+
+    prs.widgets = pr(widgets, 1);
+    expect(await widgetsReadsAt([31])).toEqual([31]);
+    expect(listPrEvents("ws").map((e) => e.kind)).toEqual(["ci-failing", "ci-passing"]);
+    expect(await widgetsReadsAt([32, 35, 39, 40, 44])).toEqual([]);
   });
 
   it("caps the backoff interval", async () => {

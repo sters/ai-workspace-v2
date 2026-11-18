@@ -61,10 +61,26 @@ function snapshotOf(p: WorkspacePullRequest, seen: string[] = []): PrWatchSnapsh
     ci: "passing",
     mergeable: p.mergeable ?? "UNKNOWN",
     seenComments: seen,
+    settledComments: [],
   };
 }
 
 describe("observePr", () => {
+  it("marks comments settled when their thread is resolved or the gh user replied after them", () => {
+    const resolved = { ...thread("u1"), isResolved: true };
+    const replied = {
+      ...thread("u2"),
+      comments: [
+        { url: "u2", author: "alice", body: "", createdAt: "2026-01-01T10:00:00Z" },
+        { url: "u3", author: "me", body: "", createdAt: "2026-01-01T11:00:00Z" },
+        { url: "u4", author: "bob", body: "", createdAt: "2026-01-01T12:00:00Z" },
+      ],
+    };
+    const open = thread("u5");
+    const { snapshot } = observePr(null, pr({ threads: [resolved, replied, open] }), "ws", NOW, "me");
+    expect(snapshot.settledComments.sort()).toEqual(["u1", "u2", "u3"]);
+  });
+
   it("records existing comments but no state transitions on first sight", () => {
     const { events, snapshot } = observePr(null, pr({ threads: [thread("u1")], mergeable: "CONFLICTING" }), "ws", NOW);
     expect(events.map((e) => e.kind)).toEqual(["comment"]);

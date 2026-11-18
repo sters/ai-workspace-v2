@@ -6,8 +6,10 @@
  * - a GitHub notification names it (comments, reviews, merge / close), or names
  *   its repository with no PR (an Actions run the user triggered finished);
  * - its base branch moved, the only way a conflict appears;
- * - its CI was pending or its mergeability still being computed at the last
- *   read: re-read after 1, 2, 4, then every 8 minutes until it settles;
+ * - its CI was pending or failing, or its mergeability still being computed, at
+ *   the last read: re-read after 1, 2, 4, then every 8 minutes until it settles
+ *   (failing counts, so a fix or re-run made outside aiw clears the triage
+ *   proposal without waiting for the sweep);
  * - the periodic sweep, which reads everything and catches what the others miss
  *   (CI outside Actions that finished without a pending read, PRs on a host the
  *   notifications API does not cover).
@@ -116,7 +118,8 @@ export function createWatchScheduler(deps: SchedulerDeps, sweepMs: number) {
       worktreePath: t.repo.worktreePath,
       headSha: pr.headSha,
     });
-    const unsettled = ciState(pr.checks) === "pending" || (pr.mergeable ?? "UNKNOWN") === "UNKNOWN";
+    const ci = ciState(pr.checks);
+    const unsettled = ci === "pending" || ci === "failing" || (pr.mergeable ?? "UNKNOWN") === "UNKNOWN";
     if (!unsettled) {
       backoff.delete(key);
       return events;

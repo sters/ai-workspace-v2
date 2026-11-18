@@ -10,6 +10,7 @@ interface SnapshotRow {
   ci: string;
   mergeable: string;
   seen_comments: string;
+  settled_comments: string;
 }
 
 export function getPrSnapshot(workspace: string, repoName: string): PrWatchSnapshot | null {
@@ -35,13 +36,17 @@ export function markPrHandled(workspace: string, at: string = new Date().toISOSt
   getDb().query("INSERT OR REPLACE INTO pr_handled (workspace, handled_at) VALUES (?, ?)").run(workspace, at);
 }
 
-function toSnapshot(row: SnapshotRow): PrWatchSnapshot {
-  let seen: unknown;
+function stringList(json: string): string[] {
+  let value: unknown;
   try {
-    seen = JSON.parse(row.seen_comments);
+    value = JSON.parse(json);
   } catch {
-    seen = [];
+    return [];
   }
+  return Array.isArray(value) ? value.filter((s): s is string => typeof s === "string") : [];
+}
+
+function toSnapshot(row: SnapshotRow): PrWatchSnapshot {
   return {
     workspace: row.workspace,
     repoName: row.repo_name,
@@ -50,7 +55,8 @@ function toSnapshot(row: SnapshotRow): PrWatchSnapshot {
     headSha: row.head_sha,
     ci: row.ci as PrCiState,
     mergeable: row.mergeable,
-    seenComments: Array.isArray(seen) ? seen.filter((s): s is string => typeof s === "string") : [],
+    seenComments: stringList(row.seen_comments),
+    settledComments: stringList(row.settled_comments),
   };
 }
 
@@ -59,8 +65,8 @@ export function savePrObservation(snapshot: PrWatchSnapshot, events: PrEventInpu
   const db = getDb();
   db.transaction(() => {
     db.query(
-      `INSERT OR REPLACE INTO pr_watch (workspace, repo_name, pr_url, state, head_sha, ci, mergeable, seen_comments, checked_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
+      `INSERT OR REPLACE INTO pr_watch (workspace, repo_name, pr_url, state, head_sha, ci, mergeable, seen_comments, settled_comments, checked_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
     ).run(
       snapshot.workspace,
       snapshot.repoName,
@@ -70,6 +76,7 @@ export function savePrObservation(snapshot: PrWatchSnapshot, events: PrEventInpu
       snapshot.ci,
       snapshot.mergeable,
       JSON.stringify(snapshot.seenComments),
+      JSON.stringify(snapshot.settledComments),
     );
     const insert = db.query(
       `INSERT INTO pr_events (workspace, repo_name, pr_url, kind, author, body, url, occurred_at)

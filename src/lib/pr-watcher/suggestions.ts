@@ -7,7 +7,9 @@
  * bots (code-review bots), and for CI that is still failing, counting only what
  * happened after the workspace was last handled (a proposal taken or dismissed),
  * and only once comments have been quiet for {@link QUIET_MS} so a review
- * arriving in several comments becomes one triage. A bot's conversation comment
+ * arriving in several comments becomes one triage. A comment already dealt with
+ * on GitHub (its thread resolved or hidden, or answered by the gh user) is left
+ * out, as is CI that has stopped failing. A bot's conversation comment
  * is a notice (deploy previews, coverage) and is left out.
  */
 
@@ -46,8 +48,9 @@ export function computePrSuggestions(input: {
   const after = (e: PrEvent) => input.handledAt === null || e.occurredAt > input.handledAt;
   const open = input.snapshots.filter((s) => s.state === "OPEN");
 
+  const settled = new Set(input.snapshots.flatMap((s) => s.settledComments));
   const comments = input.events.filter(
-    (e) => e.kind === "comment" && after(e) && isTriageComment(e, input.self),
+    (e) => e.kind === "comment" && after(e) && isTriageComment(e, input.self) && !settled.has(e.url!),
   );
   const failingRepos = open
     .filter((s) => s.ci === "failing")

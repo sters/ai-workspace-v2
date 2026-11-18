@@ -8,7 +8,7 @@ const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
 function snap(repoName: string, overrides: Partial<PrWatchSnapshot> = {}): PrWatchSnapshot {
   return {
     workspace: "ws", repoName, prUrl: `https://github.com/acme/${repoName}/pull/1`,
-    state: "OPEN", headSha: "a", ci: "passing", mergeable: "MERGEABLE", seenComments: [],
+    state: "OPEN", headSha: "a", ci: "passing", mergeable: "MERGEABLE", seenComments: [], settledComments: [],
     ...overrides,
   };
 }
@@ -58,6 +58,17 @@ describe("computePrSuggestions", () => {
     const inline = ev("comment", ago(30), { author: "review-helper[bot]", url: "https://github.com/acme/widgets/pull/1#discussion_r3" });
     const s = computePrSuggestions({ ...base, snapshots: [snap("widgets")], events: [review, inline] });
     expect(s.triage?.commentUrls).toEqual([review.url, inline.url]);
+  });
+
+  it("leaves out comments settled on GitHub", () => {
+    const settled = ev("comment", ago(30));
+    const open = ev("comment", ago(30));
+    const s = computePrSuggestions({
+      ...base,
+      snapshots: [snap("widgets", { settledComments: [settled.url!] })],
+      events: [settled, open],
+    });
+    expect(s.triage?.commentUrls).toEqual([open.url]);
   });
 
   it("leaves out what came before the workspace was last handled", () => {

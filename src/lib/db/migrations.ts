@@ -372,6 +372,14 @@ const migrations: Migration[] = [
       db.exec("ALTER TABLE repo_lessons ADD COLUMN challenges_json TEXT NOT NULL DEFAULT '[]'");
     },
   },
+  {
+    version: 21,
+    up: (db) => {
+      const columns = db.query("SELECT name FROM pragma_table_info('pr_watch')").all() as { name: string }[];
+      if (columns.some((c) => c.name === "settled_comments")) return;
+      db.exec("ALTER TABLE pr_watch ADD COLUMN settled_comments TEXT NOT NULL DEFAULT '[]'");
+    },
+  },
 ];
 
 /**

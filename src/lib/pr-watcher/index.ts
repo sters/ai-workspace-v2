@@ -60,7 +60,7 @@ export async function observeRepoPr(
   // A PR read without its threads and CI would look like every check vanished.
   if (!result.pr || result.problem) return { pr: null, events: 0 };
 
-  const { events, snapshot } = observePr(prev, result.pr, workspace, new Date().toISOString());
+  const { events, snapshot } = observePr(prev, result.pr, workspace, new Date().toISOString(), await ghLogin());
   savePrObservation(snapshot, events);
   return { pr: TERMINAL_STATES.has(result.pr.state) ? null : result.pr, events: events.length };
 }

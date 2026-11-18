@@ -14,6 +14,11 @@ export interface PrWatchSnapshot {
   mergeable: string;
   /** Permalinks of every comment already recorded as an event. */
   seenComments: string[];
+  /**
+   * Permalinks of comments already dealt with on GitHub as of this read: their
+   * thread is resolved or hidden, or the gh user replied after them in it.
+   */
+  settledComments: string[];
 }
 
 export const PR_EVENT_KINDS = [

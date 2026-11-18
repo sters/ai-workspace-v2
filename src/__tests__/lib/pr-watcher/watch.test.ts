@@ -36,7 +36,7 @@ describe("observeRepoPr", () => {
 
   it("stops reading a PR once it is merged or closed", async () => {
     savePrObservation(
-      { workspace: "ws", repoName: "widgets", prUrl: pr().url, state: "CLOSED", headSha: "aaa", ci: "passing", mergeable: "MERGEABLE", seenComments: [] },
+      { workspace: "ws", repoName: "widgets", prUrl: pr().url, state: "CLOSED", headSha: "aaa", ci: "passing", mergeable: "MERGEABLE", seenComments: [], settledComments: [] },
       [],
     );
     const read = vi.fn(async (): Promise<RepoPullRequestRead> => ({ pr: pr() }));
