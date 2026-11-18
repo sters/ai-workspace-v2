@@ -25,7 +25,9 @@ export function ciState(checks: PrChecksSummary): PrCiState {
  * lessons) and CI that is already failing (so it can be triaged), but no other
  * transitions, since there is no earlier state to transition from. `pending` CI and `UNKNOWN` mergeability are GitHub still computing, not
  * a state of their own: the snapshot keeps the last settled value so the next
- * settled one is compared against it.
+ * settled one is compared against it. The exception is `failing`: pending means
+ * no check is failing now, and a check can stay pending indefinitely (an
+ * approval gate), so `failing` gives way to `pending`.
  */
 export function observePr(
   prev: PrWatchSnapshot | null,
@@ -55,7 +57,7 @@ export function observePr(
 
   const ci = ciState(pr.checks);
   const mergeable = pr.mergeable ?? "UNKNOWN";
-  const settledCi = ci === "pending" && base ? base.ci : ci;
+  const settledCi = ci === "pending" && base && base.ci !== "failing" ? base.ci : ci;
   const settledMergeable = mergeable === "UNKNOWN" && base ? base.mergeable : mergeable;
 
   const ciFailing = () => {

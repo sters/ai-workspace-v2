@@ -116,6 +116,14 @@ describe("observePr", () => {
     expect(next.events.map((e) => e.kind)).toEqual(["ci-failing"]);
   });
 
+  it("stops calling CI failing once no check fails, even while one stays pending", () => {
+    const prev = { ...snapshotOf(pr()), ci: "failing" as const };
+    const { events, snapshot } = observePr(prev, pr({ headSha: "bbb", checks: checks({ running: 1, success: 3 }) }), "ws", NOW);
+    expect(snapshot.ci).toBe("pending");
+    expect(events.map((e) => e.kind)).toEqual(["push"]);
+    expect(observePr(snapshot, pr({ headSha: "bbb" }), "ws", NOW).events.map((e) => e.kind)).toEqual(["ci-passing"]);
+  });
+
   it("reports CI recovery and conflict resolution", () => {
     const prev = { ...snapshotOf(pr()), ci: "failing" as const, mergeable: "CONFLICTING" };
     const kinds = observePr(prev, pr(), "ws", NOW).events.map((e) => e.kind);
