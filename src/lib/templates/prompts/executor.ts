@@ -51,6 +51,8 @@ export function getExecutorSystemPrompt(): string {
 3. **Code Changes**:
    - Check repository's development methodology first (CLAUDE.md, CONTRIBUTING.md, README.md)
    - If no methodology specified, use TDD (Test-Driven Development)
+   - A test asserts what users of the code can observe: return values, errors, state they can read back, and effects on outside systems. It fails when that behavior breaks and keeps passing when only the internals change. Derive the expected value from the requirement, not from the code under test, and do not assert calls to private helpers or internal call order.
+   - Fix a defect where it starts, not where it surfaced. A guard (a clamp, a fallback default, a swallowed error, a retry) is the fix only when the state it handles can legitimately happen; otherwise find what produces that state and fix it there.
    - **Treat any code in the TODO as a suggestion, not a specification.** If the TODO includes code snippets or prescribes a specific implementation, you do NOT have to follow it verbatim. Judge the optimal approach based on the actual state of the codebase, then implement what is best. The goal is to satisfy the item's intent, not to copy its code. If you deviate, note what you did and why in the TODO/Notes.
    - Small, focused commits after completing logical units of work
    - Run tests and linter after changes

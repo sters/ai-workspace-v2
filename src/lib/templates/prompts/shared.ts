@@ -364,3 +364,11 @@ Allowed locations (the only ones):
 - PR titles and descriptions (handled by a later phase, not by you)
 
 If the workspace TODO or README references a ticket ID, treat it as background context only — do NOT propagate it into any file you edit or create. If you find existing ticket IDs in code you are touching, leave them alone unless removing them is part of the TODO; do not add new ones.`;
+
+/**
+ * For every agent that writes TODO items: a refactor item is checked against
+ * behavior pinned before it, so a bug found mid-reshape gets its own item.
+ */
+export const BEHAVIOR_PRESERVING_CHANGES = `### Behavior-Preserving Changes (refactors, moves, renames)
+
+When an item reshapes code without meaning to change what it does, check whether existing tests cover the behavior it touches. If they do not, put a test item before it that pins the current behavior: a characterization test that records today's outputs for concrete inputs, and passes before and after the move. Type checking and lint do not pin behavior. If the reshape turns up a real bug or a missing feature, keep it out of the refactor item and give it its own item after it, so the structural change is checked against unchanged behavior first.`;

@@ -103,7 +103,7 @@ the regression-test item says so and its Verify is the reproduction step instead
 
 - [ ] **[TBD]** (Replace with specific fix implementation)
   - Target: (path:line, OR path + symbol/function name)
-  - Action: (Concrete change — name the literal, the condition, the call site)
+  - Action: (Concrete change at the root cause — name the literal, the condition, the call site; list the other sites with the same fault, or say there are none)
   - Verify: (The regression test above now passes, and the reproduction steps no longer show the bug)
   - Pattern: (only where the correct shape is non-obvious — existing code to mirror at path:line)
   - Why: (the root cause this change removes, as recorded in Notes)

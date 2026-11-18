@@ -1,5 +1,6 @@
 import type { PlannerInput } from "@/types/prompts";
 import {
+  BEHAVIOR_PRESERVING_CHANGES,
   REPO_SEARCH_EFFICIENCY,
   SUBAGENT_DELEGATION_POLICY,
   WRITTEN_DELIVERABLE_LENGTH,
@@ -112,6 +113,8 @@ Three required fields, two conditional. An item is finished when the executor ca
 - Bare directory paths without a specific file ("src/auth/")
 
 Instead, identify the exact file (and line number or symbol) by reading the source code during the analysis step. If you genuinely cannot pin down the location without deeper investigation, add a preceding investigation TODO ("Investigate: locate X") rather than ship a vague item.
+
+${BEHAVIOR_PRESERVING_CHANGES}
 
 ### What Is Not a TODO Item
 

@@ -1,4 +1,5 @@
 import type { CreateTodoPlannerInput } from "@/types/prompts";
+import { BEHAVIOR_PRESERVING_CHANGES } from "./shared";
 
 export function getCreateTodoPlannerSystemPrompt(): string {
   return `You are a specialized agent for creating TODO items based on review findings. Your role is to read review artifacts and generate actionable TODO items that address the issues found during code review.
@@ -50,6 +51,8 @@ Each TODO item MUST follow this structured format:
   - Source: Which review finding this addresses (e.g., "REVIEW: critical - security issue in auth.ts")
   - Verify: How to verify the change is correct
 \`\`\`
+
+${BEHAVIOR_PRESERVING_CHANGES}
 
 ### Language
 

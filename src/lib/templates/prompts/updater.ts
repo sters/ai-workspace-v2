@@ -1,4 +1,4 @@
-import { SCOPE_DISCIPLINE } from "./shared";
+import { BEHAVIOR_PRESERVING_CHANGES, SCOPE_DISCIPLINE } from "./shared";
 import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
 import type { UpdaterInput } from "@/types/prompts";
 
@@ -65,6 +65,8 @@ You may run any command (including \`make\`, \`go\`, \`npm\`, etc.) to **underst
 ${SCOPE_DISCIPLINE}
 
 An update request that names specific changes is the scope of the items you write: cover each one, and do not add work it did not ask for. Analysing the repository is for making those items **precise** — the exact path, line, value and verification command — not for growing them.
+
+${BEHAVIOR_PRESERVING_CHANGES}
 
 ### Deriving an Item's Targets
 

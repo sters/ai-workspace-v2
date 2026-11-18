@@ -4,6 +4,7 @@ import {
   NO_CD_RULES,
   NO_WORKSPACE_REFERENCES,
   RECURRING_FINDINGS_POLICY,
+  BEHAVIOR_PRESERVING_CHANGES,
   REPO_SEARCH_EFFICIENCY,
   REVIEW_COVERAGE_POLICY,
   SCOPE_DISCIPLINE,
@@ -29,6 +30,7 @@ import { getPRCreatorSystemPrompt } from "@/lib/templates/prompts/pr-creator";
 import { getPrCommentValidatorSystemPrompt } from "@/lib/templates/prompts/pr-comment-validator";
 import { getCoordinatorSystemPrompt } from "@/lib/templates/prompts/coordinator";
 import { getUpdaterSystemPrompt } from "@/lib/templates/prompts/updater";
+import { getCreateTodoPlannerSystemPrompt } from "@/lib/templates/prompts/create-todo-planner";
 import { getFixVerifierSystemPrompt } from "@/lib/templates/prompts/fix-verifier";
 import { getCriteriaFeasibilitySystemPrompt } from "@/lib/templates/prompts/criteria-feasibility";
 import { getRepoGuidanceSystemPrompt } from "@/lib/templates/prompts/repo-guidance";
@@ -263,6 +265,16 @@ describe("SUBAGENT_DELEGATION_POLICY", () => {
       expect(prompt).toContain(SUBAGENT_DELEGATION_POLICY);
     },
   );
+});
+
+describe("BEHAVIOR_PRESERVING_CHANGES", () => {
+  it.each([
+    ["planner", getPlannerSystemPrompt],
+    ["TODO updater", getUpdaterSystemPrompt],
+    ["review-findings TODO planner", getCreateTodoPlannerSystemPrompt],
+  ])("is applied to the %s, since each one writes refactor items", (_name, build) => {
+    expect(build()).toContain(BEHAVIOR_PRESERVING_CHANGES);
+  });
 });
 
 describe("SCOPE_DISCIPLINE", () => {
