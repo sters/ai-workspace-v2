@@ -76,6 +76,13 @@ Investigation items are looser (they're exploratory).
 Bug-fix items below are code changes — they carry Target / Action / Verify, plus Pattern and Why only
 where those change what the executor writes.
 Target on fix items must be path:line OR path + symbol/function name — no vague strings.
+The failing test comes before the fix, and is committed before it so the history shows the bug
+reproduced and then fixed, unless the repository's hooks or conventions require every commit to
+pass. Every line the fix changes must trace to something observed in the investigation; a change
+that only "might help" is a hypothesis and does not ship. When an observation refutes a
+hypothesis, revert what that hypothesis motivated.
+Where no automated test can reach the bug (it needs a real browser, device or external service),
+the regression-test item says so and its Verify is the reproduction step instead.
 -->
 
 - [ ] **[TBD]** Reproduce the bug locally
@@ -83,23 +90,23 @@ Target on fix items must be path:line OR path + symbol/function name — no vagu
   - Action: (Exact steps to reproduce)
   - Verify: (Expected vs actual behavior)
 
+- [ ] **[TBD]** Add a regression test that fails on the current code
+  - Target: (Test file path + the new test name)
+  - Action: (Test case that reproduces the bug — arrange/act/assert; commit it before the fix where the repository allows a failing commit)
+  - Verify: (Exact test command, narrowed to this test; it fails, and the failure output goes in Notes)
+
 - [ ] **[TBD]** Identify root cause
   - Target: (Suspected file/function)
-  - Action: (What to investigate)
+  - Action: (Candidate causes, and the observation — log, value, test result — that rules each one in or out; record which survived in Notes)
 
 ## Bug Fix Tasks
 
 - [ ] **[TBD]** (Replace with specific fix implementation)
   - Target: (path:line, OR path + symbol/function name)
   - Action: (Concrete change — name the literal, the condition, the call site)
-  - Verify: (Reproduce steps now pass, plus the narrowest test command covering this path)
+  - Verify: (The regression test above now passes, and the reproduction steps no longer show the bug)
   - Pattern: (only where the correct shape is non-obvious — existing code to mirror at path:line)
-  - Why: (only where the Action doesn't already make it obvious — what incorrect behavior remains)
-
-- [ ] **[TBD]** Add regression test
-  - Target: (Test file path + the new test name)
-  - Action: (Test case that would have caught this bug — arrange/act/assert)
-  - Verify: Test fails on the buggy code, passes after the fix
+  - Why: (the root cause this change removes, as recorded in Notes)
 
 ## Verification
 
