@@ -145,6 +145,8 @@ export interface FixVerifierInput extends RepoPromptInput {
    */
   askSource?: "gate" | "pr-comments";
   verifyFilePath: string;
+  /** Written by this review's `Verify constraints` phase before the verifier starts. */
+  constraintReportPath: string;
   /** Baseline the fixes were requested at, when one was recorded. */
   sinceSha?: string;
   sinceTimestamp?: string;

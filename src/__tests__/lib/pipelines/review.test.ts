@@ -954,6 +954,15 @@ describe("buildReviewPipeline — a round with requested fixes keeps every revie
     );
   });
 
+  // An ask like "make lint pass" was marked PARTIAL for want of saved output
+  // while the constraint report on disk already showed it passing.
+  it("points the fix verifier at the same constraint report as the completion verifier", async () => {
+    await buildReviewPipeline({ workspace: "test-ws", requestedFixes: ["fix one"] });
+    const completion = vi.mocked(buildCompletionVerifierPrompt).mock.calls[0][0];
+    const fixes = mockBuildFixVerifierPrompt.mock.calls[0][0];
+    expect(fixes.constraintReportPath).toBe(completion.constraintReportPath);
+  });
+
   it("keeps the cross-repository reviewer", async () => {
     mockListWorkspaceRepos.mockReturnValue([
       repo,

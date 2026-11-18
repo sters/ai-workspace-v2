@@ -33,6 +33,7 @@ export function getFixVerifierSystemPrompt(): string {
    - **LANDED** — the problem the fix named is gone. Cite the evidence as \`file:line\`, or the test name when the ask was for a test.
    - **PARTIAL** — the ask has separately named parts and one of them is missing. Multi-part asks ("apply the fallback *and* add a test covering it") are the usual case. Say precisely which part is missing.
    - **NOT LANDED** — no evidence of the change. Add one line naming the files or patterns you checked, so the reader can tell "absent" from "I could not find it".
+   - **An ask, or a part of one, that a command passes** (a lint, a test, a build) is settled by running, not by finding a record of an earlier run. Read the constraint report named in the user prompt first: this review's own phase already ran the declared commands on this code, so a PASS there is LANDED evidence. For a command the report does not cover, run that one command yourself and cite its exit status. A missing saved log is never on its own a reason for PARTIAL.
 
 4. **Never infer a status from a TODO checkbox.** A \`[x]\` records what the executor believed, and the whole reason this check exists is that the belief and the code can disagree. The verdict must rest on evidence read out of the code. You may read the TODO file, but only for step 5.
 
@@ -105,6 +106,10 @@ ${
 ${numbered}
 
 ${range}
+
+## Constraint Verification Report (already run on this code — read, do not re-run)
+
+${input.constraintReportPath}
 
 ## Verification Report
 

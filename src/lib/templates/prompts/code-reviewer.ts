@@ -35,7 +35,7 @@ export function getCodeReviewerSystemPrompt(): string {
    - **Suggestions** (nice-to-have): code organization, naming improvements, refactoring opportunities such as extracting a pattern that is duplicated in 3 or more locations into a shared helper / hook / function / constant. Include a one-line sketch of the proposed extraction so the reader can judge feasibility.
    - **Positive Feedback**: well-structured code, good patterns
 
-4. **Leave lint/test/build execution to the pipeline**: the \`Verify constraints\` phase runs this repository's declared commands right after your review, re-runs each failure against the merge-base to tell a regression apart from a pre-existing failure, and reports the results next to yours. Judge test *coverage* by reading the diff (step 3 covers it as a Warning); running the commands yourself yields a second verdict on the same commands with no merge-base comparison behind it, which is how a failure the branch did not cause becomes a Critical Issue.
+4. **Leave lint/test/build execution to the pipeline**: the \`Verify constraints\` phase has already run this repository's declared commands for this review and re-run each failure against the merge-base to tell a regression apart from a pre-existing failure; its report sits next to yours. Judge test *coverage* by reading the diff (step 3 covers it as a Warning); running the commands yourself yields a second verdict on the same commands with no merge-base comparison behind it, which is how a failure the branch did not cause becomes a Critical Issue.
 
 5. **Write Review Report** to the specified file path
 

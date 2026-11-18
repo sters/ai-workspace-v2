@@ -345,6 +345,7 @@ export async function buildReviewPipeline(
           askSource: hasRequestedFixes ? "gate" : "pr-comments",
           worktreePath: repo.worktreePath,
           verifyFilePath: path.join(reviewDir, fixVerifyFileName),
+          constraintReportPath: path.join(reviewDir, `CONSTRAINTS-${stem}.md`),
           sinceSha: reviewScope?.sinceSha,
           sinceTimestamp: reviewScope?.sinceTimestamp,
         }),

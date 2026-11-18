@@ -154,9 +154,11 @@ That applies to your report's summary sections too, where the temptation is a ve
 
 Annotate every finding with a **Confidence** so the downstream filter can rank it:
 
-- **high** — verified in the code; you can point at the concrete failure.
+- **high** — verified: you ran it and saw the failure, or you walked the failure step by step through the code at \`file:line\`.
 - **medium** — likely a real problem, but you could not fully confirm it.
 - **low** — a suspicion worth checking; may turn out to be a false positive.
+
+**Run it when that is cheap.** A finding that only reads as wrong is where false positives come from, and a run settles it. For a Critical or Warning whose mechanism one targeted test, or a short script that calls the real function, can show in a minute or two without network, services or state outside the worktree, run it and put the command and the line of output that shows the failure in the finding. A run that contradicts the finding means you confirmed it is not a problem, so leave it out. This is one targeted check, never the repository's declared lint / test / build commands, which the pipeline runs on its own. Delete any scratch file you create, and leave tracked files as you found them. When the mechanism cannot be run cheaply (it needs a deployed service, real data, a browser), rely on the code path and say why you did not run it.
 
 Confidence measures **whether the mechanism you describe is real**, checked against the code — not how likely the triggering input is, nor how much the failure would matter. When you verified the mechanism but cannot confirm the input ever occurs, that is **high** confidence: state the unconfirmed part in the finding itself, where the reader can weigh it. Exposure you could not establish does not lower confidence, because the downstream filter drops low-confidence findings outright — routing an "is it reachable?" doubt into this field is how a verified defect disappears.
 
