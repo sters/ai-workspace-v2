@@ -116,3 +116,27 @@ export function listPrEvents(workspace: string): PrEvent[] {
     occurredAt: r.occurred_at,
   }));
 }
+
+export interface TriageVerdict {
+  url: string;
+  verdict: "addressed" | "open";
+  reason: string;
+}
+
+export function saveTriageVerdicts(workspace: string, verdicts: TriageVerdict[]): void {
+  const db = getDb();
+  const upsert = db.query(
+    `INSERT OR REPLACE INTO pr_triage_verdicts (workspace, comment_url, verdict, reason, judged_at)
+     VALUES (?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
+  );
+  db.transaction(() => {
+    for (const v of verdicts) upsert.run(workspace, v.url, v.verdict, v.reason);
+  })();
+}
+
+export function listAddressedTriageComments(workspace: string): string[] {
+  const rows = getDb()
+    .query("SELECT comment_url FROM pr_triage_verdicts WHERE workspace = ? AND verdict = 'addressed'")
+    .all(workspace) as { comment_url: string }[];
+  return rows.map((r) => r.comment_url);
+}

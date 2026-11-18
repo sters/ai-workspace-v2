@@ -23,7 +23,7 @@ function ev(kind: PrEventKind, occurredAt: string, overrides: Partial<PrEvent> =
   };
 }
 
-const base = { handledAt: null, self: "me", now: NOW };
+const base = { handledAt: null, self: "me", now: NOW, judgedAddressed: [] as string[] };
 
 describe("computePrSuggestions", () => {
   it("proposes triage of a person's comment once comments have been quiet for five minutes", () => {
@@ -68,6 +68,13 @@ describe("computePrSuggestions", () => {
       snapshots: [snap("widgets", { settledComments: [settled.url!] })],
       events: [settled, open],
     });
+    expect(s.triage?.commentUrls).toEqual([open.url]);
+  });
+
+  it("leaves out comments judged already addressed", () => {
+    const addressed = ev("comment", ago(30));
+    const open = ev("comment", ago(30));
+    const s = computePrSuggestions({ ...base, judgedAddressed: [addressed.url!], snapshots: [snap("widgets")], events: [addressed, open] });
     expect(s.triage?.commentUrls).toEqual([open.url]);
   });
 

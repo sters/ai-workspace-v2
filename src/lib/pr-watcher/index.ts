@@ -9,7 +9,14 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { getArchivedNameSet } from "@/lib/db/archives";
-import { getPrHandledAt, getPrSnapshot, listPrEvents, listPrSnapshots, savePrObservation } from "@/lib/db/pr-watch";
+import {
+  getPrHandledAt,
+  getPrSnapshot,
+  listAddressedTriageComments,
+  listPrEvents,
+  listPrSnapshots,
+  savePrObservation,
+} from "@/lib/db/pr-watch";
 import { findRunningOpsByWorkspace } from "@/lib/pipeline/store";
 import { pathExists } from "@/lib/fs";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
@@ -20,7 +27,7 @@ import type { WorkspacePullRequest } from "@/types/pull-request";
 import type { WorkspaceRepo } from "@/types/workspace";
 import { observePr } from "./observe";
 import type { Notification, WatchTarget } from "./scheduler";
-import { computePrSuggestions, NO_SUGGESTIONS, type PrSuggestions } from "./suggestions";
+import { computePrSuggestions, NO_SUGGESTIONS, type PrSuggestionInput, type PrSuggestions } from "./suggestions";
 
 const TERMINAL_STATES = new Set(["MERGED", "CLOSED"]);
 
@@ -99,7 +106,7 @@ export async function readBaseSha(worktreePath: string, base: string): Promise<s
 const selfLogin = globalThis as typeof globalThis & { __aiwGhLogin?: Promise<string | null> };
 
 /** The gh user's login, read once per process; null when gh cannot say. */
-function ghLogin(): Promise<string | null> {
+export function ghLogin(): Promise<string | null> {
   selfLogin.__aiwGhLogin ??= execArgs(["gh", "api", "user", "--jq", ".login"]).then(
     (out) => out.trim() || null,
     () => {
@@ -113,11 +120,15 @@ function ghLogin(): Promise<string | null> {
 /** Proposals for a workspace; none while an operation runs on it, since the PRs are about to change. */
 export async function getWorkspacePrSuggestions(workspace: string): Promise<PrSuggestions> {
   if (findRunningOpsByWorkspace(workspace).length > 0) return NO_SUGGESTIONS;
-  return computePrSuggestions({
+  return computePrSuggestions({ ...(await prSuggestionInput(workspace)), now: Date.now() });
+}
+
+export async function prSuggestionInput(workspace: string): Promise<Omit<PrSuggestionInput, "now">> {
+  return {
     snapshots: listPrSnapshots(workspace),
     events: listPrEvents(workspace),
     handledAt: getPrHandledAt(workspace),
     self: await ghLogin(),
-    now: Date.now(),
-  });
+    judgedAddressed: listAddressedTriageComments(workspace),
+  };
 }

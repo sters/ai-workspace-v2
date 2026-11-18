@@ -95,6 +95,11 @@ export const updateTodoSchema = z.object({
  * `repo` narrows it to one worktree, matching the review pipeline's filter —
  * either the worktree directory name or the full repository path.
  */
+/** Judge whether the comments proposed for triage still need anything. */
+export const checkPrTriageSchema = z.object({
+  workspace: z.string().min(1, "workspace is required"),
+});
+
 export const resolveBaseConflictsSchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
   repo: z.string().optional(),

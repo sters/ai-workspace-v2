@@ -380,6 +380,21 @@ const migrations: Migration[] = [
       db.exec("ALTER TABLE pr_watch ADD COLUMN settled_comments TEXT NOT NULL DEFAULT '[]'");
     },
   },
+  {
+    version: 22,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS pr_triage_verdicts (
+          workspace   TEXT NOT NULL,
+          comment_url TEXT NOT NULL,
+          verdict     TEXT NOT NULL,
+          reason      TEXT NOT NULL,
+          judged_at   TEXT NOT NULL,
+          PRIMARY KEY (workspace, comment_url)
+        );
+      `);
+    },
+  },
 ];
 
 /**

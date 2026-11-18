@@ -81,6 +81,7 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
 
   [STEP_TYPES.PRUNE_SUGGESTIONS]: CLAUDE_MODELS.HAIKU_5_5,
   [STEP_TYPES.AGGREGATE_SUGGESTIONS]: CLAUDE_MODELS.HAIKU_5_5,
+  [STEP_TYPES.JUDGE_PR_TRIAGE]: CLAUDE_MODELS.HAIKU_5_5,
 };
 
 /**
@@ -132,6 +133,9 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
 
   [STEP_TYPES.PRUNE_SUGGESTIONS]: "low",
   [STEP_TYPES.AGGREGATE_SUGGESTIONS]: "low",
+  // Reads a conversation it is handed, no code; an unsure answer stays open, so
+  // shallow reasoning errs toward keeping the proposal.
+  [STEP_TYPES.JUDGE_PR_TRIAGE]: "low",
 };
 
 /**

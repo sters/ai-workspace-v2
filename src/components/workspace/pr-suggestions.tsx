@@ -52,6 +52,16 @@ export function WorkspaceSuggestions({
           >
             Select for triage
           </Link>
+          {triage.commentUrls.length > 0 && (
+            <Button
+              variant="outline"
+              disabled={disabled}
+              title="Ask a small model whether these comments were already answered or fixed"
+              onClick={() => void startAndNavigate("check-pr-triage", { workspace: workspaceName })}
+            >
+              Check if needed
+            </Button>
+          )}
           <Button variant="outline-muted" onClick={() => void markHandled()}>
             Dismiss
           </Button>

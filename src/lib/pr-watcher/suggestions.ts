@@ -9,7 +9,8 @@
  * and only once comments have been quiet for {@link QUIET_MS} so a review
  * arriving in several comments becomes one triage. A comment already dealt with
  * on GitHub (its thread resolved or hidden, or answered by the gh user) is left
- * out, as is CI that has stopped failing. A bot's conversation comment
+ * out, as is CI that has stopped failing, and so is a comment the
+ * `check-pr-triage` operation judged already addressed. A bot's conversation comment
  * is a notice (deploy previews, coverage) and is left out.
  */
 
@@ -36,22 +37,32 @@ export function hasSuggestions(s: PrSuggestions): boolean {
   return s.triage !== null || s.conflicts.length > 0 || s.archive;
 }
 
-export function computePrSuggestions(input: {
+export interface PrSuggestionInput {
   snapshots: PrWatchSnapshot[];
   events: PrEvent[];
   /** ISO time the workspace was last handled, or null if never. */
   handledAt: string | null;
   /** The gh user's login; aiw comments as this user. */
   self: string | null;
+  /** Comment permalinks `check-pr-triage` judged already addressed. */
+  judgedAddressed: string[];
   now: number;
-}): PrSuggestions {
+}
+
+/** Comment events that would be proposed for triage, before the quiet period is applied. */
+export function triageCandidates(input: Omit<PrSuggestionInput, "now">): PrEvent[] {
+  const after = (e: PrEvent) => input.handledAt === null || e.occurredAt > input.handledAt;
+  const done = new Set([...input.snapshots.flatMap((s) => s.settledComments), ...input.judgedAddressed]);
+  return input.events.filter(
+    (e) => e.kind === "comment" && after(e) && isTriageComment(e, input.self) && !done.has(e.url!),
+  );
+}
+
+export function computePrSuggestions(input: PrSuggestionInput): PrSuggestions {
   const after = (e: PrEvent) => input.handledAt === null || e.occurredAt > input.handledAt;
   const open = input.snapshots.filter((s) => s.state === "OPEN");
 
-  const settled = new Set(input.snapshots.flatMap((s) => s.settledComments));
-  const comments = input.events.filter(
-    (e) => e.kind === "comment" && after(e) && isTriageComment(e, input.self) && !settled.has(e.url!),
-  );
+  const comments = triageCandidates(input);
   const failingRepos = open
     .filter((s) => s.ci === "failing")
     .filter(

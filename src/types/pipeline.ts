@@ -31,6 +31,7 @@ export const STEP_TYPES = {
   SUGGEST_WORKSPACE: "suggest-workspace",
   PLAN_VERIFICATION: "plan-verification",
   DISTILL_LESSONS: "distill-lessons",
+  JUDGE_PR_TRIAGE: "judge-pr-triage",
 } as const;
 
 export type StepType = (typeof STEP_TYPES)[keyof typeof STEP_TYPES];
