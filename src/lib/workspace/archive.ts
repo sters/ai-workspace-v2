@@ -6,13 +6,20 @@
  * ask for them to be closed; they are closed, their branches deleted, and the
  * close recorded as aiw's own so lesson distillation does not read it as a
  * reviewer turning the work down. Lessons are then harvested from the result.
+ *
+ * A review or research workspace opens no PR of its own: a PR on its branch is
+ * the one it checked out to read, so archiving neither waits on nor closes it.
  */
+
+import path from "node:path";
 
 import { archiveWorkspace } from "@/lib/db/archives";
 import { getPrSnapshot, savePrObservation } from "@/lib/db/pr-watch";
 import { startOperationPipeline } from "@/lib/pipeline";
 import { buildHarvestLessonsPipeline } from "@/lib/pipelines/harvest-lessons";
 import { observePr } from "@/lib/pr-watcher/observe";
+import { readWorkspaceReadme } from "@/lib/parsers/readme";
+import { getWorkspaceDir } from "@/lib/config";
 import { execArgs } from "./helpers";
 import { listWorkspacePullRequests } from "./pr-threads";
 import { runGit } from "./git-exec";
@@ -30,7 +37,10 @@ export class OpenPullRequestsError extends Error {
   }
 }
 
+const TASK_TYPES_WITHOUT_OWN_PRS = new Set(["review", "research"]);
+
 export interface ArchiveDeps {
+  taskType: (workspace: string) => Promise<string>;
   listPullRequests: (workspace: string) => Promise<WorkspacePullRequest[]>;
   closePullRequest: (pr: WorkspacePullRequest) => Promise<void>;
   deleteBranch: (pr: WorkspacePullRequest) => Promise<void>;
@@ -38,6 +48,8 @@ export interface ArchiveDeps {
 }
 
 const defaultDeps: ArchiveDeps = {
+  taskType: async (workspace) =>
+    (await readWorkspaceReadme(path.join(getWorkspaceDir(), workspace)).catch(() => null))?.meta.taskType ?? "",
   listPullRequests: async (workspace) => (await listWorkspacePullRequests(workspace)).pullRequests,
   closePullRequest: async (pr) => {
     await execArgs(["gh", "pr", "close", pr.url], { cwd: pr.worktreePath });
@@ -71,7 +83,9 @@ export async function archiveWorkspaceWithPrs(
   opts: { closeOpenPrs?: boolean },
   deps: ArchiveDeps = defaultDeps,
 ): Promise<ArchiveResult> {
-  const open = (await deps.listPullRequests(workspace)).filter((pr) => pr.state === "OPEN");
+  const open = TASK_TYPES_WITHOUT_OWN_PRS.has(await deps.taskType(workspace))
+    ? []
+    : (await deps.listPullRequests(workspace)).filter((pr) => pr.state === "OPEN");
   if (open.length > 0 && !opts.closeOpenPrs) {
     throw new OpenPullRequestsError(open.map((pr) => ({ repoName: pr.repoName, url: pr.url, title: pr.title })));
   }

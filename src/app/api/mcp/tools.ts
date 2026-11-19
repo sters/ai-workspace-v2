@@ -215,7 +215,7 @@ export const MCP_TOOLS: McpTool[] = [
     name: "archive_workspace",
     description:
       "Archive a workspace (hidden from list_workspaces by default), or restore it with archived: false. " +
-      "Archiving is refused while the workspace has open pull requests unless closeOpenPrs is true, which closes them and deletes their branches. " +
+      "Archiving is refused while the workspace has open pull requests unless closeOpenPrs is true, which closes them and deletes their branches; a review or research workspace's PRs are left alone. " +
       "Archiving also starts harvest_lessons on the workspace.",
     input: workspaceInput.extend({ archived: z.boolean().default(true), closeOpenPrs: z.boolean().optional() }),
     call: async (args) => {

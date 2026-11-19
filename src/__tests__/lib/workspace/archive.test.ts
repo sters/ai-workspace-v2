@@ -19,6 +19,7 @@ function pr(state: string, repoName = "widgets"): WorkspacePullRequest {
 
 function deps(prs: WorkspacePullRequest[], overrides: Partial<ArchiveDeps> = {}): ArchiveDeps {
   return {
+    taskType: async () => "feature",
     listPullRequests: async () => prs,
     closePullRequest: vi.fn(async () => {}),
     deleteBranch: vi.fn(async () => {}),
@@ -40,6 +41,15 @@ describe("archiveWorkspaceWithPrs", () => {
     expect(isWorkspaceArchived("ws")).toBe(false);
     expect(d.closePullRequest).not.toHaveBeenCalled();
     expect(d.startHarvest).not.toHaveBeenCalled();
+  });
+
+  it.each(["review", "research"])("archives a %s workspace without touching the PRs it checked out", async (taskType) => {
+    const d = deps([pr("OPEN")], { taskType: async () => taskType });
+    const result = await archiveWorkspaceWithPrs("ws", { closeOpenPrs: true }, d);
+    expect(isWorkspaceArchived("ws")).toBe(true);
+    expect(d.closePullRequest).not.toHaveBeenCalled();
+    expect(d.deleteBranch).not.toHaveBeenCalled();
+    expect(result.closed).toEqual([]);
   });
 
   it("closes open PRs, deletes their branches, marks the close as aiw's, then archives and harvests", async () => {
