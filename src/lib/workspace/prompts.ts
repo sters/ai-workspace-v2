@@ -52,6 +52,8 @@ import {
   getFindingGrounderSystemPrompt,
   getConflictResolverSystemPrompt,
   getVerificationPlannerSystemPrompt,
+  getScheduledTaskPlannerSystemPrompt,
+  getScheduledTaskRunnerSystemPrompt,
 } from "@/lib/templates/prompts";
 
 const SYSTEM_PROMPTS: Record<string, () => string> = {
@@ -72,6 +74,8 @@ const SYSTEM_PROMPTS: Record<string, () => string> = {
   "init-readme.md": getInitReadmeSystemPrompt,
   "pr-creator.md": getPRCreatorSystemPrompt,
   "search.md": getSearchSystemPrompt,
+  "scheduled-task-planner.md": getScheduledTaskPlannerSystemPrompt,
+  "scheduled-task-runner.md": getScheduledTaskRunnerSystemPrompt,
   "discovery.md": getDiscoverySystemPrompt,
   "planner.md": getPlannerSystemPrompt,
   "research-planner.md": getResearchPlannerSystemPrompt,

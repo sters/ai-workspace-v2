@@ -32,6 +32,7 @@ export { getInitReadmeSystemPrompt, buildInitAnalyzeAndReadmePrompt, INIT_ANALYS
 export { getChatSystemPrompt, buildInitPrompt, getReviewChatSystemPrompt, buildReviewChatPrompt, getResearchChatSystemPrompt, buildResearchChatPrompt, getTaskChatSystemPrompt, buildTaskChatPrompt, getDiscussionChatSystemPrompt, buildDiscussionChatPrompt, getStartPromptChatSystemPrompt, buildStartPromptChatPrompt } from "./chat";
 export { getCreateTodoPlannerSystemPrompt, buildCreateTodoFromReviewPrompt } from "./create-todo-planner";
 export { getSearchSystemPrompt, buildSearchPrompt, DEEP_SEARCH_SCHEMA } from "./search";
+export { getScheduledTaskPlannerSystemPrompt, getScheduledTaskRunnerSystemPrompt } from "./scheduled-task";
 export { buildSlackChatPrompt, getSlackChatSystemPrompt } from "./slack-chat";
 export {
   buildSlackWorkspaceChatPrompt,

@@ -32,6 +32,8 @@ export const STEP_TYPES = {
   PLAN_VERIFICATION: "plan-verification",
   DISTILL_LESSONS: "distill-lessons",
   JUDGE_PR_TRIAGE: "judge-pr-triage",
+  PLAN_SCHEDULED_TASK: "plan-scheduled-task",
+  RUN_SCHEDULED_TASK: "run-scheduled-task",
 } as const;
 
 export type StepType = (typeof STEP_TYPES)[keyof typeof STEP_TYPES];
@@ -97,6 +99,8 @@ export interface PipelinePhaseGroup {
 }
 
 export interface RunChildOptions {
+  /** Give the agent this server's MCP endpoint; `allowedTools` decides which of its tools run. */
+  aiwMcp?: boolean;
   /** JSON Schema for structured output via --json-schema. */
   jsonSchema?: Record<string, unknown>;
   /** Called with the model's final text response when the child process completes. */

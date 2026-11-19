@@ -19,3 +19,4 @@ export { buildAggregateSuggestionsPipeline } from "./aggregate-suggestions";
 export { buildPruneSuggestionsPipeline } from "./prune-suggestions";
 export { buildPlanVerificationPipeline } from "./plan-verification";
 export { buildHarvestLessonsPipeline } from "./harvest-lessons";
+export { buildPlanScheduledTaskPipeline, buildScheduledTaskPipeline } from "./scheduled-task";

@@ -395,6 +395,40 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 23,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS scheduled_tasks (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          title       TEXT NOT NULL,
+          request     TEXT NOT NULL,
+          prompt      TEXT NOT NULL,
+          cron        TEXT NOT NULL,
+          overlap     TEXT NOT NULL,
+          enabled     INTEGER NOT NULL,
+          next_run_at TEXT,
+          queued      INTEGER NOT NULL DEFAULT 0,
+          last_run_at TEXT,
+          created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+          updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+        );
+      `);
+    },
+  },
+  {
+    version: 24,
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS worker_jobs (
+          name             TEXT PRIMARY KEY,
+          last_started_at  TEXT,
+          last_finished_at TEXT,
+          last_error       TEXT
+        );
+      `);
+    },
+  },
 ];
 
 /**

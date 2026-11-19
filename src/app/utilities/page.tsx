@@ -87,6 +87,12 @@ const tools = [
       "Save and manage reusable text snippets for workspace descriptions.",
   },
   {
+    href: "/utilities/scheduled-tasks",
+    name: "Scheduled Tasks",
+    description:
+      "Describe something to watch; an agent turns it into a cron-scheduled instruction that runs unattended and notifies you.",
+  },
+  {
     href: "/utilities/chat-start-prompts",
     name: "Chat Start Prompts",
     description:

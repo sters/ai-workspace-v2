@@ -2,6 +2,7 @@ import z from "zod";
 import { parsePrUrl } from "./github-pr-url";
 import { quickWorkspaceName } from "./naming";
 import { verificationStepDraftSchema } from "./runtime-schemas";
+import { SCHEDULED_TASK_OVERLAPS } from "@/types/scheduled-task";
 
 /** Interaction level enum — shared between client and server. */
 export const interactionLevelEnum = z.enum(["low", "mid", "high"]);
@@ -324,6 +325,38 @@ export const chatStartPromptUpdateSchema = chatStartPromptCreateSchema.extend({
 
 export const chatStartPromptDeleteSchema = z.object({
   id: z.coerce.number().int().positive("id is required"),
+});
+
+const cronExpression = z
+  .string()
+  .trim()
+  .refine((v) => {
+    try {
+      return Bun.cron.parse(v, new Date()) !== null;
+    } catch {
+      return false;
+    }
+  }, "cron must be a five-field cron expression (minute hour day month weekday)");
+
+export const scheduledTaskInputSchema = z.object({
+  title: z.string().trim().min(1, "title is required"),
+  request: z.string().trim(),
+  prompt: z.string().trim().min(1, "prompt is required"),
+  cron: cronExpression,
+  overlap: z.enum(SCHEDULED_TASK_OVERLAPS),
+  enabled: z.boolean(),
+});
+
+export const scheduledTaskUpdateSchema = scheduledTaskInputSchema.extend({
+  id: z.coerce.number().int().positive("id is required"),
+});
+
+export const scheduledTaskIdSchema = z.object({
+  id: z.coerce.number().int().positive("id is required"),
+});
+
+export const planScheduledTaskSchema = z.object({
+  request: z.string().trim().min(1, "request is required"),
 });
 
 /** Archive toggle; `closeOpenPrs` is required to archive a workspace with open PRs. */

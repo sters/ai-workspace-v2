@@ -26,7 +26,9 @@ export type OperationType =
   | "discovery"
   | "aggregate-suggestions"
   | "prune-suggestions"
-  | "harvest-lessons";
+  | "harvest-lessons"
+  | "plan-scheduled-task"
+  | "scheduled-task";
 
 export type OperationStatus = "running" | "completed" | "failed";
 

@@ -11,6 +11,7 @@ import { realpathSync } from "node:fs";
 import { getCleanEnv } from "../env";
 import { runProcess, type ProcessResult } from "../process/run";
 import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
+import { aiwMcpConfigArgs } from "./aiw-mcp";
 
 let _cliPath: string | null = null;
 
@@ -195,6 +196,7 @@ export function runClaude(
     const cliArgs = [
       "-p", "-",
       "--output-format", "stream-json",
+      ...(options?.aiwMcp ? aiwMcpConfigArgs() : []),
       "--verbose",
       ...(options?.model ? ["--model", options.model] : []),
       ...(options?.effort ? ["--effort", options.effort] : []),

@@ -19,6 +19,7 @@ import { getStore, nextSessionId, persistSessionCreated, persistSessionExited, p
 import { runGc } from "./gc";
 import { resolveSlackThread } from "./slack-thread";
 import { beginChatCost, settleChatCost } from "./cost";
+import { aiwMcpConfigArgs } from "@/lib/claude/aiw-mcp";
 
 type Ws = { send(data: string): void; data: WsData };
 
@@ -159,14 +160,7 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
 
   const config = getConfig();
   const modelArgs = config.chat.model ? ["--model", config.chat.model] : [];
-  // This server's own MCP endpoint, so a chat can start operations and add repositories.
-  // `--mcp-config` takes any number of values: keep a flag after it, or it reads the prompt as one.
-  const mcpArgs = [
-    "--mcp-config",
-    JSON.stringify({
-      mcpServers: { "ai-workspace": { type: "http", url: `http://localhost:${config.server.port}/api/mcp` } },
-    }),
-  ];
+  const mcpArgs = aiwMcpConfigArgs();
 
   // The browser's xterm is the real viewport, so the PTY is born its size;
   // at any other size Claude's TUI draws boxes and status lines at a width the

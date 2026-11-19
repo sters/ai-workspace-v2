@@ -58,7 +58,10 @@ export function markComplete(managed: ManagedOperation, success: boolean) {
   managed.operation.completedAt = new Date().toISOString();
   managed.completedAt = Date.now();
 
-  sendCompletionNotification(managed.operation.id, success, managed.operation.workspace ?? undefined);
+  // A scheduled run that succeeds sends its own notice carrying what it found.
+  if (managed.operation.type !== "scheduled-task" || !success) {
+    sendCompletionNotification(managed.operation.id, success, managed.operation.workspace ?? undefined);
+  }
 
   // Emit the complete event BEFORE clearing listeners so SSE clients receive it
   emitEvent(managed, {

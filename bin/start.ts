@@ -234,19 +234,17 @@ const slackServer = slackEnabled
     })
   : null;
 
-const prWatcher = appConfig.watcher.enabled
-  ? Bun.spawn(["bun", "--bun", ...hotFlag, "run", "bin/pr-watcher.ts"], {
-      cwd: packageDir,
-      stdio: ["inherit", "inherit", "inherit"],
-      env: sharedEnv,
-    })
-  : null;
+const worker = Bun.spawn(["bun", "--bun", ...hotFlag, "run", "bin/worker.ts"], {
+  cwd: packageDir,
+  stdio: ["inherit", "inherit", "inherit"],
+  env: sharedEnv,
+});
 
 let shutdownRequested = false;
 
 function killAll(signal?: string) {
   shutdownRequested = true;
-  console.log(`[start] received ${signal ?? "shutdown request"}, stopping next/chat/slack/pr-watcher`);
+  console.log(`[start] received ${signal ?? "shutdown request"}, stopping next/chat/slack/worker`);
   // Start draining stdin immediately to catch terminal escape sequence
   // responses that arrive after child processes are killed. If we wait until
   // after the processes exit, the responses may land in the shell's input
@@ -261,7 +259,7 @@ function killAll(signal?: string) {
   nextServer.kill();
   chatServer.kill();
   slackServer?.kill();
-  prWatcher?.kill();
+  worker.kill();
 }
 
 process.on("SIGINT", killAll);
@@ -282,7 +280,7 @@ if (!shutdownRequested) {
 }
 chatServer.kill();
 slackServer?.kill();
-prWatcher?.kill();
+worker.kill();
 // Wait for siblings to exit so their cleanup runs before we exit
 await chatServer.exited;
 console.log(
@@ -305,7 +303,7 @@ if (slackServer) {
   );
 }
 
-if (prWatcher) await prWatcher.exited;
+await worker.exited;
 
 // The SIGINT handler already started draining stdin in raw mode to catch
 // terminal escape sequence responses. Wait a bit for any remaining responses

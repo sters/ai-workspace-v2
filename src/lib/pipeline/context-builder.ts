@@ -114,8 +114,8 @@ export function buildPhaseFunctionContext(
       const model = resolveModel(managed.operation.type, childOptions?.stepType, childOptions?.model);
       const effort = resolveEffort(managed.operation.type, childOptions?.stepType, childOptions?.effort);
       const claudeOpts: RunClaudeOptions | undefined =
-        (childOptions?.jsonSchema || childOptions?.cwd || childOptions?.addDirs || childOptions?.allowedTools || childOptions?.skipAskUserQuestion || childOptions?.appendSystemPromptFile || model || effort)
-          ? { jsonSchema: childOptions?.jsonSchema, cwd: childOptions?.cwd, addDirs: childOptions?.addDirs, allowedTools: childOptions?.allowedTools, skipAskUserQuestion: childOptions?.skipAskUserQuestion, appendSystemPromptFile: childOptions?.appendSystemPromptFile, model, effort }
+        (childOptions?.jsonSchema || childOptions?.cwd || childOptions?.addDirs || childOptions?.allowedTools || childOptions?.skipAskUserQuestion || childOptions?.appendSystemPromptFile || childOptions?.aiwMcp || model || effort)
+          ? { jsonSchema: childOptions?.jsonSchema, cwd: childOptions?.cwd, addDirs: childOptions?.addDirs, allowedTools: childOptions?.allowedTools, skipAskUserQuestion: childOptions?.skipAskUserQuestion, appendSystemPromptFile: childOptions?.appendSystemPromptFile, aiwMcp: childOptions?.aiwMcp, model, effort }
           : undefined;
       const result = await runChildWaitingOutUsageLimit(managed, cid, label, () => runClaude(cid, prompt, claudeOpts), childPhaseExtra, { stepType: childOptions?.stepType, effort });
       if (result.resultText && childOptions?.onResultText) {

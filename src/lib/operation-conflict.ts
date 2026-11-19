@@ -11,6 +11,8 @@ const NON_WORKSPACE_TYPES: ReadonlySet<OperationType> = new Set<OperationType>([
   "prune-suggestions",
   "workspace-prune",
   "operation-prune",
+  "plan-scheduled-task",
+  "scheduled-task",
 ]);
 
 /**

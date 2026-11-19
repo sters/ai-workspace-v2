@@ -129,6 +129,16 @@ export function sendUsageLimitNotification(
     });
 }
 
+/** One run of a scheduled task finished; replaces that task's previous notice. */
+export function sendScheduledTaskNotification(taskId: number, title: string, summary: string): void {
+  broadcastNotification({
+    title: `ai-workspace: ${title}`,
+    body: summary,
+    tag: `scheduled-task-${taskId}`,
+    url: buildAbsoluteUrl("/utilities/scheduled-tasks"),
+  });
+}
+
 export function sendAskNotification(operationId: string, workspace?: string): void {
   const path = workspace
     ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`

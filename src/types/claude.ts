@@ -58,6 +58,8 @@ export interface RunClaudeOptions {
   appendSystemPromptFile?: string;
   /** Explicit --allowedTools values. When set, overrides the auto-generated Edit/Write patterns from addDirs. */
   allowedTools?: string[];
+  /** Give the agent this server's MCP endpoint (list workspaces, start operations); `allowedTools` decides which of its tools run. */
+  aiwMcp?: boolean;
   /** Resume an existing CLI session (passed as --resume on the initial spawn). Used to continue a multi-turn conversation. */
   resumeSessionId?: string;
 }
