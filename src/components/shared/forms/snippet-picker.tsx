@@ -52,7 +52,7 @@ export function SnippetPicker({ onInsert, disabled }: SnippetPickerProps) {
           {snippets.length === 0 ? (
             <div className="p-3 text-xs text-muted-foreground">
               No snippets yet.{" "}
-              <Link href="/utilities/snippets" className="underline hover:text-foreground">
+              <Link href="/settings/snippet/init" className="underline hover:text-foreground">
                 Create one
               </Link>
             </div>

@@ -4,11 +4,18 @@ import { useCallback, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Activity,
+  Bell,
+  CalendarClock,
   ChevronsLeft,
   ChevronsRight,
+  CircleDollarSign,
+  Eraser,
   FolderPlus,
   LayoutDashboard,
-  Wrench,
+  Lightbulb,
+  RefreshCw,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -18,39 +25,19 @@ import {
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./push-toggle";
 
-const UTILITY_ITEMS = [
-  { label: "Workspace Prune", href: "/utilities/workspace-prune" },
-  { label: "Operation Log Prune", href: "/utilities/operation-prune" },
-  { label: "Repository Prune", href: "/utilities/repository-prune" },
-  { label: "MCP Servers", href: "/utilities/mcp-servers" },
-  { label: "Claude Version", href: "/utilities/claude-version" },
-  { label: "Claude Usage", href: "/utilities/claude-usage" },
-  { label: "Run Costs", href: "/utilities/run-costs" },
-  { label: "Repo Lessons", href: "/utilities/repo-lessons" },
-  { label: "AIW Settings", href: "/utilities/aiw-settings" },
-  { label: "Claude Settings", href: "/utilities/claude-settings" },
-  { label: "Claude Auth", href: "/utilities/claude-auth" },
-  { label: "Running Operations", href: "/utilities/running" },
-  { label: "Notification Logs", href: "/utilities/notification-logs" },
-  { label: "Snippets", href: "/utilities/snippets" },
-  { label: "Chat Start Prompts", href: "/utilities/chat-start-prompts" },
-  { label: "Scheduled Tasks", href: "/utilities/scheduled-tasks" },
-  { label: "Check Update", href: "/utilities/check-update" },
-];
-
 interface NavSection {
   label: string;
   href: string;
   icon: LucideIcon;
   /** Extra path prefixes that belong to this section. */
   match?: string[];
-  /** Matched by equality only — a landing page with sub-routes elsewhere. */
+  /** `href` itself is matched by equality only — a landing page with sub-routes elsewhere. */
   exact?: boolean;
   children?: { label: string; href: string }[];
 }
 
 const NAV_SECTIONS: NavSection[] = [
-  { label: "Dashboard", href: "/", icon: LayoutDashboard, exact: true },
+  { label: "Workspace", href: "/", icon: LayoutDashboard, exact: true, match: ["/workspace"] },
   {
     label: "New Workspace",
     href: "/new",
@@ -60,12 +47,39 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "Suggestions", href: "/suggestions" },
     ],
   },
+  { label: "Operations", href: "/operations", icon: Activity },
+  { label: "Scheduled Jobs", href: "/scheduled-jobs", icon: CalendarClock },
+  { label: "Repo Lessons", href: "/repo-lessons", icon: Lightbulb },
+  { label: "Run Costs", href: "/run-costs", icon: CircleDollarSign },
+  { label: "Notification Logs", href: "/notification-logs", icon: Bell },
   {
-    label: "Utilities",
-    href: "/utilities",
-    icon: Wrench,
-    children: UTILITY_ITEMS,
+    label: "Settings",
+    href: "/settings/aiw",
+    icon: Settings,
+    match: ["/settings"],
+    children: [
+      { label: "AIW Settings", href: "/settings/aiw" },
+      { label: "Snippet: Init", href: "/settings/snippet/init" },
+      { label: "Snippet: Chat", href: "/settings/snippet/chat" },
+      { label: "Claude Auth", href: "/settings/claude/auth" },
+      { label: "Claude Settings", href: "/settings/claude/settings" },
+      { label: "Claude MCP Servers", href: "/settings/claude/mcp-servers" },
+      { label: "Claude Version", href: "/settings/claude/version" },
+      { label: "Claude Usage", href: "/settings/claude/usage" },
+    ],
   },
+  {
+    label: "Cleanups",
+    href: "/cleanup/workspace",
+    icon: Eraser,
+    match: ["/cleanup"],
+    children: [
+      { label: "Workspace", href: "/cleanup/workspace" },
+      { label: "Operation Log", href: "/cleanup/operation-log" },
+      { label: "Repository", href: "/cleanup/repository" },
+    ],
+  },
+  { label: "Check Update", href: "/check-update", icon: RefreshCw },
 ];
 
 function isUnder(pathname: string, href: string): boolean {
@@ -73,11 +87,8 @@ function isUnder(pathname: string, href: string): boolean {
 }
 
 function isSectionActive(pathname: string, section: NavSection): boolean {
-  if (section.exact) return pathname === section.href;
-  return (
-    isUnder(pathname, section.href) ||
-    (section.match?.some((p) => isUnder(pathname, p)) ?? false)
-  );
+  const own = section.exact ? pathname === section.href : isUnder(pathname, section.href);
+  return own || (section.match?.some((p) => isUnder(pathname, p)) ?? false);
 }
 
 export function AppSidebar() {
@@ -160,11 +171,11 @@ export function AppSidebar() {
                               key={item.href}
                               href={item.href}
                               aria-current={
-                                pathname === item.href ? "page" : undefined
+                                isUnder(pathname, item.href) ? "page" : undefined
                               }
                               className={cn(
                                 "block px-3 py-1.5 text-xs hover:bg-accent hover:text-foreground",
-                                pathname === item.href
+                                isUnder(pathname, item.href)
                                   ? "bg-accent text-foreground"
                                   : "text-muted-foreground",
                               )}
@@ -220,11 +231,11 @@ export function AppSidebar() {
                           key={item.href}
                           href={item.href}
                           aria-current={
-                            pathname === item.href ? "page" : undefined
+                            isUnder(pathname, item.href) ? "page" : undefined
                           }
                           className={cn(
                             "block rounded-md px-3 py-1.5 text-xs hover:bg-accent hover:text-foreground",
-                            pathname === item.href
+                            isUnder(pathname, item.href)
                               ? "bg-accent text-foreground"
                               : "text-muted-foreground",
                           )}

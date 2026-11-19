@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { CostGroupTable } from "@/app/utilities/run-costs/cost-group-table";
+import { CostGroupTable } from "@/app/(tools)/run-costs/cost-group-table";
 import type { CostGroup } from "@/lib/run-costs";
 
 const group = (key: string, costUsd: number, runs: number): CostGroup => ({

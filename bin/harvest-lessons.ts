@@ -6,7 +6,7 @@
  * Asks the running server to run `harvest-lessons` on each archived workspace
  * (or only the named ones), one at a time, waiting for each to finish. Each run
  * is a billed Claude call per repository that has something to learn from.
- * Candidates land in Utilities → Repo Lessons; nothing is approved here.
+ * Candidates land in Repo Lessons; nothing is approved here.
  */
 
 import { parseArgs } from "node:util";
@@ -52,4 +52,4 @@ for (const workspace of targets) {
   console.log(`${workspace}: started ${body.id}`);
   console.log(`${workspace}: ${await waitFor(body.id)}`);
 }
-console.log("Done. Review the candidates at Utilities → Repo Lessons.");
+console.log("Done. Review the candidates at Repo Lessons.");

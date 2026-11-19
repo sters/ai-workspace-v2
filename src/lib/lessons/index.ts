@@ -30,7 +30,7 @@ function bullets(lessons: RepoLesson[], section: LessonSection): string {
 }
 
 export function renderLessonsMarkdown(repoKey: string, approved: RepoLesson[]): string {
-  return `# Lessons for ${repoKey}\n\n<!-- Generated from approved lessons; edit them in the UI (Utilities → Repo Lessons). -->\n\n## Implementation\n\n${bullets(approved, "implementation") || "None yet."}\n\n## Review\n\n${bullets(approved, "review") || "None yet."}\n`;
+  return `# Lessons for ${repoKey}\n\n<!-- Generated from approved lessons; edit them in the UI (Repo Lessons). -->\n\n## Implementation\n\n${bullets(approved, "implementation") || "None yet."}\n\n## Review\n\n${bullets(approved, "review") || "None yet."}\n`;
 }
 
 export async function writeLessonsFile(repoKey: string): Promise<void> {

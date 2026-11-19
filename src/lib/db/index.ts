@@ -8,6 +8,7 @@ export {
   updateOperationMeta,
   fillMissingOperationResultSummary,
   getOperation,
+  getOperationListItem,
   listOperations,
   listRunningOperations,
   listOperationsWithAge,

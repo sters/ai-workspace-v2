@@ -76,9 +76,7 @@ export function sendCompletionNotification(
   workspace?: string,
 ): void {
   const status = success ? "completed" : "failed";
-  const path = workspace
-    ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`
-    : "/";
+  const path = `/operations/${encodeURIComponent(operationId)}`;
   broadcastNotification({
     title: `ai-workspace: Operation ${status}`,
     body: workspace
@@ -113,7 +111,7 @@ export function sendUsageLimitNotification(
   workspace: string,
   resumeAt: number | null,
 ): void {
-  const path = `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`;
+  const path = `/operations/${encodeURIComponent(operationId)}`;
   broadcastNotification(resumeAt === null
     ? {
       title: "ai-workspace: Operation resumed",
@@ -135,14 +133,12 @@ export function sendScheduledTaskNotification(taskId: number, title: string, sum
     title: `ai-workspace: ${title}`,
     body: summary,
     tag: `scheduled-task-${taskId}`,
-    url: buildAbsoluteUrl("/utilities/scheduled-tasks"),
+    url: buildAbsoluteUrl("/scheduled-jobs"),
   });
 }
 
 export function sendAskNotification(operationId: string, workspace?: string): void {
-  const path = workspace
-    ? `/workspace/${encodeURIComponent(workspace)}/operations?operationId=${encodeURIComponent(operationId)}`
-    : "/";
+  const path = `/operations/${encodeURIComponent(operationId)}`;
   broadcastNotification({
     title: "ai-workspace: Input Required",
     body: workspace

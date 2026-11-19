@@ -129,16 +129,22 @@ suggest:
 - `/workspace/[name]/chat/interactive` — Full interactive chat with terminal
 - `/workspace/[name]/operations` — Operations history
 - `/workspace/[name]/history` — Git/operation history timeline
-- `/utilities` — Utility hub:
-  - `aiw-settings` — Application settings viewer/editor
-  - `claude-auth` — Claude authentication
-  - `claude-settings` — Claude settings browser (project / local / user scopes)
-  - `claude-version` — Claude version info
-  - `mcp-servers` — MCP server management
-  - `check-update` — Update checker
-  - `running` — Running operations monitor (also lists up to 50 most recent completed/failed operations)
-  - `operation-prune` — Operation cleanup
-  - `workspace-prune` — Workspace cleanup
+- `/operations` — Running operations and the 50 most recent finished ones, across workspaces
+- `/operations/[id]` — One operation; redirects to its workspace's Operations tab when it belongs to one
+- `/scheduled-jobs` — Cron-scheduled instructions and commands
+- `/repo-lessons` — Lessons distilled from finished workspaces
+- `/run-costs` — Claude spend by operation, phase, step, model and effort
+- `/notification-logs` — Web push history
+- `/settings/aiw` — `.ai-workspace/config.yml` editor
+- `/settings/snippet/init` — Snippets for workspace descriptions
+- `/settings/snippet/chat` — Saved chat start prompts
+- `/settings/claude/auth` — Claude authentication
+- `/settings/claude/settings` — Claude settings browser (project / local / user scopes)
+- `/settings/claude/mcp-servers` — MCP server management
+- `/settings/claude/version` — Claude version info
+- `/settings/claude/usage` — Claude billing period usage
+- `/cleanup/workspace`, `/cleanup/operation-log`, `/cleanup/repository` — Cleanups
+- `/check-update` — Update checker
 
 ## Claude Settings and MCP Servers
 

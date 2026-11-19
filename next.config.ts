@@ -26,8 +26,8 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: "/utilities/claude-settings",
-        destination: "/utilities/claude-settings/project",
+        source: "/settings/claude/settings",
+        destination: "/settings/claude/settings/project",
         permanent: false,
       },
     ];

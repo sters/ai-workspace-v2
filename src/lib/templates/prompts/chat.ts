@@ -241,7 +241,7 @@ const START_PROMPT_HEADING = "### What I want to do";
 
 /**
  * System prompt for a chat session opened from a saved chat start prompt
- * (Utilities → Chat Start Prompts): the plain chat's first turn, with the saved
+ * (Settings → Snippet: Chat): the plain chat's first turn, with the saved
  * instruction carried out in place of the bare acknowledgement.
  *
  * The instruction is the user's own, written ahead of time for sessions of a

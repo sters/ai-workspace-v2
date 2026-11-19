@@ -20,7 +20,7 @@ function LessonReviewNotice() {
   return (
     <Callout variant="info" className="mb-4 text-sm">
       {parts.join(", ")} —{" "}
-      <Link href="/utilities/repo-lessons" className="underline">
+      <Link href="/repo-lessons" className="underline">
         Repo Lessons
       </Link>
     </Callout>

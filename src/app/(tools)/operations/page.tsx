@@ -1,0 +1,170 @@
+"use client";
+
+import Link from "next/link";
+import { useCallback } from "react";
+import useSWR from "swr";
+import type { OperationListItem } from "@/types/operation";
+import type { ChatSessionInfo } from "@/types/chat";
+import { OperationSummary, useNow } from "@/components/operation/operation-summary";
+import { Button, buttonVariants } from "@/components/shared/buttons/button";
+import { Card } from "@/components/shared/containers/card";
+import { PageHeader } from "@/components/shared/feedback/page-header";
+import { StatusText } from "@/components/shared/feedback/status-text";
+import { fetcher, killOperation, killChatSession } from "@/lib/api";
+
+function viewHref(op: OperationListItem): string {
+  return `/operations/${encodeURIComponent(op.id)}`;
+}
+
+const COMPLETED_LIMIT = 50;
+
+export default function OperationsPage() {
+  const { data, error, isLoading, mutate } = useSWR<OperationListItem[]>(
+    "/api/operations?status=running",
+    fetcher,
+    { refreshInterval: 10000 }
+  );
+
+  const { data: completedData, mutate: mutateCompleted } = useSWR<OperationListItem[]>(
+    `/api/operations?status=completed&limit=${COMPLETED_LIMIT}`,
+    fetcher,
+    { refreshInterval: 30000 }
+  );
+
+  const { data: chatSessions, mutate: mutateChatSessions } = useSWR<ChatSessionInfo[]>(
+    "/api/chat-sessions",
+    fetcher,
+    { refreshInterval: 10000 }
+  );
+
+  const running = data ?? [];
+  const completed = completedData ?? [];
+  const activeChats = chatSessions ?? [];
+  const now = useNow(running.length > 0 || activeChats.length > 0 ? 1000 : 0);
+  const kill = useCallback(
+    async (operationId: string) => {
+      await killOperation(operationId);
+      mutate();
+      mutateCompleted();
+    },
+    [mutate, mutateCompleted]
+  );
+
+  const killChat = useCallback(
+    async (sessionId: string) => {
+      await killChatSession(sessionId);
+      mutateChatSessions();
+    },
+    [mutateChatSessions]
+  );
+
+  const refresh = useCallback(() => {
+    mutate();
+    mutateCompleted();
+  }, [mutate, mutateCompleted]);
+
+  const nothing =
+    !isLoading &&
+    !error &&
+    running.length === 0 &&
+    completed.length === 0 &&
+    activeChats.length === 0;
+
+  return (
+    <div>
+      <PageHeader
+        title="Operations"
+        description="Running and recent operations across workspaces."
+        onRefresh={refresh}
+      />
+
+      {isLoading && <StatusText>Loading...</StatusText>}
+      {error && (
+        <StatusText variant="error">Failed to fetch operations.</StatusText>
+      )}
+
+      {nothing && <StatusText>No operations.</StatusText>}
+
+      {running.length > 0 && (
+        <div className="grid gap-3">
+          {running.map((op) => (
+            <Card
+              key={op.id}
+              className="flex items-center justify-between"
+            >
+              <OperationSummary operation={op} now={now} />
+              <div className="flex shrink-0 items-center gap-2">
+                <Link href={viewHref(op)} className={buttonVariants("outline-muted")}>
+                  View
+                </Link>
+                <Button variant="destructive-sm" onClick={() => kill(op.id)}>
+                  Cancel
+                </Button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {completed.length > 0 && (
+        <>
+          {running.length > 0 && <hr className="my-6 border-border" />}
+          <h2 className="mb-3 text-lg font-semibold">Recent Operations</h2>
+          <div className="grid gap-3">
+            {completed.map((op) => (
+              <Card
+                key={op.id}
+                className="flex items-center justify-between"
+              >
+                <OperationSummary operation={op} now={now} />
+                <div className="flex shrink-0 items-center gap-2">
+                  <Link href={viewHref(op)} className={buttonVariants("outline-muted")}>
+                  View
+                </Link>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
+      {activeChats.length > 0 && (
+        <>
+          {(running.length > 0 || completed.length > 0) && <hr className="my-6 border-border" />}
+          <h2 className="mb-3 text-lg font-semibold">Active Chat Sessions</h2>
+          <div className="grid gap-3">
+            {activeChats.map((chat) => (
+              <Card
+                key={chat.id}
+                className="flex items-center justify-between"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">chat</span>
+                    <span className="text-sm text-muted-foreground">
+                      {chat.workspaceId}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Started {new Date(chat.startedAt).toLocaleString()}
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Link
+                    href={`/workspace/${encodeURIComponent(chat.workspaceId)}/chat`}
+                    className={buttonVariants("outline-muted")}
+                  >
+                    View
+                  </Link>
+                  <Button variant="destructive-sm" onClick={() => killChat(chat.id)}>
+                    Stop
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

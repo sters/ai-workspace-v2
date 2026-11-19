@@ -278,6 +278,13 @@ export function getOperation(id: string): Operation | null {
   return row ? rowToOperation(row) : null;
 }
 
+export function getOperationListItem(id: string): OperationListItem | null {
+  const db = getDb();
+  const s = stmts(db);
+  const row = s.getById.get(id) as OperationRow | null;
+  return row ? rowToListItem(row) : null;
+}
+
 export function listOperations(workspace?: string): OperationListItem[] {
   const db = getDb();
   const s = stmts(db);

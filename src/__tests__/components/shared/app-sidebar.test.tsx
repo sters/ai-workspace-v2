@@ -53,9 +53,9 @@ describe("AppSidebar", () => {
     expect(
       screen.getByRole("link", { name: "New Workspace" }),
     ).toHaveAttribute("href", "/new");
-    expect(screen.getByRole("link", { name: "Utilities" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Operations" })).toHaveAttribute(
       "href",
-      "/utilities",
+      "/operations",
     );
   });
 
@@ -91,15 +91,15 @@ describe("AppSidebar", () => {
 
     expect(screen.queryByText("Claude Usage")).not.toBeInTheDocument();
 
-    await user.hover(screen.getByRole("link", { name: "Utilities" }));
+    await user.hover(screen.getByRole("link", { name: "Settings" }));
     expect(screen.getByRole("link", { name: "Claude Usage" })).toHaveAttribute(
       "href",
-      "/utilities/claude-usage",
+      "/settings/claude/usage",
     );
     // Only the hovered section opens
     expect(screen.queryByText("Suggestions")).not.toBeInTheDocument();
 
-    await user.unhover(screen.getByRole("link", { name: "Utilities" }));
+    await user.unhover(screen.getByRole("link", { name: "Settings" }));
     expect(screen.queryByText("Claude Usage")).not.toBeInTheDocument();
   });
 
@@ -123,7 +123,7 @@ describe("AppSidebar", () => {
     localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "true");
     render(<AppSidebar />);
 
-    // Expand button, Dashboard, then New Workspace
+    // Expand button, Workspace, then New Workspace
     await user.tab();
     await user.tab();
     await user.tab();
@@ -144,12 +144,11 @@ describe("AppSidebar", () => {
     await user.tab();
     expect(screen.getByText("Suggestions")).toBeInTheDocument();
 
-    // Past the flyout's own link, into Utilities
+    // Past the flyout's own link, into Operations
     await user.tab();
     await user.tab();
-    expect(screen.getByRole("link", { name: "Utilities" })).toHaveFocus();
+    expect(screen.getByRole("link", { name: "Operations" })).toHaveFocus();
     expect(screen.queryByText("Suggestions")).not.toBeInTheDocument();
-    expect(screen.getByText("Claude Usage")).toBeInTheDocument();
   });
 
   it("has no flyout for a section without sub-items", async () => {
@@ -157,8 +156,8 @@ describe("AppSidebar", () => {
     localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, "true");
     render(<AppSidebar />);
 
-    await user.hover(screen.getByRole("link", { name: "Dashboard" }));
-    expect(screen.getAllByRole("link", { name: "Dashboard" })).toHaveLength(1);
+    await user.hover(screen.getByRole("link", { name: "Workspace" }));
+    expect(screen.getAllByRole("link", { name: "Workspace" })).toHaveLength(1);
   });
 
   it("does not leave a flyout open across a collapse", async () => {
@@ -170,14 +169,35 @@ describe("AppSidebar", () => {
   });
 
   it("marks the section matching the current path as current", () => {
-    mockPathname.mockReturnValue("/utilities/claude-usage");
+    mockPathname.mockReturnValue("/settings/claude/usage");
     render(<AppSidebar />);
-    expect(screen.getByRole("link", { name: "Utilities" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(screen.getByRole("link", { name: "Dashboard" })).not.toHaveAttribute(
+    // Cleanups has a "Workspace" sub-item too; the section link comes first.
+    expect(screen.getAllByRole("link", { name: "Workspace" })[0]).not.toHaveAttribute(
       "aria-current",
     );
+  });
+
+  it("keeps a sub-item current on the pages beneath it", () => {
+    mockPathname.mockReturnValue("/settings/claude/settings/local");
+    render(<AppSidebar />);
+    expect(screen.getByRole("link", { name: "Claude Settings" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
+  it("marks Workspace current inside a workspace and Operations on an operation", () => {
+    mockPathname.mockReturnValue("/workspace/my-app/todo");
+    const { unmount } = render(<AppSidebar />);
+    expect(screen.getAllByRole("link", { name: "Workspace" })[0]).toHaveAttribute("aria-current", "page");
+    unmount();
+
+    mockPathname.mockReturnValue("/operations/op-123");
+    render(<AppSidebar />);
+    expect(screen.getByRole("link", { name: "Operations" })).toHaveAttribute("aria-current", "page");
   });
 });

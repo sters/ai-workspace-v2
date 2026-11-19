@@ -115,7 +115,7 @@ export default function SuggestionsPage() {
               <>
                 {" "}
                 Follow it from the sidebar, or on{" "}
-                <Link href="/utilities/running" className="underline">
+                <Link href="/operations" className="underline">
                   Running Operations
                 </Link>
                 .

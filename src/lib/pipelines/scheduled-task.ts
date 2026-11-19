@@ -69,7 +69,7 @@ export function buildPlanScheduledTaskPipeline(request: string): PipelinePhase[]
         }
         const task = insertScheduledTask(plan);
         ctx.emitResult(
-          `Planned **${task.title}** (\`${task.cron}\`, overlap: ${task.overlap}). It is disabled until you review and enable it in Utilities → Scheduled Tasks.`,
+          `Planned **${task.title}** (\`${task.cron}\`, overlap: ${task.overlap}). It is disabled until you review and enable it in Scheduled Jobs.`,
         );
         return true;
       },

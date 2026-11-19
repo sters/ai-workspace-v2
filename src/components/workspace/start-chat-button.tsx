@@ -30,7 +30,7 @@ export function StartChatButton({
       onClick={() => onStart(typed || undefined)}
       items={[
         ...(data?.prompts ?? []).map((p) => ({ label: p.title, onClick: () => onStart(typed ? `${p.content}\n\n${typed}` : p.content) })),
-        { label: "Manage start prompts…", onClick: () => router.push("/utilities/chat-start-prompts") },
+        { label: "Manage start prompts…", onClick: () => router.push("/settings/snippet/chat") },
       ]}
     />
   );

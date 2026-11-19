@@ -2,7 +2,7 @@
  * `harvest-lessons` — distill one workspace's outcome into candidate lessons
  * for each of its repositories. Started on archive, or by hand. It never
  * changes a worktree and never approves anything: candidates wait in
- * Utilities → Repo Lessons.
+ * Repo Lessons.
  */
 
 import { applyDistilledLessons, listLessons, recordLessonFindings } from "@/lib/db/repo-lessons";
