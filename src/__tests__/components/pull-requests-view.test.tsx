@@ -534,6 +534,14 @@ describe("PullRequestsView", () => {
     expect(within(nav).getByRole("button", { name: /gadgets.*no PR/ })).toBeInTheDocument();
   });
 
+  it("shows a draft PR that was closed as closed, since GitHub keeps isDraft on it", () => {
+    setData({ pullRequests: [pr({ state: "CLOSED", isDraft: true })] });
+    render(<PullRequestsView workspaceName="feat" />);
+    const nav = screen.getByRole("navigation", { name: "Repositories" });
+    expect(within(nav).getByRole("button", { name: /widgets.*closed/ })).toBeInTheDocument();
+    expect(within(nav).queryByRole("button", { name: /draft/ })).not.toBeInTheDocument();
+  });
+
   describe("CI status", () => {
     it("shows failing checks without being expanded, with a link to the logs", () => {
       setData({

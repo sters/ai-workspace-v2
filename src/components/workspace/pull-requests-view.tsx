@@ -587,11 +587,13 @@ export function PullRequestsView({ workspaceName }: { workspaceName: string }) {
 }
 
 function PrStateBadge({ pr }: { pr: WorkspacePullRequest }) {
+  // GitHub keeps isDraft on a draft PR after it is closed or merged.
+  const isDraft = pr.isDraft && pr.state === "OPEN";
   return (
     <StatusBadge
-      label={pr.isDraft ? "draft" : pr.state.toLowerCase()}
+      label={isDraft ? "draft" : pr.state.toLowerCase()}
       variant={
-        pr.isDraft
+        isDraft
           ? "muted"
           : pr.state === "OPEN"
             ? "op-running"
