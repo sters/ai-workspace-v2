@@ -14,7 +14,9 @@
  *   (CI outside Actions that finished without a pending read, PRs on a host the
  *   notifications API does not cover).
  *
- * The schedule lives in memory: a restart begins with a sweep.
+ * Each pass may run in a new process, so the schedule is a plain `WatchState`
+ * the caller loads before a pass and saves after it; an empty one begins with
+ * a sweep.
  */
 
 import { ciState } from "./observe";
@@ -43,12 +45,28 @@ export interface SchedulerDeps {
 
 const BACKOFF_MINUTES = [1, 2, 4, 8];
 
-interface OpenPr {
+export interface OpenPr {
   repo: string;
   number: number;
   base: string;
   worktreePath: string;
   headSha: string;
+}
+
+/** Everything the scheduler carries from one pass to the next; JSON-safe. */
+export interface WatchState {
+  /** Epoch ms of the last sweep; null before the first. */
+  lastSweep: number | null;
+  /** Notifications are read from here on the next pass. */
+  since: string | null;
+  open: Record<string, OpenPr>;
+  backoff: Record<string, { step: number; at: number; headSha: string }>;
+  /** Last seen SHA per `repo\0base`. */
+  baseShas: Record<string, string>;
+}
+
+export function emptyWatchState(): WatchState {
+  return { lastSweep: null, since: null, open: {}, backoff: {}, baseShas: {} };
 }
 
 function warnEmpty(err: unknown): Notification[] {
@@ -64,12 +82,9 @@ function repoFromPath(repoPath: string): string | null {
   return parts.length >= 3 ? parts.slice(-2).join("/").toLowerCase() : null;
 }
 
-export function createWatchScheduler(deps: SchedulerDeps, sweepMs: number) {
-  let lastSweep = -Infinity;
-  let since: string | null = null;
-  const open = new Map<string, OpenPr>();
-  const backoff = new Map<string, { step: number; at: number; headSha: string }>();
-  const baseShas = new Map<string, string>();
+/** Mutates `state` as it goes. */
+export function createWatchScheduler(deps: SchedulerDeps, sweepMs: number, state: WatchState = emptyWatchState()) {
+  const { open, backoff, baseShas } = state;
 
   async function dueBySignal(targets: WatchTarget[], now: number, sinceIso: string | null): Promise<Set<string>> {
     const due = new Set<string>();
@@ -78,26 +93,26 @@ export function createWatchScheduler(deps: SchedulerDeps, sweepMs: number) {
 
     for (const t of targets) {
       const key = keyOf(t);
-      const known = open.get(key);
+      const known = open[key];
       const hit = known
         ? norm.some((n) => n.repo === known.repo && (n.pr === null || n.pr === known.number))
         : norm.some((n) => n.pr !== null && n.repo === repoFromPath(t.repo.repoPath));
       if (hit) due.add(key);
-      const b = backoff.get(key);
+      const b = backoff[key];
       if (b && b.at <= now) due.add(key);
     }
 
     const byBase = new Map<string, string[]>();
-    for (const [key, p] of open) {
+    for (const [key, p] of Object.entries(open)) {
       const baseKey = `${p.repo}\0${p.base}`;
       byBase.set(baseKey, [...(byBase.get(baseKey) ?? []), key]);
     }
     for (const [baseKey, keys] of byBase) {
-      const p = open.get(keys[0])!;
+      const p = open[keys[0]];
       const sha = await deps.baseSha(p.worktreePath, p.base).catch(() => null);
       if (!sha) continue;
-      const prev = baseShas.get(baseKey);
-      baseShas.set(baseKey, sha);
+      const prev = baseShas[baseKey];
+      baseShas[baseKey] = sha;
       if (prev && prev !== sha) for (const k of keys) due.add(k);
     }
     return due;
@@ -107,26 +122,26 @@ export function createWatchScheduler(deps: SchedulerDeps, sweepMs: number) {
     const key = keyOf(t);
     const { pr, events } = await observeRepoPr(t.workspace, t.repo, deps.read);
     if (!pr) {
-      open.delete(key);
-      backoff.delete(key);
+      delete open[key];
+      delete backoff[key];
       return events;
     }
-    open.set(key, {
+    open[key] = {
       repo: `${pr.owner}/${pr.repo}`.toLowerCase(),
       number: pr.number,
       base: pr.baseRefName,
       worktreePath: t.repo.worktreePath,
       headSha: pr.headSha,
-    });
+    };
     const ci = ciState(pr.checks);
     const unsettled = ci === "pending" || ci === "failing" || (pr.mergeable ?? "UNKNOWN") === "UNKNOWN";
     if (!unsettled) {
-      backoff.delete(key);
+      delete backoff[key];
       return events;
     }
-    const prev = backoff.get(key);
+    const prev = backoff[key];
     const step = prev && prev.headSha === pr.headSha ? Math.min(prev.step + 1, BACKOFF_MINUTES.length - 1) : 0;
-    backoff.set(key, { step, at: now + BACKOFF_MINUTES[step] * 60_000, headSha: pr.headSha });
+    backoff[key] = { step, at: now + BACKOFF_MINUTES[step] * 60_000, headSha: pr.headSha };
     return events;
   }
 
@@ -135,14 +150,14 @@ export function createWatchScheduler(deps: SchedulerDeps, sweepMs: number) {
     async tick(now: number): Promise<number> {
       const targets = await deps.listTargets();
       const live = new Set(targets.map(keyOf));
-      for (const m of [open, backoff]) for (const k of m.keys()) if (!live.has(k)) m.delete(k);
+      for (const m of [open, backoff]) for (const k of Object.keys(m)) if (!live.has(k)) delete m[k];
 
-      const sinceIso = since;
+      const sinceIso = state.since;
       // Overlap the previous window so clock skew with GitHub cannot drop a notification; a repeat only costs a read.
-      since = new Date(now - 60_000).toISOString();
+      state.since = new Date(now - 60_000).toISOString();
       let due: Set<string>;
-      if (now - lastSweep >= sweepMs) {
-        lastSweep = now;
+      if (state.lastSweep === null || now - state.lastSweep >= sweepMs) {
+        state.lastSweep = now;
         due = live;
       } else {
         due = await dueBySignal(targets, now, sinceIso);

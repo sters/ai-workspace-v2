@@ -2,7 +2,7 @@ import { listScheduledTasks, nextOccurrence, updateScheduledTaskState } from "@/
 import type { ScheduledTask } from "@/types/scheduled-task";
 
 export interface SchedulerDeps {
-  isRunning: (taskId: number) => boolean;
+  isRunning: (task: ScheduledTask) => boolean;
   /** Starts a run; rejects when it cannot (server down, concurrency limit), which leaves the occurrence due. */
   start: (task: ScheduledTask) => Promise<void>;
 }
@@ -21,17 +21,20 @@ async function tryStart(task: ScheduledTask, deps: SchedulerDeps): Promise<boole
  * Starts every enabled task that is due at `now`. An occurrence missed while
  * the server was down is still due, so it runs once on the first tick after,
  * and the next occurrence is counted from `now`, never from the missed one.
- * `getDeps` is called only on a tick that has a due or queued task.
+ * `getDeps` is called only on a tick that has a due or queued task, with those tasks.
  */
-export async function tickScheduledTasks(now: Date, getDeps: () => Promise<SchedulerDeps>): Promise<void> {
+export async function tickScheduledTasks(
+  now: Date,
+  getDeps: (candidates: ScheduledTask[]) => Promise<SchedulerDeps>,
+): Promise<void> {
   const candidates = listScheduledTasks().filter(
     (task) => task.enabled && task.nextRunAt && (task.queued || now >= new Date(task.nextRunAt)),
   );
   if (candidates.length === 0) return;
-  const deps = await getDeps();
+  const deps = await getDeps(candidates);
   for (const task of candidates) {
     if (!task.nextRunAt) continue;
-    const running = deps.isRunning(task.id);
+    const running = deps.isRunning(task);
     const due = now >= new Date(task.nextRunAt);
     if (!due && !(task.queued && !running)) continue;
 

@@ -40,10 +40,6 @@ export const CONFIG_DEFAULTS: AppConfig = {
   suggest: {
     enabled: true,
   },
-  watcher: {
-    enabled: true,
-    intervalMinutes: 15,
-  },
   hooks: {
     sessionStartGitContext: true,
     blockDangerousBash: true,
@@ -135,9 +131,6 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   },
   { key: "suggest", section: null, defaultLine: "# suggest:" },
   { key: "enabled", section: "suggest", defaultLine: "#   enabled: true                  # false disables the post-operation workspace-suggestion feature" },
-  { key: "watcher", section: null, defaultLine: "# watcher:" },
-  { key: "enabled", section: "watcher", defaultLine: "#   enabled: true                  # false stops polling workspace PRs (no LLM calls; gh only)" },
-  { key: "intervalMinutes", section: "watcher", defaultLine: "#   intervalMinutes: 15            # minutes between full sweeps; notifications, base-branch moves and pending CI are checked every minute" },
   { key: "hooks", section: null, defaultLine: "# hooks:" },
   { key: "sessionStartGitContext", section: "hooks", defaultLine: "#   sessionStartGitContext: true   # inject git branch+status into SessionStart" },
   { key: "blockDangerousBash", section: "hooks", defaultLine: "#   blockDangerousBash: true        # PreToolUse(Bash) blocks rm -rf /, git push --force, git reset --hard" },
@@ -157,9 +150,12 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
 /**
  * Legacy top-level keys that the migrator should recognize (and therefore not
  * comment out as "unknown") but should never add to a new or partial config
- * file. They're auto-converted to `openers` at runtime by `normalizeRawConfig`.
+ * file. `editor` / `terminal` are converted to `openers` at runtime by
+ * `normalizeRawConfig`; `watcher` is read once by the worker to seed the
+ * built-in PR watcher task.
  */
 export const LEGACY_TOP_LEVEL_KEYS: ReadonlySet<string> = new Set([
   "editor",
   "terminal",
+  "watcher",
 ]);

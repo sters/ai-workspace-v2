@@ -7,6 +7,8 @@ import {
   getScheduledTask,
   deleteScheduledTask,
   listScheduledTasks,
+  ensureBuiltinScheduledTask,
+  recordCommandResult,
 } from "@/lib/db/scheduled-tasks";
 import type { ScheduledTaskInput } from "@/types/scheduled-task";
 
@@ -20,6 +22,7 @@ function input(over: Partial<ScheduledTaskInput> = {}): ScheduledTaskInput {
     cron: "0 9 * * *",
     overlap: "skip",
     enabled: true,
+    kind: "prompt",
     ...over,
   };
 }
@@ -64,5 +67,29 @@ describe("db/scheduled-tasks", () => {
     expect(deleteScheduledTask(a.id)).toBe(true);
     expect(getScheduledTask(a.id)).toBeNull();
     expect(listScheduledTasks().map((t) => t.title)).toEqual(["B"]);
+  });
+
+  it("creates a built-in task once, keeps a person's later edits, and never deletes it", () => {
+    const first = ensureBuiltinScheduledTask("pr-watcher", input({ kind: "command", prompt: "watch --every 15" }), NOW);
+    updateScheduledTask(first.id, input({ kind: "command", prompt: "watch --every 30", enabled: false }), NOW);
+
+    const again = ensureBuiltinScheduledTask("pr-watcher", input({ kind: "command", prompt: "watch --every 15" }), NOW);
+    expect(again).toMatchObject({ id: first.id, builtin: "pr-watcher", prompt: "watch --every 30", enabled: false });
+    expect(deleteScheduledTask(first.id)).toBe(false);
+    expect(listScheduledTasks()).toHaveLength(1);
+  });
+
+  it("keeps a task's kind on edit", () => {
+    const task = insertScheduledTask(input({ kind: "command", prompt: "echo hi" }), NOW);
+    expect(updateScheduledTask(task.id, input({ kind: "prompt" }), NOW)!.kind).toBe("command");
+  });
+
+  it("records a command's exit code and the tail of its output", () => {
+    const task = insertScheduledTask(input({ kind: "command", prompt: "echo hi" }), NOW);
+    recordCommandResult(task.id, 2, "x".repeat(10_000) + "the end");
+    const after = getScheduledTask(task.id)!;
+    expect(after.lastExitCode).toBe(2);
+    expect(after.lastOutput!.endsWith("the end")).toBe(true);
+    expect(after.lastOutput!.length).toBeLessThan(10_000);
   });
 });

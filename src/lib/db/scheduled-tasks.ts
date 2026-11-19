@@ -1,14 +1,18 @@
 import { getDb } from "./connection";
-import type { ScheduledTask, ScheduledTaskInput, ScheduledTaskOverlap } from "@/types/scheduled-task";
+import type { ScheduledTask, ScheduledTaskInput, ScheduledTaskKind, ScheduledTaskOverlap } from "@/types/scheduled-task";
 
 interface ScheduledTaskRow {
   id: number;
   title: string;
   request: string;
+  kind: string;
   prompt: string;
   cron: string;
   overlap: string;
   enabled: number;
+  builtin: string | null;
+  last_exit_code: number | null;
+  last_output: string | null;
   next_run_at: string | null;
   queued: number;
   last_run_at: string | null;
@@ -21,13 +25,17 @@ function rowToDomain(row: ScheduledTaskRow): ScheduledTask {
     id: row.id,
     title: row.title,
     request: row.request,
+    kind: row.kind as ScheduledTaskKind,
     prompt: row.prompt,
     cron: row.cron,
     overlap: row.overlap as ScheduledTaskOverlap,
     enabled: row.enabled === 1,
+    builtin: row.builtin,
     nextRunAt: row.next_run_at,
     queued: row.queued === 1,
     lastRunAt: row.last_run_at,
+    lastExitCode: row.last_exit_code,
+    lastOutput: row.last_output,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -61,14 +69,20 @@ export function listScheduledTasks(): ScheduledTask[] {
   return (getDb().query("SELECT * FROM scheduled_tasks ORDER BY id ASC").all() as ScheduledTaskRow[]).map(rowToDomain);
 }
 
-export function insertScheduledTask(input: ScheduledTaskInput, now = new Date()): ScheduledTask {
+export function insertScheduledTask(input: ScheduledTaskInput, now = new Date(), builtin: string | null = null): ScheduledTask {
   const result = getDb()
     .query(`
-      INSERT INTO scheduled_tasks (title, request, prompt, cron, overlap, enabled, next_run_at)
-      VALUES ($title, $request, $prompt, $cron, $overlap, $enabled, $nextRunAt)
+      INSERT INTO scheduled_tasks (title, request, kind, prompt, cron, overlap, enabled, next_run_at, builtin)
+      VALUES ($title, $request, $kind, $prompt, $cron, $overlap, $enabled, $nextRunAt, $builtin)
     `)
-    .run(params(input, now));
+    .run({ ...params(input, now), $kind: input.kind, $builtin: builtin });
   return getScheduledTask(Number(result.lastInsertRowid))!;
+}
+
+/** Registers aiw's own task under `builtin` the first time; afterwards returns it as people left it. */
+export function ensureBuiltinScheduledTask(builtin: string, input: ScheduledTaskInput, now = new Date()): ScheduledTask {
+  const row = getDb().query("SELECT * FROM scheduled_tasks WHERE builtin = ?").get(builtin) as ScheduledTaskRow | null;
+  return row ? rowToDomain(row) : insertScheduledTask(input, now, builtin);
 }
 
 /** Replaces the task's settings and reschedules it from `now`; disabling drops a queued run. */
@@ -85,8 +99,17 @@ export function updateScheduledTask(id: number, input: ScheduledTaskInput, now =
   return result.changes > 0 ? getScheduledTask(id) : null;
 }
 
+/** Deletes a task people created; a built-in one is kept and reports false. */
 export function deleteScheduledTask(id: number): boolean {
-  return getDb().query("DELETE FROM scheduled_tasks WHERE id = ?").run(id).changes > 0;
+  return getDb().query("DELETE FROM scheduled_tasks WHERE id = ? AND builtin IS NULL").run(id).changes > 0;
+}
+
+const OUTPUT_TAIL_CHARS = 4000;
+
+export function recordCommandResult(id: number, exitCode: number, output: string): void {
+  getDb()
+    .query("UPDATE scheduled_tasks SET last_exit_code = ?, last_output = ? WHERE id = ?")
+    .run(exitCode, output.slice(-OUTPUT_TAIL_CHARS), id);
 }
 
 /** Records the scheduler's decision for one task; omitted fields keep their value. */

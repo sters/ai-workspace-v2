@@ -34,7 +34,7 @@ export function parseScheduledTaskPlan(raw: string, request: string): ScheduledT
   } catch {
     return { error: "The planner's answer was not JSON." };
   }
-  const result = scheduledTaskInputSchema.safeParse({ ...(parsed as object), request, enabled: false });
+  const result = scheduledTaskInputSchema.safeParse({ ...(parsed as object), request, kind: "prompt", enabled: false });
   if (!result.success) return { error: result.error.issues.map((i) => i.message).join("; ") };
   return result.data;
 }

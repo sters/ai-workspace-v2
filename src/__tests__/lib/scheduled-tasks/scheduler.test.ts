@@ -11,13 +11,13 @@ const NEXT_NINE = new Date("2026-11-20T09:00:00").toISOString();
 
 function task(overlap: ScheduledTaskOverlap = "skip", enabled = true): ScheduledTask {
   return insertScheduledTask(
-    { title: "t", request: "r", prompt: "p", cron: "0 9 * * *", overlap, enabled },
+    { title: "t", request: "r", kind: "prompt", prompt: "p", cron: "0 9 * * *", overlap, enabled },
     CREATED,
   );
 }
 
 function deps(running: Set<number> = new Set()) {
-  return { isRunning: (id: number) => running.has(id), start: vi.fn(async (_task: ScheduledTask) => {}) };
+  return { isRunning: (t: ScheduledTask) => running.has(t.id), start: vi.fn(async (_task: ScheduledTask) => {}) };
 }
 
 describe("tickScheduledTasks", () => {

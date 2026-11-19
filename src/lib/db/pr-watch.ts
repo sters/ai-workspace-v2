@@ -1,4 +1,5 @@
 import { getDb } from "./connection";
+import type { WatchState } from "@/lib/pr-watcher/scheduler";
 import type { PrEvent, PrEventInput, PrWatchSnapshot, PrCiState, PrEventKind } from "@/types/pr-watch";
 
 interface SnapshotRow {
@@ -139,4 +140,16 @@ export function listAddressedTriageComments(workspace: string): string[] {
     .query("SELECT comment_url FROM pr_triage_verdicts WHERE workspace = ? AND verdict = 'addressed'")
     .all(workspace) as { comment_url: string }[];
   return rows.map((r) => r.comment_url);
+}
+
+/** The PR watcher's schedule as the last pass left it; null before the first pass. */
+export function loadWatchState(): WatchState | null {
+  const row = getDb().query("SELECT state FROM pr_watch_state WHERE id = 1").get() as { state: string } | null;
+  return row ? (JSON.parse(row.state) as WatchState) : null;
+}
+
+export function saveWatchState(state: WatchState): void {
+  getDb()
+    .query("INSERT INTO pr_watch_state (id, state) VALUES (1, $state) ON CONFLICT(id) DO UPDATE SET state = $state")
+    .run({ $state: JSON.stringify(state) });
 }

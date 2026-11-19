@@ -2,7 +2,7 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { listPrEvents } from "@/lib/db/pr-watch";
-import { createWatchScheduler, type Notification, type SchedulerDeps } from "@/lib/pr-watcher/scheduler";
+import { createWatchScheduler, emptyWatchState, type Notification, type SchedulerDeps } from "@/lib/pr-watcher/scheduler";
 import type { WorkspacePullRequest, RepoPullRequestRead } from "@/types/pull-request";
 import type { WorkspaceRepo } from "@/types/workspace";
 
@@ -54,6 +54,7 @@ function setup(prs: Record<string, WorkspacePullRequest | null>) {
   const readNames = () => read.mock.calls.map(([r]) => r.repoName);
   return {
     scheduler,
+    deps,
     read,
     readNames,
     notify: (n: Notification[]) => { notifications = n; },
@@ -150,6 +151,16 @@ describe("watch scheduler", () => {
     for (let m = 1; m < 2 * SWEEP / MIN; m++) if ((await s.tickReads(m * MIN)).includes("widgets")) hits.push(m);
     // 15 is also the sweep; after it the gap stays 8 rather than doubling to 16.
     expect(hits).toEqual([1, 3, 7, 15, 23]);
+  });
+
+  it("carries on from a previous pass's saved state instead of starting over with a sweep", async () => {
+    const s = setup({ widgets: pr(widgets, 1, { checks: pending }), gadgets: pr(gadgets, 2) });
+    const state = emptyWatchState();
+    await createWatchScheduler(s.deps, SWEEP, state).tick(0);
+
+    s.read.mockClear();
+    await createWatchScheduler(s.deps, SWEEP, JSON.parse(JSON.stringify(state))).tick(1 * MIN);
+    expect(s.readNames()).toEqual(["widgets"]);
   });
 
   it("keeps rechecking while GitHub is still computing mergeability", async () => {

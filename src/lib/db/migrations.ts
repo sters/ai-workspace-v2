@@ -429,6 +429,30 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 25,
+    up: (db) => {
+      const columns = new Set(
+        (db.query("SELECT name FROM pragma_table_info('scheduled_tasks')").all() as { name: string }[]).map((c) => c.name),
+      );
+      for (const [name, type] of [
+        ["kind", "TEXT NOT NULL DEFAULT 'prompt'"],
+        ["builtin", "TEXT"],
+        ["last_exit_code", "INTEGER"],
+        ["last_output", "TEXT"],
+      ]) {
+        if (!columns.has(name)) db.exec(`ALTER TABLE scheduled_tasks ADD COLUMN ${name} ${type}`);
+      }
+      db.exec(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_scheduled_tasks_builtin ON scheduled_tasks(builtin);
+        CREATE TABLE IF NOT EXISTS pr_watch_state (
+          id    INTEGER PRIMARY KEY CHECK (id = 1),
+          state TEXT NOT NULL
+        );
+        DROP TABLE IF EXISTS worker_jobs;
+      `);
+    },
+  },
 ];
 
 /**

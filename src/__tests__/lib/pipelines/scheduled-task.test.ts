@@ -5,13 +5,14 @@ import { parseScheduledTaskPlan } from "@/lib/pipelines/scheduled-task";
 const plan = { title: " Watch CI ", cron: "0 9 * * 1-5", overlap: "queue", prompt: " Check main. " };
 
 describe("parseScheduledTaskPlan", () => {
-  it("takes a well-formed plan, trimmed, as a disabled task carrying the request", () => {
-    expect(parseScheduledTaskPlan(JSON.stringify(plan), "watch CI")).toEqual({
+  it("takes a well-formed plan, trimmed, as a disabled instruction task carrying the request", () => {
+    expect(parseScheduledTaskPlan(JSON.stringify({ ...plan, kind: "command" }), "watch CI")).toEqual({
       title: "Watch CI",
       cron: "0 9 * * 1-5",
       overlap: "queue",
       prompt: "Check main.",
       request: "watch CI",
+      kind: "prompt",
       enabled: false,
     });
   });

@@ -2,7 +2,7 @@ import z from "zod";
 import { parsePrUrl } from "./github-pr-url";
 import { quickWorkspaceName } from "./naming";
 import { verificationStepDraftSchema } from "./runtime-schemas";
-import { SCHEDULED_TASK_OVERLAPS } from "@/types/scheduled-task";
+import { SCHEDULED_TASK_KINDS, SCHEDULED_TASK_OVERLAPS } from "@/types/scheduled-task";
 
 /** Interaction level enum — shared between client and server. */
 export const interactionLevelEnum = z.enum(["low", "mid", "high"]);
@@ -341,6 +341,7 @@ const cronExpression = z
 export const scheduledTaskInputSchema = z.object({
   title: z.string().trim().min(1, "title is required"),
   request: z.string().trim(),
+  kind: z.enum(SCHEDULED_TASK_KINDS).default("prompt"),
   prompt: z.string().trim().min(1, "prompt is required"),
   cron: cronExpression,
   overlap: z.enum(SCHEDULED_TASK_OVERLAPS),

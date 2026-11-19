@@ -3,7 +3,9 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { GET, POST as create } from "@/app/api/scheduled-tasks/route";
 import { POST as update } from "@/app/api/scheduled-tasks/update/route";
-import { recordWorkerJobStart } from "@/lib/db/worker-jobs";
+import { POST as remove } from "@/app/api/scheduled-tasks/delete/route";
+import { POST as run } from "@/app/api/scheduled-tasks/run/route";
+import { ensureBuiltinScheduledTask, getScheduledTask } from "@/lib/db/scheduled-tasks";
 
 const body = { title: "Watch CI", request: "", prompt: "Check main.", cron: "0 9 * * 1-5", overlap: "queue", enabled: false };
 
@@ -34,11 +36,23 @@ describe("/api/scheduled-tasks", () => {
     expect((await post(update, { ...body, id: 999 })).status).toBe(404);
   });
 
-  it("lists the worker's built-in jobs, other than the scheduler itself, with the state the worker last recorded", async () => {
-    recordWorkerJobStart("pr-watcher", "2026-11-19T09:00:00.000Z");
-    recordWorkerJobStart("scheduled-tasks", "2026-11-19T09:00:00.000Z");
-    const { builtins } = await (await GET()).json();
-    expect(builtins.map((b: { name: string }) => b.name)).toEqual(["pr-watcher"]);
-    expect(builtins[0]).toMatchObject({ lastStartedAt: "2026-11-19T09:00:00.000Z" });
+  it("creates an instruction task when no kind is given", async () => {
+    expect((await (await post(create, body)).json()).kind).toBe("prompt");
+  });
+
+  it("refuses to delete a built-in task", async () => {
+    const task = ensureBuiltinScheduledTask("pr-watcher", { ...body, kind: "command", overlap: "skip" });
+    expect((await post(remove, { id: task.id })).status).toBe(409);
+    expect(getScheduledTask(task.id)).not.toBeNull();
+  });
+
+  it("runs an enabled command task now by making it due for the worker, and refuses a disabled one", async () => {
+    const created = await (await post(create, { ...body, kind: "command", prompt: "echo hi", enabled: true })).json();
+    const res = await post(run, { id: created.id });
+    expect(res.status).toBe(200);
+    expect(new Date(getScheduledTask(created.id)!.nextRunAt!).getTime()).toBeLessThanOrEqual(Date.now());
+
+    const disabled = await (await post(create, { ...body, kind: "command", prompt: "echo hi" })).json();
+    expect((await post(run, { id: disabled.id })).status).toBe(409);
   });
 });

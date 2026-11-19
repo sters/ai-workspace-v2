@@ -9,8 +9,12 @@ import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { fetcher, killOperation, postJson } from "@/lib/api";
 import type { OperationListItem } from "@/types/operation";
-import type { BuiltinWorkerJob } from "@/types/worker-job";
-import { SCHEDULED_TASK_OVERLAPS, type ScheduledTask, type ScheduledTaskInput } from "@/types/scheduled-task";
+import {
+  SCHEDULED_TASK_KINDS,
+  SCHEDULED_TASK_OVERLAPS,
+  type ScheduledTask,
+  type ScheduledTaskInput,
+} from "@/types/scheduled-task";
 
 const inputClass = "w-full rounded-md border bg-background px-2 py-1.5 text-sm";
 
@@ -20,7 +24,12 @@ const OVERLAP_LABELS: Record<ScheduledTaskInput["overlap"], string> = {
   queue: "Queue — run once the previous run finishes",
 };
 
-const EMPTY: ScheduledTaskInput = { title: "", request: "", prompt: "", cron: "", overlap: "skip", enabled: false };
+const KIND_LABELS: Record<ScheduledTaskInput["kind"], string> = {
+  prompt: "Instruction — an agent carries it out",
+  command: "Command — a shell command run by the worker",
+};
+
+const EMPTY: ScheduledTaskInput = { title: "", request: "", kind: "prompt", prompt: "", cron: "", overlap: "skip", enabled: false };
 
 /** Runs and planning operations are filed under these labels in place of a workspace. */
 const PLAN_LABEL = "scheduled-tasks";
@@ -58,11 +67,14 @@ function OperationList({ label, limit, refreshMs }: { label: string; limit: numb
 
 function TaskForm({
   initial,
+  isNew,
   submitLabel,
   onSubmit,
   onCancel,
 }: {
   initial: ScheduledTaskInput;
+  /** The kind is chosen at creation and fixed after. */
+  isNew: boolean;
   submitLabel: string;
   onSubmit: (value: ScheduledTaskInput) => Promise<string | null>;
   onCancel: () => void;
@@ -115,8 +127,26 @@ function TaskForm({
           </div>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium">Instruction</label>
-          <textarea value={value.prompt} onChange={(e) => set("prompt", e.target.value)} className={inputClass} rows={10} />
+          <label className="mb-1 block text-xs font-medium">Kind</label>
+          <select
+            value={value.kind}
+            onChange={(e) => set("kind", e.target.value as ScheduledTaskInput["kind"])}
+            disabled={!isNew}
+            className={inputClass}
+          >
+            {SCHEDULED_TASK_KINDS.map((k) => (
+              <option key={k} value={k}>{KIND_LABELS[k]}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium">{value.kind === "command" ? "Command (sh -c, from the workspace root)" : "Instruction"}</label>
+          <textarea
+            value={value.prompt}
+            onChange={(e) => set("prompt", e.target.value)}
+            className={`${inputClass} ${value.kind === "command" ? "font-mono" : ""}`}
+            rows={value.kind === "command" ? 3 : 10}
+          />
         </div>
         <label className="flex items-center gap-2 text-xs">
           <input type="checkbox" checked={value.enabled} onChange={(e) => set("enabled", e.target.checked)} />
@@ -179,30 +209,6 @@ function PlanForm({ onPlanned }: { onPlanned: () => void }) {
   );
 }
 
-function BuiltinJobs({ jobs }: { jobs: BuiltinWorkerJob[] }) {
-  return (
-    <section className="mb-4">
-      <h2 className="mb-2 text-sm font-semibold">Built-in</h2>
-      <div className="grid gap-2">
-        {jobs.map((job) => (
-          <Card key={job.name} className="text-sm">
-            <h3 className="font-semibold">
-              {job.title}
-              {!job.enabled && <span className="ml-2 text-xs font-normal text-muted-foreground">(disabled)</span>}
-            </h3>
-            <p className="mt-1 text-muted-foreground">{job.description}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {job.schedule} · last started: {formatTime(job.lastStartedAt)} · last finished: {formatTime(job.lastFinishedAt)}
-              {job.toggle && <> · toggle: {job.toggle}</>}
-            </p>
-            {job.lastError && <StatusText variant="error">Last tick failed: {job.lastError}</StatusText>}
-          </Card>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 function errorMessage(res: { ok: false; error: string }): string {
   try {
     const parsed = JSON.parse(res.error) as { error?: unknown };
@@ -213,7 +219,7 @@ function errorMessage(res: { ok: false; error: string }): string {
 }
 
 export default function ScheduledTasksPage() {
-  const { data, error, isLoading, mutate } = useSWR<{ tasks: ScheduledTask[]; builtins: BuiltinWorkerJob[] }>("/api/scheduled-tasks", fetcher, {
+  const { data, error, isLoading, mutate } = useSWR<{ tasks: ScheduledTask[] }>("/api/scheduled-tasks", fetcher, {
     refreshInterval: 10000,
   });
   const [creating, setCreating] = useState(false);
@@ -237,7 +243,8 @@ export default function ScheduledTasksPage() {
 
   async function runNow(task: ScheduledTask) {
     const res = await postJson("/api/scheduled-tasks/run", { id: task.id });
-    setNotice(res.ok ? `Started "${task.title}".` : errorMessage(res));
+    const started = task.kind === "command" ? `"${task.title}" starts within a minute.` : `Started "${task.title}".`;
+    setNotice(res.ok ? started : errorMessage(res));
   }
 
   async function handleDelete(task: ScheduledTask) {
@@ -250,7 +257,7 @@ export default function ScheduledTasksPage() {
     <div>
       <PageHeader
         title="Scheduled Tasks"
-        description="Run an instruction on a schedule. Each run reads workspaces and GitHub, may start operations, and sends its summary as a push notification."
+        description="Run an instruction or a shell command on a schedule. An instruction run reads workspaces and GitHub, may start operations, and sends its summary as a push notification; a command runs in the background worker."
         action={
           !creating ? (
             <Button variant="outline-muted" onClick={() => { setCreating(true); setEditingId(null); }}>
@@ -260,15 +267,13 @@ export default function ScheduledTasksPage() {
         }
       />
 
-      {data && <BuiltinJobs jobs={data.builtins} />}
-
       <PlanForm onPlanned={() => setNotice("Planning started. The task appears below, disabled, when it finishes.")} />
 
       {notice && <StatusText>{notice}</StatusText>}
 
       {creating && (
         <div className="mb-4">
-          <TaskForm initial={EMPTY} submitLabel="Create" onSubmit={(v) => save("/api/scheduled-tasks", v)} onCancel={() => setCreating(false)} />
+          <TaskForm initial={EMPTY} isNew submitLabel="Create" onSubmit={(v) => save("/api/scheduled-tasks", v)} onCancel={() => setCreating(false)} />
         </div>
       )}
 
@@ -282,6 +287,7 @@ export default function ScheduledTasksPage() {
             <TaskForm
               key={task.id}
               initial={task}
+              isNew={false}
               submitLabel="Update"
               onSubmit={(v) => save("/api/scheduled-tasks/update", { id: task.id, ...v })}
               onCancel={() => setEditingId(null)}
@@ -294,31 +300,40 @@ export default function ScheduledTasksPage() {
                     {task.title}
                     {!task.enabled && <span className="ml-2 text-xs font-normal text-muted-foreground">(disabled)</span>}
                     {task.queued && <span className="ml-2 text-xs font-normal text-muted-foreground">(queued)</span>}
+                    {task.builtin && <span className="ml-2 text-xs font-normal text-muted-foreground">(built-in)</span>}
                   </h3>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    <code>{task.cron}</code> · overlap: {task.overlap} · next: {formatTime(task.nextRunAt)} · last: {formatTime(task.lastRunAt)}
+                    {task.kind} · <code>{task.cron}</code> · overlap: {task.overlap} · next: {formatTime(task.nextRunAt)} · last: {formatTime(task.lastRunAt)}
+                    {task.lastExitCode !== null && <> · exit {task.lastExitCode}</>}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap gap-2">
                   <Button variant="outline-muted" onClick={() => toggle(task)}>{task.enabled ? "Disable" : "Enable"}</Button>
                   <Button variant="outline-muted" onClick={() => runNow(task)}>Run now</Button>
                   <Button variant="outline-muted" onClick={() => { setEditingId(task.id); setCreating(false); }}>Edit</Button>
-                  <Button variant="destructive-sm" onClick={() => handleDelete(task)}>Delete</Button>
+                  {!task.builtin && <Button variant="destructive-sm" onClick={() => handleDelete(task)}>Delete</Button>}
                 </div>
               </div>
               <details className="mt-2">
-                <summary className="cursor-pointer text-xs text-muted-foreground">Instruction</summary>
+                <summary className="cursor-pointer text-xs text-muted-foreground">{task.kind === "command" ? "Command" : "Instruction"}</summary>
                 <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{task.prompt}</pre>
                 {task.request && (
                   <p className="mt-2 text-xs text-muted-foreground">Requested as: {task.request}</p>
                 )}
               </details>
-              <details className="mt-2">
-                <summary className="cursor-pointer text-xs text-muted-foreground">Runs</summary>
-                <div className="mt-2">
-                  <OperationList label={runLabel(task.id)} limit={10} refreshMs={10000} />
-                </div>
-              </details>
+              {task.kind === "command" ? (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs text-muted-foreground">Last output</summary>
+                  <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{task.lastOutput || "—"}</pre>
+                </details>
+              ) : (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs text-muted-foreground">Runs</summary>
+                  <div className="mt-2">
+                    <OperationList label={runLabel(task.id)} limit={10} refreshMs={10000} />
+                  </div>
+                </details>
+              )}
             </Card>
           ),
         )}
