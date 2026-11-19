@@ -30,7 +30,7 @@ describe("tickScheduledTasks", () => {
   it("starts a due task and moves it to its next occurrence", async () => {
     const t = task();
     const d = deps();
-    await tickScheduledTasks(AT_NINE, d);
+    await tickScheduledTasks(AT_NINE, async () => d);
     expect(d.start).toHaveBeenCalledTimes(1);
     expect(d.start.mock.calls[0][0].id).toBe(t.id);
     expect(getScheduledTask(t.id)!.nextRunAt).toBe(NEXT_NINE);
@@ -40,16 +40,25 @@ describe("tickScheduledTasks", () => {
     task();
     task("skip", false);
     const d = deps();
-    await tickScheduledTasks(new Date("2026-11-19T08:59:59"), d);
-    await tickScheduledTasks(new Date("2026-11-19T08:59:59"), d);
+    await tickScheduledTasks(new Date("2026-11-19T08:59:59"), async () => d);
+    await tickScheduledTasks(new Date("2026-11-19T08:59:59"), async () => d);
     expect(d.start).not.toHaveBeenCalled();
+  });
+
+  it("asks for the server only on a tick that has a due or queued task", async () => {
+    task();
+    const getDeps = vi.fn(async () => deps());
+    await tickScheduledTasks(new Date("2026-11-19T08:59:59"), getDeps);
+    expect(getDeps).not.toHaveBeenCalled();
+    await tickScheduledTasks(AT_NINE, getDeps);
+    expect(getDeps).toHaveBeenCalledTimes(1);
   });
 
   it("runs once for occurrences missed while the server was down", async () => {
     const t = task();
     const d = deps();
-    await tickScheduledTasks(new Date("2026-11-25T12:00:00"), d);
-    await tickScheduledTasks(new Date("2026-11-25T12:01:00"), d);
+    await tickScheduledTasks(new Date("2026-11-25T12:00:00"), async () => d);
+    await tickScheduledTasks(new Date("2026-11-25T12:01:00"), async () => d);
     expect(d.start).toHaveBeenCalledTimes(1);
     expect(getScheduledTask(t.id)!.nextRunAt).toBe(new Date("2026-11-26T09:00:00").toISOString());
   });
@@ -57,7 +66,7 @@ describe("tickScheduledTasks", () => {
   it("skip: drops the occurrence while the previous run is going", async () => {
     const t = task("skip");
     const d = deps(new Set([t.id]));
-    await tickScheduledTasks(AT_NINE, d);
+    await tickScheduledTasks(AT_NINE, async () => d);
     expect(d.start).not.toHaveBeenCalled();
     expect(getScheduledTask(t.id)!.nextRunAt).toBe(NEXT_NINE);
     expect(getScheduledTask(t.id)!.queued).toBe(false);
@@ -66,7 +75,7 @@ describe("tickScheduledTasks", () => {
   it("parallel: starts another run beside the running one", async () => {
     const t = task("parallel");
     const d = deps(new Set([t.id]));
-    await tickScheduledTasks(AT_NINE, d);
+    await tickScheduledTasks(AT_NINE, async () => d);
     expect(d.start).toHaveBeenCalledTimes(1);
   });
 
@@ -74,16 +83,16 @@ describe("tickScheduledTasks", () => {
     const t = task("queue");
     const running = new Set([t.id]);
     const d = deps(running);
-    await tickScheduledTasks(AT_NINE, d);
+    await tickScheduledTasks(AT_NINE, async () => d);
     expect(d.start).not.toHaveBeenCalled();
     expect(getScheduledTask(t.id)!.queued).toBe(true);
 
-    await tickScheduledTasks(new Date("2026-11-19T09:01:30"), d);
+    await tickScheduledTasks(new Date("2026-11-19T09:01:30"), async () => d);
     expect(d.start).not.toHaveBeenCalled();
 
     running.clear();
-    await tickScheduledTasks(new Date("2026-11-19T09:02:30"), d);
-    await tickScheduledTasks(new Date("2026-11-19T09:03:30"), d);
+    await tickScheduledTasks(new Date("2026-11-19T09:02:30"), async () => d);
+    await tickScheduledTasks(new Date("2026-11-19T09:03:30"), async () => d);
     expect(d.start).toHaveBeenCalledTimes(1);
     expect(getScheduledTask(t.id)!.queued).toBe(false);
   });
@@ -92,10 +101,10 @@ describe("tickScheduledTasks", () => {
     const t = task("queue");
     const running = new Set([t.id]);
     const d = deps(running);
-    await tickScheduledTasks(AT_NINE, d);
+    await tickScheduledTasks(AT_NINE, async () => d);
     running.clear();
-    await tickScheduledTasks(new Date("2026-11-20T09:00:30"), d);
-    await tickScheduledTasks(new Date("2026-11-20T09:01:30"), d);
+    await tickScheduledTasks(new Date("2026-11-20T09:00:30"), async () => d);
+    await tickScheduledTasks(new Date("2026-11-20T09:01:30"), async () => d);
     expect(d.start).toHaveBeenCalledTimes(1);
     expect(getScheduledTask(t.id)!.nextRunAt).toBe(new Date("2026-11-21T09:00:00").toISOString());
   });
@@ -104,10 +113,10 @@ describe("tickScheduledTasks", () => {
     const t = task();
     const d = deps();
     d.start.mockRejectedValueOnce(new Error("Too many concurrent operations"));
-    await tickScheduledTasks(AT_NINE, d);
+    await tickScheduledTasks(AT_NINE, async () => d);
     expect(getScheduledTask(t.id)!.nextRunAt).toBe(new Date("2026-11-19T09:00:00").toISOString());
 
-    await tickScheduledTasks(new Date("2026-11-19T09:01:30"), d);
+    await tickScheduledTasks(new Date("2026-11-19T09:01:30"), async () => d);
     expect(d.start).toHaveBeenCalledTimes(2);
     expect(getScheduledTask(t.id)!.nextRunAt).toBe(NEXT_NINE);
   });

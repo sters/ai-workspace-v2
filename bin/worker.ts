@@ -67,5 +67,5 @@ if (cfg.watcher.enabled) {
 const serverUrl = `http://localhost:${cfg.server.port}`;
 console.log("[worker] scheduled-tasks: checking every minute");
 void loop(WORKER_JOBS.SCHEDULED_TASKS, async () => {
-  await tickScheduledTasks(new Date(), await createServerDeps(serverUrl));
+  await tickScheduledTasks(new Date(), () => createServerDeps(serverUrl));
 });

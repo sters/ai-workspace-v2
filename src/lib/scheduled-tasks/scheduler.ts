@@ -21,10 +21,16 @@ async function tryStart(task: ScheduledTask, deps: SchedulerDeps): Promise<boole
  * Starts every enabled task that is due at `now`. An occurrence missed while
  * the server was down is still due, so it runs once on the first tick after,
  * and the next occurrence is counted from `now`, never from the missed one.
+ * `getDeps` is called only on a tick that has a due or queued task.
  */
-export async function tickScheduledTasks(now: Date, deps: SchedulerDeps): Promise<void> {
-  for (const task of listScheduledTasks()) {
-    if (!task.enabled || !task.nextRunAt) continue;
+export async function tickScheduledTasks(now: Date, getDeps: () => Promise<SchedulerDeps>): Promise<void> {
+  const candidates = listScheduledTasks().filter(
+    (task) => task.enabled && task.nextRunAt && (task.queued || now >= new Date(task.nextRunAt)),
+  );
+  if (candidates.length === 0) return;
+  const deps = await getDeps();
+  for (const task of candidates) {
+    if (!task.nextRunAt) continue;
     const running = deps.isRunning(task.id);
     const due = now >= new Date(task.nextRunAt);
     if (!due && !(task.queued && !running)) continue;
