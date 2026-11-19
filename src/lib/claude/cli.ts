@@ -72,12 +72,19 @@ export function runClaudeCommand(options: Omit<SpawnClaudeOptions, "stdin">): Pr
   return runProcess([getCliPath(), ...args], { cwd, env: env ?? getClaudeEnv() });
 }
 
+/**
+ * The PTY is rendered by the browser's xterm.js, not by whatever terminal the
+ * server was started from (none, under launchd), so its capabilities are
+ * declared rather than inherited; without TERM the CLI draws in monochrome.
+ */
+const XTERM_JS_ENV = { TERM: "xterm-256color", COLORTERM: "truecolor" };
+
 /** Spawn Claude CLI in interactive PTY mode via spawnTerminal. */
 export function spawnClaudeTerminal(options: SpawnClaudeTerminalOptions): TerminalSubprocess {
   const { args, cwd = getResolvedWorkspaceRoot(), env, listeners, cols, rows } = options;
   return spawnTerminal(
     [getCliPath(), ...args],
-    { cwd, env: env ?? getClaudeEnv(), cols, rows },
+    { cwd, env: { ...(env ?? getClaudeEnv()), ...XTERM_JS_ENV }, cols, rows },
     listeners,
   );
 }

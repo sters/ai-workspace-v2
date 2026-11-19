@@ -257,6 +257,28 @@ describe("spawnClaudeTerminal", () => {
     expect(passedListeners).toBe(listeners);
   });
 
+  it("declares a color xterm even when the server has no TERM or a different one", () => {
+    const saved = { TERM: process.env.TERM, COLORTERM: process.env.COLORTERM };
+    try {
+      delete process.env.TERM;
+      delete process.env.COLORTERM;
+      spawnClaudeTerminal({ args: [], listeners: new Set() });
+      process.env.TERM = "tmux-256color";
+      spawnClaudeTerminal({ args: [], env: { PATH: "/bin" }, listeners: new Set() });
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+
+    for (const [, opts] of mockSpawnTerminal.mock.calls) {
+      expect(opts.env.TERM).toBe("xterm-256color");
+      expect(opts.env.COLORTERM).toBe("truecolor");
+    }
+    expect(mockSpawnTerminal.mock.calls[1][1].env.PATH).toBe("/bin");
+  });
+
   it("uses provided cwd", () => {
     const listeners = new Set<(data: string) => void>();
     spawnClaudeTerminal({ args: [], cwd: "/custom/dir", listeners });
