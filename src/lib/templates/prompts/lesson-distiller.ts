@@ -13,7 +13,7 @@ export const LESSON_DISTILLATION_SCHEMA = {
             type: "string",
             enum: ["new", "reinforce", "merge", "challenge"],
             description:
-              "new: a lesson no listed one covers. reinforce: the material repeats one listed approved or candidate lesson. merge: one lesson replacing one or more approved ones. challenge: the material shows one approved lesson led the work wrong.",
+              "new: a lesson no listed one covers. reinforce: the material repeats one listed approved or candidate lesson. merge: one lesson replacing one or more listed approved or candidate ones. challenge: the material shows one approved lesson led the work wrong.",
           },
           section: {
             type: "string",
@@ -27,7 +27,7 @@ export const LESSON_DISTILLATION_SCHEMA = {
           targetIds: {
             type: "array",
             items: { type: "string" },
-            description: "reinforce: exactly the one id it repeats. merge: the approved ids it replaces. challenge: exactly the one approved id it disputes. new: empty.",
+            description: "reinforce: exactly the one id it repeats. merge: the approved or candidate ids it replaces. challenge: exactly the one approved id it disputes. new: empty.",
           },
           evidence: {
             type: "array",
@@ -133,6 +133,7 @@ Challenge only on a reaction against the practice itself, not when the work mere
 ## Avoid duplicates
 
 - When the material supports a lesson already listed as approved or candidate, use \`reinforce\` with its id and add the evidence. Do not restate it as \`new\`.
+- When it supports a practice close to a listed candidate but the candidate's wording would need to change to cover it, use \`merge\` targeting that candidate with the rewritten text. Fold listed candidates that already say the same thing in different words into one \`merge\` the same way.
 - Never propose anything a listed rejected lesson already says, in any wording.
 - When several signals in this material point at one practice, propose one lesson carrying all of their evidence.
 ${cap}

@@ -189,19 +189,22 @@ export function applyDistilledLessons(
         result.dropped++;
         continue;
       }
-      const liveMatch = sameWording.find((l) => live(l));
+      const targets = d.action === "merge" ? d.targetIds.map((id) => byId.get(id)) : [];
+      const liveMatch = sameWording.find((l) => live(l) && !targets.includes(l));
       if (liveMatch) {
         addEvidence(liveMatch, evidence);
         result.reinforced++;
         continue;
       }
 
-      if (d.action === "merge") {
-        const targets = d.targetIds.map((id) => byId.get(id));
-        if (targets.length < 1 || targets.some((t) => t?.status !== "approved")) {
-          result.dropped++;
-          continue;
-        }
+      if (d.action === "merge" && (targets.length < 1 || !targets.every(live))) {
+        result.dropped++;
+        continue;
+      }
+      // No person has approved a candidate yet, so a merge replaces it now; approved targets wait for the merge's approval.
+      const candidates = targets.filter((t) => t!.status === "candidate");
+      for (const c of candidates) {
+        db.query(`UPDATE repo_lessons SET status = 'superseded', updated_at = ${NOW} WHERE id = ?`).run(c!.id);
       }
 
       insertLesson({
@@ -209,8 +212,8 @@ export function applyDistilledLessons(
         section: d.section,
         text: d.text.trim(),
         sourceWorkspace: workspace,
-        evidence,
-        replaces: d.action === "merge" ? d.targetIds : [],
+        evidence: [...candidates.flatMap((c) => c!.evidence), ...evidence],
+        replaces: targets.filter((t) => t!.status === "approved").map((t) => t!.id),
       });
       result.added++;
     }

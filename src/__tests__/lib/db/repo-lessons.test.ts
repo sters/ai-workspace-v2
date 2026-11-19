@@ -80,12 +80,46 @@ describe("db/repo-lessons", () => {
     expect(byText("B").status).toBe("superseded");
   });
 
-  it("drops a merge that names a lesson which is not approved", () => {
-    const a = insertLesson({ repoKey: REPO, section: "review", text: "A", sourceWorkspace: "ws-0", evidence: [] });
-    const { dropped } = applyDistilledLessons(REPO, "ws-1", [
-      { action: "merge", section: "review", text: "A2", targetIds: [a], evidence: [] },
+  it("replaces the candidates a merge names at once, carrying their evidence over", () => {
+    const a = insertLesson({ repoKey: REPO, section: "review", text: "A", sourceWorkspace: "ws-0", evidence: [{ workspace: "ws-0", note: "a" }] });
+    const b = insertLesson({ repoKey: REPO, section: "review", text: "B", sourceWorkspace: "ws-0", evidence: [{ workspace: "ws-0", note: "b" }] });
+    const approved = insertLesson({ repoKey: REPO, section: "review", text: "C", sourceWorkspace: "ws-0", evidence: [] });
+    setLessonStatus(approved, "approved");
+
+    const { added } = applyDistilledLessons(REPO, "ws-1", [
+      { action: "merge", section: "review", text: "A, B and C", targetIds: [a, b, approved], evidence: [{ note: "new" }] },
     ]);
-    expect(dropped).toBe(1);
+
+    expect(added).toBe(1);
+    expect(byText("A").status).toBe("superseded");
+    expect(byText("B").status).toBe("superseded");
+    expect(byText("C").status).toBe("approved");
+    const merged = byText("A, B and C");
+    expect(merged.status).toBe("candidate");
+    expect(merged.replaces).toEqual([approved]);
+    expect(merged.evidence.map((e) => e.note)).toEqual(["a", "b", "new"]);
+  });
+
+  it("merges candidates even when the merged text keeps one target's wording", () => {
+    const a = insertLesson({ repoKey: REPO, section: "review", text: "Keep handlers thin", sourceWorkspace: "ws-0", evidence: [] });
+    const b = insertLesson({ repoKey: REPO, section: "review", text: "Handlers delegate to services", sourceWorkspace: "ws-0", evidence: [] });
+    applyDistilledLessons(REPO, "ws-1", [
+      { action: "merge", section: "review", text: "Keep handlers thin.", targetIds: [a, b], evidence: [] },
+    ]);
+    const live = listLessons({ repoKey: REPO }).filter((l) => l.status === "candidate");
+    expect(live.map((l) => l.text)).toEqual(["Keep handlers thin."]);
+  });
+
+  it("drops a merge that names a rejected or unknown lesson", () => {
+    const a = insertLesson({ repoKey: REPO, section: "review", text: "A", sourceWorkspace: "ws-0", evidence: [] });
+    const r = insertLesson({ repoKey: REPO, section: "review", text: "R", sourceWorkspace: "ws-0", evidence: [] });
+    setLessonStatus(r, "rejected");
+    const { dropped } = applyDistilledLessons(REPO, "ws-1", [
+      { action: "merge", section: "review", text: "A and R", targetIds: [a, r], evidence: [] },
+      { action: "merge", section: "review", text: "A and ?", targetIds: [a, "missing"], evidence: [] },
+    ]);
+    expect(dropped).toBe(2);
+    expect(byText("A").status).toBe("candidate");
   });
 
   it("keeps lessons of other repositories apart", () => {

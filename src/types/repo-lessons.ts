@@ -2,7 +2,8 @@ export type LessonSection = "implementation" | "review";
 
 /**
  * `candidate` waits for a human; only `approved` reaches agents. `superseded`
- * is an approved lesson an approved merge replaced.
+ * is a lesson a merge replaced: an approved one once the merge is approved, a
+ * candidate as soon as the merge is proposed.
  */
 export type LessonStatus = "candidate" | "approved" | "rejected" | "superseded";
 
@@ -26,7 +27,7 @@ export interface RepoLesson {
    * agents get; a person keeps, rewrites or rejects the lesson, which clears them.
    */
   challenges: LessonEvidence[];
-  /** Approved lessons this one replaces when it is approved. */
+  /** Approved lessons this one replaces when it is approved. Candidate targets are replaced when it is proposed. */
   replaces: string[];
   sourceWorkspace: string;
   createdAt: string;
