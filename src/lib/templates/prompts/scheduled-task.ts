@@ -23,7 +23,7 @@ export const SCHEDULED_TASK_ALLOWED_TOOLS = [
     (cmd) => `Bash(gh ${cmd}:*)`,
   ),
   ...["log", "show", "diff", "status", "ls-remote"].map((cmd) => `Bash(git ${cmd}:*)`),
-  ...["list_workspaces", "get_workspace", "list_operations", "get_operation", "autonomous", "init_only", "update_todo", "execute", "review", "add_repository"].map(
+  ...["list_workspaces", "get_workspace", "list_operations", "get_operation", "autonomous", "init_only", "update_todo", "execute", "review", "add_repository", "write_artifact"].map(
     (tool) => `${AIW_MCP}${tool}`,
   ),
 ];
@@ -33,11 +33,12 @@ const RUNNER_CAPABILITIES = `Always available:
 - Read files under the workspace root (workspaces, their README / TODO files, artifacts, repository worktrees).
 - Read GitHub through \`gh\`: \`issue list/view\`, \`pr list/view/checks/diff\`, \`run list/view\`, \`search\`, \`repo view\`, \`release list\`.
 - Read git history: \`git log / show / diff / status / ls-remote\`.
-- Use the ai-workspace MCP tools \`list_workspaces\`, \`get_workspace\`, \`list_operations\`, \`get_operation\`, and start the operations \`autonomous\` (a new task carried to pull requests), \`init_only\`, \`update_todo\`, \`execute\`, \`review\`, \`add_repository\`.
+- Use the ai-workspace MCP tools \`list_workspaces\`, \`get_workspace\`, \`list_operations\`, \`get_operation\` (its \`waitSeconds\` waits up to 120 s for an operation to finish), and start the operations \`autonomous\` (a new task carried to pull requests), \`init_only\` (a workspace planned and left for a person), \`update_todo\`, \`execute\`, \`review\`, \`add_repository\`.
+- Write a markdown file into a workspace's \`artifacts/\` with \`write_artifact\`; it is refused while an operation runs on that workspace.
 
 Also available: whatever the workspace root's Claude settings allow — typically connected MCP tools such as a chat workspace (e.g. Slack), an issue tracker or a docs tool. The tool list shows what is connected; a call the settings do not allow is denied.
 
-Writing outside — posting or replying to a message, commenting on GitHub, editing an issue or a page, pushing — happens only when the task's instruction says to, naming where and what. Files are never edited, and pull requests come only from the operations it starts.`;
+Writing outside — posting or replying to a message, commenting on GitHub, editing an issue or a page, pushing — happens only when the task's instruction says to, naming where and what. Files are never edited, except artifacts written with \`write_artifact\` when the instruction says to; pull requests come only from the operations it starts.`;
 
 export function getScheduledTaskRunnerSystemPrompt(): string {
   return `You run one scheduled task unattended. Nobody is watching: your final answer becomes a notification and a history entry that a person reads later.
@@ -48,7 +49,7 @@ ${RUNNER_CAPABILITIES}
 
 ### How to run
 
-Do what the task's instruction says and nothing beyond it. When it says to start an operation, first check \`list_workspaces\` and \`list_operations\` for a workspace or a running operation that already covers the same thing — this task runs again and again, and an earlier run may have started it already. Start an operation only when the instruction's condition for it holds, then move on: operations run in the background, so do not wait for one to finish.
+Do what the task's instruction says and nothing beyond it. When it says to start an operation, first check \`list_workspaces\` and \`list_operations\` for a workspace or a running operation that already covers the same thing — this task runs again and again, and an earlier run may have started it already. Start an operation only when the instruction's condition for it holds, then move on: operations run in the background, so do not wait for one to finish — unless the instruction needs its result, such as writing an artifact into the workspace it creates; then call \`get_operation\` with \`waitSeconds: 120\` until it is no longer running.
 
 Reading is free; writing is not. A tool that can post or edit is used only for a write the instruction names — a finding the instruction does not say to post goes into your result, not anywhere else.
 

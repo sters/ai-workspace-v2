@@ -26,6 +26,10 @@ vi.mock("@/lib/workspace/archive", async (importOriginal) => ({
   archiveWorkspaceWithPrs: (name: string, opts: unknown) => mockArchive(name, opts),
 }));
 
+import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { setWorkspaceRoot, _resetWorkspaceRoot } from "@/lib/config";
 import { handleMcpMessage } from "@/lib/mcp/protocol";
 import { MCP_TOOLS } from "@/app/api/mcp/tools";
 
@@ -82,11 +86,49 @@ describe("MCP tools", () => {
     for (const [tool, args] of [
       ["write_readme_sections", { workspace: "ws", goal: "Unknown ids get a 404." }],
       ["add_todo_items", { workspace: "ws", repository: "api", section: "Tasks", items: [item] }],
+      ["write_artifact", { workspace: "ws", path: "notes.md", content: "x" }],
     ] as const) {
       const { data, isError } = await callTool(tool, args);
       expect(isError).toBe(true);
       expect(JSON.stringify(data)).toContain("op-9");
     }
+  });
+
+  it("write_artifact writes a markdown file under the workspace's artifacts, replacing or appending", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "aiw-artifact-"));
+    try {
+      setWorkspaceRoot(root);
+      await mkdir(path.join(root, "workspace", "ws"), { recursive: true });
+      mockWorkspaceSummary.mockResolvedValue({ name: "ws" });
+      const file = path.join(root, "workspace", "ws", "artifacts", "alerts", "2026-11-19.md");
+
+      expect((await callTool("write_artifact", { workspace: "ws", path: "alerts/2026-11-19.md", content: "# A\n" })).isError).toBe(false);
+      await callTool("write_artifact", { workspace: "ws", path: "alerts/2026-11-19.md", content: "more\n", append: true });
+      expect(await readFile(file, "utf-8")).toBe("# A\nmore\n");
+      await callTool("write_artifact", { workspace: "ws", path: "alerts/2026-11-19.md", content: "# B\n" });
+      expect(await readFile(file, "utf-8")).toBe("# B\n");
+    } finally {
+      _resetWorkspaceRoot();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    ["outside artifacts", "../README.md"],
+    ["not markdown", "pr-validations.json"],
+    ["inside the reviews aiw renders", "reviews/20261119/SUMMARY.md"],
+  ])("write_artifact refuses a path %s", async (_name, target) => {
+    mockWorkspaceSummary.mockResolvedValue({ name: "ws" });
+    const { isError } = await callTool("write_artifact", { workspace: "ws", path: target, content: "x" });
+    expect(isError).toBe(true);
+  });
+
+  it("get_operation with waitSeconds answers once a running operation finishes", async () => {
+    const running = { id: "op-1", type: "init", workspace: "ws", status: "running", startedAt: "2026-01-01T00:00:00Z" } as OperationListItem;
+    let reads = 0;
+    mockSummaries.mockImplementation(() => [reads++ < 2 ? running : { ...running, status: "completed" }]);
+    const { data } = await callTool("get_operation", { operationId: "op-1", waitSeconds: 30 });
+    expect(data).toMatchObject({ status: "completed" });
   });
 
   it("get_operation reports a running operation's unanswered question with its toolUseId", async () => {

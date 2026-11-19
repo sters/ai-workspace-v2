@@ -8,11 +8,13 @@ import { getOperation, getOperationEvents, getOperationSummaries } from "@/lib/p
 import { readOperationLog } from "@/lib/operation-store";
 import { eventsToLogEntries, extractResultSummary } from "@/lib/parsers/stream";
 import { findPendingAsk } from "@/components/operation/log/display-nodes";
+import { appendFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { parseReadmeMeta } from "@/lib/parsers/readme";
 import { commitWorkspaceSnapshot, listWorkspaceRepos } from "@/lib/workspace";
 import { getReadme, getWorkspaceSummary, listWorkspaceItems } from "@/lib/workspace/reader";
 import { appendTodoItems, replaceReadmeSections } from "@/lib/workspace/workspace-files";
+import { resolveArtifactPath } from "@/lib/workspace/artifacts";
 import {
   addRepositorySchema,
   autonomousSchema,
@@ -113,6 +115,18 @@ const todoItemsInput = workspaceInput.extend({
     .min(1),
 });
 
+const artifactInput = workspaceInput.extend({
+  path: z
+    .string()
+    .min(1)
+    .describe("Markdown file relative to the workspace's artifacts/, e.g. `alerts/2026-11-19.md`; directories are created. reviews/ is written by review and refused."),
+  content: z.string().describe("Markdown to write."),
+  append: z.boolean().default(false).describe("Add to the end of the file instead of replacing it."),
+});
+
+/** `artifacts/reviews/` is rendered from review results; a hand edit there disagrees with them. */
+const RESERVED_ARTIFACT_DIRS = ["reviews"];
+
 /**
  * Checks shared by the file-writing tools. A running operation rewrites README
  * and TODO files, so writing beside it loses one of the two edits.
@@ -145,6 +159,18 @@ function recentStatus(events: OperationEvent[]): string[] {
     if (line) lines.push(line.length > STATUS_LINE_MAX_CHARS ? `${line.slice(0, STATUS_LINE_MAX_CHARS)}…` : line);
   }
   return lines.reverse();
+}
+
+const WAIT_POLL_MS = 1000;
+
+/** Returns once the operation is no longer running or waits on a question, or after `seconds`. */
+async function waitWhileRunning(operationId: string, seconds: number): Promise<void> {
+  const deadline = Date.now() + seconds * 1000;
+  while (Date.now() < deadline) {
+    const op = getOperationSummaries().find((o) => o.id === operationId);
+    if (!op || op.status !== "running" || op.hasPendingAsk) return;
+    await Bun.sleep(Math.min(WAIT_POLL_MS, deadline - Date.now()));
+  }
 }
 
 async function getOperationStatus(operationId: string) {
@@ -322,6 +348,28 @@ export const MCP_TOOLS: McpTool[] = [
       return { data: { workspace: target.name, file: filename, added: items.length, created: content === null } };
     },
   },
+  {
+    name: "write_artifact",
+    description:
+      "Write a markdown file under a workspace's artifacts/ (shown on its Artifacts tab) and commit it — findings, an investigation, a report. " +
+      "Replaces the file unless append is true. Refused while an operation runs on the workspace.",
+    input: artifactInput,
+    call: async (args) => {
+      const { workspace, path: relPath, content, append } = args as z.infer<typeof artifactInput>;
+      const target = await writableWorkspace(workspace);
+      if ("error" in target) return { data: target.error, isError: true };
+      const full = await resolveArtifactPath(path.join(getWorkspaceDir(), target.name), relPath);
+      const reserved = RESERVED_ARTIFACT_DIRS.includes(path.normalize(relPath).split(/[\\/]/)[0]);
+      if (!full || reserved || path.extname(relPath).toLowerCase() !== ".md") {
+        return { data: `Not a writable artifact path: ${relPath} (a .md file inside artifacts/, outside reviews/)`, isError: true };
+      }
+      await mkdir(path.dirname(full), { recursive: true });
+      if (append) await appendFile(full, content);
+      else await Bun.write(full, content);
+      await commitWorkspaceSnapshot(target.name, `${append ? "Append to" : "Write"} artifact ${relPath}`);
+      return { data: { workspace: target.name, file: `artifacts/${relPath}`, appended: append } };
+    },
+  },
   routeTool(
     "harvest_lessons",
     "Distill a workspace's outcome (PR comments, commits people added, a rejected PR, recurring review findings) into candidate lessons " +
@@ -361,8 +409,21 @@ export const MCP_TOOLS: McpTool[] = [
     name: "get_operation",
     description:
       "Read an operation's status, phases, final result and recentStatus (its last progress and error lines, which say why a failed run stopped). While it waits on a question it carries pendingQuestion; answer it with answer_question.",
-    input: z.object({ operationId: z.string().min(1, "operationId is required") }),
-    call: async (args) => getOperationStatus((args as { operationId: string }).operationId),
+    input: z.object({
+      operationId: z.string().min(1, "operationId is required"),
+      waitSeconds: z
+        .number()
+        .int()
+        .min(0)
+        .max(120)
+        .optional()
+        .describe("Wait up to this long for a running operation to finish or ask a question before answering, instead of calling again in a loop."),
+    }),
+    call: async (args) => {
+      const { operationId, waitSeconds } = args as { operationId: string; waitSeconds?: number };
+      if (waitSeconds) await waitWhileRunning(operationId, waitSeconds);
+      return getOperationStatus(operationId);
+    },
   },
   routeTool(
     "answer_question",
