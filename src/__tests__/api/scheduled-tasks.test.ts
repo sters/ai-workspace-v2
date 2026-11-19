@@ -34,11 +34,11 @@ describe("/api/scheduled-tasks", () => {
     expect((await post(update, { ...body, id: 999 })).status).toBe(404);
   });
 
-  it("lists the worker's built-in jobs with the state the worker last recorded", async () => {
+  it("lists the worker's built-in jobs, other than the scheduler itself, with the state the worker last recorded", async () => {
+    recordWorkerJobStart("pr-watcher", "2026-11-19T09:00:00.000Z");
     recordWorkerJobStart("scheduled-tasks", "2026-11-19T09:00:00.000Z");
     const { builtins } = await (await GET()).json();
-    expect(builtins.map((b: { name: string }) => b.name)).toEqual(["pr-watcher", "scheduled-tasks"]);
-    expect(builtins[1]).toMatchObject({ enabled: true, lastStartedAt: "2026-11-19T09:00:00.000Z" });
-    expect(builtins[0].lastStartedAt).toBeNull();
+    expect(builtins.map((b: { name: string }) => b.name)).toEqual(["pr-watcher"]);
+    expect(builtins[0]).toMatchObject({ lastStartedAt: "2026-11-19T09:00:00.000Z" });
   });
 });

@@ -9,7 +9,11 @@ export const WORKER_JOBS = {
 
 const NEVER_RUN = { lastStartedAt: null, lastFinishedAt: null, lastError: null };
 
-/** The worker's jobs in the order it starts them, each with what it last recorded. */
+/**
+ * The worker's jobs in the order it starts them, each with what it last
+ * recorded. The scheduled-task tick is left out: it is what runs the listed
+ * tasks, not one of them.
+ */
 export function listBuiltinWorkerJobs(cfg: ReturnType<typeof getConfig>): BuiltinWorkerJob[] {
   const runs = listWorkerJobRuns();
   const jobs: Omit<BuiltinWorkerJob, keyof typeof NEVER_RUN>[] = [
@@ -20,14 +24,6 @@ export function listBuiltinWorkerJobs(cfg: ReturnType<typeof getConfig>): Builti
       schedule: `Every minute for notified / changed PRs; every ${cfg.watcher.intervalMinutes} min for all`,
       enabled: cfg.watcher.enabled,
       toggle: "watcher.enabled in AIW Settings (takes effect on restart)",
-    },
-    {
-      name: WORKER_JOBS.SCHEDULED_TASKS,
-      title: "Scheduled task scheduler",
-      description: "Starts the scheduled tasks below when they come due.",
-      schedule: "Every minute",
-      enabled: true,
-      toggle: null,
     },
   ];
   return jobs.map((job) => ({ ...job, ...(runs.get(job.name) ?? NEVER_RUN) }));
