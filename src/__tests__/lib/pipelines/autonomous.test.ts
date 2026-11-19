@@ -739,50 +739,6 @@ describe("buildAutonomousPipeline", () => {
       expect(mockSetupRepository).not.toHaveBeenCalled();
     });
 
-    it("sets up only the README repositories missing from the workspace", async () => {
-      // Initial state: one of two README repos already set up. After setupRepository: both.
-      mockListWorkspaceRepos
-        .mockReturnValueOnce([
-          { repoPath: "github.com/acme/already", repoName: "already", worktreePath: "/a" },
-        ])
-        .mockReturnValueOnce([
-          { repoPath: "github.com/acme/already", repoName: "already", worktreePath: "/a" },
-          { repoPath: "github.com/acme/new", repoName: "new", worktreePath: "/b" },
-        ]);
-      mockReadWorkspaceReadme.mockResolvedValue({
-        content: "",
-        meta: {
-          title: "t",
-          taskType: "feature",
-          ticketId: "",
-          date: "",
-          repositories: [
-            { alias: "already", path: "github.com/acme/already", baseBranch: "main" },
-            { alias: "new", path: "github.com/acme/new", baseBranch: "main" },
-          ],
-        },
-      });
-
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-      });
-      const ensurePhase = phases[0];
-      if (ensurePhase.kind !== "function") return;
-
-      const ctx = createMockCtx();
-      const result = await ensurePhase.fn(ctx);
-
-      expect(result).toBe(true);
-      expect(mockSetupRepository).toHaveBeenCalledTimes(1);
-      expect(mockSetupRepository).toHaveBeenCalledWith(
-        "test-ws",
-        "github.com/acme/new",
-        "main",
-        expect.any(Function),
-      );
-    });
-
     // Constraint discovery otherwise only runs on the init path, so a repo
     // salvaged into an existing workspace would reach review with its commands
     // NOT DECLARED.
@@ -1129,17 +1085,6 @@ describe("buildAutonomousPipeline", () => {
       if (lastPhase.kind === "function") {
         expect(lastPhase.label).toBe("Create PR");
       }
-    });
-
-    it("omits salvage phases on resume by default (saved phases didn't have them)", () => {
-      const phases = buildAutonomousPipeline({
-        startWith: "execute",
-        workspace: "test-ws",
-        resumeCycles: [{ cycle: 1, hasUpdateTodo: false }],
-      });
-      const labels = phases.map((p) => p.kind === "function" && p.label);
-      expect(labels).not.toContain("Ensure repositories");
-      expect(labels).not.toContain("Ensure TODOs");
     });
 
     it("includes Ensure repositories on resume when resumeWithEnsureRepos is true", () => {

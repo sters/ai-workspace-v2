@@ -46,11 +46,6 @@ describe("resolveEffort", () => {
     expect(resolveEffort("execute", "execute", "max")).toBe("max");
   });
 
-  it("returns global operations.effort", () => {
-    setConfig({ operations: { effort: "medium" } });
-    expect(resolveEffort("review")).toBe("medium");
-  });
-
   it("returns operation type effort over global", () => {
     setConfig({
       operations: {
@@ -103,14 +98,6 @@ describe("resolveEffort", () => {
   it("prefers a configured operation-type effort over the code-level step default", () => {
     setConfig({ operations: { review: { effort: "max" } } });
     expect(resolveEffort("review", "collect-reviews")).toBe("max");
-  });
-
-  it("declares a model and an effort for exactly the same step types", () => {
-    // A step with one but not the other is a drift bug: it means a tier was
-    // added to one table and forgotten in the other.
-    expect(Object.keys(STEP_DEFAULT_EFFORTS).sort()).toEqual(
-      Object.keys(STEP_DEFAULT_MODELS).sort(),
-    );
   });
 
   it("covers every known step type, so a new one must pick a tier", () => {

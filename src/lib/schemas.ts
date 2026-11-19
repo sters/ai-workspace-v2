@@ -259,10 +259,6 @@ export const claudeSettingsWriteSchema = z.object({
   content: z.string().min(1, "content is required"),
 });
 
-export const addPermissionSchema = z.object({
-  permission: z.string().min(1, "permission is required"),
-});
-
 export const suggestionDismissSchema = z.object({
   id: z.string().min(1, "id is required"),
 });

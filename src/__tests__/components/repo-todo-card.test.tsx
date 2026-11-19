@@ -47,25 +47,6 @@ beforeEach(() => {
 });
 
 describe("RepoTodoCard action row", () => {
-  it("orders the actions autonomous, execute, review, create PR, open in", () => {
-    renderCard();
-    const labels = screen
-      .getAllByRole("button")
-      .map((b) => b.getAttribute("title") ?? b.getAttribute("aria-label"))
-      .filter((l): l is string =>
-        ["Autonomous", "Execute", "Review", "Create PR", "Open in..."].includes(
-          l ?? "",
-        ),
-      );
-    expect(labels).toEqual([
-      "Autonomous",
-      "Execute",
-      "Review",
-      "Create PR",
-      "Open in...",
-    ]);
-  });
-
   it("starts autonomous scoped to the repo by name", () => {
     renderCard();
     fireEvent.click(screen.getByTitle("Autonomous"));

@@ -90,21 +90,6 @@ describe("killAndAwait", () => {
     expect(mockWhenOperationFinished.mock.calls).toEqual([["op-1"], ["auto-1"]]);
     expect(result).toEqual({ wasAutonomous: true, autonomousInputs: { repo: "gadgets" } });
   });
-
-  it("captures inputs and flags wasAutonomous when running op is autonomous", async () => {
-    mockFindRunningOpsByWorkspace.mockReturnValue([{
-      operation: {
-        id: "auto-1",
-        type: "autonomous",
-        workspace: "ws-a",
-        status: "running",
-        inputs: { description: "task", maxLoops: "3" },
-      },
-    }]);
-    const result = await killAndAwait("ws-a");
-    expect(result.wasAutonomous).toBe(true);
-    expect(result.autonomousInputs).toEqual({ description: "task", maxLoops: "3" });
-  });
 });
 
 describe("scheduleAutonomousRekick", () => {

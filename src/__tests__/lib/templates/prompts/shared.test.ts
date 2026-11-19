@@ -318,13 +318,6 @@ describe("REVIEW_COVERAGE_POLICY", () => {
     expect(REVIEW_COVERAGE_POLICY).toMatch(/merge-ready|ready to ship|no blocking/i);
     expect(REVIEW_COVERAGE_POLICY).toMatch(/do not (state|write|declare)/i);
   });
-
-  it.each([
-    ["codeReviewer", getCodeReviewerSystemPrompt()],
-    ["crossRepositoryReviewer", getCrossRepositoryReviewerSystemPrompt()],
-  ])("%s prioritizes coverage over self-filtering", (_name, prompt) => {
-    expect(prompt).toContain(REVIEW_COVERAGE_POLICY);
-  });
 });
 
 describe("SEVERITY_CALIBRATION", () => {

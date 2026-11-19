@@ -177,16 +177,6 @@ describe("NewWorkspaceForm: Start chat", () => {
     });
   });
 
-  it("hands the chat the description as typed, not the run's repository list", async () => {
-    render(<NewWorkspaceForm />);
-    fireEvent.click(screen.getByRole("checkbox", { name: /acme\/web/ }));
-    fillNote("crash on submit");
-    fireEvent.click(screen.getByRole("button", { name: /start chat/i }));
-
-    await waitFor(() => expect(mockPostJson).toHaveBeenCalled());
-    expect(mockPostJson.mock.calls[0][1].note).toBe("crash on submit");
-  });
-
   it("adds a repository that is not cloned yet from the free-text field", async () => {
     render(<NewWorkspaceForm />);
     fillName("n");

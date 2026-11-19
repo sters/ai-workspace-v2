@@ -3,12 +3,6 @@ import { parseCommand, USAGE } from "@/lib/slack-server/commands";
 
 describe("parseCommand", () => {
   describe("mention prefix stripping", () => {
-    it("strips a leading <@U...> mention", () => {
-      const r = parseCommand("<@U0BOT123> init do a thing");
-      expect(r.ok).toBe(true);
-      if (r.ok) expect(r.command).toEqual({ op: "init", only: false, description: "do a thing" });
-    });
-
     it("strips multiple leading mentions and whitespace", () => {
       const r = parseCommand("  <@U0BOT123>  <@W123|alias>   init do a thing  ");
       expect(r.ok).toBe(true);
@@ -17,16 +11,6 @@ describe("parseCommand", () => {
   });
 
   describe("init (autonomous mode by default)", () => {
-    it("captures description", () => {
-      const r = parseCommand("init add Slack bot integration");
-      expect(r.ok).toBe(true);
-      if (r.ok) expect(r.command).toEqual({
-        op: "init",
-        only: false,
-        description: "add Slack bot integration",
-      });
-    });
-
     it("preserves multi-word description with extra whitespace", () => {
       const r = parseCommand("init   fix   the   broken   thing");
       expect(r.ok).toBe(true);

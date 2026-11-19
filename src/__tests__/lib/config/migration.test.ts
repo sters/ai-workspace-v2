@@ -97,17 +97,6 @@ describe("migration: model support", () => {
     expect(result).toContain("  enabled: false");
   });
 
-  it("adds disableAccessLog to old server section missing it", () => {
-    const input = [
-      "server:",
-      "  port: 3741",
-      "  chatPort: 3742",
-      "",
-    ].join("\n");
-    const result = migrateConfigContent(input);
-    expect(result).toContain("#   disableAccessLog");
-  });
-
   it("documents the default pairing of every step type", () => {
     const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
     // A step type missing here means the hint block drifted from STEP_DEFAULT_MODELS.

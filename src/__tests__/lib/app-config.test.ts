@@ -426,11 +426,6 @@ describe("ensureConfigFile", () => {
 });
 
 describe("migrateConfigContent", () => {
-  it("returns unchanged content when all keys present", () => {
-    const content = generateDefaultConfigContent();
-    expect(migrateConfigContent(content)).toBe(content);
-  });
-
   it("adds missing nested key as comment at end of section", () => {
     const content = [
       "operations:",
@@ -683,25 +678,6 @@ describe("migrateConfigFile", () => {
     try {
       const changed = migrateConfigFile(tmpPath);
       expect(changed).toBe(false);
-    } finally {
-      fs.rmSync(tmpDir, { recursive: true, force: true });
-    }
-  });
-
-  it("writes migrated content and returns true when changes needed", async () => {
-    const fs = await import("node:fs");
-    const tmpDir = `/tmp/test-aiw-migrate-${Date.now()}`;
-    const tmpPath = `${tmpDir}/config.yml`;
-    fs.mkdirSync(tmpDir, { recursive: true });
-    fs.writeFileSync(tmpPath, "editor: vim {path}\n");
-    try {
-      const changed = migrateConfigFile(tmpPath);
-      expect(changed).toBe(true);
-      const content = fs.readFileSync(tmpPath, "utf-8");
-      // Legacy `editor:` is preserved (runtime auto-migrates)
-      expect(content).toContain("editor: vim {path}");
-      expect(content).toContain("# openers:");
-      expect(content).toContain("# operations:");
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

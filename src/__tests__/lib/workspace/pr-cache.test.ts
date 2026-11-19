@@ -18,7 +18,6 @@ import {
   _resetPrCache,
   getCachedPullRequests,
   getCachedRepoPullRequest,
-  invalidatePullRequestCache,
 } from "@/lib/workspace/pr-cache";
 
 function repo(name: string): WorkspaceRepo {
@@ -118,25 +117,5 @@ describe("getCachedPullRequests", () => {
     const got = await getCachedPullRequests("ws", { now: 1000 });
     expect(got.pullRequests).toEqual([{ title: "cache" }]);
     expect(got.problems).toEqual([{ repoName: "gadgets", reason: "no pull requests found" }]);
-  });
-});
-
-describe("invalidatePullRequestCache", () => {
-  it("drops one workspace's entries", async () => {
-    await getCachedRepoPullRequest("a", widgets, { now: 1000 });
-    await getCachedRepoPullRequest("b", widgets, { now: 1000 });
-
-    invalidatePullRequestCache("a");
-    await getCachedRepoPullRequest("a", widgets, { now: 1001 });
-    await getCachedRepoPullRequest("b", widgets, { now: 1001 });
-
-    expect(mockRead).toHaveBeenCalledTimes(3);
-  });
-
-  it("drops everything when given no workspace", async () => {
-    await getCachedRepoPullRequest("a", widgets, { now: 1000 });
-    invalidatePullRequestCache();
-    await getCachedRepoPullRequest("a", widgets, { now: 1001 });
-    expect(mockRead).toHaveBeenCalledTimes(2);
   });
 });

@@ -91,18 +91,6 @@ export async function getCachedPullRequests(
   );
 }
 
-/** Drop one workspace's entries, or the whole cache when given no workspace. */
-export function invalidatePullRequestCache(workspace?: string): void {
-  if (workspace === undefined) {
-    cache().clear();
-    return;
-  }
-  const prefix = cacheKey(workspace, "");
-  for (const key of cache().keys()) {
-    if (key.startsWith(prefix)) cache().delete(key);
-  }
-}
-
 /** Reset for testing. */
 export function _resetPrCache(): void {
   globalForPrCache.__aiwPrCache = new Map();

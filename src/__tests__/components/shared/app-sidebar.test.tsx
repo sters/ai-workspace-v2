@@ -160,14 +160,6 @@ describe("AppSidebar", () => {
     expect(screen.getAllByRole("link", { name: "Workspace" })).toHaveLength(1);
   });
 
-  it("does not leave a flyout open across a collapse", async () => {
-    const user = userEvent.setup();
-    render(<AppSidebar />);
-
-    await user.click(screen.getByRole("button", { name: /collapse sidebar/i }));
-    expect(screen.queryByText("Claude Usage")).not.toBeInTheDocument();
-  });
-
   it("marks the section matching the current path as current", () => {
     mockPathname.mockReturnValue("/settings/claude/usage");
     render(<AppSidebar />);

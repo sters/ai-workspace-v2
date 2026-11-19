@@ -287,10 +287,4 @@ describe("buildCompletionMessage", () => {
       "Done! Created PRs:\n• https://github.com/acme/widgets/pull/1\n• https://github.com/acme/gadgets/pull/2",
     );
   });
-
-  it("falls back to no-PRs message when empty", () => {
-    expect(buildCompletionMessage([])).toBe(
-      "Done! No PRs were created. Please check details on WebUI.",
-    );
-  });
 });

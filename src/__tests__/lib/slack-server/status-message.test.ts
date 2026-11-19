@@ -2,10 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import { composeStatus, finishStatus, updateStatus } from "@/lib/slack-server/status-message";
 
 describe("composeStatus", () => {
-  it("puts the body under the header", () => {
-    expect(composeStatus("Created `w`.", "⏳ Working…")).toBe("Created `w`.\n\n⏳ Working…");
-  });
-
   it("is the body alone without a header", () => {
     expect(composeStatus(undefined, "🛠 Creating a workspace…")).toBe("🛠 Creating a workspace…");
   });

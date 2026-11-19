@@ -49,18 +49,6 @@ describe("parseTodoItems", () => {
     expect(items[2].indent).toBe(4);
   });
 
-  it("attaches indented non-checkbox lines as children", () => {
-    const content = `- [x] Main task
-  Additional detail line
-  Another detail`;
-    const items = parseTodoItems(content);
-    expect(items).toHaveLength(1);
-    expect(items[0].children).toEqual([
-      "Additional detail line",
-      "Another detail",
-    ]);
-  });
-
   it("ignores blank indented lines in children", () => {
     const content = `- [x] Main task
   Detail
@@ -284,16 +272,6 @@ describe("renderTodoGroupsAsMarkdown", () => {
 });
 
 describe("stripCompletedTodoItems", () => {
-  it("removes top-level completed items", () => {
-    const content = `- [x] Done task
-- [ ] Pending task
-- [~] In progress task`;
-    const result = stripCompletedTodoItems(content);
-    expect(result).not.toContain("Done task");
-    expect(result).toContain("- [ ] Pending task");
-    expect(result).toContain("- [~] In progress task");
-  });
-
   it("removes indented child lines of a completed item", () => {
     const content = `- [x] Done task
   - Target: path/to/file

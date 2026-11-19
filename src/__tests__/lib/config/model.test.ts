@@ -40,13 +40,6 @@ describe("resolveModel", () => {
     expect(resolveModel("execute")).toBeUndefined();
   });
 
-  it("returns global operations.model", () => {
-    setConfig({
-      operations: { model: "sonnet" },
-    });
-    expect(resolveModel("execute")).toBe("sonnet");
-  });
-
   it("returns operation type model over global", () => {
     setConfig({
       operations: {

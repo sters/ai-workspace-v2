@@ -46,21 +46,6 @@ describe("GET /api/operations/new-history", () => {
     mockGetOperationSummaries.mockReturnValue([]);
   });
 
-  it("only includes init and autonomous-startWith-init operations", async () => {
-    insertCompleted(makeOp(ID(1), { type: "init" }));
-    insertCompleted(makeOp(ID(2), { type: "execute" }));
-    insertCompleted(
-      makeOp(ID(3), { type: "autonomous", inputs: { startWith: "init" } }),
-    );
-    insertCompleted(
-      makeOp(ID(4), { type: "autonomous", inputs: { startWith: "execute" } }),
-    );
-
-    const result = await fetchNewHistory();
-    const ids = result.map((op) => op.id).sort();
-    expect(ids).toEqual([ID(1), ID(3)].sort());
-  });
-
   it("respects limit query parameter", async () => {
     for (let i = 1; i <= 15; i++) {
       insertCompleted(

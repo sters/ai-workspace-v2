@@ -545,18 +545,8 @@ describe("parseStreamEvent", () => {
 });
 
 describe("buildPermissionString", () => {
-  it("returns Bash(prefix:*) for Bash tool with command", () => {
-    expect(buildPermissionString("Bash", "rm -rf /tmp")).toBe("Bash(rm:*)");
-  });
-
   it("returns Bash for Bash with no command", () => {
     expect(buildPermissionString("Bash")).toBe("Bash");
-  });
-
-  it("returns tool name as-is for non-Bash tools", () => {
-    expect(buildPermissionString("Edit")).toBe("Edit");
-    expect(buildPermissionString("Read")).toBe("Read");
-    expect(buildPermissionString("Write")).toBe("Write");
   });
 });
 

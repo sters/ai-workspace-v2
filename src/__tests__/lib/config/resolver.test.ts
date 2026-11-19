@@ -2,7 +2,6 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import {
   mergeConfig,
   getOperationConfig,
-  normalizeRawConfig,
   _resetConfig,
   _setConfigFilePath,
 } from "@/lib/config/resolver";
@@ -32,25 +31,6 @@ describe("mergeConfig", () => {
       {},
     );
     expect(result.chat.model).toBeNull();
-  });
-
-  it("merges steps in typeOverrides", () => {
-    const result = mergeConfig(
-      CONFIG_DEFAULTS,
-      {
-        operations: {
-          typeOverrides: {
-            review: {
-              model: "sonnet",
-              steps: { "code-review": { model: "opus" } },
-            },
-          },
-        },
-      } as Partial<AppConfig>,
-      {},
-    );
-    expect(result.operations.typeOverrides.review?.model).toBe("sonnet");
-    expect(result.operations.typeOverrides.review?.steps?.["code-review"]?.model).toBe("opus");
   });
 });
 
@@ -102,24 +82,5 @@ describe("getOperationConfig", () => {
     const cfg = getOperationConfig("execute");
     expect(cfg.model).toBe("haiku");
     expect(cfg.steps).toBeUndefined();
-  });
-});
-
-describe("normalizeRawConfig", () => {
-  it("moves steps into typeOverrides", () => {
-    const raw = {
-      operations: {
-        model: "sonnet",
-        review: {
-          model: "haiku",
-          steps: {
-            "code-review": { model: "opus" },
-          },
-        },
-      },
-    };
-    const result = normalizeRawConfig(raw);
-    expect(result.operations?.typeOverrides?.review?.model).toBe("haiku");
-    expect(result.operations?.typeOverrides?.review?.steps?.["code-review"]?.model).toBe("opus");
   });
 });

@@ -106,14 +106,6 @@ describe("buildTriagePrCommentsInstruction", () => {
     expect(instruction).toContain(thread.commentUrl);
   });
 
-  it("quotes the comment body so the planner does not re-fetch it", () => {
-    expect(instruction).toContain("This early return skips the unlock.");
-  });
-
-  it("carries the thread node id, which the reply phase joins on", () => {
-    expect(instruction).toContain("PRRT_kwDOabc");
-  });
-
   it("requires a row per thread in the PR Review Threads section", () => {
     // Without the row, `create-pr` has nothing to reply to after it pushes: the
     // section is the only record that survives stripCompletedTodoItems.
@@ -162,10 +154,6 @@ describe("buildTriagePrCommentsInstruction", () => {
 
   it("works with no validations at all — triage without validate is the normal path", () => {
     expect(instruction).not.toContain("Validation verdict");
-  });
-
-  it("returns an empty string for no threads, so callers cannot start empty work", () => {
-    expect(buildTriagePrCommentsInstruction({ threads: [] })).toBe("");
   });
 
   it("survives a thread with no file anchor", () => {

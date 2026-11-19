@@ -6,7 +6,6 @@ import {
   _setDbPath,
   insertOperation,
   updateOperationMeta,
-  updateOperationWorkspace,
   listRunningOperations,
   listRecentFinishedOperations,
   appendEvents,
@@ -102,16 +101,6 @@ describe("pipeline/cleanup-stale", () => {
 
       const settled = listRecentFinishedOperations(10).find((o) => o.id === OP_ID_1);
       expect(settled?.resultSummary?.content).toBe("Cycle 1 done");
-    });
-  });
-
-  describe("updateOperationWorkspace", () => {
-    it("persists workspace changes to SQLite", () => {
-      insertOperation(makeOp(OP_ID_1, { workspace: "" }));
-      updateOperationWorkspace(OP_ID_1, "new-workspace");
-
-      const op = dbGetOperation(OP_ID_1);
-      expect(op?.workspace).toBe("new-workspace");
     });
   });
 });

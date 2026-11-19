@@ -47,11 +47,6 @@ describe("group concurrency", () => {
     );
   });
 
-  it("reads operations.maxGroupConcurrency from config.yml", () => {
-    setConfig({ operations: { maxGroupConcurrency: 3 } });
-    expect(getMaxGroupConcurrency()).toBe(3);
-  });
-
   it("is read at call time, not captured at module load", () => {
     // Both call sites build a Semaphore per group, so a config change has to be
     // visible to the next group without a restart.

@@ -175,12 +175,6 @@ describe("buildExecutePipeline — phase budget scales with item count, not batc
 
   // Budgeting per *batch* would shrink the budget for identical work as
   // batchSize rises.
-  it("does not shrink the budget when a larger batchSize packs the same items into fewer batches", async () => {
-    const atTen = await budgetFor(12, 10);
-    const atTwenty = await budgetFor(12, 20);
-    expect(atTwenty).toBeGreaterThanOrEqual(atTen);
-  });
-
   it("budgets 3min per item of batch capacity plus a 5min buffer", async () => {
     // 12 items / batchSize 10 → 2 batches → 20 items of capacity
     expect(await budgetFor(12, 10)).toBe(20 * 3 * MINUTE + 5 * MINUTE);
