@@ -194,16 +194,16 @@ export function buildReviewPayload(input: {
     results.push({ id: finding.id, status: "posted" });
   }
 
-  const bodyParts = ["Review findings from ai-workspace."];
-  if (bodyFindings.length > 0) {
-    // These name files the PR does not touch, so GitHub would reject them at any
-    // anchor level. The body is the one place they still reach the reader.
-    bodyParts.push("", "#### Findings outside this PR's diff", ...bodyFindings);
-  }
+  // Findings outside the diff name files the PR does not touch, so GitHub would
+  // reject them at any anchor level; the body is the one place they still reach
+  // the reader. Without them the body still needs text: a COMMENT review requires one.
+  const body = bodyFindings.length > 0
+    ? ["#### Findings outside this PR's diff", ...bodyFindings].join("\n")
+    : "See inline comments.";
 
   const payload: ReviewPayload = {
     commit_id: input.commitSha,
-    body: bodyParts.join("\n"),
+    body,
     comments,
   };
   if (input.submit) payload.event = "COMMENT";

@@ -154,8 +154,16 @@ describe("buildReviewPayload", () => {
       submit: false,
     });
     expect(payload.comments).toHaveLength(0);
+    expect(payload.body).toMatch(/^#### Findings outside this PR's diff\n/);
     expect(payload.body).toContain("src/untouched.ts");
     expect(results[0].status).toBe("posted");
+  });
+
+  // GitHub refuses a COMMENT review without a body.
+  it("gives a review of inline comments only a body", () => {
+    const f = finding({});
+    const { payload } = buildReviewPayload({ findings: [f], comments: commentsFor(f), commitSha: "sha", submit: true });
+    expect(payload.body.trim()).not.toBe("");
   });
 
   it("skips a finding already on the PR instead of posting it twice", () => {
