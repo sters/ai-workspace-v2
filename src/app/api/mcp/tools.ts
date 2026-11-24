@@ -13,6 +13,7 @@ import path from "node:path";
 import { parseReadmeMeta } from "@/lib/parsers/readme";
 import { commitWorkspaceSnapshot, listWorkspaceRepos } from "@/lib/workspace";
 import { getReadme, getWorkspaceSummary, listWorkspaceItems } from "@/lib/workspace/reader";
+import type { WorkspaceSummary } from "@/types/workspace";
 import { appendTodoItems, replaceReadmeSections } from "@/lib/workspace/workspace-files";
 import { resolveArtifactPath } from "@/lib/workspace/artifacts";
 import {
@@ -119,26 +120,51 @@ const artifactInput = workspaceInput.extend({
   path: z
     .string()
     .min(1)
-    .describe("Markdown file relative to the workspace's artifacts/, e.g. `alerts/2026-11-19.md`; directories are created. reviews/ is written by review and refused."),
+    .describe(
+      "Markdown file relative to the workspace's artifacts/, e.g. `alerts/2026-11-19.md`; directories are created. " +
+        "reviews/ is written by review and research/ by write_research; both are refused.",
+    ),
   content: z.string().describe("Markdown to write."),
   append: z.boolean().default(false).describe("Add to the end of the file instead of replacing it."),
 });
 
-/** `artifacts/reviews/` is rendered from review results; a hand edit there disagrees with them. */
-const RESERVED_ARTIFACT_DIRS = ["reviews"];
+const researchInput = workspaceInput.extend({
+  file: z
+    .string()
+    .regex(/^[^\\/]+\.md$/i, "a file name ending in .md, without directories")
+    .default("summary.md")
+    .describe("File in artifacts/research/: summary.md is the Research tab's report, any other .md is listed under it, e.g. `findings-api.md`."),
+  content: z.string().describe("Markdown to write."),
+  append: z.boolean().default(false).describe("Add to the end of the file instead of replacing it."),
+});
+
+/**
+ * `artifacts/reviews/` is rendered from review results, so a hand edit there
+ * disagrees with them; `artifacts/research/` is the Research tab's, written
+ * through write_research.
+ */
+const RESERVED_ARTIFACT_DIRS = ["reviews", "research"];
 
 /**
  * Checks shared by the file-writing tools. A running operation rewrites README
  * and TODO files, so writing beside it loses one of the two edits.
  */
-async function writableWorkspace(workspace: string): Promise<{ name: string } | { error: string }> {
+async function writableWorkspace(workspace: string): Promise<{ name: string; summary: WorkspaceSummary } | { error: string }> {
   const name = resolveWorkspaceName(workspace);
   const running = getOperationSummaries().find((op) => op.workspace === name && op.status === "running");
   if (running) {
     return { error: `Operation ${running.id} (${running.type}) is running on ${name}; write once it has finished.` };
   }
-  if (!(await getWorkspaceSummary(name))) return { error: `Workspace not found: ${name}` };
-  return { name };
+  const summary = await getWorkspaceSummary(name);
+  if (!summary) return { error: `Workspace not found: ${name}` };
+  return { name, summary };
+}
+
+async function writeWorkspaceMarkdown(name: string, full: string, relPath: string, content: string, append: boolean): Promise<void> {
+  await mkdir(path.dirname(full), { recursive: true });
+  if (append) await appendFile(full, content);
+  else await Bun.write(full, content);
+  await commitWorkspaceSnapshot(name, `${append ? "Append to" : "Write"} ${relPath}`);
 }
 
 const RECENT_STATUS_LINES = 8;
@@ -363,10 +389,26 @@ export const MCP_TOOLS: McpTool[] = [
       if (!full || reserved || path.extname(relPath).toLowerCase() !== ".md") {
         return { data: `Not a writable artifact path: ${relPath} (a .md file inside artifacts/, outside reviews/)`, isError: true };
       }
-      await mkdir(path.dirname(full), { recursive: true });
-      if (append) await appendFile(full, content);
-      else await Bun.write(full, content);
-      await commitWorkspaceSnapshot(target.name, `${append ? "Append to" : "Write"} artifact ${relPath}`);
+      await writeWorkspaceMarkdown(target.name, full, `artifact ${relPath}`, content, append);
+      return { data: { workspace: target.name, file: `artifacts/${relPath}`, appended: append } };
+    },
+  },
+  {
+    name: "write_research",
+    description:
+      "Write a research workspace's report, shown on its Research tab, and commit it: summary.md is the report, other files are listed under it. " +
+      "The research run of execute writes the same files. Replaces the file unless append is true. Refused while an operation runs on the workspace.",
+    input: researchInput,
+    call: async (args) => {
+      const { workspace, file, content, append } = args as z.infer<typeof researchInput>;
+      const target = await writableWorkspace(workspace);
+      if ("error" in target) return { data: target.error, isError: true };
+      const taskType = target.summary.meta.taskType;
+      if (taskType !== "research") {
+        return { data: `${target.name} is a ${taskType} workspace; only research workspaces have a Research tab. Use write_artifact.`, isError: true };
+      }
+      const relPath = `research/${file}`;
+      await writeWorkspaceMarkdown(target.name, path.join(getWorkspaceDir(), target.name, "artifacts", relPath), relPath, content, append);
       return { data: { workspace: target.name, file: `artifacts/${relPath}`, appended: append } };
     },
   },

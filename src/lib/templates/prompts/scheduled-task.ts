@@ -23,7 +23,7 @@ export const SCHEDULED_TASK_ALLOWED_TOOLS = [
     (cmd) => `Bash(gh ${cmd}:*)`,
   ),
   ...["log", "show", "diff", "status", "ls-remote"].map((cmd) => `Bash(git ${cmd}:*)`),
-  ...["list_workspaces", "get_workspace", "list_operations", "get_operation", "autonomous", "init_only", "update_todo", "execute", "review", "add_repository", "write_artifact"].map(
+  ...["list_workspaces", "get_workspace", "list_operations", "get_operation", "autonomous", "init_only", "update_todo", "execute", "review", "add_repository", "write_artifact", "write_research"].map(
     (tool) => `${AIW_MCP}${tool}`,
   ),
 ];
@@ -34,11 +34,11 @@ const RUNNER_CAPABILITIES = `Always available:
 - Read GitHub through \`gh\`: \`issue list/view\`, \`pr list/view/checks/diff\`, \`run list/view\`, \`search\`, \`repo view\`, \`release list\`.
 - Read git history: \`git log / show / diff / status / ls-remote\`.
 - Use the ai-workspace MCP tools \`list_workspaces\`, \`get_workspace\`, \`list_operations\`, \`get_operation\` (its \`waitSeconds\` waits up to 120 s for an operation to finish), and start the operations \`autonomous\` (a new task carried to pull requests), \`init_only\` (a workspace planned and left for a person), \`update_todo\`, \`execute\`, \`review\`, \`add_repository\`.
-- Write a markdown file into a workspace's \`artifacts/\` with \`write_artifact\`; it is refused while an operation runs on that workspace.
+- Write a markdown file into a workspace's \`artifacts/\` with \`write_artifact\`, or a research workspace's report (its Research tab) with \`write_research\`; both are refused while an operation runs on that workspace. \`execute\` on a research workspace runs the research itself and writes that report.
 
 Also available: whatever the workspace root's Claude settings allow — typically connected MCP tools such as a chat workspace (e.g. Slack), an issue tracker or a docs tool. The tool list shows what is connected; a call the settings do not allow is denied.
 
-Writing outside — posting or replying to a message, commenting on GitHub, editing an issue or a page, pushing — happens only when the task's instruction says to, naming where and what. Files are never edited, except artifacts written with \`write_artifact\` when the instruction says to; pull requests come only from the operations it starts.`;
+Writing outside — posting or replying to a message, commenting on GitHub, editing an issue or a page, pushing — happens only when the task's instruction says to, naming where and what. Files are never edited, except artifacts and research reports written with \`write_artifact\` / \`write_research\` when the instruction says to; pull requests come only from the operations it starts.`;
 
 export function getScheduledTaskRunnerSystemPrompt(): string {
   return `You run one scheduled task unattended. Nobody is watching: your final answer becomes a notification and a history entry that a person reads later.

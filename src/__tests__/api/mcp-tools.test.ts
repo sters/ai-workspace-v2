@@ -117,9 +117,47 @@ describe("MCP tools", () => {
     ["outside artifacts", "../README.md"],
     ["not markdown", "pr-validations.json"],
     ["inside the reviews aiw renders", "reviews/20261119/SUMMARY.md"],
+    ["inside research, which write_research owns", "research/summary.md"],
   ])("write_artifact refuses a path %s", async (_name, target) => {
     mockWorkspaceSummary.mockResolvedValue({ name: "ws" });
     const { isError } = await callTool("write_artifact", { workspace: "ws", path: target, content: "x" });
+    expect(isError).toBe(true);
+  });
+
+  it("write_research writes the Research tab's files of a research workspace, summary.md by default", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "aiw-research-"));
+    try {
+      setWorkspaceRoot(root);
+      await mkdir(path.join(root, "workspace", "ws"), { recursive: true });
+      mockWorkspaceSummary.mockResolvedValue({ name: "ws", meta: { taskType: "research" } });
+      const dir = path.join(root, "workspace", "ws", "artifacts", "research");
+
+      expect((await callTool("write_research", { workspace: "ws", content: "# S\n" })).isError).toBe(false);
+      await callTool("write_research", { workspace: "ws", file: "findings-api.md", content: "# F\n" });
+      await callTool("write_research", { workspace: "ws", file: "findings-api.md", content: "more\n", append: true });
+
+      expect(await readFile(path.join(dir, "summary.md"), "utf-8")).toBe("# S\n");
+      expect(await readFile(path.join(dir, "findings-api.md"), "utf-8")).toBe("# F\nmore\n");
+    } finally {
+      _resetWorkspaceRoot();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it("write_research refuses a workspace whose task type is not research, which has no Research tab", async () => {
+    mockWorkspaceSummary.mockResolvedValue({ name: "ws", meta: { taskType: "feature" } });
+    const { data, isError } = await callTool("write_research", { workspace: "ws", content: "x" });
+    expect(isError).toBe(true);
+    expect(String(data)).toContain("feature");
+  });
+
+  it.each([
+    ["in a subdirectory, which the Research tab does not read", "notes/summary.md"],
+    ["outside research", "../memo.md"],
+    ["not markdown", "data.json"],
+  ])("write_research refuses a file %s", async (_name, file) => {
+    mockWorkspaceSummary.mockResolvedValue({ name: "ws", meta: { taskType: "research" } });
+    const { isError } = await callTool("write_research", { workspace: "ws", file, content: "x" });
     expect(isError).toBe(true);
   });
 
