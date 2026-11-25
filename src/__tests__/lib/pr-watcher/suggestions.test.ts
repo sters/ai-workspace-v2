@@ -113,9 +113,12 @@ describe("computePrSuggestions", () => {
     expect(s.conflicts).toEqual(["widgets"]);
   });
 
-  it("proposes archiving once every PR is merged", () => {
+  it("proposes archiving once every PR is merged or closed", () => {
     const merged = snap("widgets", { state: "MERGED" });
     expect(computePrSuggestions({ ...base, snapshots: [merged], events: [] }).archive).toBe(true);
+    expect(
+      computePrSuggestions({ ...base, snapshots: [merged, snap("gadgets", { state: "CLOSED" })], events: [] }).archive,
+    ).toBe(true);
     expect(computePrSuggestions({ ...base, snapshots: [merged, snap("gadgets")], events: [] }).archive).toBe(false);
     expect(computePrSuggestions({ ...base, snapshots: [], events: [] }).archive).toBe(false);
   });

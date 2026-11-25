@@ -1,10 +1,13 @@
 // @vitest-environment node
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { _resetConfig, _resetWorkspaceRoot, setWorkspaceRoot } from "@/lib/config";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { getPrSnapshot, listPrEvents, savePrObservation } from "@/lib/db/pr-watch";
 import type { WorkspacePullRequest, RepoPullRequestRead } from "@/types/pull-request";
 
-import { observeRepoPr } from "@/lib/pr-watcher";
+import { observeRepoPr, prSuggestionInput } from "@/lib/pr-watcher";
 const repo = { repoPath: "github.com/acme/widgets", repoName: "widgets", worktreePath: "/ws/widgets" };
 const watchWorkspacePrs = (ws: string, read: Parameters<typeof observeRepoPr>[2]) => observeRepoPr(ws, repo, read);
 
@@ -52,5 +55,33 @@ describe("observeRepoPr", () => {
     }));
     await watchWorkspacePrs("ws", async () => ({ pr: pr() }));
     expect(listPrEvents("ws")).toEqual([]);
+  });
+});
+
+describe("prSuggestionInput", () => {
+  let root: string;
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join("/tmp", "aiw-pr-suggest-"));
+    const worktree = path.join(root, "workspace", "ws", "github.com", "acme", "widgets");
+    fs.mkdirSync(worktree, { recursive: true });
+    fs.writeFileSync(path.join(worktree, ".git"), "gitdir: elsewhere\n");
+    _resetDb();
+    _resetConfig();
+    setWorkspaceRoot(root);
+    _setDbPath(":memory:");
+    getDb();
+  });
+  afterEach(() => {
+    _resetDb();
+    _resetConfig();
+    _resetWorkspaceRoot();
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+
+  it("leaves out the PR of a worktree removed from the workspace", async () => {
+    const snapshot = { workspace: "ws", prUrl: pr().url, headSha: "aaa", ci: "passing", mergeable: "MERGEABLE", seenComments: [], settledComments: [] } as const;
+    savePrObservation({ ...snapshot, repoName: "widgets", state: "MERGED" }, []);
+    savePrObservation({ ...snapshot, repoName: "gadgets", state: "OPEN" }, []);
+    expect((await prSuggestionInput("ws")).snapshots.map((s) => s.repoName)).toEqual(["widgets"]);
   });
 });

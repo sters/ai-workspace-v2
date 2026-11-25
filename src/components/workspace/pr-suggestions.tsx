@@ -86,7 +86,7 @@ export function WorkspaceSuggestions({
       )}
       {archive && (
         <Row>
-          <span>Every pull request is merged.</span>
+          <span>Every pull request is merged or closed.</span>
           <Button variant="outline" onClick={onArchive} disabled={disabled}>
             Archive workspace
           </Button>

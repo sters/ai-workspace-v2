@@ -80,6 +80,6 @@ export function computePrSuggestions(input: PrSuggestionInput): PrSuggestions {
         ? { commentUrls: comments.map((e) => e.url!), failingRepos }
         : null,
     conflicts: open.filter((s) => s.mergeable === "CONFLICTING").map((s) => s.repoName),
-    archive: input.snapshots.length > 0 && input.snapshots.every((s) => s.state === "MERGED"),
+    archive: input.snapshots.length > 0 && open.length === 0,
   };
 }

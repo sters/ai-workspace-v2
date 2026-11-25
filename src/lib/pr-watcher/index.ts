@@ -123,9 +123,11 @@ export async function getWorkspacePrSuggestions(workspace: string): Promise<PrSu
   return computePrSuggestions({ ...(await prSuggestionInput(workspace)), now: Date.now() });
 }
 
+/** Only the current worktrees' PRs: a removed worktree's last snapshot is never read again. */
 export async function prSuggestionInput(workspace: string): Promise<Omit<PrSuggestionInput, "now">> {
+  const current = new Set((await listWorkspaceRepos(workspace)).map((r) => r.repoName));
   return {
-    snapshots: listPrSnapshots(workspace),
+    snapshots: listPrSnapshots(workspace).filter((s) => current.has(s.repoName)),
     events: listPrEvents(workspace),
     handledAt: getPrHandledAt(workspace),
     self: await ghLogin(),
