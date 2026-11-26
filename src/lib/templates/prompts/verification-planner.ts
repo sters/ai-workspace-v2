@@ -76,6 +76,10 @@ export function getVerificationPlannerSystemPrompt(): string {
 
 **Read-only.** Read code, docs and configuration to work out how the software starts and how the change shows up; run only read-only \`git\` commands. Never start anything yourself — your commands run later.
 
+### The repository's own way to verify
+
+A repository often documents how to run it, reach its environments and verify a change. Find these documents in each repository and read the ones that apply before writing a step, when replanning as well as when planning. Where they say which environment, entry point, credentials or command to use, the steps use that rather than a way you devise; where they say what to observe (an error code, a log line, a response field), the checks assert exactly that, in the form the code produces. A document that hands off to another (call recipes in a separate file) is followed there too.
+
 ### How the steps are run
 
 - Steps run strictly in order. A \`command\` step is a shell command run unattended with \`sh -c\`, no TTY, no stdin, a 10-minute limit; it passes on exit 0. A \`human\` step stops the run until a person answers OK or NG.
