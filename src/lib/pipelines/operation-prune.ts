@@ -13,6 +13,9 @@ export function buildOperationPrunePipeline({ days, archivedOnly }: OperationPru
     {
       kind: "function",
       label: "Prune old operation logs",
+      // The budget covers the confirmation wait; a retry would only ask again.
+      timeoutMs: 60 * 60 * 1000,
+      maxRetries: 0,
       fn: async (ctx) => {
         ctx.emitStatus(
           `Scanning operation logs (threshold: ${days} days${archivedOnly ? ", archived workspaces only" : ""})...`,

@@ -11,11 +11,17 @@ export interface WorkspacePruneOptions {
   archivedOnly: boolean;
 }
 
+/** Worktrees with node_modules take tens of seconds each to unlink; parallel removal roughly halves that. */
+const DELETE_CONCURRENCY = 4;
+
 export function buildWorkspacePrunePipeline({ days, archivedOnly }: WorkspacePruneOptions): PipelinePhase[] {
   return [
     {
       kind: "function",
       label: "Prune stale workspaces",
+      // The budget covers the confirmation wait and every deletion; a retry would only ask again.
+      timeoutMs: 60 * 60 * 1000,
+      maxRetries: 0,
       fn: async (ctx) => {
         ctx.emitStatus(
           `Scanning workspaces (threshold: ${days} days${archivedOnly ? ", archived only" : ""})...`,
@@ -78,18 +84,21 @@ export function buildWorkspacePrunePipeline({ days, archivedOnly }: WorkspacePru
         let deleted = 0;
         let failedCount = 0;
 
-        for (const ws of stale) {
-          if (ctx.signal.aborted) break;
-          try {
-            await deleteWorkspace(ws.name);
-            deleted++;
-            ctx.emitStatus(`  Deleted: ${ws.name}`);
-          } catch (err) {
-            failedCount++;
-            const message = err instanceof Error ? err.message : String(err);
-            ctx.emitStatus(`  Failed: ${ws.name} (${message})`);
+        const queue = [...stale];
+        const worker = async () => {
+          for (let ws = queue.shift(); ws && !ctx.signal.aborted; ws = queue.shift()) {
+            try {
+              await deleteWorkspace(ws.name);
+              deleted++;
+              ctx.emitStatus(`  Deleted: ${ws.name}`);
+            } catch (err) {
+              failedCount++;
+              const message = err instanceof Error ? err.message : String(err);
+              ctx.emitStatus(`  Failed: ${ws.name} (${message})`);
+            }
           }
-        }
+        };
+        await Promise.all(Array.from({ length: DELETE_CONCURRENCY }, worker));
 
         ctx.emitResult(
           `Done. Deleted ${deleted}/${stale.length} workspace(s)` +

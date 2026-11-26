@@ -68,6 +68,27 @@ describe("buildWorkspacePrunePipeline", () => {
     expect(deleteWorkspace.mock.calls).toEqual([["old-archived"], ["old-active"]]);
   });
 
+  it("deletes up to four workspaces at once and counts failures", async () => {
+    const names = ["a", "b", "c", "d", "e", "f"];
+    listAllWorkspacesWithAge.mockReturnValue(names.map((n) => workspace(n, 30, true)));
+    let inFlight = 0;
+    let maxInFlight = 0;
+    deleteWorkspace.mockImplementation(async (name: string) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await Bun.sleep(5);
+      inFlight--;
+      if (name === "c") throw new Error("boom");
+    });
+    const { ctx } = fakeContext();
+    const ok = await run({ days: 7, archivedOnly: false }, ctx);
+
+    expect(maxInFlight).toBe(4);
+    expect(deleteWorkspace.mock.calls.map(([n]) => n).sort()).toEqual(names);
+    expect(ok).toBe(false);
+    expect(ctx.emitResult).toHaveBeenCalledWith("Done. Deleted 5/6 workspace(s), 1 failed");
+  });
+
   it("does not ask when nothing stale is archived", async () => {
     getArchivedNameSet.mockReturnValue(new Set(["new-archived"]));
     const { ctx } = fakeContext();
