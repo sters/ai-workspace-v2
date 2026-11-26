@@ -96,6 +96,13 @@ describe("VerificationBrowser", () => {
     expect(postedBody()).toEqual({ action: "answer", stepId: "b", verdict: "ok", note: "badge shown", values: { role: "admin" } });
   });
 
+  it("offers a replan of a passed scenario, which says it rewrites every step", () => {
+    setScenarios([scenario({ status: "passed", steps: [step({ id: "a", title: "Call", status: "passed" })] })]);
+    render(<VerificationBrowser workspaceName="ws" />);
+    fireEvent.click(screen.getByRole("button", { name: "Replan" }));
+    expect(document.body.textContent).toContain("Claude rewrites every step");
+  });
+
   it("edits only the unfinished steps and saves them in their new order", async () => {
     setScenarios([scenario({
       status: "failed",

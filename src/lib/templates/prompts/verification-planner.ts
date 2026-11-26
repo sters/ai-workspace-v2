@@ -134,7 +134,18 @@ export function buildVerificationPlannerPrompt(input: VerificationPlannerInput):
     ? input.repos.map((r) => `### ${r.repoName}\n\n- Worktree: \`${r.worktreePath}\`\n- Base branch: \`${r.baseBranch}\`\n\n${r.changes}`).join("\n\n")
     : "(no repositories on disk)";
 
-  const task = input.replan
+  const task = input.replan?.finished
+    ? `## Task: Rewrite a finished scenario
+
+The scenario below has finished: its teardown has run and its background processes are stopped. Return exactly one scenario whose \`steps\` replace all of its steps — it runs again from the first one — adjusted to what its results, the notes and the person's request say.
+
+### The scenario as it finished
+
+\`\`\`json
+${input.replan.scenarioJson}
+\`\`\`
+`
+    : input.replan
     ? `## Task: Rewrite the rest of a scenario that stopped
 
 The scenario below stopped at the first step that is not \`passed\` or \`skipped\`. Everything before that step has been done, its variables are set, and its background processes are still running. Return exactly one scenario whose \`steps\` replace that step and everything after it, teardown included — adjust to what the results, the notes and the person's request say, and do not repeat what is already done unless it has to be done again (a server that must restart to pick up a change).

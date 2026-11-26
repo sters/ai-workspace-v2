@@ -25,7 +25,7 @@ import { StatusText } from "../shared/feedback/status-text";
 import { Input } from "../shared/forms/input";
 import { Textarea } from "../shared/forms/textarea";
 import { chatPagePath, stashChatHandoff } from "@/lib/chat-handoff";
-import { buildVerificationChatTopic, editableFrom, expandText } from "@/lib/verification/model";
+import { buildVerificationChatTopic, editableFrom, expandText, isFinished } from "@/lib/verification/model";
 import { cn } from "@/lib/utils";
 import type {
   VerificationScenario,
@@ -154,7 +154,7 @@ function ScenarioView({
   const [replanText, setReplanText] = useState<string | null>(null);
   const url = `/api/workspaces/${encodeURIComponent(workspaceName)}/verification/${encodeURIComponent(sc.id)}`;
   const running = sc.status === "running";
-  const finished = sc.status === "passed" || sc.status === "aborted";
+  const finished = isFinished(sc);
 
   const act = async (body: Action): Promise<boolean> => {
     setError(null);
@@ -210,10 +210,10 @@ function ScenarioView({
               Edit steps
             </Button>
           )}
-          {!finished && !running && (
+          {!running && (
             <Button variant="outline" onClick={() => setReplanText((v) => (v === null ? "" : null))}>
               <Wand2 className="h-3.5 w-3.5" />
-              Replan from here
+              {finished ? "Replan" : "Replan from here"}
             </Button>
           )}
           <Button variant="outline" onClick={openChat}>
@@ -240,8 +240,9 @@ function ScenarioView({
       {replanText !== null && (
         <Card className="space-y-2">
           <p className="text-sm">
-            Claude rewrites the steps from the first unfinished one on, from the results and notes so far. Finished steps,
-            variables and running processes are kept.
+            {finished
+              ? "Claude rewrites every step from the results and notes of this run, and the scenario runs again from the start. This run's results and variables are replaced."
+              : "Claude rewrites the steps from the first unfinished one on, from the results and notes so far. Finished steps, variables and running processes are kept."}
           </p>
           <Textarea
             value={replanText}

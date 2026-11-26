@@ -16,7 +16,7 @@ import path from "node:path";
 import { appendFile, mkdir, open, readFile } from "node:fs/promises";
 import { getCleanEnv } from "@/lib/env";
 import { runProcess } from "@/lib/process/run";
-import { editableFrom, expandCommand, extractOutputs } from "./model";
+import { editableFrom, expandCommand, extractOutputs, isFinished } from "./model";
 import { draftToStep, readScenario, scenarioLogDir, updateScenario } from "./store";
 import type {
   VerificationProcess,
@@ -433,7 +433,9 @@ export async function skipStep(wsPath: string, id: string, worktrees: Worktrees,
 
 /**
  * Replace every step from the first unfinished one on. The steps already done
- * keep their results; the replacements start pending at `revision`.
+ * keep their results; the replacements start pending at `revision`. A finished
+ * scenario has nothing left running to build on, so all of its steps and
+ * variables are replaced and it is ready to run again.
  */
 export async function replaceRemainingSteps(
   wsPath: string,
@@ -445,9 +447,11 @@ export async function replaceRemainingSteps(
   if (busy) return busy;
   return updateScenario(wsPath, id, (sc): Outcome => {
     if (revision !== undefined) sc.revision = revision;
-    const keep = sc.steps.slice(0, editableFrom(sc.steps));
+    const finished = isFinished(sc);
+    const keep = finished ? [] : sc.steps.slice(0, editableFrom(sc.steps));
     sc.steps = [...keep, ...drafts.map((d) => draftToStep(d, sc.revision))];
-    if (sc.status !== "passed" && sc.status !== "aborted") sc.status = "ready";
+    if (finished) sc.variables = {};
+    sc.status = "ready";
     return { ok: true };
   });
 }
@@ -464,7 +468,7 @@ export async function abortScenario(wsPath: string, id: string, worktrees: Workt
     await run.done;
   }
   const sc = await readScenario(wsPath, id);
-  if (!sc || ((sc.status === "passed" || sc.status === "aborted") && sc.processes.length === 0)) return;
+  if (!sc || (isFinished(sc) && sc.processes.length === 0)) return;
   await finish(wsPath, id, worktrees, "aborted");
 }
 

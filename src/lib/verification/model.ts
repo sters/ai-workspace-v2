@@ -56,6 +56,11 @@ export function extractOutputs(
   return { ok: true, values };
 }
 
+/** A passed or aborted scenario: its teardown has run and its background processes are stopped. */
+export function isFinished(sc: VerificationScenario): boolean {
+  return sc.status === "passed" || sc.status === "aborted";
+}
+
 /** Index of the first step that is not done; steps from here on can be edited or replanned. */
 export function editableFrom(steps: VerificationStep[]): number {
   const i = steps.findIndex((s) => s.status !== "passed" && s.status !== "skipped");

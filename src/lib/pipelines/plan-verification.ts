@@ -14,6 +14,7 @@ import {
   buildVerificationPlannerPrompt,
   VERIFICATION_PLAN_SCHEMA,
 } from "@/lib/templates/prompts/verification-planner";
+import { isFinished } from "@/lib/verification/model";
 import { replaceRemainingSteps } from "@/lib/verification/runner";
 import { createScenarios, listScenarios, readScenario } from "@/lib/verification/store";
 import { detectBaseBranch, getRepoChanges, listWorkspaceRepos } from "@/lib/workspace";
@@ -67,7 +68,7 @@ export function buildPlanVerificationPipeline(input: {
           repos: repoInputs,
           existingTitles: scenario ? [] : (await listScenarios(wsPath)).map((s) => s.title),
           instruction,
-          ...(scenario && { replan: { scenarioJson: JSON.stringify(scenario, null, 2) } }),
+          ...(scenario && { replan: { scenarioJson: JSON.stringify(scenario, null, 2), finished: isFinished(scenario) } }),
         }),
         {
           jsonSchema: VERIFICATION_PLAN_SCHEMA as unknown as Record<string, unknown>,

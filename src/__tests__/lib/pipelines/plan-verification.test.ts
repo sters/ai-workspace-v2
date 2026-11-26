@@ -114,4 +114,37 @@ describe("plan-verification pipeline", () => {
       ["Down", "pending", 1],
     ]);
   });
+  it("on replan of a finished scenario, replaces every step, clears the variables and makes it ready to run again", async () => {
+    const wsPath = path.join(root, WS);
+    const [sc] = await createScenarios(wsPath, [{
+      title: "Orders",
+      summary: "",
+      steps: [
+        { title: "Seed", actor: "command", command: "true", outputs: ["order_id"] },
+        { title: "Down", actor: "command", command: "true", teardown: true },
+      ],
+    }]);
+    await updateScenario(wsPath, sc.id, (cur) => {
+      cur.status = "passed";
+      cur.variables = { order_id: "1" };
+      for (const s of cur.steps) {
+        s.status = "passed";
+        s.result = { at: "t", exitCode: 0, output: "[]" };
+      }
+    });
+
+    const { ctx, runChild } = ctxAnswering({
+      scenarios: [{ title: "Orders", summary: "", steps: [
+        { title: "Find a caller with rows", actor: "command", command: "true", expected: "one" },
+      ] }],
+    });
+    expect(await runPhase({ workspace: WS, scenarioId: sc.id, instruction: "need a positive case" }, ctx)).toBe(true);
+
+    expect(runChild.mock.calls[0][1]).toContain("replace all of its steps");
+
+    const after = (await readScenario(wsPath, sc.id))!;
+    expect(after.status).toBe("ready");
+    expect(after.variables).toEqual({});
+    expect(after.steps.map((s) => [s.title, s.status, s.revision])).toEqual([["Find a caller with rows", "pending", 1]]);
+  });
 });
