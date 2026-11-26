@@ -29,6 +29,7 @@
   "exclude": [
     "node_modules",
     "src/__tests__",
-    "src/test-setup.ts"
+    "src/test-setup.ts",
+    "src/test-setup-dom.ts"
   ]
 }

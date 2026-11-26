@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { describeChildExit, reraiseSignal, signalExitCode } from "@/lib/process/child-exit";
 
 describe("describeChildExit", () => {

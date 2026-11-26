@@ -1,6 +1,9 @@
-import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import type { PhaseFunctionContext } from "@/types/pipeline";
 
+import * as actualKnownFindings from "@/lib/workspace/known-findings";
+const realKnownFindings = { ...actualKnownFindings };
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/ws",
 }));
@@ -43,8 +46,8 @@ vi.mock("@/lib/pipeline/interject", () => ({
   scheduleAutonomousRekick: (...a: unknown[]) => mockScheduleAutonomousRekick(...a),
   scheduleUpdateTodo: (...a: unknown[]) => mockScheduleUpdateTodo(...a),
 }));
-vi.mock("@/lib/workspace/known-findings", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/workspace/known-findings")>();
+vi.mock("@/lib/workspace/known-findings", () => {
+  const actual = realKnownFindings;
   return {
     ...actual,
     appendKnownFindings: vi.fn(async (_p: string, f: unknown[]) => f),
@@ -83,8 +86,8 @@ import { buildUpdateReadmePipeline } from "@/lib/pipelines/update-readme";
 import { parseAcceptanceCriteria } from "@/lib/parsers/readme";
 import { appendKnownFindings } from "@/lib/workspace/known-findings";
 
-const mockParseAcceptanceCriteria = vi.mocked(parseAcceptanceCriteria);
-const mockAppendKnownFindings = vi.mocked(appendKnownFindings);
+const mockParseAcceptanceCriteria = mocked(parseAcceptanceCriteria);
+const mockAppendKnownFindings = mocked(appendKnownFindings);
 
 describe("buildUpdateReadmePipeline", () => {
   beforeEach(() => {
@@ -345,7 +348,7 @@ describe("buildUpdateReadmePipeline", () => {
       const ctx = ctxReturning({ infeasible: [], reason: "all achievable" });
 
       await phase.fn(ctx);
-      const opts = vi.mocked(ctx.runChild).mock.calls[0][2]!;
+      const opts = mocked(ctx.runChild).mock.calls[0][2]!;
       // An empty list would fall back to the Edit / Write grant addDirs carries.
       expect(opts.allowedTools?.length).toBeGreaterThan(0);
       expect(opts.allowedTools!.some((t) => /^(Edit|Write)/.test(t) || t === "Bash(git:*)")).toBe(false);
@@ -397,7 +400,7 @@ describe("buildUpdateReadmePipeline", () => {
       const ctx = ctxReturning({ updateTodo: true, autonomous: true, reason: "r" });
 
       await phase.fn(ctx);
-      const prompt = vi.mocked(ctx.runChild).mock.calls[0][1];
+      const prompt = mocked(ctx.runChild).mock.calls[0][1];
       expect(prompt).toContain("old goal");
       expect(prompt).toContain("new goal");
       expect(prompt).toContain("- [ ] build CSV export");

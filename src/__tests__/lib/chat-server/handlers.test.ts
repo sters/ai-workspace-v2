@@ -1,8 +1,27 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { ClaudeModel } from "@/types/claude";
+import * as realCliModule from "@/lib/claude/cli";
+import * as realConfigModule from "@/lib/config";
+import * as realTemplatesModule from "@/lib/templates";
+import * as realPromptsModule from "@/lib/workspace/prompts";
+import * as realChatSessionsModule from "@/lib/db/chat-sessions";
+import * as realArchivesModule from "@/lib/db/archives";
+import * as realSlackThreadWorkspacesModule from "@/lib/db/slack-thread-workspaces";
+import * as realSlackSessionsModule from "@/lib/db/slack-sessions";
+
+// Copied before the mocks below: each mock spreads its real module, so that
+// exports it leaves out still link when handlers.ts loads after the mock.
+const realCli = { ...realCliModule };
+const realConfig = { ...realConfigModule };
+const realTemplates = { ...realTemplatesModule };
+const realPrompts = { ...realPromptsModule };
+const realChatSessions = { ...realChatSessionsModule };
+const realArchives = { ...realArchivesModule };
+const realSlackThreadWorkspaces = { ...realSlackThreadWorkspacesModule };
+const realSlackSessions = { ...realSlackSessionsModule };
 
 const mockSpawnClaudeTerminal = vi.fn();
 const mockGetConfig = vi.fn();
@@ -23,15 +42,18 @@ afterAll(() => {
 });
 
 vi.mock("@/lib/claude/cli", () => ({
+  ...realCli,
   spawnClaudeTerminal: (...args: unknown[]) => mockSpawnClaudeTerminal(...args),
 }));
 
 vi.mock("@/lib/config", () => ({
+  ...realConfig,
   getConfig: () => mockGetConfig(),
   getResolvedWorkspaceRoot: () => tmpRoot,
 }));
 
 vi.mock("@/lib/templates", () => ({
+  ...realTemplates,
   buildInitPrompt: () => "init-prompt-body",
   buildReviewChatPrompt: () => "review-prompt-body",
   buildResearchChatPrompt: () => "research-prompt-body",
@@ -43,11 +65,13 @@ vi.mock("@/lib/templates", () => ({
 }));
 
 vi.mock("@/lib/workspace/prompts", () => ({
+  ...realPrompts,
   ensureSessionSystemPrompt: (...args: unknown[]) => mockEnsureSessionSystemPrompt(...args),
   cleanupSessionSystemPrompt: (...args: unknown[]) => mockCleanupSessionSystemPrompt(...args),
 }));
 
 vi.mock("@/lib/db/chat-sessions", () => ({
+  ...realChatSessions,
   upsertChatSession: vi.fn(),
   markChatSessionExited: vi.fn(),
   deleteChatSession: vi.fn(),
@@ -56,6 +80,7 @@ vi.mock("@/lib/db/chat-sessions", () => ({
 const mockUnarchiveWorkspace = vi.fn();
 
 vi.mock("@/lib/db/archives", () => ({
+  ...realArchives,
   unarchiveWorkspace: (...args: unknown[]) => mockUnarchiveWorkspace(...args),
 }));
 
@@ -64,11 +89,13 @@ const slackThreads = new Map<string, { workspace: string; sessionId?: string; tu
 const mockSetSession = vi.fn();
 
 vi.mock("@/lib/db/slack-thread-workspaces", () => ({
+  ...realSlackThreadWorkspaces,
   getThreadWorkspace: (key: string) => slackThreads.get(key)?.workspace,
   getThreadTurnStartedAt: (key: string) => slackThreads.get(key)?.turnStartedAt,
 }));
 
 vi.mock("@/lib/db/slack-sessions", () => ({
+  ...realSlackSessions,
   getSession: (key: string) => slackThreads.get(key)?.sessionId,
   setSession: (...args: unknown[]) => mockSetSession(...args),
 }));

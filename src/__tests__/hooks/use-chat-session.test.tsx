@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "bun:test";
+import { stubGlobal, unstubAllGlobals } from "@/__tests__/helpers/mocks";
 
 const mockInit = vi.fn();
 const mockDispose = vi.fn();
@@ -64,15 +65,15 @@ beforeEach(() => {
   mockDispose.mockReset();
   term.onData.mockClear();
   localStorage.clear();
-  vi.stubGlobal("WebSocket", FakeSocket);
-  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+  stubGlobal("WebSocket", FakeSocket);
+  stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
     queueMicrotask(() => cb(0));
     return 0;
   });
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe("useChatSession task", () => {
@@ -114,7 +115,7 @@ describe("useChatSession task", () => {
   });
 
   it("stays idle with neither a task, a saved session nor a live one", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [] })));
+    stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [] })));
     renderHook(() => useChatSession("ws"));
 
     await new Promise<void>((r) => setTimeout(r, 20));
@@ -124,7 +125,7 @@ describe("useChatSession task", () => {
   // A session the server started on its own (quick create) is saved in no
   // browser, and the user who asked for it may have been elsewhere since.
   it("attaches on mount to the workspace's live session when none is saved", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => ({
+    stubGlobal("fetch", vi.fn(async () => ({
       ok: true,
       json: async () => [
         { id: "chat-9", workspaceId: "ws", startedAt: 9 },
@@ -139,7 +140,7 @@ describe("useChatSession task", () => {
 
   it("does not attach once unmounted while the live list was being read", async () => {
     let answer: (sessions: unknown[]) => void = () => {};
-    vi.stubGlobal("fetch", vi.fn(() => new Promise((resolve) => {
+    stubGlobal("fetch", vi.fn(() => new Promise((resolve) => {
       answer = (sessions) => resolve({ ok: true, json: async () => sessions });
     })));
     const { unmount } = renderHook(() => useChatSession("ws"));
@@ -199,7 +200,7 @@ describe("useChatSession handoff delivery", () => {
     await waitFor(() => expect(sockets[0]?.sent).toHaveLength(1));
     act(() => sockets[0].receive({ type: "started", sessionId: "chat-1" }));
     act(() => sockets[0].receive({ type: "exited", code: 0 }));
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [] })));
+    stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [] })));
 
     await act(() => result.current.openSession());
     await waitFor(() => expect(sockets[1]?.sent).toHaveLength(1));
@@ -225,7 +226,7 @@ describe("useChatSession replacing a session", () => {
     act(() => sockets[0].receive({ type: "started", sessionId: "chat-1" }));
     act(() => sockets[0].onerror?.());
     expect(localStorage.getItem("aiw-chat:ws")).toBeNull();
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [] })));
+    stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => [] })));
 
     await act(() => result.current.openSession());
     await waitFor(() => expect(sockets[1]?.sent).toHaveLength(1));
@@ -243,7 +244,7 @@ describe("useChatSession replacing a session", () => {
 describe("useChatSession openSession", () => {
   function stubLiveSessions(sessions: { id: string; workspaceId: string; startedAt: number }[]) {
     const fetchMock = vi.fn(async () => ({ ok: true, json: async () => sessions }));
-    vi.stubGlobal("fetch", fetchMock);
+    stubGlobal("fetch", fetchMock);
     return fetchMock;
   }
 
@@ -273,7 +274,7 @@ describe("useChatSession openSession", () => {
   });
 
   it("starts a session when the live list cannot be read", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("down"); }));
+    stubGlobal("fetch", vi.fn(async () => { throw new Error("down"); }));
     const { result } = renderHook(() => useChatSession("ws"));
 
     await act(() => result.current.openSession());
@@ -301,7 +302,7 @@ describe("useChatSession openSession", () => {
 
 describe("useChatSession continueSlackThread", () => {
   function stubLiveSessions(sessions: { id: string; workspaceId: string; startedAt: number; slackThread?: string }[]) {
-    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => sessions })));
+    stubGlobal("fetch", vi.fn(async () => ({ ok: true, json: async () => sessions })));
   }
 
   it("starts a session on the thread, even with a plain chat live", async () => {

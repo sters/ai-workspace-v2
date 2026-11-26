@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "bun:test";
 import { getCleanEnv } from "@/lib/env";
 
 const KEYS = ["AIW_SLACK_BOT_TOKEN", "AIW_SLACK_APP_TOKEN", "AIW_SOMETHING_NEW", "UNRELATED_VAR"];

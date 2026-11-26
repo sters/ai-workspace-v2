@@ -1,5 +1,8 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
+import * as apiModule from "@/lib/api";
+
+const realApi = { ...apiModule };
 
 const mockUseRepositories = vi.fn();
 const mockPostJson = vi.fn();
@@ -9,8 +12,8 @@ vi.mock("@/hooks/use-repositories", () => ({
   useRepositories: () => mockUseRepositories(),
 }));
 
-vi.mock("@/lib/api", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/api")>()),
+vi.mock("@/lib/api", () => ({
+  ...realApi,
   postJson: (...a: unknown[]) => mockPostJson(...a),
 }));
 

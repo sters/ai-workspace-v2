@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "bun:test";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { isWorkspaceArchived } from "@/lib/db/archives";
 import { getPrSnapshot, listPrEvents } from "@/lib/db/pr-watch";

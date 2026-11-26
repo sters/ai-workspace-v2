@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
 import fs from "node:fs";
 import path from "node:path";
 import { _resetConfig, _resetWorkspaceRoot, setWorkspaceRoot } from "@/lib/config";

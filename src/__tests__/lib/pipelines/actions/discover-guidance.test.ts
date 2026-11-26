@@ -1,16 +1,19 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import fs from "node:fs";
 import path from "node:path";
 import type { GroupChild, PhaseFunctionContext } from "@/types/pipeline";
 
+import * as actualRepoGuidance from "@/lib/workspace/repo-guidance";
+const realRepoGuidance = { ...actualRepoGuidance };
 vi.mock("@/lib/templates", () => ({
   buildRepoGuidancePrompt: vi.fn((input: { repoName: string }) => `prompt-${input.repoName}`),
 }));
 vi.mock("@/lib/workspace/prompts", () => ({
   ensureSystemPrompt: vi.fn(() => "/mock/prompts/repo-guidance.md"),
 }));
-vi.mock("@/lib/workspace/repo-guidance", async (importActual) => ({
-  ...(await importActual<typeof import("@/lib/workspace/repo-guidance")>()),
+vi.mock("@/lib/workspace/repo-guidance", () => ({
+  ...realRepoGuidance,
   locateRepoGuidanceCache: vi.fn(),
   readRepoGuidanceCache: vi.fn(),
   writeRepoGuidanceCache: vi.fn(),
@@ -24,9 +27,9 @@ import {
   writeRepoGuidanceCache,
 } from "@/lib/workspace/repo-guidance";
 
-const mockLocate = vi.mocked(locateRepoGuidanceCache);
-const mockReadCache = vi.mocked(readRepoGuidanceCache);
-const mockWriteCache = vi.mocked(writeRepoGuidanceCache);
+const mockLocate = mocked(locateRepoGuidanceCache);
+const mockReadCache = mocked(readRepoGuidanceCache);
+const mockWriteCache = mocked(writeRepoGuidanceCache);
 
 const GUIDANCE = "## Implementation\n\n- `CLAUDE.md` — x\n\n## Review\n\n- `a.md` — y\n";
 
@@ -79,7 +82,7 @@ describe("buildDiscoverGuidancePhase", () => {
     const ctx = createMockCtx(writingChildren());
     await phaseFor([{ repoName: "web", worktreePath: "/w/web" }]).fn(ctx);
 
-    const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+    const [children] = mocked(ctx.runChildGroup).mock.calls[0];
     expect(children).toHaveLength(1);
     // No addDirs: those would auto-allow Edit/Write over the whole directory.
     expect(children[0].addDirs).toBeUndefined();
@@ -98,7 +101,7 @@ describe("buildDiscoverGuidancePhase", () => {
       { repoName: "api", worktreePath: "/w/api" },
     ]).fn(ctx)).toBe(true);
 
-    const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+    const [children] = mocked(ctx.runChildGroup).mock.calls[0];
     expect(children.map((c) => c.label)).toEqual(["guidance-api"]);
   });
 
@@ -131,7 +134,7 @@ describe("buildDiscoverGuidancePhase", () => {
       { repoName: "web___admin", worktreePath: "/w/web___admin" },
     ]).fn(ctx);
 
-    const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+    const [children] = mocked(ctx.runChildGroup).mock.calls[0];
     expect(children.map((c) => c.label)).toEqual(["guidance-web"]);
     expect(fs.readFileSync(repoGuidancePath(wsPath, "web___admin"), "utf8")).toBe(GUIDANCE);
   });

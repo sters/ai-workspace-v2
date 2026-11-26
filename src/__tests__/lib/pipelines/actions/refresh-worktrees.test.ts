@@ -1,12 +1,15 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import type { PhaseFunctionContext, PipelinePhaseFunction } from "@/types/pipeline";
 
+import * as actualWorktreeRefresh from "@/lib/workspace/worktree-refresh";
+const realWorktreeRefresh = { ...actualWorktreeRefresh };
 vi.mock("@/lib/workspace/git", () => ({
   listWorkspaceRepos: vi.fn(),
 }));
 
-vi.mock("@/lib/workspace/worktree-refresh", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/workspace/worktree-refresh")>();
+vi.mock("@/lib/workspace/worktree-refresh", () => {
+  const actual = realWorktreeRefresh;
   return { ...actual, refreshWorktrees: vi.fn() };
 });
 
@@ -15,8 +18,8 @@ import { listWorkspaceRepos } from "@/lib/workspace/git";
 import { refreshWorktrees } from "@/lib/workspace/worktree-refresh";
 import type { WorktreeRefreshResult } from "@/lib/workspace/worktree-refresh";
 
-const mockListRepos = vi.mocked(listWorkspaceRepos);
-const mockRefresh = vi.mocked(refreshWorktrees);
+const mockListRepos = mocked(listWorkspaceRepos);
+const mockRefresh = mocked(refreshWorktrees);
 
 function repo(repoName: string) {
   return {
@@ -76,7 +79,7 @@ describe("buildRefreshWorktreesPhase", () => {
       { repoName: "svc", worktreePath: "/repos/svc/worktrees/ws" },
       { repoName: "web", worktreePath: "/repos/web/worktrees/ws" },
     ]);
-    expect(vi.mocked(ctx.emitResult).mock.calls[0][0]).toContain("- svc: fast-forwarded");
+    expect(mocked(ctx.emitResult).mock.calls[0][0]).toContain("- svc: fast-forwarded");
   });
 
   it("honours the single-repo filter the review shares", async () => {
@@ -99,7 +102,7 @@ describe("buildRefreshWorktreesPhase", () => {
     // review, and a review of a slightly older commit beats no review at all.
     expect(await run(buildRefreshWorktreesPhase({ workspace: "ws" }), ctx)).toBe(true);
 
-    const statuses = vi.mocked(ctx.emitStatus).mock.calls.map((c) => c[0]).join("\n");
+    const statuses = mocked(ctx.emitStatus).mock.calls.map((c) => c[0]).join("\n");
     expect(statuses).toContain("does not read the pushed branch");
   });
 

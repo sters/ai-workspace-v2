@@ -1,5 +1,5 @@
-// @vitest-environment node
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import type { ClaudeProcess, RunClaudeOptions } from "@/types/claude";
 import type { GroupChild } from "@/types/pipeline";
 import type { OperationEvent } from "@/types/operation";
@@ -16,7 +16,7 @@ import { runClaude } from "@/lib/claude";
 
 /** A child that answers `answer(options)` (or fails on null) after reporting one costed result. */
 function fakeClaude(answer: (opts: RunClaudeOptions) => string | null) {
-  vi.mocked(runClaude).mockImplementation((_id, _prompt, opts) => {
+  mocked(runClaude).mockImplementation((_id, _prompt, opts) => {
     const text = answer(opts!);
     return {
       onEvent: (handler: (e: OperationEvent) => void) => {
@@ -52,7 +52,7 @@ const input = {
 
 describe("runBench", () => {
   beforeEach(() => {
-    vi.mocked(runClaude).mockReset();
+    mocked(runClaude).mockReset();
     built.child = { label: "x", prompt: "p", stepType: "autonomous-gate", addDirs: ["/review"] };
   });
 
@@ -60,7 +60,7 @@ describe("runBench", () => {
     fakeClaude(() => "{}");
     await runBench(input);
 
-    const calls = vi.mocked(runClaude).mock.calls.map(([, , o]) => o!);
+    const calls = mocked(runClaude).mock.calls.map(([, , o]) => o!);
     expect(calls.map((o) => `${o.model}/${o.effort}`)).toEqual([
       "opus/medium", "opus/medium", "claude-haiku-5-5/xhigh", "claude-haiku-5-5/xhigh",
     ]);

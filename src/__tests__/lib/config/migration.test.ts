@@ -1,5 +1,5 @@
 import { STEP_TYPES } from "@/types/pipeline";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { migrateConfigContent, generateDefaultConfigContent } from "@/lib/config/migration";
 import { CONFIG_DEFAULTS, KNOWN_CONFIG_KEYS } from "@/lib/config/defaults";
 

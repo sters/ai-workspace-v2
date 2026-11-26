@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { ReviewSessionList } from "@/components/workspace/review-session-list";
 import type { ReviewSession } from "@/types/workspace";
 

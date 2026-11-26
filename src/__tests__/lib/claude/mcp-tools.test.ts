@@ -1,4 +1,4 @@
-import { vi, describe, it, expect } from "vitest";
+import { vi, describe, it, expect } from "bun:test";
 
 // Mock dependencies to avoid bun:sqlite bundling issues
 vi.mock("@/lib/config", () => ({

@@ -1,11 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "bun:test";
+import * as actualPrThreads from "@/lib/workspace/pr-threads";
+
+const realPrThreads = { ...actualPrThreads };
 import type { WorkspaceRepo } from "@/types/workspace";
 
 const mockRead = vi.fn();
 const mockRepos = vi.fn();
 
-vi.mock("@/lib/workspace/pr-threads", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/workspace/pr-threads")>()),
+vi.mock("@/lib/workspace/pr-threads", () => ({
+  ...realPrThreads,
   readRepoPullRequest: (...args: unknown[]) => mockRead(...args),
 }));
 

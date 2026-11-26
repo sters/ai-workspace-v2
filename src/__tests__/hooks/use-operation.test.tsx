@@ -1,3 +1,5 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { stubGlobal, unstubAllGlobals } from "@/__tests__/helpers/mocks";
 import { renderHook } from "@testing-library/react";
 import { useOperation } from "@/hooks/use-operation";
 import type { OperationListItem } from "@/types/operation";
@@ -17,14 +19,14 @@ describe("useOperation localStorage hydration safety", () => {
   beforeEach(() => {
     localStorage.clear();
     // SSE fetch should never resolve so the restored operation stays put.
-    vi.stubGlobal(
+    stubGlobal(
       "fetch",
       vi.fn(() => new Promise(() => {})),
     );
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
     localStorage.clear();
   });
 

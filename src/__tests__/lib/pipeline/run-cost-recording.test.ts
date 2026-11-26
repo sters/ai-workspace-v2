@@ -1,5 +1,5 @@
-// @vitest-environment node
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import type { OperationEvent } from "@/types/operation";
 import type { ClaudeProcess } from "@/types/claude";
 import type { ManagedOperation } from "@/lib/pipeline/types";
@@ -98,11 +98,11 @@ const expected = {
 
 describe("run cost recording", () => {
   beforeEach(() => {
-    vi.mocked(insertClaudeRun).mockReset();
-    vi.mocked(runClaude).mockReset();
-    vi.mocked(runClaude).mockImplementation(() => makeProcessStub());
-    vi.mocked(resolveModel).mockReturnValue(undefined);
-    vi.mocked(resolveEffort).mockReturnValue("low");
+    mocked(insertClaudeRun).mockReset();
+    mocked(runClaude).mockReset();
+    mocked(runClaude).mockImplementation(() => makeProcessStub());
+    mocked(resolveModel).mockReturnValue(undefined);
+    mocked(resolveEffort).mockReturnValue("low");
   });
 
   it("records a single phase's result with its step type and effort", async () => {
@@ -123,11 +123,11 @@ describe("run cost recording", () => {
     await ctx.runChild("reviewer", "p", { stepType: "code-review" });
     await ctx.runChildGroup([{ label: "reviewer", prompt: "p", stepType: "code-review" }]);
     expect(insertClaudeRun).toHaveBeenCalledTimes(2);
-    expect(vi.mocked(insertClaudeRun).mock.calls.every(([run]) => expect.objectContaining(expected).asymmetricMatch(run))).toBe(true);
+    for (const [run] of mocked(insertClaudeRun).mock.calls) expect(run).toEqual(expect.objectContaining(expected));
   });
 
   it("keeps the operation running when recording fails", async () => {
-    vi.mocked(insertClaudeRun).mockImplementation(() => { throw new Error("disk full"); });
+    mocked(insertClaudeRun).mockImplementation(() => { throw new Error("disk full"); });
     const ok = await runSinglePhase(makeManaged(), { kind: "single", label: "reviewer", prompt: "p", stepType: "code-review" }, "op-1", 0, 1, phaseExtra);
     expect(ok).toBe(true);
   });

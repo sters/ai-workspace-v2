@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { BLOCK_DANGEROUS_BASH_SH, SESSION_START_GIT_SH } from "@/lib/claude/hooks/scripts";
 
 let tmpDir: string;

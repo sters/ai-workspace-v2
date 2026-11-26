@@ -1,4 +1,5 @@
-import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/ws",
@@ -29,7 +30,7 @@ afterAll(() => {
 import { stripCompletedTodosFromWorkspace } from "@/lib/workspace/todo-cleanup";
 import { listWorkspaceRepos } from "@/lib/workspace/git";
 
-const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
+const mockListWorkspaceRepos = mocked(listWorkspaceRepos);
 
 describe("stripCompletedTodosFromWorkspace", () => {
   beforeEach(() => {

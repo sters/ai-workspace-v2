@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "bun:test";
 
 vi.mock("@/lib/config", () => ({
   getResolvedWorkspaceRoot: () => "/workspace-root",
@@ -11,16 +11,6 @@ vi.mock("@/lib/claude/mcp", () => ({
 }));
 
 async function callGET() {
-  vi.resetModules();
-
-  // Re-apply mocks after resetModules
-  vi.doMock("@/lib/config", () => ({
-    getResolvedWorkspaceRoot: () => "/workspace-root",
-  }));
-  vi.doMock("@/lib/claude/mcp", () => ({
-    getMcpTools: () => mockGetMcpTools(),
-  }));
-
   const mod = await import("@/app/api/mcp-servers/tools/route");
   const response = await mod.GET();
   return { status: response.status, body: await response.json() };

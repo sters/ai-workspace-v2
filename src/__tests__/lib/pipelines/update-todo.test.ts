@@ -1,4 +1,5 @@
-import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/ws",
@@ -32,7 +33,7 @@ afterAll(() => {
 import { buildUpdateTodoPipeline } from "@/lib/pipelines/update-todo";
 import { listWorkspaceRepos } from "@/lib/workspace";
 
-const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
+const mockListWorkspaceRepos = mocked(listWorkspaceRepos);
 
 describe("buildUpdateTodoPipeline", () => {
   beforeEach(() => {
@@ -59,7 +60,7 @@ describe("buildUpdateTodoPipeline", () => {
 
     it("filters to specified repo when repo parameter is provided", async () => {
       const { buildUpdaterPrompt } = await import("@/lib/templates");
-      const mockBuildUpdaterPrompt = vi.mocked(buildUpdaterPrompt);
+      const mockBuildUpdaterPrompt = mocked(buildUpdaterPrompt);
       mockBuildUpdaterPrompt.mockClear();
 
       await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests", repo: "repo-b" });
@@ -72,7 +73,7 @@ describe("buildUpdateTodoPipeline", () => {
 
     it("processes all repos when repo parameter is omitted", async () => {
       const { buildUpdaterPrompt } = await import("@/lib/templates");
-      const mockBuildUpdaterPrompt = vi.mocked(buildUpdaterPrompt);
+      const mockBuildUpdaterPrompt = mocked(buildUpdaterPrompt);
       mockBuildUpdaterPrompt.mockClear();
 
       await buildUpdateTodoPipeline({ workspace: "test-ws", instruction: "add tests" });

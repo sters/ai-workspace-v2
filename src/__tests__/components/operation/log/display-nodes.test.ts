@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import type { LogEntry, DisplayNode } from "@/types/claude";
 import { buildDisplayNodes, groupByChildLabel, findPendingAsk } from "@/components/operation/log/display-nodes";
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import type { AppConfig } from "@/types/config";
 import {
   CONFIG_DEFAULTS,

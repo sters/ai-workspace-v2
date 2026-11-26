@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { buildPrChatTopic } from "@/lib/pr-chat-topic";
 import type { PrThreadValidation } from "@/types/pull-request";
 

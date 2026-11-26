@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
 import type { OperationEvent } from "@/types/operation";
 import type { ManagedOperation } from "@/lib/pipeline/types";
 import { buildPhaseFunctionContext } from "@/lib/pipeline/context-builder";

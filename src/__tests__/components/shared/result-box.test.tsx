@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import { ResultBox } from "@/components/shared/feedback/result-box";
 
 vi.mock("@/components/shared/content/markdown-renderer", () => ({

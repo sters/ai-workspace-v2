@@ -1,5 +1,5 @@
-// @vitest-environment node
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import type { OperationEvent } from "@/types/operation";
 import type { ClaudeProcess } from "@/types/claude";
 import type { ManagedOperation } from "@/lib/pipeline/types";
@@ -83,12 +83,12 @@ const phaseExtra = { phaseIndex: 0, phaseLabel: "Phase" };
 
 describe("effort plumbing", () => {
   beforeEach(() => {
-    vi.mocked(runClaude).mockReset();
-    vi.mocked(runClaude).mockImplementation(() => makeProcessStub());
-    vi.mocked(resolveModel).mockReset();
-    vi.mocked(resolveModel).mockReturnValue(undefined);
-    vi.mocked(resolveEffort).mockReset();
-    vi.mocked(resolveEffort).mockReturnValue("xhigh");
+    mocked(runClaude).mockReset();
+    mocked(runClaude).mockImplementation(() => makeProcessStub());
+    mocked(resolveModel).mockReset();
+    mocked(resolveModel).mockReturnValue(undefined);
+    mocked(resolveEffort).mockReset();
+    mocked(resolveEffort).mockReturnValue("xhigh");
   });
 
   it("passes the resolved effort to runClaude for a single phase", async () => {
@@ -102,7 +102,7 @@ describe("effort plumbing", () => {
     await runSinglePhase(makeManaged(), phase, "op-1", 0, 1, phaseExtra);
 
     expect(resolveEffort).toHaveBeenCalledWith("review", "execute", undefined);
-    expect(vi.mocked(runClaude).mock.calls[0][2]).toMatchObject({ effort: "xhigh" });
+    expect(mocked(runClaude).mock.calls[0][2]).toMatchObject({ effort: "xhigh" });
   });
 
   it("forwards an explicit per-phase effort override to the resolver", async () => {
@@ -132,7 +132,7 @@ describe("effort plumbing", () => {
 
     expect(resolveEffort).toHaveBeenCalledWith("review", "code-review", undefined);
     expect(resolveEffort).toHaveBeenCalledWith("review", "verify-todo", "low");
-    for (const call of vi.mocked(runClaude).mock.calls) {
+    for (const call of mocked(runClaude).mock.calls) {
       expect(call[2]).toMatchObject({ effort: "xhigh" });
     }
   });
@@ -144,7 +144,7 @@ describe("effort plumbing", () => {
     await ctx.runChild("Verify", "prompt", { stepType: "verify-readme" });
 
     expect(resolveEffort).toHaveBeenCalledWith("review", "verify-readme", undefined);
-    expect(vi.mocked(runClaude).mock.calls[0][2]).toMatchObject({ effort: "xhigh" });
+    expect(mocked(runClaude).mock.calls[0][2]).toMatchObject({ effort: "xhigh" });
   });
 
   it("passes the resolved effort to runClaude from runChildGroup", async () => {
@@ -156,15 +156,15 @@ describe("effort plumbing", () => {
     ]);
 
     expect(resolveEffort).toHaveBeenCalledWith("review", "collect-reviews", undefined);
-    expect(vi.mocked(runClaude).mock.calls[0][2]).toMatchObject({ effort: "xhigh" });
+    expect(mocked(runClaude).mock.calls[0][2]).toMatchObject({ effort: "xhigh" });
   });
 
   it("still omits claude options entirely when nothing is configured", async () => {
-    vi.mocked(resolveEffort).mockReturnValue(undefined);
+    mocked(resolveEffort).mockReturnValue(undefined);
     const phase: PipelinePhaseSingle = { kind: "single", label: "Plain", prompt: "p" };
 
     await runSinglePhase(makeManaged(), phase, "op-1", 0, 1, phaseExtra);
 
-    expect(vi.mocked(runClaude).mock.calls[0][2]).toBeUndefined();
+    expect(mocked(runClaude).mock.calls[0][2]).toBeUndefined();
   });
 });

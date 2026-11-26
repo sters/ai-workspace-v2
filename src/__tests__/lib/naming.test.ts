@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import {
   DERIVED_NAME_MAX_CHARS,
   dateStamp,

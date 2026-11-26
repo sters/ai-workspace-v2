@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { parseCommand, USAGE } from "@/lib/slack-server/commands";
 
 describe("parseCommand", () => {

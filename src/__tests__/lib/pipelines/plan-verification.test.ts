@@ -1,4 +1,4 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "bun:test";
 import path from "node:path";
 import os from "node:os";
 import { mkdtemp, rm } from "node:fs/promises";

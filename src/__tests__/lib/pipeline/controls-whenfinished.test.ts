@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { operations } from "@/lib/pipeline/store";
 import { whenOperationFinished } from "@/lib/pipeline/controls";
 import type { ManagedOperation } from "@/lib/pipeline/types";

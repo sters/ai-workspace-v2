@@ -1,5 +1,5 @@
-// @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "bun:test";
+import { waitFor } from "@/__tests__/helpers/mocks";
 
 const mockCreateQuickWorkspace = vi.fn();
 const mockSetupRepositories = vi.fn();
@@ -236,7 +236,7 @@ describe("POST /api/workspaces — progress a reopened form can read", () => {
     );
 
     const pending = post({ name: "login crash", repositories: ["github.com/acme/web"], note: "fix" });
-    await vi.waitFor(async () =>
+    await waitFor(async () =>
       expect(await listed()).toMatchObject([
         {
           name: "login crash",

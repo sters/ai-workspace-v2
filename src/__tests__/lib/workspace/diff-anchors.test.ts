@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { parseDiffHunks, resolveAnchor } from "@/lib/workspace/diff-anchors";
 import type { ReviewFinding } from "@/types/review-findings";
 

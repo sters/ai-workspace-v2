@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
+import { stubGlobal } from "@/__tests__/helpers/mocks";
 import type { VerificationScenario, VerificationStep } from "@/types/verification";
 
 const mockReplace = vi.fn();
@@ -45,7 +46,7 @@ beforeEach(() => {
   mockPush.mockReset();
   fetchMock.mockClear();
   searchParams = new URLSearchParams();
-  vi.stubGlobal("fetch", fetchMock);
+  stubGlobal("fetch", fetchMock);
 });
 
 function setScenarios(scenarios: VerificationScenario[]) {

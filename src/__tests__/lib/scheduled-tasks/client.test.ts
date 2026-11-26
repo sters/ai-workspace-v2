@@ -1,5 +1,5 @@
-// @vitest-environment node
-import { describe, expect, it, vi, afterEach } from "vitest";
+import { describe, expect, it, vi, afterEach } from "bun:test";
+import { stubGlobal, unstubAllGlobals } from "@/__tests__/helpers/mocks";
 import { createServerDeps, createWorkerDeps } from "@/lib/scheduled-tasks/client";
 import type { ScheduledTask } from "@/types/scheduled-task";
 
@@ -8,10 +8,10 @@ function respond(status: number, body: unknown) {
 }
 
 describe("createServerDeps", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => unstubAllGlobals());
 
   it("counts a task as running only from its own run label", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => respond(200, [
+    stubGlobal("fetch", vi.fn(async () => respond(200, [
       { workspace: "scheduled-task-12" },
       { workspace: "scheduled-tasks" },
       { workspace: "scheduled-task-3x" },
@@ -22,7 +22,7 @@ describe("createServerDeps", () => {
   });
 
   it("fails a start the server refused, so the occurrence stays due", async () => {
-    vi.stubGlobal("fetch", vi.fn(async (url: string) =>
+    stubGlobal("fetch", vi.fn(async (url: string) =>
       url.includes("/run") ? respond(429, { error: "Too many concurrent operations" }) : respond(200, []),
     ));
     const deps = await createServerDeps("http://localhost:1");
@@ -31,7 +31,7 @@ describe("createServerDeps", () => {
 
   it("runs command tasks itself and asks the server only when a prompt task is among them", async () => {
     const fetchMock = vi.fn(async (url: string) => (url.includes("/run") ? respond(200, {}) : respond(200, [])));
-    vi.stubGlobal("fetch", fetchMock);
+    stubGlobal("fetch", fetchMock);
     const commands = { isRunning: vi.fn(() => false), start: vi.fn(async () => {}) };
     const getDeps = createWorkerDeps("http://localhost:1", commands);
     const command = { id: 1, kind: "command" } as ScheduledTask;
@@ -52,7 +52,7 @@ describe("createServerDeps", () => {
   });
 
   it("still runs command tasks when the server cannot be reached, failing only the prompt task's start", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("ECONNREFUSED"); }));
+    stubGlobal("fetch", vi.fn(async () => { throw new Error("ECONNREFUSED"); }));
     const commands = { isRunning: vi.fn(() => false), start: vi.fn(async () => {}) };
     const command = { id: 1, kind: "command" } as ScheduledTask;
     const prompt = { id: 2, kind: "prompt" } as ScheduledTask;

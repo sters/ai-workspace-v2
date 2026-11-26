@@ -1,13 +1,15 @@
-// @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import * as actualConfig from "@/lib/config";
+
+const realConfig = { ...actualConfig };
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { OperationListItem } from "@/types/operation";
 
 let workspaceDir = "";
-vi.mock("@/lib/config", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/config")>()),
+vi.mock("@/lib/config", () => ({
+  ...realConfig,
   getWorkspaceDir: () => workspaceDir,
 }));
 

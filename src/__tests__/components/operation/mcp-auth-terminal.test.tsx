@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "bun:test";
+import { waitFor } from "@/__tests__/helpers/mocks";
 import type { OperationEvent } from "@/types/operation";
 
 const mockWrite = vi.fn();
@@ -60,7 +61,7 @@ describe("McpAuthTerminal", () => {
 
     const { rerender } = render(<McpAuthTerminal {...defaultProps} />);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockOpen).toHaveBeenCalled();
     });
 
@@ -79,7 +80,7 @@ describe("McpAuthTerminal", () => {
 
     const { rerender } = render(<McpAuthTerminal {...defaultProps} />);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockOpen).toHaveBeenCalled();
     });
 
@@ -98,7 +99,7 @@ describe("McpAuthTerminal", () => {
 
     const { rerender } = render(<McpAuthTerminal {...defaultProps} />);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockOpen).toHaveBeenCalled();
     });
 
@@ -113,7 +114,7 @@ describe("McpAuthTerminal", () => {
 
     const { rerender } = render(<McpAuthTerminal {...defaultProps} />);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockOpen).toHaveBeenCalled();
     });
 
@@ -139,7 +140,7 @@ describe("McpAuthTerminal", () => {
         operationStatus="completed"
       />,
     );
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockOpen).toHaveBeenCalled();
     });
     expect(
@@ -158,7 +159,7 @@ describe("McpAuthTerminal", () => {
         operationStatus="failed"
       />,
     );
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockOpen).toHaveBeenCalled();
     });
     expect(
@@ -169,7 +170,7 @@ describe("McpAuthTerminal", () => {
   it("disposes xterm on unmount", async () => {
     const { unmount } = render(<McpAuthTerminal {...defaultProps} />);
 
-    await vi.waitFor(() => {
+    await waitFor(() => {
       expect(mockOpen).toHaveBeenCalled();
     });
 

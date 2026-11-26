@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
+import { stubGlobal } from "@/__tests__/helpers/mocks";
 
 const mockUseRepositories = vi.fn();
 const fetchMock = vi.fn();
@@ -32,7 +33,7 @@ beforeEach(() => {
     error: undefined,
   });
   fetchMock.mockReset().mockResolvedValue(started());
-  vi.stubGlobal("fetch", fetchMock);
+  stubGlobal("fetch", fetchMock);
 });
 
 function describeTask(value: string) {

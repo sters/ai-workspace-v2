@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { SELECTED_REPOS_HEADING, withSelectedRepositories } from "@/lib/task-description";
 
 describe("withSelectedRepositories", () => {

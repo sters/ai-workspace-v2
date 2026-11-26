@@ -1,4 +1,5 @@
-import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import type { GroupChild, PhaseFunctionContext } from "@/types/pipeline";
 import type { TodoReviewFinding } from "@/types/prompts";
 
@@ -40,8 +41,8 @@ import {
 } from "@/lib/pipelines/actions/review-todos";
 import { buildTodoReviewResolutionInstruction, buildUpdaterPrompt } from "@/lib/templates";
 
-const mockBuildInstruction = vi.mocked(buildTodoReviewResolutionInstruction);
-const mockBuildUpdaterPrompt = vi.mocked(buildUpdaterPrompt);
+const mockBuildInstruction = mocked(buildTodoReviewResolutionInstruction);
+const mockBuildUpdaterPrompt = mocked(buildUpdaterPrompt);
 
 /** runChildGroup stub that feeds each child the verdict text keyed by its label. */
 function makeCtx(options?: {

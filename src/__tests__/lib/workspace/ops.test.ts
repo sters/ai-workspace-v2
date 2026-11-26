@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { parseAnalysisResultText } from "@/lib/workspace/setup";
 import { sanitizeSlug } from "@/lib/workspace/helpers";
 

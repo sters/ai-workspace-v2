@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { buildRequest } from "@/lib/slack-server/dispatcher";
 import { initSchema, autonomousSchema, updateTodoSchema } from "@/lib/schemas";
 

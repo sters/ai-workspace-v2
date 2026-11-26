@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import type { ClaudeProcess } from "@/types/claude";
 import type { OperationEvent } from "@/types/operation";
 import type { ManagedOperation } from "@/lib/pipeline/types";

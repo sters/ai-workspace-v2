@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { getAddressPrReviewsInstruction } from "@/lib/templates/prompts/address-pr-reviews";
 import { PR_REVIEW_THREADS_HEADING } from "@/lib/parsers/todo";
 

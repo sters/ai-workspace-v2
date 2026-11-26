@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { CostGroupTable } from "@/app/(tools)/run-costs/cost-group-table";
 import type { CostGroup } from "@/lib/run-costs";
 

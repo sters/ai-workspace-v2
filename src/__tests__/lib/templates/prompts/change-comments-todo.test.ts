@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { buildChangeCommentsTodoInstruction } from "@/lib/templates/prompts/change-comments-todo";
 import type { ChangeComment } from "@/lib/change-comments";
 

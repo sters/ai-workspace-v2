@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { findingId, parseFindingsFile } from "@/lib/workspace/review-findings";
 
 const VALID = JSON.stringify({

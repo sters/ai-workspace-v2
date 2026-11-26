@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
 import type { OperationPhaseInfo } from "@/types/operation";
 import type { PipelinePhase } from "@/types/pipeline";
 import type { ManagedOperation } from "@/lib/pipeline/types";

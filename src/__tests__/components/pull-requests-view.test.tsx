@@ -1,5 +1,6 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "bun:test";
+import { stubGlobal } from "@/__tests__/helpers/mocks";
 import type {
   PrCheck,
   PrCheckState,
@@ -190,7 +191,7 @@ beforeEach(() => {
       ],
     }),
   });
-  vi.stubGlobal("fetch", mockFetch);
+  stubGlobal("fetch", mockFetch);
 });
 
 describe("PullRequestsView", () => {

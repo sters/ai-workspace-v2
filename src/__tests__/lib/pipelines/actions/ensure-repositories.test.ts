@@ -1,4 +1,5 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import type { PhaseFunctionContext } from "@/types/pipeline";
 
 vi.mock("@/lib/config", () => ({
@@ -40,10 +41,10 @@ import { readWorkspaceReadme } from "@/lib/parsers/readme";
 import { setupRepository } from "@/lib/pipelines/actions/setup-repository";
 import { buildDiscoverConstraintsPhase } from "@/lib/pipelines/actions/discover-constraints";
 
-const mockList = vi.mocked(listWorkspaceRepos);
-const mockReadReadme = vi.mocked(readWorkspaceReadme);
-const mockSetup = vi.mocked(setupRepository);
-const mockBuildConstraints = vi.mocked(buildDiscoverConstraintsPhase);
+const mockList = mocked(listWorkspaceRepos);
+const mockReadReadme = mocked(readWorkspaceReadme);
+const mockSetup = mocked(setupRepository);
+const mockBuildConstraints = mocked(buildDiscoverConstraintsPhase);
 
 function createMockCtx(): PhaseFunctionContext {
   return {

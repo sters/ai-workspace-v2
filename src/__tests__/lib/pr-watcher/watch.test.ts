@@ -1,7 +1,6 @@
-// @vitest-environment node
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "bun:test";
 import { _resetConfig, _resetWorkspaceRoot, setWorkspaceRoot } from "@/lib/config";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { getPrSnapshot, listPrEvents, savePrObservation } from "@/lib/db/pr-watch";

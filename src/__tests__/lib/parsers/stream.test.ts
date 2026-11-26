@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
 import {
   parseStreamEvent,
   buildPermissionString,

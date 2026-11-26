@@ -1,5 +1,5 @@
-// @vitest-environment node
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "bun:test";
+import { advanceTimersByTimeAsync } from "@/__tests__/helpers/mocks";
 
 const runClaudeMock = vi.fn();
 
@@ -86,7 +86,7 @@ describe("summarizeProgress", () => {
       runClaudeMock.mockReturnValue({ ...fakeProc({ events: [] }), kill });
 
       const promise = summarizeProgress("work", "haiku");
-      await vi.advanceTimersByTimeAsync(30_000);
+      await advanceTimersByTimeAsync(30_000);
       const summary = await promise;
 
       expect(summary).toBeUndefined();

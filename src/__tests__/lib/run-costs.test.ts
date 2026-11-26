@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { summarizeClaudeRuns } from "@/lib/run-costs";
 import type { ClaudeRun } from "@/lib/db/claude-runs";
 

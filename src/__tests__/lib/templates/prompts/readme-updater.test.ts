@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { buildReadmeUpdaterPrompt } from "@/lib/templates/prompts/readme-updater";
 import type { ReadmeUpdaterInput } from "@/types/prompts";
 

@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { stubGlobal, unstubAllGlobals } from "@/__tests__/helpers/mocks";
 import {
   anchorComment,
   buildCommentsTopic,
@@ -92,13 +93,13 @@ describe("anchorComment", () => {
 describe("loadChangeComments", () => {
   beforeEach(() => {
     const map = new Map<string, string>();
-    vi.stubGlobal("sessionStorage", {
+    stubGlobal("sessionStorage", {
       getItem: (k: string) => map.get(k) ?? null,
       setItem: (k: string, v: string) => map.set(k, String(v)),
       removeItem: (k: string) => map.delete(k),
     });
   });
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => unstubAllGlobals());
 
   it("round-trips what was saved", () => {
     saveChangeComments("ws", [base]);

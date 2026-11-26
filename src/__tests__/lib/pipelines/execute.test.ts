@@ -1,4 +1,5 @@
-import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import type { PhaseFunctionContext } from "@/types/pipeline";
 
 vi.mock("@/lib/config", () => ({
@@ -58,7 +59,7 @@ afterAll(() => {
 import { buildExecutePipeline } from "@/lib/pipelines/execute";
 import { listWorkspaceRepos } from "@/lib/workspace";
 
-const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
+const mockListWorkspaceRepos = mocked(listWorkspaceRepos);
 
 function createMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunctionContext {
   return {

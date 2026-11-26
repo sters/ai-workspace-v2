@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { computeRepoFreshness } from "@/lib/workspace/review-freshness";
 
 const REVIEWED = "1111111111111111111111111111111111111111";

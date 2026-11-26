@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach } from "bun:test";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import {
   getSession,

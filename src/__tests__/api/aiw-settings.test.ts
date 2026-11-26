@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "bun:test";
 
 const mockPathExists = vi.fn();
 const mockReadFile = vi.fn();
@@ -48,14 +48,12 @@ vi.mock("@/lib/config", () => ({
 }));
 
 async function callGET() {
-  vi.resetModules();
   const mod = await import("@/app/api/aiw-settings/route");
   const response = await mod.GET();
   return { status: response.status, data: await response.json() };
 }
 
 async function callPOST(body: Record<string, unknown>) {
-  vi.resetModules();
   const mod = await import("@/app/api/aiw-settings/route");
   const request = new Request("http://localhost:3741/api/aiw-settings", {
     method: "POST",

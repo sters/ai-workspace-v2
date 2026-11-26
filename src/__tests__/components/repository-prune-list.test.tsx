@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, setSystemTime } from "bun:test";
 import type { RepositoryPruneCandidate } from "@/types/repository-prune";
 
 const mockUseCandidates = vi.fn();
@@ -40,8 +40,7 @@ function listing(repositories: RepositoryPruneCandidate[]) {
 }
 
 beforeEach(() => {
-  vi.useFakeTimers({ shouldAdvanceTime: true });
-  vi.setSystemTime(new Date("2026-09-23T00:00:00.000Z"));
+  setSystemTime(new Date("2026-09-23T00:00:00.000Z"));
   mockPostJson.mockReset();
   mockPostJson.mockResolvedValue({ ok: true, data: { outcomes: [] } });
   mockRefresh.mockReset();
@@ -49,7 +48,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.useRealTimers();
+  setSystemTime();
   vi.restoreAllMocks();
 });
 

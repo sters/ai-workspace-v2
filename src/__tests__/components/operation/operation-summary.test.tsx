@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { render, screen } from "@testing-library/react";
 import type { OperationListItem } from "@/types/operation";
 import { OperationSummary } from "@/components/operation/operation-summary";

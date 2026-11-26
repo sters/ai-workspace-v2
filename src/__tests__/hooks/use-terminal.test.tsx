@@ -1,5 +1,6 @@
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 
 const mockWrite = vi.fn();
 const mockOpen = vi.fn();
@@ -199,7 +200,7 @@ describe("useTerminal", () => {
       await result.current.init();
     });
 
-    const opts = vi.mocked(Terminal).mock.calls[0][0];
+    const opts = mocked(Terminal).mock.calls[0][0];
     expect(opts?.theme?.cursor).toBe(opts?.theme?.background);
   });
   describe("focusOnWindowFocus", () => {

@@ -1,6 +1,9 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import type { PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 
+import * as actualKnownFindings from "@/lib/workspace/known-findings";
+const realKnownFindings = { ...actualKnownFindings };
 vi.mock("@/lib/pipeline-manager", () => ({
   getOperation: vi.fn(),
 }));
@@ -72,8 +75,8 @@ vi.mock("@/lib/pipelines/actions/setup-repository", () => ({
 vi.mock("@/lib/pipelines/actions/init-todo-analysis", () => ({
   buildInitTodoAnalysisPhases: vi.fn(() => []),
 }));
-vi.mock("@/lib/workspace/known-findings", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/workspace/known-findings")>();
+vi.mock("@/lib/workspace/known-findings", () => {
+  const actual = realKnownFindings;
   return {
     ...actual,
     readKnownFindings: vi.fn(async () => ""),
@@ -101,22 +104,22 @@ import { getOperation } from "@/lib/pipeline-manager";
 import { getReviewSessions, getReviewDetail } from "@/lib/workspace/reader";
 import { stripCompletedTodosFromWorkspace } from "@/lib/workspace/todo-cleanup";
 
-const mockGetOperation = vi.mocked(getOperation);
-const mockGetReviewDetail = vi.mocked(getReviewDetail);
-const mockBuildInit = vi.mocked(buildInitPipeline);
-const mockBuildUpdateTodo = vi.mocked(buildUpdateTodoPipeline);
-const mockBuildExecute = vi.mocked(buildExecutePipeline);
-const mockBuildReview = vi.mocked(buildReviewPipeline);
-const mockBuildCreatePr = vi.mocked(buildCreatePrPipeline);
-const mockGetReviewSessions = vi.mocked(getReviewSessions);
-const mockStripCompletedTodos = vi.mocked(stripCompletedTodosFromWorkspace);
-const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
-const mockReadWorkspaceReadme = vi.mocked(readWorkspaceReadme);
-const mockSetupRepository = vi.mocked(setupRepository);
-const mockBuildInitTodoAnalysis = vi.mocked(buildInitTodoAnalysisPhases);
-const mockGetTodos = vi.mocked(getTodos);
-const mockAppendKnownFindings = vi.mocked(appendKnownFindings);
-const mockParseAcceptanceCriteria = vi.mocked(parseAcceptanceCriteria);
+const mockGetOperation = mocked(getOperation);
+const mockGetReviewDetail = mocked(getReviewDetail);
+const mockBuildInit = mocked(buildInitPipeline);
+const mockBuildUpdateTodo = mocked(buildUpdateTodoPipeline);
+const mockBuildExecute = mocked(buildExecutePipeline);
+const mockBuildReview = mocked(buildReviewPipeline);
+const mockBuildCreatePr = mocked(buildCreatePrPipeline);
+const mockGetReviewSessions = mocked(getReviewSessions);
+const mockStripCompletedTodos = mocked(stripCompletedTodosFromWorkspace);
+const mockListWorkspaceRepos = mocked(listWorkspaceRepos);
+const mockReadWorkspaceReadme = mocked(readWorkspaceReadme);
+const mockSetupRepository = mocked(setupRepository);
+const mockBuildInitTodoAnalysis = mocked(buildInitTodoAnalysisPhases);
+const mockGetTodos = mocked(getTodos);
+const mockAppendKnownFindings = mocked(appendKnownFindings);
+const mockParseAcceptanceCriteria = mocked(parseAcceptanceCriteria);
 
 function createMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunctionContext {
   return {
@@ -410,7 +413,7 @@ describe("buildAutonomousPipeline", () => {
       });
       const execPhase = phaseByLabel(phases, "Cycle 1: Execute");
 
-      const { batchSize } = vi.mocked(getOperationConfig)("execute");
+      const { batchSize } = mocked(getOperationConfig)("execute");
       expect(execPhase.timeoutMs).toBeGreaterThanOrEqual(
         executePhaseBudgetMs(ROUTINE_BATCH_COUNT, batchSize),
       );
@@ -771,7 +774,7 @@ describe("buildAutonomousPipeline", () => {
       const ctx = createMockCtx();
       expect(await ensurePhase.fn(ctx)).toBe(true);
 
-      const labels = vi.mocked(ctx.runChildGroup).mock.calls.flatMap(([children]) => children.map((c) => c.label));
+      const labels = mocked(ctx.runChildGroup).mock.calls.flatMap(([children]) => children.map((c) => c.label));
       expect(labels.sort()).toEqual(["constraints-new", "guidance-new"]);
     });
 
@@ -1379,7 +1382,7 @@ describe("buildAutonomousPipeline — repositories finish independently", () => 
     });
     await findPhase(phases, "Cycle 1: Gate").fn(gate.ctx);
 
-    const stop = vi.mocked(gate.ctx.emitResult).mock.calls
+    const stop = mocked(gate.ctx.emitResult).mock.calls
       .map((c) => c[0])
       .find((m) => m.startsWith(FINAL_CYCLE_STOP_PREFIX));
     expect(stop).toMatch(/only for the finished repository \(api\); none for web/);

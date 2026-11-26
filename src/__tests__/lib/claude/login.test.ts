@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "bun:test";
+import * as actualLogin from "@/lib/claude/login";
+
+const realLogin = { ...actualLogin };
 
 function makeStream(content: string): ReadableStream<Uint8Array> {
   return new ReadableStream({
@@ -26,8 +29,8 @@ function mockProc(
 const mockSpawnClaudeAuth = vi.fn();
 const mockCheckAuthStatus = vi.fn();
 
-vi.mock("@/lib/claude/login", async (importOriginal) => {
-  const original = await importOriginal<typeof import("@/lib/claude/login")>();
+vi.mock("@/lib/claude/login", () => {
+  const original = realLogin;
 
   async function readStream(stream: ReadableStream<Uint8Array>): Promise<string> {
     const reader = stream.getReader();

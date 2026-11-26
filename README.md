@@ -195,21 +195,18 @@ bun run lint
 # Run all tests
 bun run test
 
-# Run tests in watch mode
-bun run test:watch
-
-# Run a single test file (--bun is required so bun:sqlite resolves)
-bun --bun vitest run src/__tests__/lib/parsers/todo.test.ts
+# Run a single test file (components/ and hooks/ also need --preload ./src/test-setup-dom.ts)
+bun test src/__tests__/lib/parsers/todo.test.ts
 ```
 
 ## Testing
 
-Tests use **Vitest** with jsdom environment, `@testing-library/react`, and `@testing-library/jest-dom` matchers. Test files live in `src/__tests__/` mirroring the `src/` structure.
+Tests use **`bun test`** with `@testing-library/react` and `@testing-library/jest-dom` matchers; `src/__tests__/components/` and `src/__tests__/hooks/` run with a happy-dom DOM. Test files live in `src/__tests__/` mirroring the `src/` structure.
 
 ```bash
-bun run test          # Run all tests
-bun run test:watch    # Watch mode
-bun --bun vitest run <file>  # Single file (plain `bunx vitest` fails to bundle bun:sqlite)
+bun run test          # Run all tests (test:node, then test:dom)
+bun test <file>       # Single non-DOM file
+bun test --preload ./src/test-setup-dom.ts <file>  # Single components/ or hooks/ file
 ```
 
 ## Tech Stack

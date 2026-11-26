@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
 
 // The palette itself is not asserted — a single class token per case is only a

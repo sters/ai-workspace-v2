@@ -1,3 +1,5 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
+import { stubGlobal, unstubAllGlobals } from "@/__tests__/helpers/mocks";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { SWRConfig } from "swr";
 import type { ReactNode } from "react";
@@ -39,11 +41,11 @@ beforeEach(() => {
     }
     return Promise.resolve(json({ pr: { repoName: "widgets", title: "Add widget cache" } }));
   });
-  vi.stubGlobal("fetch", mockFetch);
+  stubGlobal("fetch", mockFetch);
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe("usePullRequests", () => {

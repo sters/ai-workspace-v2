@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { applyManagedHooks, syncManagedHooks } from "@/lib/claude/hooks/sync";
 import { MANAGED_COMMAND_PREFIX, MANAGED_SCRIPT_NAMES } from "@/lib/claude/hooks/scripts";
 import { _resetConfig, setWorkspaceRoot, _resetWorkspaceRoot } from "@/lib/config";

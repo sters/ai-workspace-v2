@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "bun:test";
 import { resolveModel } from "@/lib/config/model";
 import { _resetConfig, _setConfigFilePath } from "@/lib/config/resolver";
 import fs from "node:fs";

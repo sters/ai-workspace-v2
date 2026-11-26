@@ -1,10 +1,9 @@
-// @vitest-environment node
 /**
  * An operation the server was killed mid-run never had its result written, but
  * its events were flushed as they arrived — so the result is still derivable,
  * and the card would otherwise show nothing until it is expanded.
  */
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach } from "bun:test";
 import {
   getDb,
   _resetDb,

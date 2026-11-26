@@ -1,9 +1,12 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
+import * as actualHelpers from "@/lib/workspace/helpers";
+
+const realHelpers = { ...actualHelpers };
 import { extractPrUrls } from "@/lib/workspace/pr-url";
 import type { PrUrlInfo } from "@/lib/workspace/pr-url";
 
-vi.mock("@/lib/workspace/helpers", async (importOriginal) => {
-  const mod = await importOriginal<typeof import("@/lib/workspace/helpers")>();
+vi.mock("@/lib/workspace/helpers", () => {
+  const mod = realHelpers;
   return {
     ...mod,
     exec: vi.fn(),

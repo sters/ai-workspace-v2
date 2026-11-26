@@ -1,5 +1,8 @@
-import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 
+import * as actualPrTitle from "@/lib/workspace/pr-title";
+const realPrTitle = { ...actualPrTitle };
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/ws",
 }));
@@ -31,8 +34,8 @@ vi.mock("@/lib/templates", () => ({
 
 // The derivation itself is real (see pr-title.test.ts); only the git read is
 // replaced, since these cases are about which candidate reaches the prompt.
-vi.mock("@/lib/workspace/pr-title", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/workspace/pr-title")>()),
+vi.mock("@/lib/workspace/pr-title", () => ({
+  ...realPrTitle,
   getSoleCommitSubject: vi.fn(() => null),
 }));
 
@@ -58,11 +61,11 @@ import { getSoleCommitSubject } from "@/lib/workspace/pr-title";
 import { parseReadmeMeta } from "@/lib/parsers/readme";
 import { buildPRCreatorPrompt } from "@/lib/templates";
 
-const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
-const mockCheckExistingPR = vi.mocked(checkExistingPR);
-const mockParseReadmeMeta = vi.mocked(parseReadmeMeta);
-const mockBuildPrompt = vi.mocked(buildPRCreatorPrompt);
-const mockSoleCommit = vi.mocked(getSoleCommitSubject);
+const mockListWorkspaceRepos = mocked(listWorkspaceRepos);
+const mockCheckExistingPR = mocked(checkExistingPR);
+const mockParseReadmeMeta = mocked(parseReadmeMeta);
+const mockBuildPrompt = mocked(buildPRCreatorPrompt);
+const mockSoleCommit = mocked(getSoleCommitSubject);
 
 const meta = (title: string, ticketId = "") =>
   ({ title, ticketId, repositories: [] }) as ReturnType<typeof parseReadmeMeta>;

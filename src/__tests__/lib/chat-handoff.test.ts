@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { stubGlobal, unstubAllGlobals } from "@/__tests__/helpers/mocks";
 import {
   CHAT_HANDOFF_TTL_MS,
   clearChatHandoff,
@@ -19,11 +20,11 @@ function memoryStorage(): Storage {
 }
 
 beforeEach(() => {
-  vi.stubGlobal("sessionStorage", memoryStorage());
+  stubGlobal("sessionStorage", memoryStorage());
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 describe("chat handoff", () => {

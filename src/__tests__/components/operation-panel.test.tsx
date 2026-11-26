@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "bun:test";
+import { stubGlobal, unstubAllGlobals } from "@/__tests__/helpers/mocks";
 
 vi.mock("@/lib/router/link", () => ({
   default: ({
@@ -108,11 +109,11 @@ describe("WorkspaceManageButtons archive button", () => {
   beforeEach(() => {
     mockShowToast.mockClear();
     fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ archived: true }) });
-    vi.stubGlobal("fetch", fetchMock);
+    stubGlobal("fetch", fetchMock);
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 
   it("posts to the archive route and reports back when clicked", async () => {

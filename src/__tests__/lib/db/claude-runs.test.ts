@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { getDb, _resetDb, _setDbPath, runMigrations } from "@/lib/db";
 import { insertClaudeRun, listClaudeRuns } from "@/lib/db/claude-runs";

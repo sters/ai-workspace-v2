@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "bun:test";
+import * as actualOs from "node:os";
+
+const realOs = { ...actualOs };
 
 const mockReadFile = vi.fn();
 const mockWriteFile = vi.fn();
@@ -24,14 +27,11 @@ vi.mock("node:fs/promises", () => ({
   mkdir: (...args: unknown[]) => mockMkdir(...args),
 }));
 
-vi.mock("node:os", async () => {
-  const actual = await vi.importActual("node:os");
-  return {
-    ...(actual as Record<string, unknown>),
-    default: { ...(actual as Record<string, unknown>), homedir: () => "/mock-home" },
-    homedir: () => "/mock-home",
-  };
-});
+vi.mock("node:os", () => ({
+  ...realOs,
+  default: { ...realOs, homedir: () => "/mock-home" },
+  homedir: () => "/mock-home",
+}));
 
 vi.mock("@/lib/config", () => ({
   getResolvedWorkspaceRoot: () => "/workspace-root",
@@ -39,14 +39,12 @@ vi.mock("@/lib/config", () => ({
 }));
 
 async function callGET() {
-  vi.resetModules();
   const mod = await import("@/app/api/claude-settings/route");
   const response = await mod.GET();
   return { status: response.status, data: await response.json() };
 }
 
 async function callPOST(body: Record<string, unknown>) {
-  vi.resetModules();
   const mod = await import("@/app/api/claude-settings/route");
   const request = new Request("http://localhost:3741/api/claude-settings", {
     method: "POST",

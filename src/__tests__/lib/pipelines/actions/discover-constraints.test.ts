@@ -1,8 +1,14 @@
-import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { PhaseFunctionContext } from "@/types/pipeline";
+import * as actualReadme from "@/lib/parsers/readme";
+import * as actualRepoConstraintsCache from "@/lib/workspace/repo-constraints-cache";
+
+const realParseConstraints = actualReadme.parseConstraints;
+const realAppendRepoConstraints = actualRepoConstraintsCache.appendRepoConstraints;
 
 vi.mock("@/lib/templates", () => ({
   buildRepoConstraintsPrompt: vi.fn((input: { repoName: string }) => `prompt-${input.repoName}`),
@@ -14,9 +20,8 @@ vi.mock("@/lib/parsers/readme", () => ({
   readWorkspaceReadme: vi.fn(),
   parseConstraints: vi.fn(),
 }));
-vi.mock("@/lib/workspace/repo-constraints-cache", async (importActual) => ({
-  appendRepoConstraints: (await importActual<typeof import("@/lib/workspace/repo-constraints-cache")>())
-    .appendRepoConstraints,
+vi.mock("@/lib/workspace/repo-constraints-cache", () => ({
+  appendRepoConstraints: realAppendRepoConstraints,
   locateRepoConstraintsCache: vi.fn(),
   readRepoConstraintsCache: vi.fn(),
   writeRepoConstraintsCache: vi.fn(),
@@ -30,14 +35,11 @@ import {
   writeRepoConstraintsCache,
 } from "@/lib/workspace/repo-constraints-cache";
 
-const { parseConstraints: realParseConstraints } =
-  await vi.importActual<typeof import("@/lib/parsers/readme")>("@/lib/parsers/readme");
-
-const mockReadReadme = vi.mocked(readWorkspaceReadme);
-const mockParseConstraints = vi.mocked(parseConstraints);
-const mockLocate = vi.mocked(locateRepoConstraintsCache);
-const mockReadCache = vi.mocked(readRepoConstraintsCache);
-const mockWriteCache = vi.mocked(writeRepoConstraintsCache);
+const mockReadReadme = mocked(readWorkspaceReadme);
+const mockParseConstraints = mocked(parseConstraints);
+const mockLocate = mocked(locateRepoConstraintsCache);
+const mockReadCache = mocked(readRepoConstraintsCache);
+const mockWriteCache = mocked(writeRepoConstraintsCache);
 
 function createMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunctionContext {
   return {
@@ -80,7 +82,7 @@ describe("buildDiscoverConstraintsPhase", () => {
 
     expect(await phase.fn(ctx)).toBe(true);
     expect(ctx.runChildGroup).toHaveBeenCalledTimes(1);
-    const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+    const [children] = mocked(ctx.runChildGroup).mock.calls[0];
     expect(children.map((c) => c.label)).toEqual(["constraints-a", "constraints-b"]);
   });
 
@@ -97,7 +99,7 @@ describe("buildDiscoverConstraintsPhase", () => {
     const ctx = createMockCtx();
 
     expect(await phase.fn(ctx)).toBe(true);
-    const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+    const [children] = mocked(ctx.runChildGroup).mock.calls[0];
     expect(children.map((c) => c.label)).toEqual(["constraints-b"]);
   });
 
@@ -118,7 +120,7 @@ describe("buildDiscoverConstraintsPhase", () => {
     const ctx = createMockCtx();
 
     expect(await phase.fn(ctx)).toBe(true);
-    const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+    const [children] = mocked(ctx.runChildGroup).mock.calls[0];
     expect(children.map((c) => c.label)).toEqual(["constraints-a"]);
   });
 
@@ -170,7 +172,7 @@ describe("buildDiscoverConstraintsPhase", () => {
         const ctx = createMockCtx();
 
         expect(await phase.fn(ctx)).toBe(true);
-        const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+        const [children] = mocked(ctx.runChildGroup).mock.calls[0];
         expect(children.map((c) => c.label)).toEqual(["constraints-b"]);
         expect(fs.readFileSync(readmePath, "utf8")).toBe(
           "# Task: x\n\n## Repository Constraints\n\n### a\n\n- Lint: `make lint`\n\n## Related Resources\n",
@@ -266,7 +268,7 @@ describe("buildDiscoverConstraintsPhase", () => {
         const ctx = createMockCtx({ runChildGroup: discoveringGroup([true]) });
 
         expect(await buildDiscoverConstraintsPhase({ workspace: "ws", wsPath, repos }).fn(ctx)).toBe(true);
-        const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+        const [children] = mocked(ctx.runChildGroup).mock.calls[0];
         expect(children.map((c) => c.label)).toEqual(["constraints-repo"]);
         expect(realParseConstraints(fs.readFileSync(readmePath, "utf8"))).toEqual([
           { repoName: "repo", constraints: LINT },
@@ -279,7 +281,7 @@ describe("buildDiscoverConstraintsPhase", () => {
         const ctx = createMockCtx({ runChildGroup: discoveringGroup([true, true]) });
 
         expect(await buildDiscoverConstraintsPhase({ workspace: "ws", wsPath, repos }).fn(ctx)).toBe(true);
-        const [children] = vi.mocked(ctx.runChildGroup).mock.calls[0];
+        const [children] = mocked(ctx.runChildGroup).mock.calls[0];
         expect(children.map((c) => c.label)).toEqual(["constraints-repo", "constraints-repo___dev"]);
       });
 

@@ -8,9 +8,10 @@
   "scripts": {
     "dev:hot": "bun --bun bin/start.ts --hot",
     "start": "bun --bun bin/start.ts",
-    "lint": "bun --bun tsc --noEmit && bun --bun eslint src/",
-    "test": "bun --bun vitest run",
-    "test:watch": "bun --bun vitest",
+    "lint": "bun check && bun --bun eslint src/",
+    "test": "bun run test:node && bun run test:dom",
+    "test:node": "bun test --parallel src/__tests__/api src/__tests__/app src/__tests__/lib",
+    "test:dom": "bun test --parallel --preload ./src/test-setup-dom.ts src/__tests__/components src/__tests__/hooks",
     "web-server": "bun run bin/web-server.ts",
     "chat-server": "bun run bin/chat-server.ts",
     "bench": "bun --bun bin/bench.ts",
@@ -41,6 +42,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@happy-dom/global-registrator": "^21.0.4",
     "@tailwindcss/typography": "^0.5.16",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -50,17 +52,14 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/web-push": "^3.6.4",
-    "@vitejs/plugin-react": "^5.2.0",
     "bun-plugin-tailwind": "^0.1.2",
     "eslint": "^10.1.0",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "jsdom": "^29.0.1",
     "postcss": "^8.5.8",
     "postcss-load-config": "^6.0.1",
     "tailwindcss": "^4.2.2",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.57.1",
-    "vitest": "^4.1.0"
+    "typescript-eslint": "^8.57.1"
   },
   "patchedDependencies": {
     "@tanstack/router-core@1.171.39": "patches/@tanstack%2Frouter-core@1.171.39.patch"

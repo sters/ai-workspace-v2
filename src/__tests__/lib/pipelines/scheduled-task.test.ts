@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { parseScheduledTaskPlan } from "@/lib/pipelines/scheduled-task";
 
 const plan = { title: " Watch CI ", cron: "0 9 * * 1-5", overlap: "queue", prompt: " Check main. " };

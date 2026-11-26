@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { parseRunUsage } from "@/lib/parsers/run-usage";
 
 function usage(cost: number, tokens: Partial<Record<string, number>> = {}) {

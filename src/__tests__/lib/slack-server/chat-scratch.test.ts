@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import path from "node:path";
 import { getSlackScratchDir, getSlackScratchRoot } from "@/lib/slack-server/chat-scratch";
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { computePrSuggestions } from "@/lib/pr-watcher/suggestions";
 import type { PrEvent, PrEventKind, PrWatchSnapshot } from "@/types/pr-watch";
 

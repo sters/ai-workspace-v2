@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "bun:test";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { insertOperation, updateOperationStatus, updateOperationWorkspace } from "@/lib/db/operations";
 import { addPendingNotification, listReadyNotifications } from "@/lib/db/slack-notifications";

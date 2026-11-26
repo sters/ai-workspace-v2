@@ -1,5 +1,5 @@
-// @vitest-environment node
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "bun:test";
+import { advanceTimersByTimeAsync } from "@/__tests__/helpers/mocks";
 
 const runClaudeMock = vi.fn();
 const getConfigMock = vi.fn();
@@ -198,7 +198,7 @@ describe("converse", () => {
       );
 
       const promise = converse("thread-timeout", "a big investigation", { userId: "U1" });
-      await vi.advanceTimersByTimeAsync(18 * 60 * 1000);
+      await advanceTimersByTimeAsync(18 * 60 * 1000);
       const reply = await promise;
 
       expect(reply).toContain("took too long");
@@ -214,7 +214,7 @@ describe("converse", () => {
       runClaudeMock.mockReturnValue(fakeProc({ events: [] }));
 
       const promise = converse("thread-none", "hi", { userId: "U1" });
-      await vi.advanceTimersByTimeAsync(18 * 60 * 1000);
+      await advanceTimersByTimeAsync(18 * 60 * 1000);
       await promise;
 
       expect(getSession("thread-none", Date.now())).toBeUndefined();
@@ -234,13 +234,13 @@ describe("converse", () => {
 
       const promise = converse("thread-hb", "investigate", { userId: "U1", onProgress });
       // One heartbeat interval elapses before the turn completes.
-      await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+      await advanceTimersByTimeAsync(3 * 60 * 1000);
 
       expect(summarizeMock).toHaveBeenCalledWith("grepping the logs…", "haiku");
       expect(onProgress).toHaveBeenCalledWith("Reading the auth logs.");
 
       // Let it reach the cap so the promise settles.
-      await vi.advanceTimersByTimeAsync(18 * 60 * 1000);
+      await advanceTimersByTimeAsync(18 * 60 * 1000);
       await promise;
     } finally {
       vi.useRealTimers();
@@ -254,12 +254,12 @@ describe("converse", () => {
       const onProgress = vi.fn();
 
       const promise = converse("thread-empty", "investigate", { userId: "U1", onProgress });
-      await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+      await advanceTimersByTimeAsync(3 * 60 * 1000);
 
       expect(summarizeMock).not.toHaveBeenCalled();
       expect(onProgress).toHaveBeenCalledWith("");
 
-      await vi.advanceTimersByTimeAsync(18 * 60 * 1000);
+      await advanceTimersByTimeAsync(18 * 60 * 1000);
       await promise;
     } finally {
       vi.useRealTimers();
@@ -285,12 +285,12 @@ describe("converse", () => {
       const onProgress = vi.fn();
 
       const promise = converse("thread-null", "investigate", { userId: "U1", onProgress });
-      await vi.advanceTimersByTimeAsync(3 * 60 * 1000);
+      await advanceTimersByTimeAsync(3 * 60 * 1000);
 
       expect(summarizeMock).not.toHaveBeenCalled();
       expect(onProgress).toHaveBeenCalledWith("");
 
-      await vi.advanceTimersByTimeAsync(18 * 60 * 1000);
+      await advanceTimersByTimeAsync(18 * 60 * 1000);
       await promise;
     } finally {
       vi.useRealTimers();

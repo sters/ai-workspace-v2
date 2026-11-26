@@ -1,5 +1,8 @@
-import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
+import { vi, describe, it, expect, beforeEach, afterAll } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 
+import * as actualConstraintScope from "@/lib/workspace/constraint-scope";
+const realConstraintScope = { ...actualConstraintScope };
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/ws",
 }));
@@ -64,8 +67,8 @@ vi.mock("@/lib/workspace/constraint-runner", () => ({
   buildNoConstraintsReport: vi.fn(() => "NOT-DECLARED-REPORT"),
 }));
 
-vi.mock("@/lib/workspace/constraint-scope", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/workspace/constraint-scope")>()),
+vi.mock("@/lib/workspace/constraint-scope", () => ({
+  ...realConstraintScope,
   resolveConstraintScope: vi.fn(async () => null),
 }));
 
@@ -121,20 +124,20 @@ import {
   writeReviewBaseline,
 } from "@/lib/workspace/review-baseline";
 
-const mockListWorkspaceRepos = vi.mocked(listWorkspaceRepos);
-const mockParseConstraints = vi.mocked(parseConstraints);
-const mockExecConstraintCommand = vi.mocked(execConstraintCommand);
-const mockBuildNoConstraintsReport = vi.mocked(buildNoConstraintsReport);
-const mockBuildConstraintReport = vi.mocked(buildConstraintReport);
-const mockResolveConstraintScope = vi.mocked(resolveConstraintScope);
-const mockGetRepoChanges = vi.mocked(getRepoChanges);
-const mockBuildCodeReviewerPrompt = vi.mocked(buildCodeReviewerPrompt);
-const mockBuildCrossRepoPrompt = vi.mocked(buildCrossRepositoryReviewerPrompt);
-const mockBuildFixVerifierPrompt = vi.mocked(buildFixVerifierPrompt);
-const mockCaptureRepoHead = vi.mocked(captureRepoHead);
-const mockReadPreviousBaseline = vi.mocked(readPreviousReviewBaseline);
-const mockWriteReviewBaseline = vi.mocked(writeReviewBaseline);
-const mockCollectPostedAsks = vi.mocked(collectPostedAsks);
+const mockListWorkspaceRepos = mocked(listWorkspaceRepos);
+const mockParseConstraints = mocked(parseConstraints);
+const mockExecConstraintCommand = mocked(execConstraintCommand);
+const mockBuildNoConstraintsReport = mocked(buildNoConstraintsReport);
+const mockBuildConstraintReport = mocked(buildConstraintReport);
+const mockResolveConstraintScope = mocked(resolveConstraintScope);
+const mockGetRepoChanges = mocked(getRepoChanges);
+const mockBuildCodeReviewerPrompt = mocked(buildCodeReviewerPrompt);
+const mockBuildCrossRepoPrompt = mocked(buildCrossRepositoryReviewerPrompt);
+const mockBuildFixVerifierPrompt = mocked(buildFixVerifierPrompt);
+const mockCaptureRepoHead = mocked(captureRepoHead);
+const mockReadPreviousBaseline = mocked(readPreviousReviewBaseline);
+const mockWriteReviewBaseline = mocked(writeReviewBaseline);
+const mockCollectPostedAsks = mocked(collectPostedAsks);
 
 describe("buildReviewPipeline — completion verifier", () => {
   beforeEach(() => {
@@ -161,7 +164,7 @@ describe("buildReviewPipeline — completion verifier", () => {
 
     expect(labels.filter((l) => l.startsWith("verify-"))).toEqual(["verify-empty-todo-repo", "verify-active-repo"]);
     const todoBy = Object.fromEntries(
-      vi.mocked(buildCompletionVerifierPrompt).mock.calls.map(([input]) => [input.repoName, input.todoContent]),
+      mocked(buildCompletionVerifierPrompt).mock.calls.map(([input]) => [input.repoName, input.todoContent]),
     );
     expect(todoBy).toEqual({ "empty-todo-repo": "", "active-repo": "# TODO\n\n- [ ] do this" });
   });
@@ -245,7 +248,7 @@ describe("buildReviewPipeline — cross-repository review", () => {
 
   it("hands both reviewers each repository's review guidance, not its implementation guidance", async () => {
     mockListWorkspaceRepos.mockReturnValue(twoRepos());
-    vi.mocked(readRepoGuidance).mockImplementation(async (_ws, repoName) => ({
+    mocked(readRepoGuidance).mockImplementation(async (_ws, repoName) => ({
       implementation: `${repoName}-implementation`,
       review: `${repoName}-review`,
     }));
@@ -258,7 +261,7 @@ describe("buildReviewPipeline — cross-repository review", () => {
     ]);
     const [crossInput] = mockBuildCrossRepoPrompt.mock.calls[0];
     expect(crossInput.repos.map((r) => r.repoGuidance)).toEqual(["api-review", "web-review"]);
-    expect(vi.mocked(readRepoGuidance)).toHaveBeenCalledWith("/ws/test-ws", "api");
+    expect(mocked(readRepoGuidance)).toHaveBeenCalledWith("/ws/test-ws", "api");
   });
 
   it("does NOT add a cross-repository review child for a single-repo workspace", async () => {
@@ -425,7 +428,7 @@ describe("buildReviewPipeline — constraint timeout aborts remaining commands i
     expect(ctx.emitResult).toHaveBeenCalledWith("Constraint verification completed with failures");
 
     // Status should mention skipping remaining constraints for the timed-out repo.
-    const statusMessages = vi.mocked(ctx.emitStatus).mock.calls.map((c) => c[0]);
+    const statusMessages = mocked(ctx.emitStatus).mock.calls.map((c) => c[0]);
     expect(
       statusMessages.some(
         (m) => m.includes("repo-a") && /skip/i.test(m) && /timeout|timed out/i.test(m),
@@ -586,7 +589,7 @@ describe("buildReviewPipeline — repos without declared constraints", () => {
     const ctx = createMockCtx();
     await (phases[0] as PipelinePhaseFunction).fn(ctx);
 
-    const results = vi.mocked(ctx.emitResult).mock.calls.map((c) => c[0]);
+    const results = mocked(ctx.emitResult).mock.calls.map((c) => c[0]);
     expect(results.some((m) => /failure/i.test(m))).toBe(false);
     expect(results.some((m) => /no constraints declared/i.test(m))).toBe(true);
   });
@@ -914,7 +917,7 @@ describe("buildReviewPipeline — phase order", () => {
 
   it("points the completion verifier at the constraint report instead of the commands", async () => {
     await buildReviewPipeline({ workspace: "test-ws" });
-    expect(vi.mocked(buildCompletionVerifierPrompt)).toHaveBeenCalledWith(
+    expect(mocked(buildCompletionVerifierPrompt)).toHaveBeenCalledWith(
       expect.objectContaining({
         constraintReportPath: expect.stringContaining("CONSTRAINTS-owner_repo-a.md"),
       }),
@@ -958,7 +961,7 @@ describe("buildReviewPipeline — a round with requested fixes keeps every revie
   // while the constraint report on disk already showed it passing.
   it("points the fix verifier at the same constraint report as the completion verifier", async () => {
     await buildReviewPipeline({ workspace: "test-ws", requestedFixes: ["fix one"] });
-    const completion = vi.mocked(buildCompletionVerifierPrompt).mock.calls[0][0];
+    const completion = mocked(buildCompletionVerifierPrompt).mock.calls[0][0];
     const fixes = mockBuildFixVerifierPrompt.mock.calls[0][0];
     expect(fixes.constraintReportPath).toBe(completion.constraintReportPath);
   });
@@ -1002,7 +1005,7 @@ describe("buildReviewPipeline — refreshFromRemote", () => {
     ]);
     // The review's diff, scope and baseline are all resolved while it is built,
     // so nothing about it may be built before the refresh has run.
-    expect(vi.mocked(prepareReviewDir)).not.toHaveBeenCalled();
+    expect(mocked(prepareReviewDir)).not.toHaveBeenCalled();
     expect(mockWriteReviewBaseline).not.toHaveBeenCalled();
   });
 

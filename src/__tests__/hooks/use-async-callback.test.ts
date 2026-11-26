@@ -1,5 +1,5 @@
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "bun:test";
 import { useAsyncCallback } from "@/hooks/use-async-callback";
 
 describe("useAsyncCallback", () => {

@@ -13,9 +13,9 @@ bunx github:sters/ai-workspace-v2 [/path/to/ai-workspace]  # Run via bunx
 bun install
 bun run dev:hot                 # Development with hot reload
 bun run start                   # Start (no build step: Bun.serve bundles the page)
-bun run lint                    # tsc + eslint src/
-bun run test                    # All tests
-bun --bun vitest run src/__tests__/lib/parsers/todo.test.ts  # Single file (--bun required for bun:sqlite)
+bun run lint                    # bun check (type check) + eslint src/
+bun run test                    # All tests: test:node, then test:dom
+bun test src/__tests__/lib/parsers/todo.test.ts  # Single file; components/ and hooks/ also need --preload ./src/test-setup-dom.ts
 bun run bench --root ~/ai-workspace --workspace <ws> --step verify-completion --configs opus/medium,claude-haiku-5-5/xhigh  # billed; answers go to .ai-workspace/bench/, read and compare them; --list, --dry-run
 bun run bench:execute --root ~/ai-workspace --workspace <ws> --repo <worktree> --configs opus/medium,claude-sonnet-5-5/high  # billed; reruns the planned TODO from the commit it started on, in sandbox worktrees; writes patch, commits, TODO and constraint results per attempt
 ```
@@ -102,7 +102,7 @@ React 19 + TanStack Router, TypeScript strict, Tailwind CSS 4, SWR, Bun runtime.
 
 ## Testing
 
-Vitest + Testing Library, globals enabled. Only `src/__tests__/components/**` and `src/__tests__/hooks/**` get jsdom; everything else runs in node. Bound any loop a permissive `vi.fn()` mock could make endless (`mock.calls` grows without limit). Kill a runaway vitest worker by pid.
+`bun test` (`--parallel`, one isolated global per file) + Testing Library; `bunfig.toml` preloads `src/test-setup.ts`. Only `src/__tests__/components/**` and `src/__tests__/hooks/**` get a DOM (happy-dom, `src/test-setup-dom.ts`, preloaded by `test:dom`); a new top-level test directory must be added to `test:node` or `test:dom` in `package.json`. `vi.mock` is not hoisted: it patches the live bindings of a module already loaded, and a module first loaded after it gets exactly the factory's exports, so spread the real module (`import * as actual` copied before the mock) into a partial mock; a module that must see the mock at its own import time is imported with `await import()` after the mock. Bun lacks `vi.mocked` / `stubGlobal` / `unstubAllGlobals` / `waitFor` / `advanceTimersByTimeAsync`; use `src/__tests__/helpers/mocks.ts`. Bound any loop a permissive `vi.fn()` mock could make endless (`mock.calls` grows without limit). Kill a runaway test worker by pid.
 
 ## Gotchas
 

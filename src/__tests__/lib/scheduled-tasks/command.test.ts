@@ -1,5 +1,5 @@
-// @vitest-environment node
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach } from "bun:test";
+import { waitFor } from "@/__tests__/helpers/mocks";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { getScheduledTask, insertScheduledTask } from "@/lib/db/scheduled-tasks";
 import { createCommandRunner } from "@/lib/scheduled-tasks/command";
@@ -22,7 +22,7 @@ describe("createCommandRunner", () => {
     expect(runner.isRunning(task)).toBe(true);
     expect(getScheduledTask(task.id)!.lastRunAt).toEqual(expect.any(String));
 
-    await vi.waitFor(() => expect(runner.isRunning(task)).toBe(false), { timeout: 5000 });
+    await waitFor(() => expect(runner.isRunning(task)).toBe(false), { timeout: 5000 });
     const after = getScheduledTask(task.id)!;
     expect(after.lastExitCode).toBe(3);
     expect(after.lastOutput).toContain("hi");
@@ -34,7 +34,7 @@ describe("createCommandRunner", () => {
     const task = commandTask("sleep 0.1");
     await runner.start(task);
     await runner.start(task);
-    await vi.waitFor(() => expect(runner.isRunning(task)).toBe(false), { timeout: 5000 });
+    await waitFor(() => expect(runner.isRunning(task)).toBe(false), { timeout: 5000 });
     expect(getScheduledTask(task.id)!.lastExitCode).toBe(0);
   });
 });

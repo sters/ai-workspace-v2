@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect } from "bun:test";
 import { appendTodoItems, replaceReadmeSections } from "@/lib/workspace/workspace-files";
 import { parseAcceptanceCriteria, parseReadmeMeta } from "@/lib/parsers/readme";
 import { parseTodoItems, parseTodoSections } from "@/lib/parsers/todo";

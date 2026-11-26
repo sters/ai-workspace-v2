@@ -1,4 +1,5 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 import type { PhaseFunctionContext, PipelinePhase, GroupChild } from "@/types/pipeline";
 
 vi.mock("@/lib/pipeline-manager", () => ({
@@ -41,10 +42,10 @@ import { buildExecutePipeline } from "@/lib/pipelines/execute";
 import { buildCreatePrPipeline } from "@/lib/pipelines/create-pr";
 import { getOperation } from "@/lib/pipeline-manager";
 
-const mockBuildUpdateTodo = vi.mocked(buildUpdateTodoPipeline);
-const mockBuildExecute = vi.mocked(buildExecutePipeline);
-const mockBuildCreatePr = vi.mocked(buildCreatePrPipeline);
-const mockGetOperation = vi.mocked(getOperation);
+const mockBuildUpdateTodo = mocked(buildUpdateTodoPipeline);
+const mockBuildExecute = mocked(buildExecutePipeline);
+const mockBuildCreatePr = mocked(buildCreatePrPipeline);
+const mockGetOperation = mocked(getOperation);
 
 function createMockCtx(overrides?: Partial<PhaseFunctionContext>): PhaseFunctionContext {
   return {

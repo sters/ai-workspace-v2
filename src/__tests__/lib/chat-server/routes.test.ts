@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "bun:test";
 import type { ChatSessionInfo } from "@/types/chat";
 
 vi.mock("@/lib/db/chat-sessions", () => ({

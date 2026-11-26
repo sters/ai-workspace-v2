@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "bun:test";
 import { createSlackWorkspace } from "@/lib/slack-server/workspace-create";
 
 const REPOS = [{ repoPath: "github.com/acme/web", repoName: "web", baseBranch: "main" }];

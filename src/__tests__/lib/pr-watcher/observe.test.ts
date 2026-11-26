@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { observePr } from "@/lib/pr-watcher/observe";
 import type { PrChecksSummary, PrReviewThread, WorkspacePullRequest } from "@/types/pull-request";
 import type { PrWatchSnapshot } from "@/types/pr-watch";

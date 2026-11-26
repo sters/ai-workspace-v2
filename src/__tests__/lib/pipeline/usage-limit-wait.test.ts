@@ -1,5 +1,5 @@
-// @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, setSystemTime } from "bun:test";
+import { mocked, advanceTimersByTimeAsync } from "@/__tests__/helpers/mocks";
 import type { ClaudeProcess } from "@/types/claude";
 import type { OperationEvent, OperationPhaseInfo } from "@/types/operation";
 import type { PipelinePhase } from "@/types/pipeline";
@@ -45,7 +45,7 @@ const NOW = new Date("2026-10-29T09:00:00Z").getTime();
 const MINUTE = 60_000;
 
 function setWaitOutUsageLimit(enabled: boolean) {
-  vi.mocked(getConfig).mockReturnValue({ operations: { waitOutUsageLimit: enabled } } as ReturnType<typeof getConfig>);
+  mocked(getConfig).mockReturnValue({ operations: { waitOutUsageLimit: enabled } } as ReturnType<typeof getConfig>);
 }
 
 function makeManaged(phases: OperationPhaseInfo[] = []): ManagedOperation {
@@ -114,9 +114,9 @@ function statuses(managed: ManagedOperation): string[] {
 describe("runChildWaitingOutUsageLimit", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(NOW);
+    setSystemTime(NOW);
     setWaitOutUsageLimit(true);
-    vi.mocked(sendUsageLimitNotification).mockClear();
+    mocked(sendUsageLimitNotification).mockClear();
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -131,14 +131,14 @@ describe("runChildWaitingOutUsageLimit", () => {
       runChildWaitingOutUsageLimit(managed, "a", "A", spawnA),
       runChildWaitingOutUsageLimit(managed, "b", "B", spawnB),
     ]);
-    await vi.advanceTimersByTimeAsync(MINUTE);
-    expect(vi.mocked(sendUsageLimitNotification).mock.calls).toEqual([
+    await advanceTimersByTimeAsync(MINUTE);
+    expect(mocked(sendUsageLimitNotification).mock.calls).toEqual([
       ["op-1", "ws-1", expect.any(Number)],
     ]);
 
-    await vi.advanceTimersByTimeAsync(40 * MINUTE);
+    await advanceTimersByTimeAsync(40 * MINUTE);
     await pending;
-    expect(vi.mocked(sendUsageLimitNotification).mock.calls).toEqual([
+    expect(mocked(sendUsageLimitNotification).mock.calls).toEqual([
       ["op-1", "ws-1", expect.any(Number)],
       ["op-1", "ws-1", null],
     ]);
@@ -149,11 +149,11 @@ describe("runChildWaitingOutUsageLimit", () => {
     const spawn = vi.fn().mockReturnValue(limited(NOW + 30 * MINUTE));
 
     const pending = runChildWaitingOutUsageLimit(managed, "c1", "Child", spawn);
-    await vi.advanceTimersByTimeAsync(MINUTE);
+    await advanceTimersByTimeAsync(MINUTE);
     managed.abortController.abort();
     await pending;
 
-    expect(vi.mocked(sendUsageLimitNotification).mock.calls).toEqual([
+    expect(mocked(sendUsageLimitNotification).mock.calls).toEqual([
       ["op-1", "ws-1", expect.any(Number)],
     ]);
   });
@@ -165,10 +165,10 @@ describe("runChildWaitingOutUsageLimit", () => {
       .mockReturnValueOnce(succeeds());
 
     const pending = runChildWaitingOutUsageLimit(managed, "c1", "Child", spawn);
-    await vi.advanceTimersByTimeAsync(29 * MINUTE);
+    await advanceTimersByTimeAsync(29 * MINUTE);
     expect(spawn).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(10 * MINUTE);
+    await advanceTimersByTimeAsync(10 * MINUTE);
     const result = await pending;
 
     expect(spawn).toHaveBeenCalledTimes(2);
@@ -186,11 +186,11 @@ describe("runChildWaitingOutUsageLimit", () => {
 
     try {
       const pending = runChildWaitingOutUsageLimit(managed, "c1", "Child", spawn);
-      await vi.advanceTimersByTimeAsync(MINUTE);
+      await advanceTimersByTimeAsync(MINUTE);
       const until = summary()?.usageLimitWaitUntil;
       expect(until && new Date(until).getTime()).toBeGreaterThanOrEqual(NOW + 30 * MINUTE);
 
-      await vi.advanceTimersByTimeAsync(40 * MINUTE);
+      await advanceTimersByTimeAsync(40 * MINUTE);
       await pending;
       expect(summary()?.usageLimitWaitUntil).toBeUndefined();
     } finally {
@@ -205,7 +205,7 @@ describe("runChildWaitingOutUsageLimit", () => {
     );
 
     const pending = runChildWaitingOutUsageLimit(managed, "c1", "Child", spawn);
-    await vi.advanceTimersByTimeAsync(10);
+    await advanceTimersByTimeAsync(10);
     const result = await pending;
 
     expect(spawn).toHaveBeenCalledTimes(1);
@@ -218,7 +218,7 @@ describe("runChildWaitingOutUsageLimit", () => {
     const spawn = vi.fn().mockReturnValue(limited(NOW + 30 * MINUTE));
 
     const pending = runChildWaitingOutUsageLimit(managed, "c1", "Child", spawn);
-    await vi.advanceTimersByTimeAsync(10);
+    await advanceTimersByTimeAsync(10);
     const result = await pending;
 
     expect(spawn).toHaveBeenCalledTimes(1);
@@ -230,7 +230,7 @@ describe("runChildWaitingOutUsageLimit", () => {
     const spawn = vi.fn().mockReturnValue(limited(NOW + 3 * 24 * 60 * MINUTE));
 
     const pending = runChildWaitingOutUsageLimit(managed, "c1", "Child", spawn);
-    await vi.advanceTimersByTimeAsync(10);
+    await advanceTimersByTimeAsync(10);
     const result = await pending;
 
     expect(spawn).toHaveBeenCalledTimes(1);
@@ -242,7 +242,7 @@ describe("runChildWaitingOutUsageLimit", () => {
     const spawn = vi.fn().mockReturnValue(limited(NOW + 30 * MINUTE));
 
     const pending = runChildWaitingOutUsageLimit(managed, "c1", "Child", spawn);
-    await vi.advanceTimersByTimeAsync(MINUTE);
+    await advanceTimersByTimeAsync(MINUTE);
     managed.abortController.abort();
     const result = await pending;
 
@@ -255,7 +255,7 @@ describe("runChildWaitingOutUsageLimit", () => {
     const spawn = vi.fn().mockImplementation(() => limited(Date.now() + MINUTE));
 
     const pending = runChildWaitingOutUsageLimit(managed, "c1", "Child", spawn);
-    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    await advanceTimersByTimeAsync(60 * MINUTE);
     const result = await pending;
 
     expect(result.success).toBe(false);
@@ -267,7 +267,7 @@ describe("runChildWaitingOutUsageLimit", () => {
 describe("phase timeout while a child waits out a usage limit", () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(NOW);
+    setSystemTime(NOW);
     setWaitOutUsageLimit(true);
   });
   afterEach(() => {
@@ -275,7 +275,7 @@ describe("phase timeout while a child waits out a usage limit", () => {
   });
 
   it("does not count the wait against the phase budget", async () => {
-    vi.mocked(runClaude)
+    mocked(runClaude)
       .mockReturnValueOnce(limited(NOW + 30 * MINUTE))
       .mockReturnValueOnce(succeeds());
 
@@ -295,7 +295,7 @@ describe("phase timeout while a child waits out a usage limit", () => {
       phaseInfos,
       operationType: "autonomous",
     });
-    await vi.advanceTimersByTimeAsync(60 * MINUTE);
+    await advanceTimersByTimeAsync(60 * MINUTE);
     await pending;
 
     expect(runClaude).toHaveBeenCalledTimes(2);

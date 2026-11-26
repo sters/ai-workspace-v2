@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach } from "bun:test";
 import { listRecentNewOriginatedOperations } from "@/lib/operation-store/new-history";
 import type { Operation } from "@/types/operation";
 import { getDb, _resetDb, _setDbPath, insertOperation, updateOperationStatus } from "@/lib/db";

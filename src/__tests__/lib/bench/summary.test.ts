@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { summarizeBench } from "@/lib/bench/summary";
 
 const attempt = (config: string, n: number, ok: boolean, costUsd: number, outputTokens: number) => ({

@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "bun:test";
+import { stubGlobal, unstubAllGlobals } from "@/__tests__/helpers/mocks";
 import type { RepoLesson } from "@/types/repo-lessons";
 import { RepoLessonsBrowser } from "@/components/utilities/repo-lessons-browser";
 
@@ -72,7 +73,7 @@ describe("RepoLessonsBrowser", () => {
   it("lists disputed approved lessons first and lets a person keep one", async () => {
     const onChanged = vi.fn();
     const fetchMock = vi.fn().mockResolvedValue(new Response("{}"));
-    vi.stubGlobal("fetch", fetchMock);
+    stubGlobal("fetch", fetchMock);
     render(
       <RepoLessonsBrowser
         lessons={[
@@ -90,6 +91,6 @@ describe("RepoLessonsBrowser", () => {
     await userEvent.click(within(rows[0]).getByRole("button", { name: "Keep" }));
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ dismissChallenges: true });
     expect(onChanged).toHaveBeenCalled();
-    vi.unstubAllGlobals();
+    unstubAllGlobals();
   });
 });

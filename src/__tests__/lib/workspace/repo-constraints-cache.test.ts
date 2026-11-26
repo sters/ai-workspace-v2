@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { _resetConfig, _resetWorkspaceRoot, setWorkspaceRoot } from "@/lib/config";
 import { sh as exec } from "../../fixtures/sh";
 import { parseConstraints } from "@/lib/parsers/readme";

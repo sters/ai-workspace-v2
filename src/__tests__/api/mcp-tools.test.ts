@@ -1,4 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "bun:test";
+import * as actualPipelineManager from "@/lib/pipeline-manager";
+import * as actualOperationStore from "@/lib/operation-store";
+import * as actualReader from "@/lib/workspace/reader";
+import * as actualArchive from "@/lib/workspace/archive";
+
+const realPipelineManager = { ...actualPipelineManager };
+const realOperationStore = { ...actualOperationStore };
+const realReader = { ...actualReader };
+const realArchive = { ...actualArchive };
 import type { OperationEvent, OperationListItem } from "@/types/operation";
 
 const mockSummaries = vi.fn<() => OperationListItem[]>(() => []);
@@ -7,22 +16,22 @@ const mockReadLog = vi.fn();
 const mockWorkspaceSummary = vi.fn();
 const mockArchive = vi.fn();
 
-vi.mock("@/lib/pipeline-manager", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+vi.mock("@/lib/pipeline-manager", () => ({
+  ...realPipelineManager,
   getOperationSummaries: () => mockSummaries(),
   getOperationEvents: (id: string) => mockEvents(id),
   getOperation: () => ({ phases: [{ index: 0, label: "Execute", status: "running" }] }),
 }));
-vi.mock("@/lib/operation-store", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+vi.mock("@/lib/operation-store", () => ({
+  ...realOperationStore,
   readOperationLog: (id: string) => mockReadLog(id),
 }));
-vi.mock("@/lib/workspace/reader", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+vi.mock("@/lib/workspace/reader", () => ({
+  ...realReader,
   getWorkspaceSummary: (name: string) => mockWorkspaceSummary(name),
 }));
-vi.mock("@/lib/workspace/archive", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
+vi.mock("@/lib/workspace/archive", () => ({
+  ...realArchive,
   archiveWorkspaceWithPrs: (name: string, opts: unknown) => mockArchive(name, opts),
 }));
 

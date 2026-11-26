@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach } from "bun:test";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { GET, POST as create } from "@/app/api/scheduled-tasks/route";
 import { POST as update } from "@/app/api/scheduled-tasks/update/route";

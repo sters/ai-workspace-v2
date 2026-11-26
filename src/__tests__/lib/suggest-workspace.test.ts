@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "bun:test";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { listActiveSuggestions } from "@/lib/db/suggestions";
 import { _resetConfig, _setConfigFilePath } from "@/lib/config";

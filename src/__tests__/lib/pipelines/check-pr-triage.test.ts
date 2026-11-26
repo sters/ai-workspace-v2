@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { parseTriageVerdicts } from "@/lib/pipelines/check-pr-triage";
 
 describe("parseTriageVerdicts", () => {

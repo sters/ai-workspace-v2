@@ -1,6 +1,7 @@
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { vi, describe, it, expect, beforeEach } from "bun:test";
+import { mocked } from "@/__tests__/helpers/mocks";
 
-const config = vi.hoisted(() => ({ operations: { fetchIntervalMinutes: 10 } }));
+const config = ({ operations: { fetchIntervalMinutes: 10 } });
 vi.mock("@/lib/config", () => ({
   getWorkspaceDir: () => "/ws",
   getConfig: () => config,
@@ -12,9 +13,9 @@ vi.mock("@/lib/workspace/helpers", () => ({
   remoteBranchExists: vi.fn(() => true),
 }));
 vi.mock("@/lib/fs", () => ({ pathExists: vi.fn() }));
-const files = vi.hoisted(() => new Map<string, string>());
+const files = new Map<string, string>();
 /** mtime (ms) of each path `stat` finds; anything else is ENOENT. */
-const mtimes = vi.hoisted(() => new Map<string, number>());
+const mtimes = new Map<string, number>();
 vi.mock("node:fs/promises", () => {
   const fs = {
     mkdir: vi.fn(async () => {}),
@@ -38,9 +39,9 @@ import { pathExists } from "@/lib/fs";
 import { exec, remoteBranchExists } from "@/lib/workspace/helpers";
 import { setupRepositories, setupRepository } from "@/lib/pipelines/actions/setup-repository";
 
-const mockExec = vi.mocked(exec);
-const mockExists = vi.mocked(pathExists);
-const mockRemoteBranchExists = vi.mocked(remoteBranchExists);
+const mockExec = mocked(exec);
+const mockExists = mocked(pathExists);
+const mockRemoteBranchExists = mocked(remoteBranchExists);
 
 const WORKSPACE = "feature-ABC-1-thing-20260101";
 const REPO_ABS = "/repos/github.com/acme/repo";

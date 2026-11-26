@@ -1,10 +1,9 @@
-// @vitest-environment node
 /**
  * A completed operation still in the in-memory store wins the dedup in
  * `/api/operations`, so its summary is what the card renders — including the
  * result box it shows without being expanded.
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "bun:test";
 import { operations } from "@/lib/pipeline/store";
 import { markComplete } from "@/lib/pipeline/events";
 import { getOperationSummaries } from "@/lib/pipeline/queries";

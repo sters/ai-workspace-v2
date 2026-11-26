@@ -1,5 +1,6 @@
 import { act, render, screen, fireEvent, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "bun:test";
+import { stubGlobal, unstubAllGlobals, waitFor } from "@/__tests__/helpers/mocks";
 import type { RepoChangeSet } from "@/types/changes";
 import type { OperationType } from "@/types/operation";
 import { blocksOperation } from "@/lib/operation-conflict";
@@ -113,7 +114,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  unstubAllGlobals();
 });
 
 function fileSection(path: string): HTMLElement {
@@ -156,7 +157,7 @@ describe("ChangesBrowser", () => {
 
   it("reads a file's diff only once its section nears the visible part of the list", () => {
     const observed = new Map<Element, (entries: { isIntersecting: boolean }[]) => void>();
-    vi.stubGlobal(
+    stubGlobal(
       "IntersectionObserver",
       class {
         constructor(private cb: (entries: { isIntersecting: boolean }[]) => void) {}
@@ -189,7 +190,7 @@ describe("ChangesBrowser", () => {
   });
 
   it("scrolls the tree along with the list, so the file being read stays in view", () => {
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       cb(0);
       return 0;
     });
@@ -317,14 +318,14 @@ describe("ChangesBrowser", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /make todos/i }));
 
-    await vi.waitFor(() => expect(mockStart).toHaveBeenCalled());
+    await waitFor(() => expect(mockStart).toHaveBeenCalled());
     const [type, body] = mockStart.mock.calls[0];
     expect(type).toBe("autonomous");
     expect(body.startWith).toBe("update-todo");
     expect(body.repo).toBe("github.com/acme/web");
     expect(body.instruction).toContain("`TODO-web.md`");
     expect(body.instruction).toContain("Merge the two lines.");
-    await vi.waitFor(() => expect(screen.queryByText("1 comment")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("1 comment")).not.toBeInTheDocument());
   });
 
   it("keeps the comments when the TODO run is refused", async () => {
@@ -335,7 +336,7 @@ describe("ChangesBrowser", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /make todos/i }));
 
-    await vi.waitFor(() => expect(mockStart).toHaveBeenCalled());
+    await waitFor(() => expect(mockStart).toHaveBeenCalled());
     expect(screen.getByText("1 comment")).toBeInTheDocument();
   });
 

@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { selectHumanCommits } from "@/lib/lessons/material";
 
 const commit = (oid: string, committedDate: string) => ({ oid, committedDate, messageHeadline: oid });

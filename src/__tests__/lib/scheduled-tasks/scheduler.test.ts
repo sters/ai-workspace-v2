@@ -1,5 +1,4 @@
-// @vitest-environment node
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "bun:test";
 import { getDb, _resetDb, _setDbPath } from "@/lib/db";
 import { insertScheduledTask, getScheduledTask } from "@/lib/db/scheduled-tasks";
 import { tickScheduledTasks } from "@/lib/scheduled-tasks/scheduler";

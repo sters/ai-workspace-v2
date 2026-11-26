@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterAll } from "bun:test";
+import * as actualOs from "node:os";
+
+const realOs = { ...actualOs };
 
 const mockReadFile = vi.fn();
 
@@ -10,21 +13,17 @@ const mockBunFile = vi.fn((filePath: string) => ({
 const originalBunFile = Bun.file;
 Bun.file = mockBunFile as unknown as typeof Bun.file;
 
-vi.mock("node:os", async () => {
-  const actual = await vi.importActual("node:os");
-  return {
-    ...(actual as Record<string, unknown>),
-    default: { ...(actual as Record<string, unknown>), homedir: () => "/mock-home" },
-    homedir: () => "/mock-home",
-  };
-});
+vi.mock("node:os", () => ({
+  ...realOs,
+  default: { ...realOs, homedir: () => "/mock-home" },
+  homedir: () => "/mock-home",
+}));
 
 vi.mock("@/lib/config", () => ({
   getResolvedWorkspaceRoot: () => "/workspace-root",
 }));
 
 async function callGET() {
-  vi.resetModules();
   const mod = await import("@/app/api/mcp-servers/route");
   const response = await mod.GET();
   return response.json();
