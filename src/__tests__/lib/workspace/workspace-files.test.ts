@@ -43,6 +43,17 @@ describe("replaceReadmeSections", () => {
     ]);
   });
 
+  it("sets a criterion's check when checked is given, overriding the one it had", () => {
+    const out = replaceReadmeSections(README, {
+      acceptanceCriteria: [
+        { kind: "auto", text: "`make test` passes", checked: false },
+        { kind: "manual", text: "Looks right on staging", checked: true },
+      ],
+    });
+
+    expect(parseAcceptanceCriteria(out).map((c) => c.checked)).toEqual([false, true]);
+  });
+
   it("retitles the task and adds a section the README lacks", () => {
     const withoutContext = README.replace(/## Context\n[\s\S]*?(?=## Requirements)/, "");
     const out = replaceReadmeSections(withoutContext, { title: "Return 404 for unknown users", context: "Clients retry on 5xx." });

@@ -85,10 +85,14 @@ const readmeSectionsInput = workspaceInput.extend({
           .enum(["auto", "manual"])
           .describe("auto: an agent can prove it with evidence (exit code, code presence, API behavior). manual: needs a person; agents never attempt it."),
         text: z.string().min(1).describe("One objectively checkable condition."),
+        checked: z
+          .boolean()
+          .optional()
+          .describe("Whether it is met. Set it only for what was confirmed (e.g. a person reported a manual check); omit to keep the current state."),
       }),
     )
     .optional()
-    .describe("The whole checklist that defines done, replacing the current one. A criterion restated with the same text keeps its checked state."),
+    .describe("The whole checklist that defines done, replacing the current one. A criterion restated with the same text and no checked keeps its checked state."),
   relatedResources: sectionText("links."),
 });
 

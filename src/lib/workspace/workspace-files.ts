@@ -50,6 +50,7 @@ function insertSection(sections: Section[], section: Section, before: string[]):
 export interface AcceptanceCriterionInput {
   kind: "auto" | "manual";
   text: string;
+  checked?: boolean;
 }
 
 export interface ReadmeSectionsInput {
@@ -77,9 +78,9 @@ function singleLine(text: string): string {
 }
 
 /**
- * Replaces each given section's body whole. A criterion whose text matches one
- * already in the README keeps its checked state, so restating the list does
- * not undo what the verifier has already confirmed.
+ * Replaces each given section's body whole. A criterion without `checked`
+ * keeps the checked state of the one with the same text already in the
+ * README, so restating the list does not undo what the verifier has confirmed.
  */
 export function replaceReadmeSections(content: string, input: ReadmeSectionsInput): string {
   const { preamble, sections } = splitSections(content);
@@ -92,7 +93,7 @@ export function replaceReadmeSections(content: string, input: ReadmeSectionsInpu
     const checked = new Set(parseAcceptanceCriteria(content).filter((c) => c.checked).map((c) => c.text));
     const lines = input.acceptanceCriteria.map((c) => {
       const text = singleLine(c.text);
-      return `- [${checked.has(text) ? "x" : " "}] (${c.kind}) ${text}`;
+      return `- [${(c.checked ?? checked.has(text)) ? "x" : " "}] (${c.kind}) ${text}`;
     });
     bodies.set("Acceptance Criteria", sectionBody(lines.join("\n")));
   }
