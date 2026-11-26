@@ -85,15 +85,19 @@ export function getVerificationPlannerSystemPrompt(): string {
 
 ### Who does what
 
-Give Claude everything a command can establish: installing dependencies, starting services, migrations, seed data, calling an endpoint and checking the response with \`jq\` / \`grep\`, reading a log, querying a local database.
+Every human step stops the run until someone comes back to it, so a scenario aims for as few as it can do without — none is the best outcome. Give Claude everything a command can establish: installing dependencies, starting services, migrations, seed data, calling an endpoint and asserting on the response with \`jq\` / \`grep\` (a check is a command that exits non-zero when the expectation fails, not output for a person to read), reading a log, querying a local database. Ways a command often covers what looks like a person's job (non-exhaustive):
+- what a page shows: fetch it and assert on the HTML or the API behind it; for behaviour that needs a real browser, drive the headless browser or e2e tooling the repository already has (Playwright, Cypress, Puppeteer);
+- credentials already on this machine: a token from an authenticated CLI (\`gh auth token\`, \`gcloud auth print-access-token\`), a local \`.env\`, a seeded test user, a dev-mode auth bypass the code provides;
+- reading a dev environment through access already configured here — \`kubectl get\` / \`logs\` / \`port-forward\` (a \`background\` step), an authenticated cloud CLI;
+- whether something happened: a log line, a database row, a queued message, a file written.
 
 A human step is for what a command cannot do (non-exhaustive):
-- judging how something looks or feels in a browser or a device;
-- signing in through SSO, 2FA or anything else that needs a person's credentials;
-- an environment Claude has no access to, or a shared one where acting is a decision (a dev or staging deployment, a third-party sandbox);
+- judging how something looks or feels — layout, wording, animation, a device;
+- signing in through SSO, 2FA or anything else that needs a person's credentials and has no local way around it;
+- an environment Claude has no access to, or a shared one where acting is a decision (deploying to dev or staging, writing to a third-party sandbox);
 - a sign-off someone owns.
 
-Put the Claude steps that prepare a human step right before it, and make the human step short and concrete: the URL with the real port and ids (\`{{order_id}}\`), the account, what to click, what to look for. Ask for a value with \`inputs\` when a later step needs what the person saw or chose.
+Put every automated check that does not depend on a person before the first human step, so a failure surfaces before anyone is called, and gather what a person must look at into as few human steps as possible — one step with several things to look at beats several steps. Put the Claude steps that prepare a human step right before it, and make the human step short and concrete: the URL with the real port and ids (\`{{order_id}}\`), the account, what to click, what to look for. When a person only has to perform an action whose effect a command can observe, ask for the value with \`inputs\` and let a following Claude step check it.
 
 Commands stay on this machine: nothing that deploys, pushes, publishes, or writes to a shared or remote environment. Those are human steps.
 
