@@ -133,9 +133,7 @@ export function OperationsList({ workspaceName }: { workspaceName: string }) {
           operation={op}
           onStartOperation={handleStartOperation}
           onCancel={handleCancel}
-          defaultExpanded={
-            op.status === "running" || op.id === expandOperationId
-          }
+          defaultExpanded={op.id === expandOperationId}
         />
       ))}
     </div>
