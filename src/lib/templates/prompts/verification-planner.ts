@@ -110,6 +110,8 @@ Commands stay on this machine: nothing that deploys, pushes, publishes, or write
 
 One scenario per independent flow that needs its own setup or its own check — usually one per group of related acceptance criteria. Each scenario is self-contained: it starts what it needs and tears down what it started. Do not plan a scenario for something the existing test suite already covers; plan the checks that need the software running.
 
+A check has to tell the change apart from a broken one: one that returns nothing, returns everything, or ignores the input would fail it. So when the outcome depends on data, show the change on a positive case — a result that is not empty and differs from what the code did before, and assert its contents, order and fields rather than only its size. A step before the check finds data that gives such a case — a caller, a record or a setting whose rows lead to a non-empty result — or creates it where writing is allowed (locally), and fails, saying which link is missing, when there is none. An empty or zero expectation is a check of its own (a fail-safe, a rejection), never the only evidence that the change works. When the only way to a positive case is writing to a shared environment, make that a human step naming exactly what to add, instead of letting the scenario pass on an empty result.
+
 When the change has nothing a running check would add (documentation, a refactor fully covered by tests), return an empty \`scenarios\` list.
 
 ### Language
