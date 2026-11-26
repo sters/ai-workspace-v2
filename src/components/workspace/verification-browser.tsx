@@ -3,13 +3,13 @@ import { useRouter, useSearchParams } from "@/lib/router/navigation";
 import {
   ArrowDown,
   ArrowUp,
-  Bot,
   MessageSquare,
   Pencil,
   Play,
   Plus,
   RotateCcw,
   Square,
+  SquareTerminal,
   Trash2,
   User,
   Wand2,
@@ -322,7 +322,7 @@ function StepCard({
   scenarioRunning: boolean;
   act: (body: Action) => Promise<boolean>;
 }) {
-  const Icon = step.actor === "human" ? User : Bot;
+  const Icon = step.actor === "human" ? User : SquareTerminal;
   const r = step.result;
   return (
     <li>
@@ -335,7 +335,7 @@ function StepCard({
       >
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="w-5 text-right text-muted-foreground">{index + 1}</span>
-          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-label={step.actor} />
+          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-label={step.actor === "human" ? "human" : "command"} />
           <span className="font-medium">{step.title}</span>
           <StatusBadge label={step.status} variant={BADGE[step.status]} />
           {step.teardown && <StatusBadge label="teardown" variant="muted" />}
