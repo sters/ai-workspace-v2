@@ -394,21 +394,26 @@ export async function answerStep(
 export async function rerunFrom(wsPath: string, id: string, worktrees: Worktrees, stepId: string): Promise<Outcome> {
   const busy = idle(wsPath, id);
   if (busy) return busy;
+  let repeated: VerificationProcess[] = [];
   const outcome = await updateScenario(wsPath, id, (sc): Outcome => {
     const i = sc.steps.findIndex((s) => s.id === stepId);
     if (i === -1) return { ok: false, error: "No such step" };
-    for (const s of sc.steps.slice(i)) {
+    const reset = new Set<string>();
+    for (const s of sc.steps.slice(i)) reset.add(s.id);
+    for (const s of sc.steps) if (s.teardown) reset.add(s.id);
+    for (const s of sc.steps) if (reset.has(s.id)) {
       s.status = "pending";
       delete s.result;
     }
-    for (const s of sc.steps) if (s.teardown) {
-      s.status = "pending";
-      delete s.result;
-    }
+    // A repeated background step starts its process again, which would collide with the old one (a port in use).
+    repeated = sc.processes.filter((p) => reset.has(p.stepId));
+    sc.processes = sc.processes.filter((p) => !reset.has(p.stepId));
     sc.status = "ready";
     return { ok: true };
   });
-  return outcome.ok ? startRun(wsPath, id, worktrees) : outcome;
+  if (!outcome.ok) return outcome;
+  await Promise.all(repeated.map(stopProcess));
+  return startRun(wsPath, id, worktrees);
 }
 
 export async function skipStep(wsPath: string, id: string, worktrees: Worktrees, stepId: string): Promise<Outcome> {

@@ -152,6 +152,28 @@ describe("verification runner", () => {
     expect(() => process.kill(-pid, 0)).toThrow();
   });
 
+  it("stops the background processes of the steps a rerun repeats, and keeps the earlier ones", async () => {
+    const id = await create([
+      { title: "Serve", actor: "claude", command: "sleep 60", background: true, readyCommand: "true" },
+      { title: "Forward", actor: "claude", command: "sleep 60", background: true, readyCommand: "true" },
+      { title: "Look", actor: "human", instructions: "Look at it" },
+    ]);
+    let sc = await run(id);
+    const [serve, forward] = sc.processes.map((p) => p.pid);
+
+    expect(await rerunFrom(wsPath, id, {}, sc.steps[1].id)).toEqual({ ok: true });
+    await waitForRun(wsPath, id);
+    sc = (await readScenario(wsPath, id))!;
+    expect(sc.status).toBe("waiting");
+    expect(alive(serve)).toBe(true);
+    expect(alive(forward)).toBe(false);
+    expect(sc.processes).toHaveLength(2);
+    expect(sc.processes[0].pid).toBe(serve);
+    expect(alive(sc.processes[1].pid)).toBe(true);
+
+    await abortScenario(wsPath, id);
+  });
+
   it("fails a background step whose process exits before it is ready", async () => {
     const id = await create([
       { title: "Serve", actor: "claude", command: "echo cannot bind; exit 1", background: true, readyCommand: "false" },
