@@ -198,6 +198,12 @@ const routeTree = rootRoute.addChildren([
 export const router = createRouter({
   routeTree,
   scrollRestoration: true,
+  // A route is mounted afresh when a param in its own path changes, so a page
+  // never carries one workspace's, review's or operation's state (a chat
+  // session, a typed instruction) over to the next. Layouts above the changed
+  // segment stay mounted.
+  defaultRemountDeps: ({ routeId, params }) =>
+    (routeId as string).match(/\$\w+/g)?.map((key) => (params as Record<string, string>)[key.slice(1)]),
   // Query strings stay plain strings, read and written as `URLSearchParams`.
   parseSearch: (search) => Object.fromEntries(new URLSearchParams(search)),
   stringifySearch: (search) => {
