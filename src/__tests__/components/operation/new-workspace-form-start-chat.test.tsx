@@ -23,6 +23,18 @@ vi.mock("@/lib/router/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
 }));
 
+vi.mock("@/lib/router/link", () => ({
+  default: ({ onClick, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a
+      {...props}
+      onClick={(event) => {
+        onClick?.(event);
+        event.preventDefault();
+      }}
+    />
+  ),
+}));
+
 import { NewWorkspaceForm } from "@/components/operation/new-workspace-form";
 import { peekChatHandoff } from "@/lib/chat-handoff";
 
