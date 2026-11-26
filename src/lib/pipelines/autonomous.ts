@@ -32,7 +32,7 @@ import path from "node:path";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { GroupChild, PipelinePhase, PhaseFunctionContext } from "@/types/pipeline";
 import type { AutonomousGateInput, InteractionLevel } from "@/types/prompts";
-import type { TodoFile, WorkspaceRepo } from "@/types/workspace";
+import type { WorkspaceRepo } from "@/types/workspace";
 
 const DEFAULT_MAX_LOOPS = 10;
 
@@ -101,23 +101,19 @@ function settled(reason: string): AutonomousGateResult {
  *
  * Falls back to everything still open when the gate named nothing usable,
  * because a repository wrongly closed gets a PR with its work unfinished, while
- * one wrongly kept open costs only a cycle of review. A repository with
- * actionable TODO items stays open whatever the gate said: the executor would
- * otherwise never reach them, and its PR would carry them.
+ * one wrongly kept open costs only a cycle of review. A list the gate did give
+ * is final: it reads the TODO files whole, so it can tell an in-scope item from
+ * a reading list or an item only the PR phase can carry out.
  */
 export function resolveUnfinishedRepositories(input: {
   gate: Pick<AutonomousGateResult, "shouldLoop" | "giveUp" | "unfinishedRepositories">;
   repoNames: string[];
   open: string[];
-  todos: Pick<TodoFile, "repoName" | "pending" | "inProgress">[];
 }): string[] {
-  const { gate, repoNames, open, todos } = input;
+  const { gate, repoNames, open } = input;
   if (!gate.shouldLoop && !gate.giveUp) return [];
   const named = (gate.unfinishedRepositories ?? []).filter((n) => repoNames.includes(n));
   const result = new Set(named.length > 0 ? named : open);
-  for (const t of todos) {
-    if (t.pending + t.inProgress > 0 && repoNames.includes(t.repoName)) result.add(t.repoName);
-  }
   return repoNames.filter((n) => result.has(n));
 }
 
@@ -588,7 +584,6 @@ export function buildAutonomousPipeline(input: {
           gate: gateResult,
           repoNames,
           open: unfinished ?? repoNames,
-          todos: await getTodos(ws),
         });
         const done = repoNames.filter((n) => !open.includes(n));
         for (const name of repoNames) {

@@ -1209,7 +1209,6 @@ describe("buildAutonomousPipeline — every loop goes through the plan", () => {
 
 describe("resolveUnfinishedRepositories", () => {
   const repoNames = ["api", "web", "worker"];
-  const noTodos: { repoName: string; pending: number; inProgress: number }[] = [];
   const loop = (unfinishedRepositories: string[] | null) => ({
     shouldLoop: true,
     giveUp: false,
@@ -1219,13 +1218,13 @@ describe("resolveUnfinishedRepositories", () => {
   it("leaves nothing open when the run is done, whatever the list says", () => {
     expect(resolveUnfinishedRepositories({
       gate: { shouldLoop: false, giveUp: false, unfinishedRepositories: ["web"] },
-      repoNames, open: repoNames, todos: noTodos,
+      repoNames, open: repoNames,
     })).toEqual([]);
   });
 
   it("keeps the named repositories, in workspace order", () => {
     expect(resolveUnfinishedRepositories({
-      gate: loop(["worker", "api"]), repoNames, open: repoNames, todos: noTodos,
+      gate: loop(["worker", "api"]), repoNames, open: repoNames,
     })).toEqual(["api", "worker"]);
   });
 
@@ -1238,27 +1237,15 @@ describe("resolveUnfinishedRepositories", () => {
     ["only unknown names", ["frontend"]],
   ])("keeps everything still open when the gate gives %s", (_case, named) => {
     expect(resolveUnfinishedRepositories({
-      gate: loop(named), repoNames, open: ["web", "worker"], todos: noTodos,
+      gate: loop(named), repoNames, open: ["web", "worker"],
     })).toEqual(["web", "worker"]);
   });
 
   it("does the same for a give-up verdict", () => {
     expect(resolveUnfinishedRepositories({
       gate: { shouldLoop: false, giveUp: true, unfinishedRepositories: null },
-      repoNames, open: repoNames, todos: noTodos,
+      repoNames, open: repoNames,
     })).toEqual(repoNames);
-  });
-
-  it("keeps a repository with actionable TODO items open even when the gate closed it", () => {
-    expect(resolveUnfinishedRepositories({
-      gate: loop(["web"]),
-      repoNames,
-      open: repoNames,
-      todos: [
-        { repoName: "api", pending: 0, inProgress: 1 },
-        { repoName: "worker", pending: 0, inProgress: 0 },
-      ],
-    })).toEqual(["api", "web"]);
   });
 });
 
