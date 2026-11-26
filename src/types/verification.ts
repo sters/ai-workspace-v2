@@ -1,11 +1,11 @@
 /**
  * A verification scenario: the steps that check a workspace's change actually
- * works when run, in the order they are carried out. Claude steps are shell
+ * works when run, in the order they are carried out. Command steps are shell
  * commands run unattended; human steps stop the run until someone answers them.
  * Stored as `artifacts/verification/<id>.json`.
  */
 
-export type VerificationActor = "claude" | "human";
+export type VerificationActor = "command" | "human";
 
 export type VerificationStepStatus = "pending" | "running" | "waiting" | "passed" | "failed" | "skipped";
 
@@ -31,14 +31,14 @@ export interface VerificationStepDraft {
   actor: VerificationActor;
   /** Worktree directory name the command runs in; the workspace directory when unset. */
   repo?: string;
-  /** Claude steps: run with `sh -c`. `{{name}}` expands to a shell-quoted variable. */
+  /** Command steps: run with `sh -c`. `{{name}}` expands to a shell-quoted variable. */
   command?: string;
-  /** Claude steps: the command keeps running (a dev server); it is stopped at teardown. */
+  /** Command steps: the command keeps running (a dev server); it is stopped at teardown. */
   background?: boolean;
   /** Background steps: polled until it exits 0, which is when the step passes. */
   readyCommand?: string;
   /**
-   * Claude steps: variables taken from the command's stdout — the keys of a JSON
+   * Command steps: variables taken from the command's stdout — the keys of a JSON
    * object it prints, or, for a single name, the whole trimmed stdout.
    */
   outputs?: string[];

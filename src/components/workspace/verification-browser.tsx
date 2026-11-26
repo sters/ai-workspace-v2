@@ -46,7 +46,7 @@ const BADGE: Record<string, string> = {
 
 /**
  * The workspace's verification scenarios: one per flow to check in the running
- * software, each an ordered list of steps that Claude runs and people answer.
+ * software, each an ordered list of steps that run as commands or that people answer.
  * Laid out like Artifacts and Changes — the scenarios on the left, the selected
  * one's steps on the right — with the selection in `?scenario=`.
  */
@@ -335,7 +335,7 @@ function StepCard({
       >
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="w-5 text-right text-muted-foreground">{index + 1}</span>
-          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-label={step.actor === "human" ? "human" : "command"} />
+          <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-label={step.actor} />
           <span className="font-medium">{step.title}</span>
           <StatusBadge label={step.status} variant={BADGE[step.status]} />
           {step.teardown && <StatusBadge label="teardown" variant="muted" />}
@@ -533,7 +533,7 @@ function StepsEditor({
               value={d.actor}
               onChange={(e) => update(i, { actor: e.target.value as VerificationStepDraft["actor"] })}
             >
-              <option value="claude">Claude</option>
+              <option value="command">Command</option>
               <option value="human">Human</option>
             </select>
             <button type="button" aria-label="Move up" onClick={() => move(i, -1)} className="p-1 hover:text-foreground">
@@ -551,7 +551,7 @@ function StepsEditor({
               <Trash2 className="h-4 w-4" />
             </button>
           </div>
-          {d.actor === "claude" ? (
+          {d.actor === "command" ? (
             <>
               <Textarea
                 className="font-mono text-xs"
@@ -634,7 +634,7 @@ function StepsEditor({
         </Card>
       ))}
       <div className="flex gap-1.5">
-        <Button variant="outline" onClick={() => setRows((all) => [...all, { key: crypto.randomUUID(), d: { title: "New step", actor: "claude" } }])}>
+        <Button variant="outline" onClick={() => setRows((all) => [...all, { key: crypto.randomUUID(), d: { title: "New step", actor: "command" } }])}>
           <Plus className="h-3.5 w-3.5" />
           Add step
         </Button>

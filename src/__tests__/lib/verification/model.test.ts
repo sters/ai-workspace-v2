@@ -10,7 +10,7 @@ import {
 import type { VerificationScenario, VerificationStep } from "@/types/verification";
 
 function step(over: Partial<VerificationStep>): VerificationStep {
-  return { id: "s1", title: "t", actor: "claude", status: "pending", revision: 0, ...over };
+  return { id: "s1", title: "t", actor: "command", status: "pending", revision: 0, ...over };
 }
 
 function scenario(over: Partial<VerificationScenario>): VerificationScenario {
@@ -108,7 +108,7 @@ describe("renderVerificationResults", () => {
       }),
     ]);
     expect(md).toContain("Orders list");
-    expect(md).toContain("[claude] PASS — API returns badge");
+    expect(md).toContain("[command] PASS — API returns badge");
     expect(md).toContain("[human] PASS — Badge looks right");
     expect(md).toContain("Unshipped orders show a red badge");
     expect(md).toContain("checked in Chrome");

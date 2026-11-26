@@ -17,15 +17,15 @@ const STEP_SCHEMA = {
   type: "object",
   properties: {
     title: { type: "string", description: "Short imperative title." },
-    actor: { type: "string", enum: ["claude", "human"] },
+    actor: { type: "string", enum: ["command", "human"] },
     repo: { type: "string", description: "Worktree directory name the command runs in. Omit to run in the workspace directory." },
-    command: { type: "string", description: "Claude steps: a non-interactive shell command (sh -c). {{name}} expands to a shell-quoted variable." },
-    background: { type: "boolean", description: "Claude steps: the command keeps running (a dev server, a watcher) and is stopped at the end." },
+    command: { type: "string", description: "Command steps: a non-interactive shell command (sh -c). {{name}} expands to a shell-quoted variable." },
+    background: { type: "boolean", description: "Command steps: the command keeps running (a dev server, a watcher) and is stopped at the end." },
     readyCommand: { type: "string", description: "Background steps: a quick command that exits 0 once the process is ready, polled every 2s for up to 3 minutes." },
     outputs: {
       type: "array",
       items: { type: "string" },
-      description: "Claude steps: variable names taken from stdout — the keys of one JSON object printed on stdout, or for a single name the whole trimmed stdout.",
+      description: "Command steps: variable names taken from stdout — the keys of one JSON object printed on stdout, or for a single name the whole trimmed stdout.",
     },
     instructions: { type: "string", description: "Human steps: what to do, in Markdown — URL, account, what to click. {{name}} expands to a variable." },
     inputs: {
@@ -44,7 +44,7 @@ const STEP_SCHEMA = {
     },
     expected: { type: "string", description: "What passing looks like, concretely." },
     criteria: { type: "array", items: { type: "string" }, description: "Acceptance criteria this step's pass establishes, quoted from the README." },
-    teardown: { type: "boolean", description: "Runs when the scenario ends, however it ends. Claude steps only." },
+    teardown: { type: "boolean", description: "Runs when the scenario ends, however it ends. Command steps only." },
   },
   required: ["title", "actor", "expected"],
   additionalProperties: false,
@@ -78,15 +78,15 @@ export function getVerificationPlannerSystemPrompt(): string {
 
 ### How the steps are run
 
-- Steps run strictly in order. A \`claude\` step is a shell command run unattended with \`sh -c\`, no TTY, no stdin, a 10-minute limit; it passes on exit 0. A \`human\` step stops the run until a person answers OK or NG.
+- Steps run strictly in order. A \`command\` step is a shell command run unattended with \`sh -c\`, no TTY, no stdin, a 10-minute limit; it passes on exit 0. A \`human\` step stops the run until a person answers OK or NG.
 - A command runs in the worktree named by \`repo\`, or in the workspace directory without one. Each step is a fresh shell, so a \`cd\` or an \`export\` does not carry over; put it in the command that needs it.
 - A long-running process (dev server, docker compose in the foreground, a worker) is a \`background\` step with a \`readyCommand\` that exits 0 once it serves — e.g. \`curl -sf http://localhost:3000/health\`. It stays up through later steps, including human ones, and is stopped when the scenario ends, so it needs no stop step of its own. Something started detached (\`docker compose up -d\`) does need a \`teardown\` step (\`docker compose down\`).
-- Values pass between steps through variables. A \`claude\` step lists \`outputs\` and prints them as one JSON object on stdout (\`... | jq -c '{order_id: .id}'\`); a \`human\` step lists \`inputs\`. Later steps use \`{{name}}\`. Use this for anything one step creates and another needs: an id, a port, a token. A step with \`outputs\` prints nothing else on stdout; send progress and diagnostics to stderr.
+- Values pass between steps through variables. A \`command\` step lists \`outputs\` and prints them as one JSON object on stdout (\`... | jq -c '{order_id: .id}'\`); a \`human\` step lists \`inputs\`. Later steps use \`{{name}}\`. Use this for anything one step creates and another needs: an id, a port, a token. A step with \`outputs\` prints nothing else on stdout; send progress and diagnostics to stderr.
 - A check that matches on something outside the repository (an image tag, a resource label, a log line's format, a response field) matches on a form you have seen — in the repository's deploy configuration, its code, or a document — not on a form you assume. An image may be pinned by digest with the commit only in a label or an annotation; a log may be JSON. When you cannot see the form, have the failure path print what it found (\`kubectl get pod -o json | jq '.items[].metadata'\`, the raw response), so a rerun can be adjusted from the output.
 
 ### Who does what
 
-Every human step stops the run until someone comes back to it, so a scenario aims for as few as it can do without — none is the best outcome. Give Claude everything a command can establish: installing dependencies, starting services, migrations, seed data, calling an endpoint and asserting on the response with \`jq\` / \`grep\` (a check is a command that exits non-zero when the expectation fails, not output for a person to read), reading a log, querying a local database. Ways a command often covers what looks like a person's job (non-exhaustive):
+Every human step stops the run until someone comes back to it, so a scenario aims for as few as it can do without — none is the best outcome. Make a command step of everything a command can establish: installing dependencies, starting services, migrations, seed data, calling an endpoint and asserting on the response with \`jq\` / \`grep\` (a check is a command that exits non-zero when the expectation fails, not output for a person to read), reading a log, querying a local database. Ways a command often covers what looks like a person's job (non-exhaustive):
 - what a page shows: fetch it and assert on the HTML or the API behind it; for behaviour that needs a real browser, drive the headless browser or e2e tooling the repository already has (Playwright, Cypress, Puppeteer);
 - credentials already on this machine: a token from an authenticated CLI (\`gh auth token\`, \`gcloud auth print-access-token\`), a local \`.env\`, a seeded test user, a dev-mode auth bypass the code provides;
 - reading a dev environment through access already configured here — \`kubectl get\` / \`logs\` / \`port-forward\` (a \`background\` step), an authenticated cloud CLI;
@@ -95,10 +95,10 @@ Every human step stops the run until someone comes back to it, so a scenario aim
 A human step is for what a command cannot do (non-exhaustive):
 - judging how something looks or feels — layout, wording, animation, a device;
 - signing in through SSO, 2FA or anything else that needs a person's credentials and has no local way around it;
-- an environment Claude has no access to, or a shared one where acting is a decision (deploying to dev or staging, writing to a third-party sandbox);
+- an environment this machine has no access to, or a shared one where acting is a decision (deploying to dev or staging, writing to a third-party sandbox);
 - a sign-off someone owns.
 
-Put every automated check that does not depend on a person before the first human step, so a failure surfaces before anyone is called, and gather what a person must look at into as few human steps as possible — one step with several things to look at beats several steps. Put the Claude steps that prepare a human step right before it, and make the human step short and concrete: the URL with the real port and ids (\`{{order_id}}\`), the account, what to click, what to look for. When a person only has to perform an action whose effect a command can observe, ask for the value with \`inputs\` and let a following Claude step check it.
+Put every automated check that does not depend on a person before the first human step, so a failure surfaces before anyone is called, and gather what a person must look at into as few human steps as possible — one step with several things to look at beats several steps. Put the Command steps that prepare a human step right before it, and make the human step short and concrete: the URL with the real port and ids (\`{{order_id}}\`), the account, what to click, what to look for. When a person only has to perform an action whose effect a command can observe, ask for the value with \`inputs\` and let a following command step check it.
 
 Commands stay on this machine: nothing that deploys, pushes, publishes, or writes to a shared or remote environment. Those are human steps.
 

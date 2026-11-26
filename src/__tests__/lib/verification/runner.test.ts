@@ -47,18 +47,18 @@ function alive(pid: number): boolean {
 }
 
 describe("verification runner", () => {
-  it("runs Claude steps in order, stops on a human step, and carries its answer into later commands", async () => {
+  it("runs command steps in order, stops on a human step, and carries its answer into later commands", async () => {
     const marker = path.join(wsPath, "teardown-ran");
     const id = await create([
-      { title: "Seed", actor: "claude", command: `echo '{"order_id":"o-1"}'`, outputs: ["order_id"] },
+      { title: "Seed", actor: "command", command: `echo '{"order_id":"o-1"}'`, outputs: ["order_id"] },
       {
         title: "Pick a role",
         actor: "human",
         instructions: "Open order {{order_id}}",
         inputs: [{ name: "role", label: "Role", options: ["admin", "member"] }],
       },
-      { title: "Check", actor: "claude", command: `test {{order_id}} = o-1 && test {{role}} = admin` },
-      { title: "Clean up", actor: "claude", command: `touch ${marker}`, teardown: true },
+      { title: "Check", actor: "command", command: `test {{order_id}} = o-1 && test {{role}} = admin` },
+      { title: "Clean up", actor: "command", command: `touch ${marker}`, teardown: true },
     ]);
 
     let sc = await run(id);
@@ -80,9 +80,9 @@ describe("verification runner", () => {
 
   it("stops on a failing command and continues from it once the step is edited and rerun", async () => {
     const id = await create([
-      { title: "Ok", actor: "claude", command: "true" },
-      { title: "Broken", actor: "claude", command: "echo boom >&2; exit 3" },
-      { title: "After", actor: "claude", command: "true" },
+      { title: "Ok", actor: "command", command: "true" },
+      { title: "Broken", actor: "command", command: "echo boom >&2; exit 3" },
+      { title: "After", actor: "command", command: "true" },
     ]);
 
     let sc = await run(id);
@@ -92,8 +92,8 @@ describe("verification runner", () => {
     expect(sc.steps[2].status).toBe("pending");
 
     expect(await editSteps(wsPath, id, [
-      { title: "Fixed", actor: "claude", command: "true" },
-      { title: "After", actor: "claude", command: "true" },
+      { title: "Fixed", actor: "command", command: "true" },
+      { title: "After", actor: "command", command: "true" },
     ])).toEqual({ ok: true });
     sc = (await readScenario(wsPath, id))!;
     expect(sc.status).toBe("ready");
@@ -109,7 +109,7 @@ describe("verification runner", () => {
   });
 
   it("fails a step whose command names a variable nobody set, without running it", async () => {
-    const id = await create([{ title: "Call", actor: "claude", command: "curl /orders/{{order_id}}" }]);
+    const id = await create([{ title: "Call", actor: "command", command: "curl /orders/{{order_id}}" }]);
     const sc = await run(id);
     expect(sc.steps[0]).toMatchObject({ status: "failed", result: { note: "Unknown variable: order_id" } });
   });
@@ -117,7 +117,7 @@ describe("verification runner", () => {
   it("skips a step answered NG and goes on", async () => {
     const id = await create([
       { title: "Look", actor: "human", instructions: "Look at it" },
-      { title: "After", actor: "claude", command: "true" },
+      { title: "After", actor: "command", command: "true" },
     ]);
     let sc = await run(id);
     const look = sc.steps[0].id;
@@ -135,7 +135,7 @@ describe("verification runner", () => {
 
   it("keeps a background process up across a human step and stops its whole process group on abort", async () => {
     const id = await create([
-      { title: "Serve", actor: "claude", command: "sleep 60 & sleep 60", background: true, readyCommand: "true" },
+      { title: "Serve", actor: "command", command: "sleep 60 & sleep 60", background: true, readyCommand: "true" },
       { title: "Look", actor: "human", instructions: "Look at it" },
     ]);
     let sc = await run(id);
@@ -154,8 +154,8 @@ describe("verification runner", () => {
 
   it("stops the background processes of the steps a rerun repeats, and keeps the earlier ones", async () => {
     const id = await create([
-      { title: "Serve", actor: "claude", command: "sleep 60", background: true, readyCommand: "true" },
-      { title: "Forward", actor: "claude", command: "sleep 60", background: true, readyCommand: "true" },
+      { title: "Serve", actor: "command", command: "sleep 60", background: true, readyCommand: "true" },
+      { title: "Forward", actor: "command", command: "sleep 60", background: true, readyCommand: "true" },
       { title: "Look", actor: "human", instructions: "Look at it" },
     ]);
     let sc = await run(id);
@@ -176,7 +176,7 @@ describe("verification runner", () => {
 
   it("fails a background step whose process exits before it is ready", async () => {
     const id = await create([
-      { title: "Serve", actor: "claude", command: "echo cannot bind; exit 1", background: true, readyCommand: "false" },
+      { title: "Serve", actor: "command", command: "echo cannot bind; exit 1", background: true, readyCommand: "false" },
     ]);
     const sc = await run(id);
     expect(sc.steps[0].status).toBe("failed");
@@ -185,14 +185,14 @@ describe("verification runner", () => {
   });
 
   it("refuses a second run while one is in progress", async () => {
-    const id = await create([{ title: "Slow", actor: "claude", command: "sleep 1" }]);
+    const id = await create([{ title: "Slow", actor: "command", command: "sleep 1" }]);
     expect(await startRun(wsPath, id, {})).toEqual({ ok: true });
     expect(await startRun(wsPath, id, {})).toMatchObject({ ok: false });
     await waitForRun(wsPath, id);
   });
 
   it("marks a scenario left running by a previous server process as interrupted", async () => {
-    const id = await create([{ title: "Slow", actor: "claude", command: "true" }]);
+    const id = await create([{ title: "Slow", actor: "command", command: "true" }]);
     await updateScenario(wsPath, id, (sc) => {
       sc.status = "running";
       sc.steps[0].status = "running";

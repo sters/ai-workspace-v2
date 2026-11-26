@@ -57,7 +57,7 @@ describe("plan-verification pipeline", () => {
   it("writes one scenario file per planned scenario", async () => {
     const { ctx } = ctxAnswering({
       scenarios: [
-        { title: "Orders list", summary: "s", steps: [{ title: "Start", actor: "claude", command: "make dev", background: true, expected: "up" }] },
+        { title: "Orders list", summary: "s", steps: [{ title: "Start", actor: "command", command: "make dev", background: true, expected: "up" }] },
         { title: "Admin", summary: "s", steps: [{ title: "Look", actor: "human", instructions: "Open it", expected: "badge" }] },
       ],
     });
@@ -69,7 +69,7 @@ describe("plan-verification pipeline", () => {
 
   it("rejects a plan with a Claude step that has no command, writing nothing", async () => {
     const { ctx } = ctxAnswering({
-      scenarios: [{ title: "Bad", summary: "", steps: [{ title: "Start", actor: "claude", expected: "up" }] }],
+      scenarios: [{ title: "Bad", summary: "", steps: [{ title: "Start", actor: "command", expected: "up" }] }],
     });
     expect(await runPhase({ workspace: WS }, ctx)).toBe(false);
     expect(await listScenarios(path.join(root, WS))).toEqual([]);
@@ -81,9 +81,9 @@ describe("plan-verification pipeline", () => {
       title: "Orders",
       summary: "",
       steps: [
-        { title: "Seed", actor: "claude", command: "true" },
-        { title: "Call", actor: "claude", command: "false" },
-        { title: "Down", actor: "claude", command: "true", teardown: true },
+        { title: "Seed", actor: "command", command: "true" },
+        { title: "Call", actor: "command", command: "false" },
+        { title: "Down", actor: "command", command: "true", teardown: true },
       ],
     }]);
     await updateScenario(wsPath, sc.id, (cur) => {
@@ -95,8 +95,8 @@ describe("plan-verification pipeline", () => {
 
     const { ctx, runChild } = ctxAnswering({
       scenarios: [{ title: "Orders", summary: "", steps: [
-        { title: "Call with auth", actor: "claude", command: "true", expected: "200" },
-        { title: "Down", actor: "claude", command: "true", teardown: true, expected: "down" },
+        { title: "Call with auth", actor: "command", command: "true", expected: "200" },
+        { title: "Down", actor: "command", command: "true", teardown: true, expected: "down" },
       ] }],
     });
     expect(await runPhase({ workspace: WS, scenarioId: sc.id, instruction: "use the admin token" }, ctx)).toBe(true);

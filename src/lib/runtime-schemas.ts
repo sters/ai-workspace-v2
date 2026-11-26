@@ -263,7 +263,8 @@ const VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 /** A step before it runs, as the planner or the Verify tab's editor writes it. */
 export const verificationStepDraftSchema = z.object({
   title: z.string().min(1),
-  actor: z.enum(["claude", "human"]),
+  // "claude" is what scenario files saved before the rename hold.
+  actor: z.preprocess((v) => (v === "claude" ? "command" : v), z.enum(["command", "human"])),
   repo: z.string().min(1).optional(),
   command: z.string().min(1).optional(),
   background: z.boolean().optional(),
@@ -279,14 +280,14 @@ export const verificationStepDraftSchema = z.object({
   criteria: z.array(z.string()).optional(),
   teardown: z.boolean().optional(),
 }).superRefine((s, ctx) => {
-  if (s.actor === "claude" && !s.command) {
-    ctx.addIssue({ code: "custom", message: `Claude step "${s.title}" needs a command` });
+  if (s.actor === "command" && !s.command) {
+    ctx.addIssue({ code: "custom", message: `Command step "${s.title}" needs a command` });
   }
   if (s.actor === "human" && !s.instructions) {
     ctx.addIssue({ code: "custom", message: `Human step "${s.title}" needs instructions` });
   }
   if (s.actor === "human" && s.teardown) {
-    ctx.addIssue({ code: "custom", message: `Teardown step "${s.title}" must be a Claude step` });
+    ctx.addIssue({ code: "custom", message: `Teardown step "${s.title}" must be a command step` });
   }
 });
 

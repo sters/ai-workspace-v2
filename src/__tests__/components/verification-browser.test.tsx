@@ -20,7 +20,7 @@ vi.mock("@/hooks/use-start-and-navigate", () => ({ useStartAndNavigate: () => vi
 import { VerificationBrowser } from "@/components/workspace/verification-browser";
 
 function step(over: Partial<VerificationStep>): VerificationStep {
-  return { id: "s", title: "t", actor: "claude", command: "true", status: "pending", revision: 0, ...over };
+  return { id: "s", title: "t", actor: "command", command: "true", status: "pending", revision: 0, ...over };
 }
 
 function scenario(over: Partial<VerificationScenario>): VerificationScenario {
@@ -116,8 +116,8 @@ describe("VerificationBrowser", () => {
     expect(postedBody()).toEqual({
       action: "edit",
       steps: [
-        { title: "Check", actor: "claude", command: "test 1 = 1" },
-        { title: "Call", actor: "claude", command: "true" },
+        { title: "Check", actor: "command", command: "test 1 = 1" },
+        { title: "Call", actor: "command", command: "true" },
       ],
     });
   });

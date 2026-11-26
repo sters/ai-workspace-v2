@@ -225,8 +225,8 @@ async function runBackground(
   };
 }
 
-/** Run one Claude step against the scenario as it stands. Never throws for a step's own failure. */
-async function runClaudeStep(
+/** Run one command step against the scenario as it stands. Never throws for a step's own failure. */
+async function runCommandStep(
   wsPath: string,
   sc: VerificationScenario,
   step: VerificationStep,
@@ -269,7 +269,7 @@ async function finish(wsPath: string, id: string, worktrees: Worktrees, status: 
     const sc = await readScenario(wsPath, id);
     const step = sc?.steps.find((s) => s.teardown && s.status === "pending");
     if (!sc || !step) break;
-    const r = await runClaudeStep(wsPath, sc, step, worktrees, signal);
+    const r = await runCommandStep(wsPath, sc, step, worktrees, signal);
     await updateScenario(wsPath, id, (cur) => {
       const s = cur.steps.find((x) => x.id === step.id);
       if (s) Object.assign(s, { status: r.ok ? "passed" : "failed", result: r.result });
@@ -308,7 +308,7 @@ async function advance(wsPath: string, id: string, worktrees: Worktrees, signal:
       if (s) s.status = "running";
       cur.status = "running";
     });
-    const r = await runClaudeStep(wsPath, sc, step, worktrees, signal);
+    const r = await runCommandStep(wsPath, sc, step, worktrees, signal);
     if (signal.aborted && r.process) await stopProcess(r.process);
     await updateScenario(wsPath, id, (cur) => {
       const s = cur.steps.find((x) => x.id === step.id);
