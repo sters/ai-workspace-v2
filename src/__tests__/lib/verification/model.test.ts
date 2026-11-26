@@ -137,4 +137,16 @@ describe("buildVerificationChatTopic", () => {
     expect(topic).toContain("make dev");
     expect(topic).toContain("/tmp/a.log");
   });
+
+  it("opens a scenario that did not stop without asking why it stopped, and points at its file and step logs", () => {
+    const topic = buildVerificationChatTopic(
+      scenario({
+        status: "passed",
+        steps: [step({ id: "a", title: "Call API", status: "passed", command: "curl -f localhost:3000" })],
+      }),
+    );
+    expect(topic).not.toContain("stopped");
+    expect(topic).toContain("artifacts/verification/orders.json");
+    expect(topic).toContain("artifacts/verification/orders/");
+  });
 });

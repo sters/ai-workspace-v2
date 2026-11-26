@@ -179,7 +179,7 @@ function ScenarioView({
     await refresh();
   };
 
-  const investigate = () => {
+  const openChat = () => {
     stashChatHandoff(workspaceName, { discussion: buildVerificationChatTopic(sc) });
     router.push(chatPagePath(workspaceName));
   };
@@ -216,12 +216,10 @@ function ScenarioView({
               Replan from here
             </Button>
           )}
-          {stopped && (
-            <Button variant="outline" onClick={investigate}>
-              <MessageSquare className="h-3.5 w-3.5" />
-              Investigate in chat
-            </Button>
-          )}
+          <Button variant="outline" onClick={openChat}>
+            <MessageSquare className="h-3.5 w-3.5" />
+            {stopped ? "Investigate in chat" : "Chat about this"}
+          </Button>
           {(running || stopped || sc.processes.length > 0) && (
             <Button variant="destructive-sm" onClick={() => act({ action: "abort" })}>
               <Square className="h-3.5 w-3.5" />

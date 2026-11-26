@@ -87,13 +87,19 @@ export function renderVerificationResults(scenarios: VerificationScenario[]): st
   return sections.join("\n\n");
 }
 
-/** Opening message for a chat that investigates where a scenario stopped. */
+/**
+ * Opening message for a chat about a scenario: what to look into when it
+ * stopped, and where its file and step logs are for whatever the person asks.
+ */
 export function buildVerificationChatTopic(sc: VerificationScenario): string {
   const stopped = sc.steps.find((s) => s.status === "failed" || s.status === "waiting");
   const lines = [
-    `A verification scenario stopped. Look into why, and say what to change: the code, or the scenario's steps.`,
+    stopped
+      ? `A verification scenario stopped. Look into why, and say what to change: the code, or the scenario's steps.`
+      : `A verification scenario, for the person to ask about. Wait for what they want.`,
     "",
-    `Scenario: ${sc.title} (artifacts/verification/${sc.id}.json)`,
+    `Scenario: ${sc.title} (artifacts/verification/${sc.id}.json — every step's command, expected result and recorded result)`,
+    `Step logs: artifacts/verification/${sc.id}/<step id>.log (full output)`,
   ];
   if (sc.summary) lines.push(sc.summary);
   lines.push("", "Steps:");
