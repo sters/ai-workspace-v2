@@ -1,7 +1,5 @@
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from "@/lib/router/link";
+import { usePathname } from "@/lib/router/navigation";
 import { cn } from "@/lib/utils";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 

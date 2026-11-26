@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR from "swr";
 import { fetcher } from "@/lib/api";
 import type { SelectableRepository } from "@/types/workspace";

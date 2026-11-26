@@ -1,9 +1,6 @@
-import { NextResponse } from "next/server";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { readArtifact } from "@/lib/workspace/artifacts";
-
-export const dynamic = "force-dynamic";
 
 /**
  * One artifact's content, named by `?path=` relative to `artifacts/`.
@@ -19,18 +16,18 @@ export async function GET(
   const { name: rawName } = await params;
   const name = decodeURIComponent(rawName);
   if (name.includes("..") || name.includes("/") || name.includes("\\")) {
-    return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
+    return Response.json({ error: "Invalid workspace name" }, { status: 400 });
   }
 
   const relPath = new URL(request.url).searchParams.get("path");
   if (!relPath) {
-    return NextResponse.json({ error: "Missing path" }, { status: 400 });
+    return Response.json({ error: "Missing path" }, { status: 400 });
   }
 
   const file = await readArtifact(path.join(getWorkspaceDir(), name), relPath);
   if (!file) {
-    return NextResponse.json({ error: "Artifact not found" }, { status: 404 });
+    return Response.json({ error: "Artifact not found" }, { status: 404 });
   }
 
-  return NextResponse.json(file);
+  return Response.json(file);
 }

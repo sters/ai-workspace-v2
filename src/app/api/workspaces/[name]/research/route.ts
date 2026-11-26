@@ -1,7 +1,4 @@
-import { NextResponse } from "next/server";
 import { getResearchReport } from "@/lib/workspace/reader";
-
-export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,
@@ -10,11 +7,11 @@ export async function GET(
   const { name: rawName } = await params;
   const name = decodeURIComponent(rawName);
   if (name.includes('..') || name.includes('/') || name.includes('\\')) {
-    return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
+    return Response.json({ error: "Invalid workspace name" }, { status: 400 });
   }
   const report = await getResearchReport(name);
   if (report === null) {
-    return NextResponse.json({ summary: "", files: [] });
+    return Response.json({ summary: "", files: [] });
   }
-  return NextResponse.json(report);
+  return Response.json(report);
 }

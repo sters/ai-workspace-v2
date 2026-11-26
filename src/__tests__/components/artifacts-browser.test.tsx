@@ -7,7 +7,7 @@ const mockUseArtifacts = vi.fn();
 const mockUseArtifactFile = vi.fn();
 let searchParams = new URLSearchParams();
 
-vi.mock("next/navigation", () => ({
+vi.mock("@/lib/router/navigation", () => ({
   useRouter: () => ({ replace: mockReplace }),
   useSearchParams: () => searchParams,
 }));

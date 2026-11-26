@@ -1,6 +1,5 @@
 import { pathExists } from "@/lib/fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { NextRequest, NextResponse } from "next/server";
 import path from "node:path";
 import { parse as parseYaml } from "yaml";
 import {
@@ -13,8 +12,6 @@ import {
 import { aiwSettingsSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   try {
     const filePath = getConfigFilePath();
@@ -23,17 +20,17 @@ export async function GET() {
     if (exists) {
       content = await readFile(filePath, "utf-8");
     }
-    return NextResponse.json({
+    return Response.json({
       filePath,
       exists,
       content,
     });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = parseBody(aiwSettingsSchema, body);
@@ -46,13 +43,13 @@ export async function POST(request: NextRequest) {
       try {
         yamlParsed = parseYaml(content);
       } catch (err) {
-        return NextResponse.json(
+        return Response.json(
           { error: `Invalid YAML: ${err instanceof Error ? err.message : String(err)}` },
           { status: 400 },
         );
       }
       if (yamlParsed !== null && typeof yamlParsed !== "object") {
-        return NextResponse.json(
+        return Response.json(
           { error: "Config must be a YAML mapping (object), not a scalar or array" },
           { status: 400 },
         );
@@ -67,7 +64,7 @@ export async function POST(request: NextRequest) {
             validateOpeners(normalized.openers);
           } catch (err) {
             if (err instanceof ConfigValidationError) {
-              return NextResponse.json({ error: err.message }, { status: 400 });
+              return Response.json({ error: err.message }, { status: 400 });
             }
             throw err;
           }
@@ -84,8 +81,8 @@ export async function POST(request: NextRequest) {
     // Invalidate cached config so the app picks up changes immediately
     _resetConfig();
 
-    return NextResponse.json({ ok: true });
+    return Response.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

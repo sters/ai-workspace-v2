@@ -1,9 +1,6 @@
-import { NextResponse } from "next/server";
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
 import { listArtifacts } from "@/lib/workspace/artifacts";
-
-export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,
@@ -12,8 +9,8 @@ export async function GET(
   const { name: rawName } = await params;
   const name = decodeURIComponent(rawName);
   if (name.includes("..") || name.includes("/") || name.includes("\\")) {
-    return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
+    return Response.json({ error: "Invalid workspace name" }, { status: 400 });
   }
 
-  return NextResponse.json(await listArtifacts(path.join(getWorkspaceDir(), name)));
+  return Response.json(await listArtifacts(path.join(getWorkspaceDir(), name)));
 }

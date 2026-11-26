@@ -1,9 +1,6 @@
-import { NextResponse } from "next/server";
 import { runClaudeCommand } from "@/lib/claude/cli";
 import { mcpAddSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
-
-export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -21,11 +18,11 @@ export async function POST(request: Request) {
   const stderr = result.stderr.trim();
 
   if (!result.success) {
-    return NextResponse.json(
+    return Response.json(
       { error: stderr || "claude mcp add failed", stdout },
       { status: 500 }
     );
   }
 
-  return NextResponse.json({ ok: true, output: stdout || stderr });
+  return Response.json({ ok: true, output: stdout || stderr });
 }

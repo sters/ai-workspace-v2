@@ -1,11 +1,11 @@
-"use client";
-
 import { ClaudeOperation } from "@/components/operation/claude-operation";
 import { Button } from "@/components/shared/buttons/button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const PRUNE_STORAGE_KEY = "prune-suggestions";
 
 export default function PrunePage() {
+  useDocumentTitle("Prune Suggestions");
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">

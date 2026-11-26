@@ -3,7 +3,7 @@
  * quick create, with the repositories, task type and name decided by a
  * one-shot model call instead of a form.
  *
- * Creation goes through the HTTP API, like `init`, so the Next.js process stays
+ * Creation goes through the HTTP API, like `init`, so the web server process stays
  * the one that sets up worktrees. The API's own follow-up (a task chat in the
  * browser) is turned off: the Slack thread runs its own session on the
  * workspace.

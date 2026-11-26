@@ -1,13 +1,13 @@
-"use client";
-
 import useSWR from "swr";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { RepoLessonsBrowser } from "@/components/utilities/repo-lessons-browser";
 import { fetcher } from "@/lib/api";
 import type { RepoLesson } from "@/types/repo-lessons";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function RepoLessonsPage() {
+  useDocumentTitle("Repo Lessons");
   const { data, error, isLoading, mutate } = useSWR<{ lessons: RepoLesson[] }>("/api/repo-lessons", fetcher);
 
   return (

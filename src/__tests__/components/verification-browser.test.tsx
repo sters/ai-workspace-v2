@@ -7,7 +7,7 @@ const mockPush = vi.fn();
 const mockUseScenarios = vi.fn();
 let searchParams = new URLSearchParams();
 
-vi.mock("next/navigation", () => ({
+vi.mock("@/lib/router/navigation", () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
   useSearchParams: () => searchParams,
 }));

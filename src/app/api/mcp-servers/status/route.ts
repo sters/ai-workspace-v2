@@ -1,14 +1,11 @@
-import { NextResponse } from "next/server";
 import { getMcpStatuses } from "@/lib/claude/mcp";
-
-export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const statuses = await getMcpStatuses();
-    return NextResponse.json({ statuses });
+    return Response.json({ statuses });
   } catch (err) {
-    return NextResponse.json(
+    return Response.json(
       { statuses: [], error: String(err) },
       { status: 500 }
     );

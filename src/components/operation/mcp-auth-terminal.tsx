@@ -1,5 +1,3 @@
-"use client";
-
 import { useRef, useEffect, useState, useMemo } from "react";
 import type { McpAuthTerminalProps } from "@/types/components";
 import { useTerminal } from "@/hooks/use-terminal";

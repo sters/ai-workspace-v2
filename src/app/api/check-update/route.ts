@@ -1,13 +1,10 @@
-import { NextResponse } from "next/server";
 import { checkForUpdate } from "@/lib/update";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
-  const currentHash = process.env.NEXT_PUBLIC_GIT_HASH || "";
+  const currentHash = process.env.AIW_GIT_HASH || "";
 
   if (!currentHash) {
-    return NextResponse.json({
+    return Response.json({
       currentHash: "",
       latestHash: null,
       updateAvailable: false,
@@ -17,8 +14,8 @@ export async function GET() {
 
   try {
     const result = await checkForUpdate(currentHash);
-    return NextResponse.json(result);
+    return Response.json(result);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

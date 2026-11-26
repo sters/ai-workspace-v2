@@ -1,8 +1,6 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import type { Snippet } from "@/types/snippet";
 import { fetcher } from "@/lib/api";
 

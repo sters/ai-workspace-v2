@@ -1,5 +1,3 @@
-"use client";
-
 import "@xterm/xterm/css/xterm.css";
 import { useRef, useEffect, useCallback } from "react";
 import type { UseTerminalOptions, UseTerminalReturn } from "@/types/hooks";

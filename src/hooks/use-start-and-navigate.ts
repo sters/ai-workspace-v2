@@ -1,7 +1,5 @@
-"use client";
-
 import { useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router/navigation";
 import { useSWRConfig } from "swr";
 import type { OperationType } from "@/types/operation";
 

@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR from "swr";
 import type { WorkspaceListItem } from "@/types/workspace";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";

@@ -14,7 +14,7 @@ export interface ResolvedBoundWorkspace {
  * The workspace a thread is bound to, as it stands now. Undefined when none was
  * bound or the workspace has since been deleted — the thread then goes back to
  * the unbound conversation. Running operations are read from the database,
- * since they run in the Next.js process, not this one.
+ * since they run in the web server process, not this one.
  */
 export async function resolveBoundWorkspace(threadKey: string): Promise<ResolvedBoundWorkspace | undefined> {
   const name = getThreadWorkspace(threadKey);

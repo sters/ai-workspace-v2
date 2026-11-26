@@ -1,7 +1,5 @@
-"use client";
-
 import { useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router/navigation";
 import { OperationCard } from "@/components/workspace/operation-card";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -9,7 +7,13 @@ import { killOperation } from "@/lib/api";
 import type { OperationListItem, OperationType } from "@/types/operation";
 
 /** An operation that belongs to no workspace, shown on a page of its own. */
-export function OperationDetail({ operation }: { operation: OperationListItem }) {
+export function OperationDetail({
+  operation,
+  onRefresh,
+}: {
+  operation: OperationListItem;
+  onRefresh: () => void;
+}) {
   const router = useRouter();
   useDocumentTitle(`Operation: ${operation.type}`);
 
@@ -30,9 +34,9 @@ export function OperationDetail({ operation }: { operation: OperationListItem })
   const handleCancel = useCallback(
     async (operationId: string) => {
       await killOperation(operationId);
-      router.refresh();
+      onRefresh();
     },
-    [router],
+    [onRefresh],
   );
 
   return (
@@ -40,7 +44,7 @@ export function OperationDetail({ operation }: { operation: OperationListItem })
       <PageHeader
         title={operation.type}
         description={operation.workspace || undefined}
-        onRefresh={() => router.refresh()}
+        onRefresh={onRefresh}
       />
       <OperationCard
         key={`${operation.id}:${operation.status}`}

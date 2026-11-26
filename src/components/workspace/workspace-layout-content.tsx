@@ -1,9 +1,7 @@
-"use client";
-
-import { use, useEffect } from "react";
-import Link from "next/link";
+import { useEffect } from "react";
+import Link from "@/lib/router/link";
 import useSWR from "swr";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useParams, usePathname, useRouter, useSearchParams } from "@/lib/router/navigation";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { Card } from "@/components/shared/containers/card";
 import { ProgressBar } from "@/components/shared/feedback/progress-bar";
@@ -36,15 +34,10 @@ const BASE_TABS = [
   { label: "Chat", segment: "chat", href: "chat/interactive" },
 ] as const;
 
-export function WorkspaceLayoutContent({
-  params,
-  children,
-}: {
-  params: Promise<{ name: string }>;
-  children: React.ReactNode;
-}) {
-  const { name } = use(params);
-  const decodedName = decodeURIComponent(name);
+export function WorkspaceLayoutContent({ children }: { children: React.ReactNode }) {
+  const { name: decodedName } = useParams<{ name: string }>();
+  // The URL path segment, for building this workspace's links.
+  const name = encodeURIComponent(decodedName);
   const { workspace, isLoading, error, refresh } = useWorkspace(decodedName);
   const { data: slackData } = useSWR<{ slackThread: WorkspaceSlackThread | null }>(
     `/api/workspaces/${encodeURIComponent(decodedName)}/slack-thread`,

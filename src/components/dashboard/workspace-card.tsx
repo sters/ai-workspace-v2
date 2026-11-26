@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import { Archive, ArchiveRestore, Lightbulb, Loader2, MessageCircleQuestion } from "lucide-react";
 import type { WorkspaceListItem } from "@/types/workspace";
 import { cardVariants } from "../shared/containers/card";

@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback } from "react";
 import useSWR from "swr";
 import { AddMcpServerForm } from "@/components/utilities/mcp-servers/add-mcp-server-form";
@@ -9,8 +7,10 @@ import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { fetcher } from "@/lib/api";
 import type { McpServerEntry, McpConnectionStatus, McpServerTools } from "@/types/claude";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function McpServersPage() {
+  useDocumentTitle("Claude MCP Servers");
   const { data, error, isLoading, mutate } = useSWR<{
     servers: McpServerEntry[];
   }>("/api/mcp-servers", fetcher);

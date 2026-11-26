@@ -1,7 +1,5 @@
-"use client";
-
 import useSWR from "swr";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router/navigation";
 import { SplitButton } from "../shared/buttons/split-button";
 import { fetcher } from "@/lib/api";
 import type { ChatStartPrompt } from "@/types/chat-start-prompt";

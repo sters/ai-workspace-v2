@@ -1,5 +1,3 @@
-"use client";
-
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { useReviewFreshness, useWorkspace } from "@/hooks/use-workspace";
 import { useRunningOperations } from "@/hooks/use-running-operations";

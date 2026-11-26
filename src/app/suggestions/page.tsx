@@ -1,7 +1,5 @@
-"use client";
-
 import { useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/lib/router/navigation";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useOperation } from "@/hooks/use-operation";
 import { useSuggestions } from "@/hooks/use-suggestions";
@@ -9,7 +7,7 @@ import { postJson } from "@/lib/api";
 import { InitSplitButton } from "@/components/operation/init-split-button";
 import { CollapsibleSection } from "@/components/shared/containers/collapsible-section";
 import { X, Search, Trash2, Layers } from "lucide-react";
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import type { OperationType } from "@/types/operation";
 
 const AGGREGATE_STORAGE_KEY = "aggregate-suggestions";

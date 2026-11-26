@@ -1,11 +1,11 @@
-"use client";
-
 import { useEffect, useCallback, useRef, useState } from "react";
 import { FetchStatus } from "@/components/shared/feedback/fetch-status";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { useTerminal } from "@/hooks/use-terminal";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function ClaudeUsagePage() {
+  useDocumentTitle("Claude Usage");
   const { containerRef, termRef, init } = useTerminal({ readonly: true });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);

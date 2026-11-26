@@ -1,7 +1,5 @@
-"use client";
-
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import { MessageSquare } from "lucide-react";
 import { chatPagePath, stashChatHandoff } from "@/lib/chat-handoff";
 import { useArtifactFile, useReviewDetail, useWorkspace } from "@/hooks/use-workspace";

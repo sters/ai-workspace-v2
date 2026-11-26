@@ -1,12 +1,9 @@
 import { pathExists } from "@/lib/fs";
 import path from "node:path";
-import { NextResponse } from "next/server";
 import { openSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 import { getConfig, resolveWorkspacePath } from "@/lib/config";
 import { getCleanEnv } from "@/lib/env";
-
-export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -15,12 +12,12 @@ export async function POST(request: Request) {
 
   const workspacePath = resolveWorkspacePath(parsed.data.workspace);
   if (!workspacePath || !(await pathExists(workspacePath))) {
-    return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+    return Response.json({ error: "Workspace not found" }, { status: 404 });
   }
 
   const opener = getConfig().openers.find((o) => o.name === parsed.data.openerName);
   if (!opener) {
-    return NextResponse.json(
+    return Response.json(
       { error: `Unknown opener: ${parsed.data.openerName}` },
       { status: 404 },
     );
@@ -31,7 +28,7 @@ export async function POST(request: Request) {
   const sub = parsed.data.subPath?.trim();
   if (sub) {
     if (sub.includes("..") || path.isAbsolute(sub)) {
-      return NextResponse.json(
+      return Response.json(
         { error: "subPath must be a relative path without '..'" },
         { status: 400 },
       );
@@ -57,11 +54,11 @@ export async function POST(request: Request) {
 
   if (proc.exitCode !== 0) {
     const stderr = await new Response(proc.stderr).text();
-    return NextResponse.json(
+    return Response.json(
       { error: stderr || `Failed to launch opener "${opener.name}"` },
       { status: 500 },
     );
   }
 
-  return NextResponse.json({ ok: true });
+  return Response.json({ ok: true });
 }

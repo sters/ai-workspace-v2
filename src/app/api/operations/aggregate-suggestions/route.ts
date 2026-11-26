@@ -1,8 +1,5 @@
-import { NextResponse } from "next/server";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { buildAggregateSuggestionsPipeline } from "@/lib/pipelines/aggregate-suggestions";
-
-export const dynamic = "force-dynamic";
 
 export async function POST() {
   try {
@@ -12,11 +9,11 @@ export async function POST() {
       "aggregate-suggestions",
       phases,
     );
-    return NextResponse.json(operation);
+    return Response.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {
-      return NextResponse.json({ error: err.message }, { status: 429 });
+      return Response.json({ error: err.message }, { status: 429 });
     }
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

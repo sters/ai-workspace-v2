@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useCallback, useEffect, useMemo } from "react";
 import type { OperationListItem, OperationType } from "@/types/operation";
 import { useSSE } from "./use-sse";

@@ -1,5 +1,3 @@
-"use client";
-
 import { GitMerge } from "lucide-react";
 import type { OperationType } from "@/types/operation";
 

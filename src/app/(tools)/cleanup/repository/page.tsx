@@ -1,7 +1,9 @@
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { RepositoryPruneList } from "@/components/utilities/repository-prune-list";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function RepositoryPrunePage() {
+  useDocumentTitle("Cleanup: Repository");
   return (
     <div>
       <PageHeader

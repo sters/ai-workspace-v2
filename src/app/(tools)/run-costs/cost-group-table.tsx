@@ -1,5 +1,3 @@
-"use client";
-
 import { Fragment, useState } from "react";
 import type { ReactNode } from "react";
 import type { CostGroup } from "@/lib/run-costs";

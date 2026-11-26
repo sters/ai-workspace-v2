@@ -1,7 +1,7 @@
 /**
  * Run a child process without blocking the event loop.
  *
- * The Next.js server, the chat server and the Slack bot are each one JavaScript
+ * The web server, the chat server and the Slack bot are each one JavaScript
  * thread, so a `spawnSync` in any request path stops every other request, SSE
  * stream and timer in that process until the child exits. Server code spawns
  * through this instead.

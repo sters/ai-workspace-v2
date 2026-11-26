@@ -1,5 +1,3 @@
-"use client";
-
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
 import type { McpConnectionStatus } from "@/types/claude";
 

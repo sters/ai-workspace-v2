@@ -1,9 +1,6 @@
-import { NextResponse } from "next/server";
 import { fetchPrCheckFailureLogs } from "@/lib/workspace/pr-check-logs";
 import { prCheckLogsSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
-
-export const dynamic = "force-dynamic";
 
 /**
  * The failing checks' logs, read on demand when a human ticks them for triage.
@@ -21,7 +18,7 @@ export async function POST(
     const { name: rawName } = await params;
     const name = decodeURIComponent(rawName);
     if (name.includes("..") || name.includes("/") || name.includes("\\")) {
-      return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
+      return Response.json({ error: "Invalid workspace name" }, { status: 400 });
     }
 
     const body = await request.json().catch(() => ({}));
@@ -32,8 +29,8 @@ export async function POST(
       workspace: name,
       checks: parsed.data.checks,
     });
-    return NextResponse.json({ logs });
+    return Response.json({ logs });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

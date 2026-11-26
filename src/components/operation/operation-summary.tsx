@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import type { OperationListItem, OperationPhaseInfo } from "@/types/operation";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";

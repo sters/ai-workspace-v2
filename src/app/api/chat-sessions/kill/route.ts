@@ -1,9 +1,6 @@
-import { NextResponse } from "next/server";
 import { chatSessionKillSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 import { getConfig } from "@/lib/config";
-
-export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -25,15 +22,15 @@ export async function POST(request: Request) {
       data = JSON.parse(text);
     } catch {
       console.error(`[chat-sessions/kill] Non-JSON response (${res.status}): ${text}`);
-      return NextResponse.json(
+      return Response.json(
         { error: `Chat server returned unexpected response: ${text}` },
         { status: 502 }
       );
     }
-    return NextResponse.json(data, { status: res.status });
+    return Response.json(data, { status: res.status });
   } catch (err) {
     console.error("[chat-sessions/kill] Chat server unreachable:", err);
-    return NextResponse.json(
+    return Response.json(
       { error: "Chat server unreachable" },
       { status: 502 }
     );

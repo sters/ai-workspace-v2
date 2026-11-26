@@ -61,10 +61,10 @@ Three-tier config system (priority: env vars > config file > defaults):
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AIW_WORKSPACE_ROOT` | cwd | ai-workspace root directory |
-| `AIW_PORT` | 3741 | Next.js server port |
+| `AIW_PORT` | 3741 | Web server port |
 | `AIW_CHAT_PORT` | 3742 | WebSocket chat server port |
 | `AIW_CLAUDE_PATH` | auto-detect | Custom Claude CLI path |
-| `AIW_DISABLE_ACCESS_LOG` | `false` | Silence Next.js dev access logs (also `server.disableAccessLog` in `config.yml`) |
+| `AIW_DISABLE_ACCESS_LOG` | `false` | Silence the web server's API access log (also `server.disableAccessLog` in `config.yml`) |
 
 The "Open in..." menu is configured via the `openers` field in `config.yml`:
 
@@ -99,7 +99,7 @@ suggest:
 
 ## Architecture
 
-**Next.js 16 App Router** with React 19, TypeScript strict mode, Tailwind CSS 4, and SWR for data fetching.
+**React 19** with TanStack Router, served and bundled by `Bun.serve` (HTML import), TypeScript strict mode, Tailwind CSS 4, and SWR for data fetching.
 
 ### Server-side
 
@@ -186,8 +186,8 @@ bun install
 # Development with hot reload
 bun run dev:hot
 
-# Production build + start
-bun run start:build    # = bun run build, then bun run start
+# Start (the page is bundled on startup; there is no separate build step)
+bun run start
 
 # Lint (runs tsc --noEmit + eslint)
 bun run lint
@@ -214,7 +214,7 @@ bun --bun vitest run <file>  # Single file (plain `bunx vitest` fails to bundle 
 
 ## Tech Stack
 
-- **Next.js 16** (App Router) with React 19
+- **React 19** with **TanStack Router**, on `Bun.serve`
 - **TypeScript** (strict mode)
 - **Tailwind CSS 4** with shadcn/ui-style theme
 - **SWR** for data fetching

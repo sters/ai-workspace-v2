@@ -12,7 +12,7 @@ vi.mock("@/hooks/use-quick-creates", () => ({
   useQuickCreates: () => ({ quickCreates: [] }),
 }));
 
-vi.mock("next/navigation", () => ({
+vi.mock("@/lib/router/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
 }));
 

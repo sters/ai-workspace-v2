@@ -1,6 +1,4 @@
-"use client";
-
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import { Lightbulb } from "lucide-react";
 import { Button, Callout } from "@/components/shared";
 import { usePrSuggestions } from "@/hooks/use-pr-suggestions";

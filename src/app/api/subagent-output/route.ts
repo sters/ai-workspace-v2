@@ -1,9 +1,6 @@
 import { stat } from "node:fs/promises";
-import { NextResponse } from "next/server";
 import { watch, type FSWatcher } from "node:fs";
 import path from "node:path";
-
-export const dynamic = "force-dynamic";
 
 const MAX_READ_BYTES = 512 * 1024; // 512KB per chunk
 const BLOCKED_PREFIXES = ["/etc/", "/var/", "/usr/", "/bin/", "/sbin/"];
@@ -31,10 +28,10 @@ export async function GET(request: Request) {
   const pathParam = url.searchParams.get("path");
 
   if (!pathParam || !path.isAbsolute(pathParam)) {
-    return NextResponse.json({ error: "path must be an absolute path" }, { status: 400 });
+    return Response.json({ error: "path must be an absolute path" }, { status: 400 });
   }
   if (!isPathAllowed(pathParam)) {
-    return NextResponse.json({ error: "path not allowed" }, { status: 403 });
+    return Response.json({ error: "path not allowed" }, { status: 403 });
   }
 
   // Re-bind as non-nullable for use inside closures

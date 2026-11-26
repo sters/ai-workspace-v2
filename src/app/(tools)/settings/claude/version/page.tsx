@@ -1,12 +1,12 @@
-"use client";
-
 import useSWR from "swr";
 import { Card } from "@/components/shared/containers/card";
 import { FetchStatus } from "@/components/shared/feedback/fetch-status";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { fetcher } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function ClaudeVersionPage() {
+  useDocumentTitle("Claude Version");
   const { data, error, isLoading, mutate } = useSWR<{
     version?: string;
     error?: string;

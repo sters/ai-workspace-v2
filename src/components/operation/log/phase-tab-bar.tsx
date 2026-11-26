@@ -1,5 +1,3 @@
-"use client";
-
 import type { OperationPhaseInfo } from "@/types/operation";
 import { Button } from "../../shared/buttons/button";
 import { statusTextColors, statusIcons } from "@/lib/status-styles";

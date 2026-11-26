@@ -1,14 +1,11 @@
-import { NextResponse } from "next/server";
 import { getClaudeVersion } from "@/lib/claude/version";
-
-export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
     const version = await getClaudeVersion();
-    return NextResponse.json({ version });
+    return Response.json({ version });
   } catch (err) {
-    return NextResponse.json(
+    return Response.json(
       { error: String(err) },
       { status: 500 }
     );

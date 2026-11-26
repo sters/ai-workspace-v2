@@ -1,5 +1,3 @@
-"use client";
-
 import type { TodoFile } from "@/types/workspace";
 import type { OperationType } from "@/types/operation";
 import { TodoItemRow } from "./todo-item";

@@ -1,5 +1,3 @@
-"use client";
-
 import { type ReactNode, useState, useRef, useEffect, useCallback } from "react";
 import { useAsyncCallback } from "@/hooks/use-async-callback";
 import type { SplitButtonItem, SplitButtonVariant } from "@/types/components";

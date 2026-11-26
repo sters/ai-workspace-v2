@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import type { LogEntry } from "@/types/claude";
 import { Button } from "../../shared/buttons/button";

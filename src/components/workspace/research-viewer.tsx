@@ -1,6 +1,4 @@
-"use client";
-
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import { MessageSquare } from "lucide-react";
 import { chatPagePath, stashChatHandoff } from "@/lib/chat-handoff";
 import { MarkdownRenderer } from "../shared/content/markdown-renderer";

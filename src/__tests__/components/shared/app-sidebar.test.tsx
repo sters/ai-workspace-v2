@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-vi.mock("next/link", () => ({
+vi.mock("@/lib/router/link", () => ({
   default: ({
     href,
     children,
@@ -20,7 +20,7 @@ vi.mock("next/link", () => ({
 }));
 
 const mockPathname = vi.fn<() => string>();
-vi.mock("next/navigation", () => ({
+vi.mock("@/lib/router/navigation", () => ({
   usePathname: () => mockPathname(),
 }));
 

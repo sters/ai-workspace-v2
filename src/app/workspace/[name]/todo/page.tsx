@@ -1,19 +1,12 @@
-"use client";
-
-import { use } from "react";
+import { useParams } from "@/lib/router/navigation";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { TodoUpdater } from "@/components/workspace/todo-updater";
 
-export default function WorkspaceTodoPage({
-  params,
-}: {
-  params: Promise<{ name: string }>;
-}) {
-  const { name } = use(params);
-  const decodedName = decodeURIComponent(name);
-  useDocumentTitle(`TODO - ${decodedName}`);
-  const { workspace } = useWorkspace(decodedName);
+export default function WorkspaceTodoPage() {
+  const { name } = useParams<{ name: string }>();
+  useDocumentTitle(`TODO - ${name}`);
+  const { workspace } = useWorkspace(name);
 
   if (!workspace) return null;
 
@@ -21,7 +14,7 @@ export default function WorkspaceTodoPage({
     <TodoUpdater
       todos={workspace.todos}
       workspacePath={workspace.path}
-      workspaceName={decodedName}
+      workspaceName={name}
       repositories={workspace.meta.repositories}
     />
   );

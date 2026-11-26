@@ -28,8 +28,8 @@ export function describeChildExit({
 
     // SIGKILL cannot be handled, so the process left no output of its own. On
     // macOS the usual sender is the kernel reclaiming memory. An unrequested
-    // SIGTERM is nearly always name-based: `pkill -f "next dev"` matches our
-    // Next.js child whatever port or project it belongs to.
+    // SIGTERM is nearly always name-based: a broad `pkill -f` from another
+    // project matches our children whatever port they listen on.
     const hint =
       signalCode === "SIGKILL"
         ? " — likely the OS under memory pressure, or an external kill -9"

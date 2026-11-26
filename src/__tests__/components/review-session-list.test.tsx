@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ReviewSessionList } from "@/components/workspace/review-session-list";
 import type { ReviewSession } from "@/types/workspace";
 
-vi.mock("next/link", () => ({
+vi.mock("@/lib/router/link", () => ({
   default: ({
     href,
     children,

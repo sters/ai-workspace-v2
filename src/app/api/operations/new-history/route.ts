@@ -1,9 +1,6 @@
-import { NextResponse } from "next/server";
 import { getOperationSummaries } from "@/lib/pipeline-manager";
 import { listRecentNewOriginatedOperations } from "@/lib/operation-store";
 import type { OperationListItem } from "@/types/operation";
-
-export const dynamic = "force-dynamic";
 
 const LIMIT_DEFAULT = 10;
 const LIMIT_MAX = 50;
@@ -43,8 +40,8 @@ export function GET(request: Request) {
       return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
     });
 
-    return NextResponse.json(merged.slice(0, limit));
+    return Response.json(merged.slice(0, limit));
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

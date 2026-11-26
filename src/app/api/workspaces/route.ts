@@ -1,4 +1,3 @@
-import { NextRequest, NextResponse } from "next/server";
 import { startTaskChatSession } from "@/lib/chat-server/client";
 import { startUserReview } from "@/lib/pipelines/review";
 import { setupRepositories } from "@/lib/pipelines/actions/setup-repository";
@@ -22,18 +21,16 @@ import { cachedRepoConstraints } from "@/lib/workspace/repo-constraints-cache";
 import { listWorkspaceItems } from "@/lib/workspace/reader";
 import type { QuickCreateStart } from "@/types/workspace";
 
-export const dynamic = "force-dynamic";
-
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
     const recentOnly =
-      request.nextUrl.searchParams.get("recentOnly") === "true";
+      new URL(request.url).searchParams.get("recentOnly") === "true";
     const includeArchived =
-      request.nextUrl.searchParams.get("includeArchived") === "true";
+      new URL(request.url).searchParams.get("includeArchived") === "true";
     const result = await listWorkspaceItems({ recentOnly, includeArchived });
-    return NextResponse.json(result);
+    return Response.json(result);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }
 
@@ -116,13 +113,13 @@ export async function POST(request: Request) {
         problems: result.problems.length,
       });
     }
-    return NextResponse.json({ ...result, start });
+    return Response.json({ ...result, start });
   } catch (err) {
     if (err instanceof QuickCreateRefusal) {
       if (progressId) discardQuickCreate(progressId);
-      return NextResponse.json({ error: err.message }, { status: 400 });
+      return Response.json({ error: err.message }, { status: 400 });
     }
     if (progressId) finishQuickCreate(progressId, { error: String(err) });
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

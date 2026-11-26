@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { verificationActionSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 import {
@@ -12,8 +11,6 @@ import {
 import { deleteScenarioFiles, readScenario, SCENARIO_ID } from "@/lib/verification/store";
 import { workspacePathFor, worktreesFor } from "@/lib/verification/workspace";
 
-export const dynamic = "force-dynamic";
-
 type Params = { params: Promise<{ name: string; id: string }> };
 
 async function resolve(params: Params["params"]) {
@@ -26,7 +23,7 @@ async function resolve(params: Params["params"]) {
 
 export async function POST(request: Request, { params }: Params) {
   const target = await resolve(params);
-  if (!target) return NextResponse.json({ error: "Scenario not found" }, { status: 404 });
+  if (!target) return Response.json({ error: "Scenario not found" }, { status: 404 });
   const parsed = parseBody(verificationActionSchema, await request.json().catch(() => ({})));
   if (!parsed.success) return parsed.response;
   const { name, id, wsPath } = target;
@@ -34,11 +31,11 @@ export async function POST(request: Request, { params }: Params) {
 
   if (body.action === "abort") {
     await abortScenario(wsPath, id, await worktreesFor(name));
-    return NextResponse.json({ ok: true });
+    return Response.json({ ok: true });
   }
   if (body.action === "edit") {
     const outcome = await editSteps(wsPath, id, body.steps);
-    return outcome.ok ? NextResponse.json(outcome) : NextResponse.json(outcome, { status: 409 });
+    return outcome.ok ? Response.json(outcome) : Response.json(outcome, { status: 409 });
   }
 
   const worktrees = await worktreesFor(name);
@@ -47,13 +44,13 @@ export async function POST(request: Request, { params }: Params) {
     : body.action === "answer" ? await answerStep(wsPath, id, worktrees, body)
     : body.action === "rerun" ? await rerunFrom(wsPath, id, worktrees, body.stepId)
     : await skipStep(wsPath, id, worktrees, body.stepId);
-  return outcome.ok ? NextResponse.json(outcome) : NextResponse.json(outcome, { status: 409 });
+  return outcome.ok ? Response.json(outcome) : Response.json(outcome, { status: 409 });
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
   const target = await resolve(params);
-  if (!target) return NextResponse.json({ error: "Scenario not found" }, { status: 404 });
+  if (!target) return Response.json({ error: "Scenario not found" }, { status: 404 });
   await abortScenario(target.wsPath, target.id, await worktreesFor(target.name));
   await deleteScenarioFiles(target.wsPath, target.id);
-  return NextResponse.json({ ok: true });
+  return Response.json({ ok: true });
 }

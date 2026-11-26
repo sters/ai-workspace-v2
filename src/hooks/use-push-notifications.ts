@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useState } from "react";
 
 type PushState = "unsupported" | "default" | "denied" | "granted" | "subscribed";

@@ -1,17 +1,10 @@
-"use client";
-
-import { use } from "react";
+import { useParams } from "@/lib/router/navigation";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { ArtifactsBrowser } from "@/components/workspace/artifacts-browser";
 
-export default function WorkspaceArtifactsPage({
-  params,
-}: {
-  params: Promise<{ name: string }>;
-}) {
-  const { name } = use(params);
-  const decodedName = decodeURIComponent(name);
-  useDocumentTitle(`Artifacts - ${decodedName}`);
+export default function WorkspaceArtifactsPage() {
+  const { name } = useParams<{ name: string }>();
+  useDocumentTitle(`Artifacts - ${name}`);
 
-  return <ArtifactsBrowser workspaceName={decodedName} />;
+  return <ArtifactsBrowser workspaceName={name} />;
 }

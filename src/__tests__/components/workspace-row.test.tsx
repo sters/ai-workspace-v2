@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { WorkspaceCard } from "@/components/dashboard/workspace-card";
 import type { WorkspaceListItem } from "@/types/workspace";
 
-vi.mock("next/link", () => ({
+vi.mock("@/lib/router/link", () => ({
   default: ({
     href,
     children,

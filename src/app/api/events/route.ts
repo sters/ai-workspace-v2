@@ -1,12 +1,9 @@
-import { NextResponse } from "next/server";
 import {
   getOperation,
   getOperationEvents,
   subscribeToOperation,
 } from "@/lib/pipeline-manager";
 import { readOperationLog, backfillResultSummary } from "@/lib/operation-store";
-
-export const dynamic = "force-dynamic";
 
 /**
  * Resolve events for a completed operation from memory or disk.
@@ -26,7 +23,7 @@ export async function GET(request: Request) {
   const operationId = url.searchParams.get("operationId");
 
   if (!operationId) {
-    return NextResponse.json({ error: "operationId is required" }, { status: 400 });
+    return Response.json({ error: "operationId is required" }, { status: 400 });
   }
 
   const operation = getOperation(operationId);
@@ -36,7 +33,7 @@ export async function GET(request: Request) {
     const stored = readOperationLog(operationId);
     if (!stored) {
       console.log(`[events][${operationId}] operation not found`);
-      return NextResponse.json({ error: "operation not found" }, { status: 404 });
+      return Response.json({ error: "operation not found" }, { status: 404 });
     }
 
     // Completed on disk → return JSON. Expanding the card is also the moment
@@ -44,7 +41,7 @@ export async function GET(request: Request) {
     // the listing shows it next time without being expanded.
     backfillResultSummary(operationId, stored.events);
     console.log(`[events][${operationId}] serving from disk (JSON), ${stored.events.length} events`);
-    return NextResponse.json(stored.events);
+    return Response.json(stored.events);
   }
 
   // ---------- Completed in memory → return JSON ----------
@@ -52,7 +49,7 @@ export async function GET(request: Request) {
     const events = resolveCompletedEvents(operationId) ?? [];
     backfillResultSummary(operationId, events);
     console.log(`[events][${operationId}] completed (JSON), ${events.length} events`);
-    return NextResponse.json(events);
+    return Response.json(events);
   }
 
   // ---------- Running → SSE stream ----------

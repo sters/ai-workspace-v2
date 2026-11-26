@@ -1,7 +1,4 @@
-import { NextResponse } from "next/server";
 import { readWorkspaceFileDiff } from "@/lib/workspace/changes";
-
-export const dynamic = "force-dynamic";
 
 /**
  * One changed file's diff, named by `?repo=` (the worktree, relative to the
@@ -15,19 +12,19 @@ export async function GET(
   const { name: rawName } = await params;
   const name = decodeURIComponent(rawName);
   if (name.includes("..") || name.includes("/") || name.includes("\\")) {
-    return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
+    return Response.json({ error: "Invalid workspace name" }, { status: 400 });
   }
 
   const search = new URL(request.url).searchParams;
   const repo = search.get("repo");
   const filePath = search.get("path");
   if (!repo || !filePath) {
-    return NextResponse.json({ error: "Missing repo or path" }, { status: 400 });
+    return Response.json({ error: "Missing repo or path" }, { status: 400 });
   }
 
   const diff = await readWorkspaceFileDiff(name, repo, filePath);
   if (!diff) {
-    return NextResponse.json({ error: "Change not found" }, { status: 404 });
+    return Response.json({ error: "Change not found" }, { status: 404 });
   }
-  return NextResponse.json(diff);
+  return Response.json(diff);
 }

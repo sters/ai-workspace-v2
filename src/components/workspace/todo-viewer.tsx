@@ -1,5 +1,3 @@
-"use client";
-
 import type { TodoSection } from "@/types/workspace";
 import { TodoItemRow } from "./todo-item";
 import { MarkdownRenderer } from "../shared/content/markdown-renderer";

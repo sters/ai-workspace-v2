@@ -1,20 +1,17 @@
-import { NextRequest, NextResponse } from "next/server";
 import { readAllSettings, writeSettings } from "@/lib/claude/settings";
 import { claudeSettingsWriteSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   try {
     const settings = await readAllSettings();
-    return NextResponse.json({ settings });
+    return Response.json({ settings });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}));
     const parsed = parseBody(claudeSettingsWriteSchema, body);
@@ -26,12 +23,12 @@ export async function POST(request: NextRequest) {
     } catch (err) {
       const msg = err instanceof SyntaxError ? "Content is not valid JSON" : String(err);
       const status = err instanceof SyntaxError ? 400 : 500;
-      return NextResponse.json({ error: msg }, { status });
+      return Response.json({ error: msg }, { status });
     }
 
-    return NextResponse.json({ ok: true });
+    return Response.json({ ok: true });
   } catch (err) {
-    return NextResponse.json(
+    return Response.json(
       { error: String(err) },
       { status: 500 }
     );

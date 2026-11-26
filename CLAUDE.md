@@ -12,8 +12,8 @@ Web UI dashboard for a multi-repository workspace manager for Claude Code. Brows
 bunx github:sters/ai-workspace-v2 [/path/to/ai-workspace]  # Run via bunx
 bun install
 bun run dev:hot                 # Development with hot reload
-bun run start:build             # Production build + start
-bun run lint                    # next typegen + tsc (tsconfig.typecheck.json) + eslint src/
+bun run start                   # Start (no build step: Bun.serve bundles the page)
+bun run lint                    # tsc + eslint src/
 bun run test                    # All tests
 bun --bun vitest run src/__tests__/lib/parsers/todo.test.ts  # Single file (--bun required for bun:sqlite)
 bun run bench --root ~/ai-workspace --workspace <ws> --step verify-completion --configs opus/medium,claude-haiku-5-5/xhigh  # billed; answers go to .ai-workspace/bench/, read and compare them; --list, --dry-run
@@ -28,9 +28,10 @@ Notable keys: `operations.maxGroupConcurrency` (per parallel group, `getMaxGroup
 
 ## Architecture
 
-Next.js 16 App Router, React 19, TypeScript strict, Tailwind CSS 4, SWR, Bun runtime.
+React 19 + TanStack Router, TypeScript strict, Tailwind CSS 4, SWR, Bun runtime.
 
-- **Processes** — `bin/start.ts` spawns Next.js (`bin/next-server.ts`), the chat server (`bin/chat-server.ts`), the background worker (`bin/worker.ts`: the scheduled-task tick, once a minute) and optionally the Slack bot (`bin/slack-server.ts`). `--hot` applies to all of them; each registers process-level state (signal handlers, timers, Slack connection) once, guarded on `globalThis`.
+- **Web server** — `bin/web-server.ts` is one `Bun.serve`: the HTTP API, `public/`, and `src/client/index.html` (HTML import, bundled with `bun-plugin-tailwind` from `bunfig.toml`) at every other path; `--hot` gives the page HMR and reloads server code in place. Each `src/app/api/<path>/route.ts` serves `/api/<path>` (`[param]` → `:param`), its exported `GET` / `POST` / … taking `(request, { params })` with `params` a promise (`src/lib/web/api-routes.ts`). The page's routes are defined in code in `src/client/router.tsx` from the components under `src/app/` (`page.tsx` / `layout.tsx` are only names now); components navigate through `@/lib/router/link` and `@/lib/router/navigation` (`useRouter` / `usePathname` / `useSearchParams` / `useParams`, search params kept as plain strings). Values the page needs from the server's environment come from `/api/client-config`, not build-time env. `patches/` holds a `bun patch` of `@tanstack/router-core`: its `router.js` reads a `load-client.js` export at top level inside an import cycle, which Bun's HMR runtime sees as null.
+- **Processes** — `bin/start.ts` spawns the web server (`bin/web-server.ts`), the chat server (`bin/chat-server.ts`), the background worker (`bin/worker.ts`: the scheduled-task tick, once a minute) and optionally the Slack bot (`bin/slack-server.ts`). `--hot` applies to all of them; each registers process-level state (signal handlers, timers, Slack connection) once, guarded on `globalThis`.
 - **SQLite** — `.ai-workspace/db.sqlite` via `bun:sqlite` (`src/lib/db/`). Events are buffered and flushed asynchronously (`event-buffer.ts`). Each pipeline child's CLI-reported cost lands in `claude_runs` (written by `wire-child.ts`, kept past operation pruning) and is broken down at Run Costs. A chat's cost is read on exit from its transcript's `cost-state` line (`chat-server/cost.ts`), which is why chats start with `--session-id`.
 - **Pipelines** — an operation is a list of `PipelinePhase`s (single child, parallel group, or TS function) run by `startOperationPipeline()` (`src/lib/pipeline/orchestrator.ts`; max 3 concurrent). Definitions in `src/lib/pipelines/` (`build*Pipeline()`), reusable pieces in `pipelines/actions/`. Function phases get a `PhaseFunctionContext` (`emitStatus` / `emitResult` / `emitAsk` / `runChild` / `runChildGroup` / `appendPhases` / `setWorkspace` / `signal`). Phases have `maxRetries` (default 2) and `timeoutMs`. Interrupted operations are settled as failed on restart (`failStaleOperations()`), never resumed. Phase state travels as `__phaseUpdate:` / `__setWorkspace:` status events.
 - **Claude CLI** — `src/lib/claude/cli.ts`. `allowedTools` replaces the patterns `addDirs` would generate. It adds to the workspace root's `.claude/settings*.json` allows rather than replacing them (agents run from the root), so it narrows only what those settings leave out.
@@ -58,7 +59,7 @@ Next.js 16 App Router, React 19, TypeScript strict, Tailwind CSS 4, SWR, Bun run
 
 ### Scheduled tasks
 
-`scheduled_tasks` (`src/lib/db/scheduled-tasks.ts`, UI at Scheduled Jobs): a cron expression (server local time, next occurrence from `Bun.cron.parse`), a kind — `prompt` (an instruction for an agent) or `command` (a shell command) — fixed at creation, and an overlap policy — `skip` / `parallel` / `queue` — for an occurrence that comes due while the previous run is going. `plan-scheduled-task` turns a person's request into a task saved **disabled** for review. The worker ticks every minute (`scheduled-tasks/scheduler.ts`); a tick with nothing due or queued only reads the table. A `command` task runs in the worker as `sh -c` from the workspace root with `AIW_WORKSPACE_ROOT` / `AIW_HOME` set (`scheduled-tasks/command.ts`), its exit code and output tail recorded on the task; Run now makes it due for the next tick. For a `prompt` task, since operations live in the Next server's memory, the worker reads which runs are going and starts them over HTTP (`scheduled-tasks/client.ts` → `/api/scheduled-tasks/run`, which Run now also uses); an occurrence missed while the server was down runs once on the next tick, and one that cannot start (server down, concurrency limit) stays due. Each `prompt` run is a `scheduled-task` operation filed under `scheduled-task-<id>` in place of a workspace (its history is that listing), one child with this server's MCP (`aiwMcp`). `SCHEDULED_TASK_ALLOWED_TOOLS` (reads, read-only `gh` / `git`, starting operations) adds to the workspace root's settings rather than limiting them, so connected MCP tools such as Slack are usable too; the prompts' rule is that it writes outside only what the instruction names. A successful run pushes its summary instead of the generic completion notice. Built-in tasks (`builtin` set) are registered by the worker with `ensureBuiltinScheduledTask` and can be edited or disabled but not deleted.
+`scheduled_tasks` (`src/lib/db/scheduled-tasks.ts`, UI at Scheduled Jobs): a cron expression (server local time, next occurrence from `Bun.cron.parse`), a kind — `prompt` (an instruction for an agent) or `command` (a shell command) — fixed at creation, and an overlap policy — `skip` / `parallel` / `queue` — for an occurrence that comes due while the previous run is going. `plan-scheduled-task` turns a person's request into a task saved **disabled** for review. The worker ticks every minute (`scheduled-tasks/scheduler.ts`); a tick with nothing due or queued only reads the table. A `command` task runs in the worker as `sh -c` from the workspace root with `AIW_WORKSPACE_ROOT` / `AIW_HOME` set (`scheduled-tasks/command.ts`), its exit code and output tail recorded on the task; Run now makes it due for the next tick. For a `prompt` task, since operations live in the web server's memory, the worker reads which runs are going and starts them over HTTP (`scheduled-tasks/client.ts` → `/api/scheduled-tasks/run`, which Run now also uses); an occurrence missed while the server was down runs once on the next tick, and one that cannot start (server down, concurrency limit) stays due. Each `prompt` run is a `scheduled-task` operation filed under `scheduled-task-<id>` in place of a workspace (its history is that listing), one child with this server's MCP (`aiwMcp`). `SCHEDULED_TASK_ALLOWED_TOOLS` (reads, read-only `gh` / `git`, starting operations) adds to the workspace root's settings rather than limiting them, so connected MCP tools such as Slack are usable too; the prompts' rule is that it writes outside only what the instruction names. A successful run pushes its summary instead of the generic completion notice. Built-in tasks (`builtin` set) are registered by the worker with `ensureBuiltinScheduledTask` and can be edited or disabled but not deleted.
 
 ### Autonomous loop
 
@@ -96,7 +97,7 @@ Next.js 16 App Router, React 19, TypeScript strict, Tailwind CSS 4, SWR, Bun run
 
 - Path alias `@/*` → `./src/*`; types in `src/types/`; tests in `src/__tests__/` mirroring `src/`.
 - Mutable server state (DB, operations, config, chat sessions, locks) lives on `globalThis` to survive HMR.
-- All API routes export `const dynamic = "force-dynamic"`.
+- Page titles are set by `useDocumentTitle` in each page.
 - ESLint: unused vars prefixed `_`; `bin/**` not linted.
 
 ## Testing
@@ -109,5 +110,4 @@ Vitest + Testing Library, globals enabled. Only `src/__tests__/components/**` an
 - Events reach the DB asynchronously; don't query them right after emitting.
 - Running operations are in memory (`src/lib/pipeline/store.ts`), completed ones on disk; `/api/operations` merges both.
 - `runSubPhases` ignores sub-phase `timeoutMs` / `effort`: under autonomous only the wrapping phase budget (`CYCLE_BUDGETS_MS`, `executeCycleBudgetMs()`) applies.
-- Lint type-checks through `tsconfig.typecheck.json` after `next typegen` because `.next/dev` types go stale on route deletion.
-- `bin/next-server.ts` prewarms every route after a dev start (`src/lib/dev/prewarm.ts`).
+- `globals.css` limits Tailwind's class detection to `src/` (`source("..")`); without it Tailwind scans `node_modules` too and emits classes for words found there.

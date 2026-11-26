@@ -1,5 +1,3 @@
-"use client";
-
 import { useMemo, useState } from "react";
 import { OperationLog } from "./log";
 import { ResultBox } from "../shared/feedback/result-box";

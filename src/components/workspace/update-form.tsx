@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, type ReactNode } from "react";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";

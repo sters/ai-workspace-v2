@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR from "swr";
 import { CollapsibleSection } from "@/components/shared/containers/collapsible-section";
 import { fetcher } from "@/lib/api";

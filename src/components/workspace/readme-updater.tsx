@@ -1,5 +1,3 @@
-"use client";
-
 import { Card } from "../shared/containers/card";
 import { UpdateForm } from "./update-form";
 import { useRunningOperations } from "@/hooks/use-running-operations";

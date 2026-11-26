@@ -1,10 +1,7 @@
-import { NextResponse } from "next/server";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { buildSearchPipeline } from "@/lib/pipelines/search";
 import { searchSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
-
-export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -16,11 +13,11 @@ export async function POST(request: Request) {
     const operation = startOperationPipeline("search", "deep-search", phases, undefined, {
       query: parsed.data.query,
     });
-    return NextResponse.json(operation);
+    return Response.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {
-      return NextResponse.json({ error: err.message }, { status: 429 });
+      return Response.json({ error: err.message }, { status: 429 });
     }
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

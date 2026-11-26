@@ -1,5 +1,5 @@
 /**
- * The Next.js side's calls into the chat server, which is a separate process.
+ * The web server's calls into the chat server, which is a separate process.
  */
 
 import { getConfig } from "@/lib/config";

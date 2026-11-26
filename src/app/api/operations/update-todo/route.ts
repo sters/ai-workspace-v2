@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import {
   acquireInterject,
@@ -11,8 +10,6 @@ import { buildUpdateTodoPipeline } from "@/lib/pipelines/update-todo";
 import { updateTodoSchema } from "@/lib/schemas";
 import { parseBody, applyOperationDefaults } from "@/lib/validate";
 
-export const dynamic = "force-dynamic";
-
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const parsed = parseBody(updateTodoSchema, body);
@@ -24,7 +21,7 @@ export async function POST(request: Request) {
 
   if (interject) {
     if (!acquireInterject(workspace)) {
-      return NextResponse.json(
+      return Response.json(
         { error: `Interject already in flight for workspace ${workspace}` },
         { status: 409 },
       );
@@ -50,12 +47,12 @@ export async function POST(request: Request) {
         scheduleAutonomousRekick(operation.id, workspace, autonomousInputs);
       }
 
-      return NextResponse.json(operation);
+      return Response.json(operation);
     } catch (err) {
       if (err instanceof ConcurrencyLimitError) {
-        return NextResponse.json({ error: err.message }, { status: 429 });
+        return Response.json({ error: err.message }, { status: 429 });
       }
-      return NextResponse.json({ error: String(err) }, { status: 500 });
+      return Response.json({ error: String(err) }, { status: 500 });
     } finally {
       releaseInterject(workspace);
     }
@@ -72,11 +69,11 @@ export async function POST(request: Request) {
       interactionLevel,
       ...(repo && { repo }),
     });
-    return NextResponse.json(operation);
+    return Response.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {
-      return NextResponse.json({ error: err.message }, { status: 429 });
+      return Response.json({ error: err.message }, { status: 429 });
     }
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

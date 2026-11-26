@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import useSWR from "swr";
 import type { ChatStartPrompt } from "@/types/chat-start-prompt";
@@ -8,6 +6,7 @@ import { Button } from "@/components/shared/buttons/button";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { fetcher, postJson } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface ChatStartPromptsResponse {
   prompts: ChatStartPrompt[];
@@ -81,6 +80,7 @@ function PromptForm({
 }
 
 export default function ChatStartPromptsPage() {
+  useDocumentTitle("Snippet: Chat");
   const { data, error, isLoading, mutate } = useSWR<ChatStartPromptsResponse>(
     "/api/chat-start-prompts",
     fetcher,

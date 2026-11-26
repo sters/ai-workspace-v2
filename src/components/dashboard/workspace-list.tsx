@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { Archive, ChevronDown } from "lucide-react";
 import { useWorkspaces } from "@/hooks/use-workspaces";

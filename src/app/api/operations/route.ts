@@ -1,9 +1,6 @@
-import { NextResponse } from "next/server";
 import { getOperationSummaries } from "@/lib/pipeline-manager";
 import { listStoredOperations, listRecentFinishedOperations } from "@/lib/operation-store";
 import type { OperationListItem } from "@/types/operation";
-
-export const dynamic = "force-dynamic";
 
 const COMPLETED_LIMIT_DEFAULT = 50;
 const COMPLETED_LIMIT_MAX = 200;
@@ -27,7 +24,7 @@ export function GET(request: Request) {
         running = running.filter((op) => op.workspace === workspace);
       }
       running.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
-      return NextResponse.json(running);
+      return Response.json(running);
     }
 
     // Recent finished (completed + failed). Merges in-memory non-running with stored,
@@ -46,7 +43,7 @@ export function GET(request: Request) {
         const bt = new Date(b.completedAt ?? b.startedAt).getTime();
         return bt - at;
       });
-      return NextResponse.json(merged.slice(0, limit));
+      return Response.json(merged.slice(0, limit));
     }
 
     // Full listing: merge in-memory summaries with disk-stored summaries
@@ -69,8 +66,8 @@ export function GET(request: Request) {
       return new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime();
     });
 
-    return NextResponse.json(merged);
+    return Response.json(merged);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

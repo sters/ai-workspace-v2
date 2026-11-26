@@ -1,17 +1,10 @@
-"use client";
-
-import { use } from "react";
+import { useParams } from "@/lib/router/navigation";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { HistoryTimeline } from "@/components/workspace/history-timeline";
 
-export default function WorkspaceHistoryPage({
-  params,
-}: {
-  params: Promise<{ name: string }>;
-}) {
-  const { name } = use(params);
-  const decodedName = decodeURIComponent(name);
-  useDocumentTitle(`History - ${decodedName}`);
+export default function WorkspaceHistoryPage() {
+  const { name } = useParams<{ name: string }>();
+  useDocumentTitle(`History - ${name}`);
 
-  return <HistoryTimeline workspaceName={decodedName} />;
+  return <HistoryTimeline workspaceName={name} />;
 }

@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useCallback, useEffect } from "react";
 import type { HistoryEntry } from "@/types/workspace";
 import { useHistory } from "@/hooks/use-workspace";

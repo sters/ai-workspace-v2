@@ -1,5 +1,3 @@
-"use client";
-
 import { ExternalLink } from "lucide-react";
 import { MarkdownRenderer } from "../shared/content/markdown-renderer";
 import { StatusBadge } from "../shared/feedback/status-badge";

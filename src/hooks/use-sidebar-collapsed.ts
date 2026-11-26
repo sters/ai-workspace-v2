@@ -1,5 +1,3 @@
-"use client";
-
 import { useSyncExternalStore } from "react";
 
 export const SIDEBAR_COLLAPSED_STORAGE_KEY = "aiw:sidebar-collapsed";

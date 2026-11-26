@@ -1,11 +1,10 @@
-import { NextResponse } from "next/server";
 import type z from "zod";
 import { getConfig } from "./config";
 import type { InteractionLevel } from "@/types/prompts";
 
 type ParseResult<T> =
   | { success: true; data: T }
-  | { success: false; response: NextResponse };
+  | { success: false; response: Response };
 
 export function parseBody<S extends z.ZodTypeAny>(schema: S, body: unknown): ParseResult<z.output<S>> {
   const result = schema.safeParse(body);
@@ -13,7 +12,7 @@ export function parseBody<S extends z.ZodTypeAny>(schema: S, body: unknown): Par
     const message = result.error.issues.map((i) => i.message).join("; ");
     return {
       success: false,
-      response: NextResponse.json({ error: message }, { status: 400 }),
+      response: Response.json({ error: message }, { status: 400 }),
     };
   }
   return { success: true, data: result.data };

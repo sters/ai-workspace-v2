@@ -1,5 +1,3 @@
-"use client";
-
 import { useMemo, useState } from "react";
 import { Button } from "@/components/shared/buttons/button";
 import { StatusText } from "@/components/shared/feedback/status-text";

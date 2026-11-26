@@ -1,5 +1,3 @@
-"use client";
-
 import { useMemo, useState } from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { useReviewFindings } from "@/hooks/use-workspace";

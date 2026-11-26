@@ -1,5 +1,3 @@
-"use client";
-
 import type { QuickSearchResponse, QuickSearchResult, DeepSearchResponse } from "@/types/search";
 import type { WorkspaceListItem } from "@/types/workspace";
 import { Spinner } from "@/components/shared/feedback/spinner";

@@ -1,8 +1,6 @@
-"use client";
-
 import { useCallback, useState } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from "@/lib/router/link";
+import { usePathname } from "@/lib/router/navigation";
 import {
   Activity,
   Bell,
@@ -22,7 +20,10 @@ import {
   setSidebarCollapsed,
   useSidebarCollapsed,
 } from "@/hooks/use-sidebar-collapsed";
+import useSWR from "swr";
 import { cn } from "@/lib/utils";
+import { fetcher } from "@/lib/api";
+import type { ClientConfig } from "@/lib/api/client-config";
 import { PushToggle } from "./push-toggle";
 
 interface NavSection {
@@ -92,6 +93,7 @@ function isSectionActive(pathname: string, section: NavSection): boolean {
 }
 
 export function AppSidebar() {
+  const { data: clientConfig } = useSWR<ClientConfig>("/api/client-config", fetcher);
   const pathname = usePathname();
   const collapsed = useSidebarCollapsed();
   const [openSection, setOpenSection] = useState<string | null>(null);
@@ -251,7 +253,7 @@ export function AppSidebar() {
             <div className="border-t p-3">
               <PushToggle />
               <div className="mt-2 text-xs text-muted-foreground">
-                {process.env.NEXT_PUBLIC_GIT_HASH ?? "dev"}
+                {clientConfig?.gitHash}
               </div>
             </div>
           </>

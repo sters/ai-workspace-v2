@@ -1,24 +1,15 @@
-"use client";
-
-import { use } from "react";
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import Link from "@/lib/router/link";
+import { usePathname, useParams } from "@/lib/router/navigation";
 import { cn } from "@/lib/utils";
 
 const SUB_TABS = [
   { label: "Interactive Chat", segment: "interactive" },
 ] as const;
 
-export default function ChatLayout({
-  params,
-  children,
-}: {
-  params: Promise<{ name: string }>;
-  children: React.ReactNode;
-}) {
-  const { name } = use(params);
+export default function ChatLayout({ children }: { children: React.ReactNode }) {
+  const { name } = useParams<{ name: string }>();
   const pathname = usePathname();
-  const basePath = `/workspace/${name}/chat`;
+  const basePath = `/workspace/${encodeURIComponent(name)}/chat`;
   const activeSegment = pathname.replace(basePath, "").replace(/^\//, "");
 
   return (

@@ -1,7 +1,5 @@
-"use client";
-
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "@/lib/router/navigation";
 import {
   ChevronDown,
   ChevronRight,

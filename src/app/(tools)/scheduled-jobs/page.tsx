@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import useSWR from "swr";
 import { OperationCard } from "@/components/workspace/operation-card";
@@ -15,6 +13,7 @@ import {
   type ScheduledTask,
   type ScheduledTaskInput,
 } from "@/types/scheduled-task";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const inputClass = "w-full rounded-md border bg-background px-2 py-1.5 text-sm";
 
@@ -219,6 +218,7 @@ function errorMessage(res: { ok: false; error: string }): string {
 }
 
 export default function ScheduledTasksPage() {
+  useDocumentTitle("Scheduled Jobs");
   const { data, error, isLoading, mutate } = useSWR<{ tasks: ScheduledTask[] }>("/api/scheduled-tasks", fetcher, {
     refreshInterval: 10000,
   });

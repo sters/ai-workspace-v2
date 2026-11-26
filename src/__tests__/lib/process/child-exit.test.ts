@@ -21,17 +21,17 @@ describe("describeChildExit", () => {
 
   it("flags a SIGKILL nobody asked for as an external kill, and names memory pressure", () => {
     const msg = describeChildExit({
-      name: "next dev",
+      name: "web-server",
       exitCode: null,
       signalCode: "SIGKILL",
     });
-    expect(msg).toContain("next dev was killed by SIGKILL");
+    expect(msg).toContain("web-server was killed by SIGKILL");
     expect(msg).toContain("not requested by us");
     expect(msg).toContain("memory pressure");
   });
 
   it("points an unrequested SIGTERM at name-based killers", () => {
-    const msg = describeChildExit({ name: "next dev", exitCode: null, signalCode: "SIGTERM" });
+    const msg = describeChildExit({ name: "web-server", exitCode: null, signalCode: "SIGTERM" });
     expect(msg).toContain("not requested by us");
     expect(msg).toContain("pkill -f");
   });
@@ -49,7 +49,7 @@ describe("describeChildExit", () => {
 
   it("prefers the signal over an exit code when both are reported", () => {
     expect(
-      describeChildExit({ name: "next dev", exitCode: 0, signalCode: "SIGKILL" }),
+      describeChildExit({ name: "web-server", exitCode: 0, signalCode: "SIGKILL" }),
     ).toContain("killed by SIGKILL");
   });
 

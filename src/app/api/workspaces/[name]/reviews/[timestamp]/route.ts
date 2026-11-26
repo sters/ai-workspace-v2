@@ -1,7 +1,4 @@
-import { NextResponse } from "next/server";
 import { getReviewFileList } from "@/lib/workspace/reader";
-
-export const dynamic = "force-dynamic";
 
 export async function GET(
   _request: Request,
@@ -11,18 +8,18 @@ export async function GET(
     const { name: rawName, timestamp: rawTimestamp } = await params;
     const name = decodeURIComponent(rawName);
     if (name.includes('..') || name.includes('/') || name.includes('\\')) {
-      return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
+      return Response.json({ error: "Invalid workspace name" }, { status: 400 });
     }
     const timestamp = decodeURIComponent(rawTimestamp);
     if (timestamp.includes('..') || timestamp.includes('/') || timestamp.includes('\\')) {
-      return NextResponse.json({ error: "Invalid timestamp" }, { status: 400 });
+      return Response.json({ error: "Invalid timestamp" }, { status: 400 });
     }
     const detail = await getReviewFileList(name, timestamp);
     if (!detail) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return Response.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json(detail);
+    return Response.json(detail);
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useState } from "react";
 import useSWR from "swr";
 import { OperationCard } from "@/components/workspace/operation-card";

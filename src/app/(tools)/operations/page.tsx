@@ -1,6 +1,4 @@
-"use client";
-
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import { useCallback } from "react";
 import useSWR from "swr";
 import type { OperationListItem } from "@/types/operation";
@@ -11,6 +9,7 @@ import { Card } from "@/components/shared/containers/card";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { fetcher, killOperation, killChatSession } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 function viewHref(op: OperationListItem): string {
   return `/operations/${encodeURIComponent(op.id)}`;
@@ -19,6 +18,7 @@ function viewHref(op: OperationListItem): string {
 const COMPLETED_LIMIT = 50;
 
 export default function OperationsPage() {
+  useDocumentTitle("Operations");
   const { data, error, isLoading, mutate } = useSWR<OperationListItem[]>(
     "/api/operations?status=running",
     fetcher,

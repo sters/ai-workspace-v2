@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR from "swr";
 import { ConfigEditor } from "@/components/utilities/config-editor";
 import { StatusText } from "@/components/shared/feedback/status-text";

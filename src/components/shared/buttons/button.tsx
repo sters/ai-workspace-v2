@@ -1,5 +1,3 @@
-"use client";
-
 import { type ButtonHTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 import { useAsyncCallback } from "@/hooks/use-async-callback";

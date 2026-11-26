@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR from "swr";
 import type { UsageLimitStop } from "@/types/operation";
 import { SWR_REFRESH_INTERVAL } from "@/lib/constants";

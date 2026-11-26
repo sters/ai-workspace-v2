@@ -1,8 +1,5 @@
 import { pathExists } from "@/lib/fs";
-import { NextResponse } from "next/server";
 import { loadReviewFindings, reviewDirPath } from "@/lib/workspace/review-findings";
-
-export const dynamic = "force-dynamic";
 
 /**
  * The review's structured findings, each resolved against the PR it would be
@@ -20,19 +17,19 @@ export async function GET(
     const { name: rawName, timestamp: rawTimestamp } = await params;
     const name = decodeURIComponent(rawName);
     if (name.includes("..") || name.includes("/") || name.includes("\\")) {
-      return NextResponse.json({ error: "Invalid workspace name" }, { status: 400 });
+      return Response.json({ error: "Invalid workspace name" }, { status: 400 });
     }
     const timestamp = decodeURIComponent(rawTimestamp);
     if (timestamp.includes("..") || timestamp.includes("/") || timestamp.includes("\\")) {
-      return NextResponse.json({ error: "Invalid timestamp" }, { status: 400 });
+      return Response.json({ error: "Invalid timestamp" }, { status: 400 });
     }
 
     if (!(await pathExists(reviewDirPath(name, timestamp)))) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
+      return Response.json({ error: "Not found" }, { status: 404 });
     }
 
-    return NextResponse.json(await loadReviewFindings(name, timestamp));
+    return Response.json(await loadReviewFindings(name, timestamp));
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

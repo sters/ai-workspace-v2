@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import useSWR from "swr";
 import type { Snippet } from "@/types/snippet";
@@ -8,6 +6,7 @@ import { Button } from "@/components/shared/buttons/button";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { fetcher, postJson } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface SnippetsResponse {
   snippets: Snippet[];
@@ -73,6 +72,7 @@ function SnippetEditForm({
 }
 
 export default function SnippetsPage() {
+  useDocumentTitle("Snippet: Init");
   const { data, error, isLoading, mutate } = useSWR<SnippetsResponse>(
     "/api/snippets",
     fetcher,

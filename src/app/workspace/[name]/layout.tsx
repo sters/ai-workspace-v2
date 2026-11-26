@@ -1,15 +1,7 @@
-"use client";
-
 import { Suspense } from "react";
 import { WorkspaceLayoutContent } from "@/components/workspace/workspace-layout-content";
 
-export default function WorkspaceLayout({
-  params,
-  children,
-}: {
-  params: Promise<{ name: string }>;
-  children: React.ReactNode;
-}) {
+export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   return (
     <Suspense
       fallback={
@@ -19,7 +11,7 @@ export default function WorkspaceLayout({
         </div>
       }
     >
-      <WorkspaceLayoutContent params={params}>
+      <WorkspaceLayoutContent>
         {children}
       </WorkspaceLayoutContent>
     </Suspense>

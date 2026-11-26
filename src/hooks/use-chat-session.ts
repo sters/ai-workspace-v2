@@ -1,13 +1,8 @@
-"use client";
-
 import { useRef, useEffect, useState, useCallback } from "react";
 import { useTerminal } from "./use-terminal";
 import type { ChatSessionInfo, SessionState, ServerMessage } from "@/types/chat";
+import { chatWsUrl } from "@/lib/api/client-config";
 
-const CHAT_WS_URL =
-  typeof window !== "undefined"
-    ? `ws://${window.location.hostname}:${process.env.NEXT_PUBLIC_CHAT_WS_PORT || "3742"}/ws`
-    : "";
 
 // ---------------------------------------------------------------------------
 // localStorage helpers
@@ -189,6 +184,8 @@ export function useChatSession(
         return;
       }
 
+      const wsUrl = await chatWsUrl();
+
       // If another session init started while we awaited, abandon this one.
       if (generationRef.current !== gen) {
         dispose();
@@ -202,7 +199,7 @@ export function useChatSession(
         return;
       }
 
-      const ws = new WebSocket(CHAT_WS_URL);
+      const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       let resumedExited = false;
@@ -325,6 +322,8 @@ export function useChatSession(
       return;
     }
 
+    const wsUrl = await chatWsUrl();
+
     // If another session init started while we awaited, abandon this one.
     if (generationRef.current !== gen) {
       dispose();
@@ -339,7 +338,7 @@ export function useChatSession(
       return;
     }
 
-    const ws = new WebSocket(CHAT_WS_URL);
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {

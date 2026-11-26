@@ -1,6 +1,4 @@
-"use client";
-
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import { SplitButton } from "../shared/buttons/split-button";
 import { Button } from "../shared/buttons/button";
 import { RepositoryActionButton } from "./repository-action-button";

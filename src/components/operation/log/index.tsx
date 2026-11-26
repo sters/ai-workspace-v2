@@ -1,5 +1,3 @@
-"use client";
-
 import { useMemo, useState } from "react";
 import type { OperationLogProps } from "@/types/components";
 import { eventsToLogEntries } from "@/lib/parsers/stream";

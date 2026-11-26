@@ -1,12 +1,12 @@
-"use client";
-
 import { useState } from "react";
 import { ClaudeOperation } from "@/components/operation/claude-operation";
 import { Button } from "@/components/shared/buttons/button";
 import { Input } from "@/components/shared/forms/input";
 import { PageHeader } from "@/components/shared/feedback/page-header";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function OperationPrunePage() {
+  useDocumentTitle("Cleanup: Operation Log");
   const [days, setDays] = useState("7");
   const [archivedOnly, setArchivedOnly] = useState(true);
 

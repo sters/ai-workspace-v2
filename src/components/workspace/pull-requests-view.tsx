@@ -1,10 +1,8 @@
-"use client";
-
 import { PrEventTimeline } from "./pr-event-timeline";
 import { SELECT_TRIAGE_PARAM } from "./pr-suggestions";
 import { usePrSuggestions } from "@/hooks/use-pr-suggestions";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "@/lib/router/navigation";
 import { ExternalLink, MessageSquare, RefreshCw } from "lucide-react";
 import { usePullRequests, type RepoPullRequestState } from "@/hooks/use-workspace";
 import { useRunningOperations } from "@/hooks/use-running-operations";

@@ -2,7 +2,7 @@
 /**
  * Entry point for the background worker. Spawned by bin/start.ts. Once a
  * minute it starts the scheduled tasks that have come due: `command` tasks
- * here, `prompt` tasks through the Next server, which holds operations. It
+ * here, `prompt` tasks through the web server, which holds operations. It
  * registers aiw's own tasks (the PR watcher) the first time it starts.
  *
  * Required env: AIW_WORKSPACE_ROOT (set by start.ts).

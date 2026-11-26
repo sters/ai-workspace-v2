@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import useSWR from "swr";
 import type { NotificationLog } from "@/lib/db/notification-logs";
@@ -8,6 +6,7 @@ import { Button } from "@/components/shared/buttons/button";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { fetcher } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface NotificationLogsResponse {
   logs: NotificationLog[];
@@ -17,6 +16,7 @@ interface NotificationLogsResponse {
 const PAGE_SIZE = 50;
 
 export default function NotificationLogsPage() {
+  useDocumentTitle("Notification Logs");
   const [offset, setOffset] = useState(0);
   const { data, error, isLoading } = useSWR<NotificationLogsResponse>(
     `/api/notification-logs?limit=${PAGE_SIZE}&offset=${offset}`,

@@ -14,7 +14,7 @@ const globalStore = globalThis as unknown as {
 /**
  * Get the SQLite database singleton.
  * Creates the database and runs migrations on first call.
- * Stored on globalThis to survive Next.js module isolation / HMR.
+ * Stored on globalThis to survive HMR.
  */
 export function getDb(): Database {
   if (globalStore.__aiwDb) {

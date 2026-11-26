@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR from "swr";
 import type { Opener } from "@/types/config";
 import { showToast } from "@/components/shared/feedback/toast";

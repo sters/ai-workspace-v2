@@ -1,12 +1,9 @@
-import { NextResponse } from "next/server";
 import { repositoryPruneSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
 import {
   listRepositoryPruneCandidates,
   pruneRepositories,
 } from "@/lib/workspace/repository-prune";
-
-export const dynamic = "force-dynamic";
 
 /**
  * Separate from `/api/repositories`, which the repository picker reads on every
@@ -15,9 +12,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
-    return NextResponse.json({ repositories: await listRepositoryPruneCandidates() });
+    return Response.json({ repositories: await listRepositoryPruneCandidates() });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }
 
@@ -27,8 +24,8 @@ export async function POST(request: Request) {
   if (!parsed.success) return parsed.response;
 
   try {
-    return NextResponse.json({ outcomes: await pruneRepositories(parsed.data.repositories) });
+    return Response.json({ outcomes: await pruneRepositories(parsed.data.repositories) });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

@@ -1,6 +1,4 @@
-"use client";
-
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import { Card } from "../shared/containers/card";
 import { cn, formatReviewTimestamp } from "@/lib/utils";
 import type { ReviewSession } from "@/types/workspace";

@@ -1,25 +1,18 @@
-"use client";
-
-import { use } from "react";
+import { useParams } from "@/lib/router/navigation";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { MemoEditor } from "@/components/workspace/memo-editor";
 
-export default function WorkspaceMemoPage({
-  params,
-}: {
-  params: Promise<{ name: string }>;
-}) {
-  const { name } = use(params);
-  const decodedName = decodeURIComponent(name);
-  useDocumentTitle(`Memo - ${decodedName}`);
-  const { workspace } = useWorkspace(decodedName);
+export default function WorkspaceMemoPage() {
+  const { name } = useParams<{ name: string }>();
+  useDocumentTitle(`Memo - ${name}`);
+  const { workspace } = useWorkspace(name);
 
   if (!workspace) return null;
 
   return (
     <MemoEditor
-      workspaceName={decodedName}
+      workspaceName={name}
       workspacePath={workspace.path}
     />
   );

@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
 
 const mockPathExists = vi.fn();
 const mockReadFile = vi.fn();
@@ -58,7 +57,7 @@ async function callGET() {
 async function callPOST(body: Record<string, unknown>) {
   vi.resetModules();
   const mod = await import("@/app/api/aiw-settings/route");
-  const request = new NextRequest("http://localhost:3741/api/aiw-settings", {
+  const request = new Request("http://localhost:3741/api/aiw-settings", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),

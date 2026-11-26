@@ -1,5 +1,3 @@
-"use client";
-
 import { Button, Callout } from "@/components/shared";
 import type { OpenPullRequestInfo } from "@/hooks/use-archive-toggle";
 

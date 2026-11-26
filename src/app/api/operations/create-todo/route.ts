@@ -1,5 +1,4 @@
 import { pathExists } from "@/lib/fs";
-import { NextResponse } from "next/server";
 import path from "node:path";
 import { getWorkspaceDir, resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
@@ -7,8 +6,6 @@ import { listWorkspaceRepos } from "@/lib/workspace";
 import { createTodoSchema } from "@/lib/schemas";
 import { parseBody, applyOperationDefaults } from "@/lib/validate";
 import { buildCreateTodoPipeline } from "@/lib/pipelines/create-todo";
-
-export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -22,7 +19,7 @@ export async function POST(request: Request) {
 
   const reviewDir = path.join(wsPath, "artifacts", "reviews", reviewTimestamp);
   if (!(await pathExists(reviewDir))) {
-    return NextResponse.json(
+    return Response.json(
       { error: `Review directory not found: ${reviewTimestamp}` },
       { status: 404 },
     );
@@ -30,7 +27,7 @@ export async function POST(request: Request) {
 
   const repos = await listWorkspaceRepos(workspace);
   if (repos.length === 0) {
-    return NextResponse.json(
+    return Response.json(
       { error: "No repositories found in workspace" },
       { status: 400 },
     );
@@ -43,11 +40,11 @@ export async function POST(request: Request) {
       interactionLevel,
       ...(instruction && { instruction }),
     });
-    return NextResponse.json(operation);
+    return Response.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {
-      return NextResponse.json({ error: err.message }, { status: 429 });
+      return Response.json({ error: err.message }, { status: 429 });
     }
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

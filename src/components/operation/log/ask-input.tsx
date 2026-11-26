@@ -1,5 +1,3 @@
-"use client";
-
 import type { AskQuestion } from "@/types/claude";
 import { useAskInput } from "@/hooks/use-ask-input";
 import { Button } from "../../shared/buttons/button";

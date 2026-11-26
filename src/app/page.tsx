@@ -1,11 +1,9 @@
-"use client";
-
 import { Suspense, useState } from "react";
 import { WorkspaceList } from "@/components/dashboard/workspace-list";
 import { WorkspaceSearch } from "@/components/dashboard/workspace-search";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { useDocumentTitle } from "@/hooks/use-document-title";
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import useSWR from "swr";
 import { Callout } from "@/components/shared/containers/callout";
 import { fetcher } from "@/lib/api";

@@ -21,7 +21,7 @@ export function generateDefaultConfigContent(): string {
     "# server:",
     "#   port: 3741",
     "#   chatPort: 3742",
-    "#   disableAccessLog: false   # true silences Next.js dev access logs",
+    "#   disableAccessLog: false   # true silences the web server's API access log",
     "",
     "# claude:",
     "#   path: null           # null = auto-detect",

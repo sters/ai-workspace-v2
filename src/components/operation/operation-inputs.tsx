@@ -1,5 +1,3 @@
-"use client";
-
 const INPUT_LABELS: Record<string, string> = {
   instruction: "Instruction",
   description: "Description",

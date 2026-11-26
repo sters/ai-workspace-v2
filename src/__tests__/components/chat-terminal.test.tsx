@@ -24,7 +24,7 @@ vi.mock("swr", () => ({
   }),
 }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("@/lib/router/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 import { ChatTerminal } from "@/components/workspace/chat-terminal";
 

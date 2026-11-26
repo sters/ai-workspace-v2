@@ -1,10 +1,9 @@
-"use client";
-
 import useSWR from "swr";
 import { ConfigEditor } from "@/components/utilities/config-editor";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { fetcher } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 type ConfigData = {
   filePath: string;
@@ -13,6 +12,7 @@ type ConfigData = {
 };
 
 export default function AiwSettingsPage() {
+  useDocumentTitle("AIW Settings");
   const { data, error, isLoading, mutate } = useSWR<ConfigData>(
     "/api/aiw-settings",
     fetcher,

@@ -1,17 +1,10 @@
-"use client";
-
-import { use } from "react";
+import { useParams } from "@/lib/router/navigation";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { ChangesBrowser } from "@/components/workspace/changes-browser";
 
-export default function WorkspaceChangesPage({
-  params,
-}: {
-  params: Promise<{ name: string }>;
-}) {
-  const { name } = use(params);
-  const decodedName = decodeURIComponent(name);
-  useDocumentTitle(`Changes - ${decodedName}`);
+export default function WorkspaceChangesPage() {
+  const { name } = useParams<{ name: string }>();
+  useDocumentTitle(`Changes - ${name}`);
 
-  return <ChangesBrowser workspaceName={decodedName} />;
+  return <ChangesBrowser workspaceName={name} />;
 }

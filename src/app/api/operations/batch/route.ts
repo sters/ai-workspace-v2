@@ -1,12 +1,9 @@
-import { NextResponse } from "next/server";
 import { resolveWorkspaceName } from "@/lib/config";
 import { startOperationPipeline, ConcurrencyLimitError } from "@/lib/pipeline-manager";
 import { listWorkspaceRepos } from "@/lib/workspace";
 import { buildBatchPipeline } from "@/lib/pipelines/batch";
 import { batchSchema } from "@/lib/schemas";
 import { parseBody, applyOperationDefaults } from "@/lib/validate";
-
-export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
@@ -19,14 +16,14 @@ export async function POST(request: Request) {
 
   if (startWith === "init") {
     if (!description || !description.trim()) {
-      return NextResponse.json(
+      return Response.json(
         { error: "description is required for init batch" },
         { status: 400 },
       );
     }
   } else {
     if (!workspace || !workspace.trim()) {
-      return NextResponse.json(
+      return Response.json(
         { error: "workspace is required for this batch mode" },
         { status: 400 },
       );
@@ -34,7 +31,7 @@ export async function POST(request: Request) {
     workspace = resolveWorkspaceName(workspace);
     const repos = await listWorkspaceRepos(workspace);
     if (repos.length === 0) {
-      return NextResponse.json(
+      return Response.json(
         { error: "No repositories found in workspace" },
         { status: 400 },
       );
@@ -67,11 +64,11 @@ export async function POST(request: Request) {
         ...(repo && { repo }),
       },
     );
-    return NextResponse.json(operation);
+    return Response.json(operation);
   } catch (err) {
     if (err instanceof ConcurrencyLimitError) {
-      return NextResponse.json({ error: err.message }, { status: 429 });
+      return Response.json({ error: err.message }, { status: 429 });
     }
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

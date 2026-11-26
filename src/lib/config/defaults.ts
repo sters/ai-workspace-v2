@@ -102,7 +102,7 @@ export const KNOWN_CONFIG_KEYS: ConfigKeyDef[] = [
   { key: "server", section: null, defaultLine: "# server:" },
   { key: "port", section: "server", defaultLine: "#   port: 3741" },
   { key: "chatPort", section: "server", defaultLine: "#   chatPort: 3742" },
-  { key: "disableAccessLog", section: "server", defaultLine: "#   disableAccessLog: false   # true silences Next.js dev access logs" },
+  { key: "disableAccessLog", section: "server", defaultLine: "#   disableAccessLog: false   # true silences the web server's API access log" },
   { key: "claude", section: null, defaultLine: "# claude:" },
   { key: "path", section: "claude", defaultLine: "#   path: null           # null = auto-detect" },
   { key: "operations", section: null, defaultLine: "# operations:" },

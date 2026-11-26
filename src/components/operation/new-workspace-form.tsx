@@ -1,5 +1,3 @@
-"use client";
-
 import { useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
 import { InitSplitButton } from "./init-split-button";

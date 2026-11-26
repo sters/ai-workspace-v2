@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useMemo } from "react";
 import { parseStreamEvent } from "@/lib/parsers/stream";
 import { statusTextColors, statusIcons } from "@/lib/status-styles";

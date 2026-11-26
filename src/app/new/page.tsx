@@ -1,10 +1,9 @@
-"use client";
-
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams } from "@/lib/router/navigation";
 import { NewOperationsHistory } from "@/components/operation/new-operations-history";
 import { NewWorkspaceForm } from "@/components/operation/new-workspace-form";
 import { PageHeader } from "@/components/shared/feedback/page-header";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 function NewWorkspacePageContent() {
   const searchParams = useSearchParams();
@@ -26,6 +25,7 @@ function NewWorkspacePageContent() {
 }
 
 export default function NewWorkspacePage() {
+  useDocumentTitle("New Workspace");
   return (
     <Suspense>
       <NewWorkspacePageContent />

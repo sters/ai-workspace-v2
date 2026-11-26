@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useOperation } from "@/hooks/use-operation";
 import { CollapsibleOperationLog } from "./collapsible-operation-log";

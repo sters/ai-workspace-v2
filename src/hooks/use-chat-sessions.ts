@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR from "swr";
 import type { ChatSessionInfo } from "@/types/chat";
 import { fetcher } from "@/lib/api";

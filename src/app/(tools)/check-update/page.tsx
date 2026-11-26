@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR from "swr";
 import { Card } from "@/components/shared/containers/card";
 import { Callout } from "@/components/shared/containers/callout";
@@ -7,6 +5,7 @@ import { FetchStatus } from "@/components/shared/feedback/fetch-status";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { fetcher } from "@/lib/api";
 import type { UpdateCheckResult } from "@/lib/update";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 type CheckUpdateResponse = UpdateCheckResult & {
   devMode?: boolean;
@@ -14,6 +13,7 @@ type CheckUpdateResponse = UpdateCheckResult & {
 };
 
 export default function CheckUpdatePage() {
+  useDocumentTitle("Check Update");
   const { data, error, isLoading, mutate } = useSWR<CheckUpdateResponse>(
     "/api/check-update",
     fetcher,

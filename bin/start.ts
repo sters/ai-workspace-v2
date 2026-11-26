@@ -53,8 +53,8 @@ if (process.argv.includes("--self-update")) {
   process.exit(await child.exited ?? 0);
 }
 
-// When run via bunx, the package lives inside node_modules/ which breaks
-// Next.js TypeScript compilation (SWC skips TS for node_modules files).
+// When run via bunx, the package lives inside node_modules/, where its own
+// tsconfig paths and dependencies do not resolve as they do in a checkout.
 // Copy the project to a temp directory and install deps fresh.
 let resolvedGitHash = "";
 if (isBunx) {
@@ -66,26 +66,23 @@ if (isBunx) {
     if (match) resolvedGitHash = match[1];
   } catch {}
 
-  // Include git hash in cache dir name so version changes trigger rebuild
+  // Include git hash in cache dir name so version changes trigger a fresh copy
   const cacheKey = resolvedGitHash || "latest";
   const tempDir = resolve(tmpdir(), `ai-workspace-v2-app-${cacheKey}`);
 
-  // Reuse existing temp dir if it has a valid .next build for this version
-  if (existsSync(resolve(tempDir, ".next", "BUILD_ID"))) {
-    console.log(`Using cached build (${cacheKey})...`);
+  // Reuse an existing temp dir whose install finished for this version
+  if (existsSync(resolve(tempDir, "node_modules", ".bin"))) {
+    console.log(`Using cached install (${cacheKey})...`);
     packageDir = tempDir;
   } else {
     if (existsSync(tempDir)) rmSync(tempDir, { recursive: true });
 
-    // Copy project files (exclude node_modules and .next)
+    // Copy project files (exclude node_modules)
     cpSync(packageDir, tempDir, {
       recursive: true,
       filter: (src) => {
         const rel = src.slice(packageDir.length);
-        return (
-          !rel.startsWith(`${sep}node_modules`) &&
-          !rel.startsWith(`${sep}.next`)
-        );
+        return !rel.startsWith(`${sep}node_modules`);
       },
     });
 
@@ -181,7 +178,6 @@ const chatPort = appConfig.server.chatPort;
 console.log(`ai-workspace root: ${root}`);
 console.log(`Starting on http://localhost:${port}`);
 
-const isDev = process.argv.includes("--dev");
 const isHot = process.argv.includes("--hot");
 
 const sharedEnv = {
@@ -190,11 +186,11 @@ const sharedEnv = {
   AIW_PORT: String(port),
   AIW_CHAT_PORT: String(chatPort),
   ...(appConfig.server.disableAccessLog ? { AIW_DISABLE_ACCESS_LOG: "true" } : {}),
-  ...(resolvedGitHash ? { NEXT_PUBLIC_GIT_HASH: resolvedGitHash } : {}),
+  ...(resolvedGitHash ? { AIW_GIT_HASH: resolvedGitHash } : {}),
 };
 
-const nextFlags = isHot ? ["--hot"] : isDev ? ["--dev"] : [];
-const nextServer = Bun.spawn(["bun", "--bun", "run", "bin/next-server.ts", ...nextFlags], {
+const hotFlag = isHot ? ["--hot"] : [];
+const webServer = Bun.spawn(["bun", "--bun", ...hotFlag, "run", "bin/web-server.ts", ...hotFlag], {
   cwd: packageDir,
   stdio: ["inherit", "inherit", "inherit"],
   env: sharedEnv,
@@ -209,7 +205,6 @@ const nextServer = Bun.spawn(["bun", "--bun", "run", "bin/next-server.ts", ...ne
 // closure is registered when the session starts and keeps running the code it
 // was created with, so a change on the output path applies to sessions started
 // after it rather than to the ones already open.
-const hotFlag = isHot ? ["--hot"] : [];
 const chatServer = Bun.spawn(["bun", "--bun", ...hotFlag, "run", "bin/chat-server.ts"], {
   cwd: packageDir,
   stdio: ["inherit", "inherit", "inherit"],
@@ -244,7 +239,7 @@ let shutdownRequested = false;
 
 function killAll(signal?: string) {
   shutdownRequested = true;
-  console.log(`[start] received ${signal ?? "shutdown request"}, stopping next/chat/slack/worker`);
+  console.log(`[start] received ${signal ?? "shutdown request"}, stopping web/chat/slack/worker`);
   // Start draining stdin immediately to catch terminal escape sequence
   // responses that arrive after child processes are killed. If we wait until
   // after the processes exit, the responses may land in the shell's input
@@ -256,7 +251,7 @@ function killAll(signal?: string) {
       process.stdin.resume();
     } catch {}
   }
-  nextServer.kill();
+  webServer.kill();
   chatServer.kill();
   slackServer?.kill();
   worker.kill();
@@ -265,18 +260,18 @@ function killAll(signal?: string) {
 process.on("SIGINT", killAll);
 process.on("SIGTERM", killAll);
 
-// Wait for Next.js to exit, then clean up sibling servers
-const nextExitCode = await nextServer.exited;
+// Wait for the web server to exit, then clean up sibling servers
+const webExitCode = await webServer.exited;
 console.log(
   `[start] ${describeChildExit({
-    name: "next-server",
-    exitCode: nextServer.exitCode,
-    signalCode: nextServer.signalCode,
+    name: "web-server",
+    exitCode: webServer.exitCode,
+    signalCode: webServer.signalCode,
     requested: shutdownRequested,
   })}`,
 );
 if (!shutdownRequested) {
-  console.log("[start] next-server is gone, so stopping chat/slack too (they are tied to it)");
+  console.log("[start] web-server is gone, so stopping chat/slack too (they are tied to it)");
 }
 chatServer.kill();
 slackServer?.kill();
@@ -319,6 +314,6 @@ if (process.stdin.isTTY) {
   }
 }
 
-// next-server passes on the signal that stopped it, so a tree that was killed
-// from outside exits non-zero here instead of looking like a clean stop.
-process.exit(nextExitCode ?? (nextServer.signalCode ? signalExitCode(nextServer.signalCode) : 0));
+// A web server killed from outside exits by signal, so the tree exits non-zero
+// here instead of looking like a clean stop.
+process.exit(webExitCode ?? (webServer.signalCode ? signalExitCode(webServer.signalCode) : 0));

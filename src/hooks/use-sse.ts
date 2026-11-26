@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useRef, useReducer, useState, useCallback } from "react";
 import type { OperationEvent } from "@/types/operation";
 import { operationEventSchema } from "@/lib/runtime-schemas";

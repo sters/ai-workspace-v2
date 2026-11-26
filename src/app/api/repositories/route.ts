@@ -1,12 +1,9 @@
-import { NextResponse } from "next/server";
 import { listSelectableRepositories } from "@/lib/workspace/quick-create";
-
-export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    return NextResponse.json({ repositories: await listSelectableRepositories() });
+    return Response.json({ repositories: await listSelectableRepositories() });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

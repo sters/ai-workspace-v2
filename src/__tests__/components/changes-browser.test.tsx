@@ -15,7 +15,7 @@ let searchParams = new URLSearchParams();
 let ws = "";
 let wsCount = 0;
 
-vi.mock("next/navigation", () => ({
+vi.mock("@/lib/router/navigation", () => ({
   useRouter: () => ({ replace: mockReplace, push: mockPush }),
   useSearchParams: () => searchParams,
 }));

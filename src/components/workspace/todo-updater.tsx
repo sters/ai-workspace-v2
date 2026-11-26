@@ -1,5 +1,3 @@
-"use client";
-
 import type { TodoFile } from "@/types/workspace";
 import { Bot } from "lucide-react";
 import { Card } from "../shared/containers/card";

@@ -1,5 +1,3 @@
-"use client";
-
 import { Textarea } from "../shared/forms/textarea";
 
 /**

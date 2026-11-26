@@ -1,7 +1,5 @@
-"use client";
-
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import useSWR from "swr";
 import type { RunCostSummary } from "@/lib/run-costs";
 import { CostGroupTable, usd } from "./cost-group-table";
@@ -10,6 +8,7 @@ import { Button } from "@/components/shared/buttons/button";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusText } from "@/components/shared/feedback/status-text";
 import { fetcher } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const RANGES = [
   { days: 7, label: "7 days" },
@@ -25,6 +24,7 @@ const BASES = [
 ];
 
 export default function RunCostsPage() {
+  useDocumentTitle("Run Costs");
   const [days, setDays] = useState(30);
   const [basis, setBasis] = useState("1h");
   const { data, error, isLoading } = useSWR<RunCostSummary>(`/api/run-costs?days=${days}&basis=${basis}`, fetcher);

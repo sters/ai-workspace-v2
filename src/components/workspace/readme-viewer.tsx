@@ -1,5 +1,3 @@
-"use client";
-
 import { MarkdownRenderer } from "../shared/content/markdown-renderer";
 import { StatusText } from "../shared/feedback/status-text";
 

@@ -1,19 +1,12 @@
-"use client";
-
-import { use, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { useRouter, useParams } from "@/lib/router/navigation";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useReviews } from "@/hooks/use-workspace";
 
-export default function WorkspaceReviewPage({
-  params,
-}: {
-  params: Promise<{ name: string }>;
-}) {
-  const { name } = use(params);
-  const decodedName = decodeURIComponent(name);
-  useDocumentTitle(`Review - ${decodedName}`);
-  const { reviews } = useReviews(decodedName);
+export default function WorkspaceReviewPage() {
+  const { name } = useParams<{ name: string }>();
+  useDocumentTitle(`Review - ${name}`);
+  const { reviews } = useReviews(name);
   const router = useRouter();
 
   useEffect(() => {

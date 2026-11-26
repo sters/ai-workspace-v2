@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { Button } from "@/components/shared/buttons/button";
 import { Input } from "@/components/shared/forms/input";

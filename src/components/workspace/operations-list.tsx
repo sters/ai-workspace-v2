@@ -1,7 +1,5 @@
-"use client";
-
 import { useEffect, useRef, useCallback } from "react";
-import { useSearchParams, useRouter, usePathname } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "@/lib/router/navigation";
 import useSWR from "swr";
 import { OperationCard } from "@/components/workspace/operation-card";
 import { StatusText } from "@/components/shared/feedback/status-text";

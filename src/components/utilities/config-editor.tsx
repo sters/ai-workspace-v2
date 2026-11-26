@@ -1,5 +1,3 @@
-"use client";
-
 import { useState, useCallback, useEffect } from "react";
 import { MonacoEditorLazy } from "@/components/shared/content/monaco-editor-lazy";
 import { Button } from "@/components/shared/buttons/button";

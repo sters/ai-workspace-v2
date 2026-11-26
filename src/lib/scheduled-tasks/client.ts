@@ -35,7 +35,7 @@ export async function createServerDeps(baseUrl: string): Promise<SchedulerDeps> 
 
 /**
  * The worker's scheduler dependencies: `command` tasks go to `commands`, which
- * runs them in the worker; `prompt` tasks to the Next server, asked only on a
+ * runs them in the worker; `prompt` tasks to the web server, asked only on a
  * tick where one is due. An unreachable server fails only the prompt tasks'
  * starts, which leaves them due.
  */

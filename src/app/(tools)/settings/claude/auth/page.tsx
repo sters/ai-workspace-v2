@@ -1,5 +1,3 @@
-"use client";
-
 import useSWR from "swr";
 import { ClaudeOperation } from "@/components/operation/claude-operation";
 import { Button } from "@/components/shared/buttons/button";
@@ -8,6 +6,7 @@ import { FetchStatus } from "@/components/shared/feedback/fetch-status";
 import { PageHeader } from "@/components/shared/feedback/page-header";
 import { StatusBadge } from "@/components/shared/feedback/status-badge";
 import { fetcher } from "@/lib/api";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 type AuthStatus = {
   loggedIn: boolean;
@@ -30,6 +29,7 @@ function AuthDetail({ label, value }: { label: string; value?: string | null }) 
 }
 
 export default function ClaudeAuthPage() {
+  useDocumentTitle("Claude Auth");
   const {
     data: status,
     error,

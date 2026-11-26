@@ -1,5 +1,3 @@
-"use client";
-
 import { usePushNotifications } from "@/hooks/use-push-notifications";
 import { Bell, BellOff, BellRing } from "lucide-react";
 

@@ -1,8 +1,6 @@
-"use client";
-
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { useRouter } from "@/lib/router/navigation";
+import Link from "@/lib/router/link";
 import { Button } from "@/components/shared/buttons";
 import { Input } from "@/components/shared/forms";
 import { Spinner } from "@/components/shared/feedback";

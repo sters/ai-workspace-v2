@@ -1,17 +1,10 @@
-"use client";
-
-import { use } from "react";
+import { useParams } from "@/lib/router/navigation";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { PullRequestsView } from "@/components/workspace/pull-requests-view";
 
-export default function WorkspacePullRequestsPage({
-  params,
-}: {
-  params: Promise<{ name: string }>;
-}) {
-  const { name } = use(params);
-  const decodedName = decodeURIComponent(name);
-  useDocumentTitle(`Pull Requests - ${decodedName}`);
+export default function WorkspacePullRequestsPage() {
+  const { name } = useParams<{ name: string }>();
+  useDocumentTitle(`Pull Requests - ${name}`);
 
-  return <PullRequestsView workspaceName={decodedName} />;
+  return <PullRequestsView workspaceName={name} />;
 }

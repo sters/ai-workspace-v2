@@ -1,9 +1,6 @@
-import { NextResponse } from "next/server";
 import { spawnClaudeTerminal } from "@/lib/claude/cli";
 import { collectOutput } from "@/lib/pty";
 import type { DataListener } from "@/types/pty";
-
-export const dynamic = "force-dynamic";
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -38,9 +35,9 @@ export async function GET(request: Request) {
 
     proc.kill();
 
-    return NextResponse.json({ usage: rawOutput });
+    return Response.json({ usage: rawOutput });
   } catch (err) {
     proc?.kill();
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500 });
   }
 }

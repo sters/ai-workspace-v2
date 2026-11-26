@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import useSWR from "swr";
 import { useChatSession } from "@/hooks/use-chat-session";

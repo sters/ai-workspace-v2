@@ -1,5 +1,3 @@
-"use client";
-
 import { useMemo, useState } from "react";
 import { Input } from "./input";
 import { Spinner } from "@/components/shared/feedback";

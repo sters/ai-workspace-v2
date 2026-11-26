@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { StatusBadge } from "../shared/feedback/status-badge";

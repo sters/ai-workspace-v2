@@ -1,5 +1,3 @@
-"use client";
-
 import { SplitButton } from "@/components/shared/buttons/split-button";
 import type { OperationType } from "@/types/operation";
 

@@ -1,17 +1,10 @@
-"use client";
-
-import { use } from "react";
+import { useParams } from "@/lib/router/navigation";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { ReviewDetail } from "@/components/workspace/review-detail";
 
-export default function ReviewTimestampPage({
-  params,
-}: {
-  params: Promise<{ name: string; timestamp: string }>;
-}) {
-  const { name, timestamp } = use(params);
-  const decodedName = decodeURIComponent(name);
-  useDocumentTitle(`Review ${timestamp} - ${decodedName}`);
+export default function ReviewTimestampPage() {
+  const { name, timestamp } = useParams<{ name: string; timestamp: string }>();
+  useDocumentTitle(`Review ${timestamp} - ${name}`);
 
-  return <ReviewDetail workspaceName={decodedName} timestamp={timestamp} />;
+  return <ReviewDetail workspaceName={name} timestamp={timestamp} />;
 }

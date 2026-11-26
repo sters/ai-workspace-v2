@@ -1,5 +1,3 @@
-"use client";
-
 import Editor, { type EditorProps, type OnMount } from "@monaco-editor/react";
 import { useCallback } from "react";
 import type { editor } from "monaco-editor";

@@ -29,7 +29,7 @@ export interface AppConfig {
   server: {
     port: number;
     chatPort: number;
-    /** Disable Next.js dev-mode incoming-request access logs. */
+    /** Silence the web server's API access log. */
     disableAccessLog: boolean;
   };
 

@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { Card } from "@/components/shared/containers/card";
 import { Button } from "@/components/shared/buttons/button";

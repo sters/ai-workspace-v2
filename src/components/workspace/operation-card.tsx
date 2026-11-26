@@ -1,7 +1,5 @@
-"use client";
-
 import { useState, useMemo } from "react";
-import Link from "next/link";
+import Link from "@/lib/router/link";
 import { OperationSummary, useNow } from "@/components/operation/operation-summary";
 import { OperationInputs } from "@/components/operation/operation-inputs";
 import { OperationLog } from "@/components/operation/log";

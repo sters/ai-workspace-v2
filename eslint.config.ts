@@ -1,5 +1,4 @@
 import js from "@eslint/js";
-import nextPlugin from "@next/eslint-plugin-next";
 import reactHooksPlugin from "eslint-plugin-react-hooks";
 import tseslint from "typescript-eslint";
 import type { ConfigArray } from "typescript-eslint";
@@ -35,7 +34,7 @@ const SYNC_FS_IMPORTS = ["node:fs", "fs"].map((name) => ({
 
 export default tseslint.config(
   {
-    ignores: ["node_modules/**", ".next/**", "out/**", "bin/**"],
+    ignores: ["node_modules/**", "bin/**"],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -43,7 +42,6 @@ export default tseslint.config(
     files: ["src/**/*.{ts,tsx}"],
     plugins: {
       "react-hooks": reactHooksPlugin,
-      "@next/next": nextPlugin,
     },
     languageOptions: {
       parserOptions: {
@@ -54,8 +52,6 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooksPlugin.configs.recommended.rules,
-      ...(nextPlugin.configs.recommended.rules as ConfigArray[number]["rules"]),
-      ...(nextPlugin.configs["core-web-vitals"].rules as ConfigArray[number]["rules"]),
       "@typescript-eslint/no-unused-vars": [
         "error",
         {
@@ -90,7 +86,6 @@ export default tseslint.config(
       "src/lib/web-push/vapid.ts",
       "src/lib/slack-server/memory-db.ts",
       "src/lib/claude/cli.ts",
-      "src/lib/dev/prewarm.ts",
     ],
     rules: {
       "no-restricted-properties": ["error", ...SYNC_SPAWN_PROPERTIES],
