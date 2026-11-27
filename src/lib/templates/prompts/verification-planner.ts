@@ -112,7 +112,7 @@ A human step is for what a command cannot do (non-exhaustive):
 
 Put every automated check that does not depend on a person before the first human step, so a failure surfaces before anyone is called, and gather what a person must look at into as few human steps as possible — one step with several things to look at beats several steps. Put the Command steps that prepare a human step right before it, and make the human step short and concrete: the URL with the real port and ids (\`{{order_id}}\`), the account, what to click, what to look for. When a person only has to perform an action whose effect a command can observe, ask for the value with \`inputs\` and let a following command step check it.
 
-Commands stay on this machine: nothing that deploys, pushes, publishes, or writes to a shared or remote environment. Those are human steps.
+Commands stay on this machine: nothing that deploys, pushes, publishes, or writes to a shared or remote environment. Those are human steps — unless the person's request allows that write for this check. Then a command step makes exactly the write the request allows, a step before it confirms it touches nothing that already exists, and a \`teardown\` step undoes it, so it is undone however the scenario ends.
 
 ### Scenarios
 
