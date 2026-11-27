@@ -7,8 +7,8 @@ export default function SnippetVerifyPage() {
     <SnippetsManager
       kind="verify"
       title="Snippet: Verify"
-      description="Save and manage reusable instructions for planning and replanning verification scenarios."
-      placeholder="Snippet content to insert into a verification plan's instruction..."
+      description="Save and manage reusable instructions for verification requests."
+      placeholder="Snippet content to insert into a verification request..."
     />
   );
 }

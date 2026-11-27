@@ -17,6 +17,6 @@ export { buildAutonomousPipeline } from "./autonomous";
 export { buildDiscoveryPipeline } from "./discovery";
 export { buildAggregateSuggestionsPipeline } from "./aggregate-suggestions";
 export { buildPruneSuggestionsPipeline } from "./prune-suggestions";
-export { buildPlanVerificationPipeline } from "./plan-verification";
+export { buildVerifyPipeline } from "./verify";
 export { buildHarvestLessonsPipeline } from "./harvest-lessons";
 export { buildPlanScheduledTaskPipeline, buildScheduledTaskPipeline } from "./scheduled-task";

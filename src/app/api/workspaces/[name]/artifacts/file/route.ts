@@ -1,9 +1,10 @@
 import path from "node:path";
 import { getWorkspaceDir } from "@/lib/config";
-import { readArtifact } from "@/lib/workspace/artifacts";
+import { readArtifact, resolveArtifactPath } from "@/lib/workspace/artifacts";
 
 /**
- * One artifact's content, named by `?path=` relative to `artifacts/`.
+ * One artifact's content, named by `?path=` relative to `artifacts/`; with
+ * `&raw=1` the file itself, typed by its extension (a report's screenshots).
  *
  * `readArtifact` is what decides whether that path is readable at all — it
  * refuses anything resolving outside the directory — so a refusal and a missing
@@ -19,9 +20,19 @@ export async function GET(
     return Response.json({ error: "Invalid workspace name" }, { status: 400 });
   }
 
-  const relPath = new URL(request.url).searchParams.get("path");
+  const url = new URL(request.url);
+  const relPath = url.searchParams.get("path");
   if (!relPath) {
     return Response.json({ error: "Missing path" }, { status: 400 });
+  }
+
+  if (url.searchParams.get("raw") === "1") {
+    const full = await resolveArtifactPath(path.join(getWorkspaceDir(), name), relPath);
+    const raw = full ? Bun.file(full) : null;
+    if (!raw || !(await raw.exists())) {
+      return Response.json({ error: "Artifact not found" }, { status: 404 });
+    }
+    return new Response(raw);
   }
 
   const file = await readArtifact(path.join(getWorkspaceDir(), name), relPath);

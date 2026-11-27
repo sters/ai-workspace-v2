@@ -13,7 +13,9 @@ export type OperationType =
   | "check-pr-triage"
   | "post-review-findings"
   | "resolve-base-conflicts"
+  // No longer started — `verify` replaced it — but operations recorded under it are still listed.
   | "plan-verification"
+  | "verify"
   | "create-todo"
   | "delete"
   | "workspace-prune"

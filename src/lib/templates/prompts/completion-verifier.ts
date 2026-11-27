@@ -112,7 +112,7 @@ ${input.repoChanges}
 ## Constraint Verification Report (already run — read, do not re-run)
 
 ${input.constraintReportPath}
-${input.verificationResults ? `\n## Verification Results (recorded on the Verify tab)\n\n${input.verificationResults}\n` : ""}
+
 ### Working Directory
 
 \`\`\`bash

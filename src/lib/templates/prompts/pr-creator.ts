@@ -231,12 +231,7 @@ ${input.repoChanges}
 ${existingPRSection}
 ${titleSection}
 ${prTemplateSection}
-${reviewThreadsSection}${input.verificationResults ? `## Verification Results
-
-What was checked in the running software, step by step. Where the template has a testing or verification section, fill it from these; with no template, add a short \`## Verification\` section listing what passed. Leave out step ids, dates and anything marked SKIPPED.
-
-${input.verificationResults}
-` : ""}
+${reviewThreadsSection}
 ### Working Directory
 
 \`\`\`bash

@@ -101,7 +101,7 @@ describe("migration: model support", () => {
     const result = migrateConfigContent("operations:\n  maxConcurrent: 3\n");
     // A step type missing here means the hint block drifted from STEP_DEFAULT_MODELS.
     const block = result.slice(result.indexOf("Built-in step defaults"), result.indexOf("Per-operation-type overrides"));
-    const named = new Set(block.match(/[a-z]+(?:-[a-z]+)+|\bexecute\b|\bresearch\b/g));
+    const named = new Set(block.match(/[a-z]+(?:-[a-z]+)+|\bexecute\b|\bresearch\b|(?<!-)\bverify\b(?!-)/g));
     for (const step of Object.values(STEP_TYPES)) expect(named, step).toContain(step);
     // The bare aliases resolve to a previous generation, so no pairing names them.
     expect(result).not.toMatch(/# {3}# {3}(sonnet|haiku) \//);

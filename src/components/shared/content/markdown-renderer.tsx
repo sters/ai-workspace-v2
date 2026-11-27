@@ -26,16 +26,30 @@ function ExternalLink(props: ComponentPropsWithoutRef<"a">) {
 export function MarkdownRenderer({
   content,
   allowHtml = false,
+  resolveImageSrc,
 }: {
   content: string;
   allowHtml?: boolean;
+  /** Maps an image's relative `src`, for a document whose images sit next to it on the server. */
+  resolveImageSrc?: (src: string) => string;
 }) {
   return (
     <div className="prose prose-sm dark:prose-invert max-w-none">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={allowHtml ? [rehypeRaw, rehypeSanitize] : undefined}
-        components={{ a: ExternalLink }}
+        components={{
+          a: ExternalLink,
+          ...(resolveImageSrc && {
+            img: ({ src, alt, ...rest }: ComponentPropsWithoutRef<"img">) => (
+              <img
+                src={typeof src === "string" && !/^[a-z][a-z0-9+.-]*:|^\//i.test(src) ? resolveImageSrc(src) : src}
+                alt={alt}
+                {...rest}
+              />
+            ),
+          }),
+        }}
       >
         {content}
       </ReactMarkdown>

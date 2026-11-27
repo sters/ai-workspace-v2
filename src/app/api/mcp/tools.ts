@@ -26,12 +26,14 @@ import {
   operationAnswerSchema,
   operationKillSchema,
   reviewSchema,
+  verifySchema,
   updateTodoSchema,
 } from "@/lib/schemas";
 import { POST as postInit } from "../operations/init/route";
 import { POST as postAutonomous } from "../operations/autonomous/route";
 import { POST as postExecute } from "../operations/execute/route";
 import { POST as postReview } from "../operations/review/route";
+import { POST as postVerify } from "../operations/verify/route";
 import { POST as postCreatePr } from "../operations/create-pr/route";
 import { POST as postAddRepository } from "../operations/add-repository/route";
 import { POST as postHarvestLessons } from "../operations/harvest-lessons/route";
@@ -324,6 +326,14 @@ export const MCP_TOOLS: McpTool[] = [
     `Review a workspace's changes against its README and TODOs; repository narrows it to one. ${STARTS_OPERATION}`,
     reviewSchema,
     postReview,
+  ),
+  routeTool(
+    "verify",
+    "Check that a workspace's change works in the running software (locally, or in an environment this machine reaches) by running it, and write a report to its Verify tab. " +
+      "It changes no code, and asks before anything only a person can do — signing in, judging how something looks, writing to a shared environment. " +
+      `instruction says what to check or how; without one it checks the README's acceptance criteria. ${STARTS_OPERATION}`,
+    verifySchema,
+    postVerify,
   ),
   routeTool(
     "add_repository",

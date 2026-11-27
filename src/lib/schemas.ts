@@ -1,7 +1,6 @@
 import z from "zod";
 import { parsePrUrl } from "./github-pr-url";
 import { quickWorkspaceName } from "./naming";
-import { verificationStepDraftSchema } from "./runtime-schemas";
 import { SCHEDULED_TASK_KINDS, SCHEDULED_TASK_OVERLAPS } from "@/types/scheduled-task";
 import { SNIPPET_KINDS } from "@/types/snippet";
 
@@ -389,25 +388,8 @@ export const repoLessonUpdateSchema = z.object({
   dismissChallenges: z.literal(true).optional(),
 });
 
-/** Draft verification scenarios, or (with `scenarioId`) rewrite the rest of one. */
-export const planVerificationSchema = z.object({
+/** Check a workspace's change in the running software. */
+export const verifySchema = z.object({
   workspace: z.string().min(1, "workspace is required"),
-  scenarioId: z.string().optional(),
-  instruction: z.string().optional(),
+  instruction: z.string().optional().describe("What to check, or how; without one the README's acceptance criteria are checked."),
 });
-
-/** An action on one verification scenario from the Verify tab. */
-export const verificationActionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("run") }),
-  z.object({ action: z.literal("abort") }),
-  z.object({
-    action: z.literal("answer"),
-    stepId: z.string().min(1),
-    verdict: z.enum(["ok", "ng"]),
-    note: z.string().optional(),
-    values: z.record(z.string(), z.string()).optional(),
-  }),
-  z.object({ action: z.literal("rerun"), stepId: z.string().min(1) }),
-  z.object({ action: z.literal("skip"), stepId: z.string().min(1) }),
-  z.object({ action: z.literal("edit"), steps: z.array(verificationStepDraftSchema) }),
-]);

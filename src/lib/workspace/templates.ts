@@ -50,15 +50,10 @@ export async function writeResearchTemplates(wsPath: string): Promise<string> {
   return researchDir;
 }
 
-export async function prepareReviewDir(workspaceName: string): Promise<string> {
-  const wsPath = path.join(getWorkspaceDir(), workspaceName);
-  if (!(await pathExists(wsPath))) {
-    throw new Error(`Workspace directory not found: ${wsPath}`);
-  }
-
-  const now = new Date();
+/** A session directory name, `YYYYMMDD-HHMMSS` in local time (`formatReviewTimestamp` reads it). */
+export function sessionTimestamp(now = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  const timestamp = [
+  return [
     now.getFullYear(),
     pad(now.getMonth() + 1),
     pad(now.getDate()),
@@ -67,6 +62,15 @@ export async function prepareReviewDir(workspaceName: string): Promise<string> {
     pad(now.getMinutes()),
     pad(now.getSeconds()),
   ].join("");
+}
+
+export async function prepareReviewDir(workspaceName: string): Promise<string> {
+  const wsPath = path.join(getWorkspaceDir(), workspaceName);
+  if (!(await pathExists(wsPath))) {
+    throw new Error(`Workspace directory not found: ${wsPath}`);
+  }
+
+  const timestamp = sessionTimestamp();
 
   const reviewDir = path.join(wsPath, "artifacts", "reviews", timestamp);
   await mkdir(reviewDir, { recursive: true });
