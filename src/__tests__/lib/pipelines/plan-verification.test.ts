@@ -85,6 +85,15 @@ describe("plan-verification pipeline", () => {
     expect(prompt).toContain("`{{repo_widgets}}` = `/ws/github.com/acme/widgets`");
   });
 
+  it("lets the planner try jq filters and read-only lookups, and nothing that writes", async () => {
+    const { ctx, runChild } = ctxAnswering({ scenarios: [] });
+    expect(await runPhase({ workspace: WS }, ctx)).toBe(true);
+    const tools = runChild.mock.calls[0][2]?.allowedTools ?? [];
+    expect(tools).toEqual(expect.arrayContaining(["Read", "Bash(jq:*)", "Bash(kubectl get:*)", "Bash(kubectl logs:*)", "Bash(gh pr view:*)"]));
+    expect(tools).not.toContain("Write");
+    expect(tools.some((t) => t.startsWith("Bash(kubectl") && !/^Bash\(kubectl (get|describe|logs):/.test(t))).toBe(false);
+  });
+
   it("rejects a plan with a Claude step that has no command, writing nothing", async () => {
     const { ctx } = ctxAnswering({
       scenarios: [{ title: "Bad", summary: "", steps: [{ title: "Start", actor: "command", expected: "up" }] }],

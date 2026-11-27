@@ -24,6 +24,20 @@ import { getReadme } from "@/lib/workspace/reader";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 
+/**
+ * Read-only, plus what lets the planner try a step before writing it: jq on
+ * sample input, and reads of the cluster and PRs the steps will look at.
+ */
+const VERIFICATION_PLANNER_TOOLS = [
+  ...READ_ONLY_TOOLS,
+  "Bash(jq:*)",
+  "Bash(kubectl get:*)",
+  "Bash(kubectl describe:*)",
+  "Bash(kubectl logs:*)",
+  "Bash(gh pr view:*)",
+  "Bash(gh pr list:*)",
+];
+
 export function buildPlanVerificationPipeline(input: {
   workspace: string;
   scenarioId?: string;
@@ -79,7 +93,7 @@ export function buildPlanVerificationPipeline(input: {
           jsonSchema: VERIFICATION_PLAN_SCHEMA as unknown as Record<string, unknown>,
           stepType: STEP_TYPES.PLAN_VERIFICATION,
           addDirs: [wsPath, ...repos.map((r) => r.worktreePath)],
-          allowedTools: READ_ONLY_TOOLS,
+          allowedTools: VERIFICATION_PLANNER_TOOLS,
           appendSystemPromptFile: await ensureSystemPrompt(wsPath, "verification-planner"),
           onResultText: (text) => { resultText = text; },
           skipAskUserQuestion: true,

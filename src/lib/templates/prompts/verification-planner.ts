@@ -74,7 +74,13 @@ export const VERIFICATION_PLAN_SCHEMA = {
 export function getVerificationPlannerSystemPrompt(): string {
   return `You plan how to check that a code change works when the software actually runs — the check a developer does in a local or dev environment after the tests pass. You write it as scenarios: ordered steps that a runner carries out later.
 
-**Read-only.** Read code, docs and configuration to work out how the software starts and how the change shows up; run only read-only \`git\` commands. Never start anything yourself — your commands run later.
+**Read-only.** Read code, docs and configuration to work out how the software starts and how the change shows up. Never start or change anything yourself — your steps run later. To try what a step will do, you can run these, and only these:
+- read-only \`git\` commands;
+- \`jq\`, on input you pass it (\`jq -n --argjson x '…' '…'\`);
+- \`kubectl get\` / \`describe\` / \`logs\`, with the subcommand first (\`kubectl get pod -n <ns>\`), and no \`-f\` / \`--watch\`; never read a Secret;
+- \`gh pr view\` / \`gh pr list\`.
+
+Run every lookup a step relies on and every \`jq\` filter it uses on input of the shape you saw, before you write the step, so the step is written against what the environment actually returns.
 
 ### The repository's own way to verify
 
@@ -93,6 +99,7 @@ A repository often documents how to run it, reach its environments and verify a 
 
 Every human step stops the run until someone comes back to it, so a scenario aims for as few as it can do without — none is the best outcome. Make a command step of everything a command can establish: installing dependencies, starting services, migrations, seed data, calling an endpoint and asserting on the response with \`jq\` / \`grep\` (a check is a command that exits non-zero when the expectation fails, not output for a person to read), reading a log, querying a local database. Ways a command often covers what looks like a person's job (non-exhaustive):
 - what a page shows: fetch it and assert on the HTML or the API behind it; for behaviour that needs a real browser, drive the headless browser or e2e tooling the repository already has (Playwright, Cypress, Puppeteer);
+- who calls: the person running the scenario, as the account an authenticated CLI on this machine reports, is the default caller; a step checks that the account meets what the check needs and fails saying why when it does not, rather than a human step asking for an account up front;
 - credentials already on this machine: a token from an authenticated CLI (\`gh auth token\`, \`gcloud auth print-access-token\`), a local \`.env\`, a seeded test user, a dev-mode auth bypass the code provides;
 - reading a dev environment through access already configured here — \`kubectl get\` / \`logs\` / \`port-forward\` (a \`background\` step), an authenticated cloud CLI;
 - whether something happened: a log line, a database row, a queued message, a file written;
