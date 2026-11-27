@@ -15,7 +15,8 @@ vi.mock("@/lib/router/navigation", () => ({
 vi.mock("@/hooks/use-workspace", () => ({
   useVerificationScenarios: (...args: unknown[]) => mockUseScenarios(...args),
 }));
-vi.mock("@/hooks/use-start-and-navigate", () => ({ useStartAndNavigate: () => vi.fn(async () => true) }));
+const mockStart = vi.fn(async (..._args: unknown[]) => true);
+vi.mock("@/hooks/use-start-and-navigate", () => ({ useStartAndNavigate: () => mockStart }));
 
 import { VerificationBrowser } from "@/components/workspace/verification-browser";
 
@@ -44,6 +45,7 @@ const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
 beforeEach(() => {
   mockReplace.mockReset();
   mockPush.mockReset();
+  mockStart.mockClear();
   fetchMock.mockClear();
   searchParams = new URLSearchParams();
   stubGlobal("fetch", fetchMock);
@@ -139,6 +141,30 @@ describe("VerificationBrowser", () => {
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("/api/workspaces/ws/verification/orders");
     expect(init.method).toBe("DELETE");
+  });
+
+  it("reruns a failed scenario from its failed step with the button at the top", async () => {
+    setScenarios([scenario({
+      status: "failed",
+      steps: [
+        step({ id: "a", title: "Start", status: "passed" }),
+        step({ id: "b", title: "Call API", status: "failed", result: { at: "2026-01-01T00:00:00.000Z", exitCode: 1 } }),
+      ],
+    })]);
+    render(<VerificationBrowser workspaceName="ws" />);
+    fireEvent.click(screen.getByRole("button", { name: "Rerun from failed" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(postedBody()).toEqual({ action: "rerun", stepId: "b" });
+  });
+
+  it("starts a replan from the failed step itself", () => {
+    setScenarios([scenario({
+      status: "failed",
+      steps: [step({ id: "b", title: "Call API", status: "failed", result: { at: "2026-01-01T00:00:00.000Z", exitCode: 1 } })],
+    })]);
+    render(<VerificationBrowser workspaceName="ws" />);
+    fireEvent.click(screen.getByRole("button", { name: "Replan from failed" }));
+    expect(mockStart).toHaveBeenCalledWith("plan-verification", { workspace: "ws", scenarioId: "orders" });
   });
 
   it("offers a replan of a passed scenario, which says it rewrites every step", () => {

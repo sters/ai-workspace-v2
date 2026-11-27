@@ -195,6 +195,8 @@ function ScenarioView({
 
   const stopped = sc.status === "failed" || sc.status === "waiting";
   const hasPending = sc.steps.some((s) => s.status === "pending" && !s.teardown);
+  const failedStep = sc.status === "failed" ? sc.steps.find((s) => s.status === "failed") : undefined;
+  const replanFromFailed = () => startAndNavigate("plan-verification", { workspace: workspaceName, scenarioId: sc.id });
 
   return (
     <div className="space-y-4">
@@ -207,6 +209,12 @@ function ScenarioView({
           {sc.summary && <p className="text-sm text-muted-foreground">{sc.summary}</p>}
         </div>
         <div className="flex flex-wrap gap-1.5">
+          {failedStep && !running && (
+            <Button onClick={() => act({ action: "rerun", stepId: failedStep.id })}>
+              <RotateCcw className="h-3.5 w-3.5" />
+              Rerun from failed
+            </Button>
+          )}
           {sc.status === "ready" && hasPending && (
             <Button onClick={() => act({ action: "run" })}>
               <Play className="h-3.5 w-3.5" />
@@ -324,6 +332,7 @@ function ScenarioView({
               scenarioRunning={running}
               act={act}
               onInvestigate={openChat}
+              onReplan={replanFromFailed}
             />
           ))}
         </ol>
@@ -339,6 +348,7 @@ function StepCard({
   scenarioRunning,
   act,
   onInvestigate,
+  onReplan,
 }: {
   index: number;
   step: VerificationStep;
@@ -346,6 +356,7 @@ function StepCard({
   scenarioRunning: boolean;
   act: (body: Action) => Promise<boolean>;
   onInvestigate: () => void;
+  onReplan: () => void;
 }) {
   const Icon = step.actor === "human" ? User : SquareTerminal;
   const r = step.result;
@@ -429,10 +440,16 @@ function StepCard({
               Skip and continue
             </Button>
             {step.status === "failed" && (
-              <Button variant="outline" onClick={onInvestigate}>
-                <MessageSquare className="h-3.5 w-3.5" />
-                Investigate in chat
-              </Button>
+              <>
+                <Button variant="outline" onClick={onReplan}>
+                  <Wand2 className="h-3.5 w-3.5" />
+                  Replan from failed
+                </Button>
+                <Button variant="outline" onClick={onInvestigate}>
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  Investigate in chat
+                </Button>
+              </>
             )}
           </div>
         )}
