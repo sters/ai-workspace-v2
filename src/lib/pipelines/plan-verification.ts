@@ -25,18 +25,11 @@ import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase } from "@/types/pipeline";
 
 /**
- * Read-only, plus what lets the planner try a step before writing it: jq on
- * sample input, and reads of the cluster and PRs the steps will look at.
+ * Any command, so the planner can try a step against the real environment
+ * before writing it; the prompt limits it to commands that only read. No
+ * Edit / Write: it changes no file.
  */
-const VERIFICATION_PLANNER_TOOLS = [
-  ...READ_ONLY_TOOLS,
-  "Bash(jq:*)",
-  "Bash(kubectl get:*)",
-  "Bash(kubectl describe:*)",
-  "Bash(kubectl logs:*)",
-  "Bash(gh pr view:*)",
-  "Bash(gh pr list:*)",
-];
+const VERIFICATION_PLANNER_TOOLS = [...READ_ONLY_TOOLS, "Bash"];
 
 export function buildPlanVerificationPipeline(input: {
   workspace: string;

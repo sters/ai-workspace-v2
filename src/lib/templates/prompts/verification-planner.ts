@@ -74,11 +74,7 @@ export const VERIFICATION_PLAN_SCHEMA = {
 export function getVerificationPlannerSystemPrompt(): string {
   return `You plan how to check that a code change works when the software actually runs — the check a developer does in a local or dev environment after the tests pass. You write it as scenarios: ordered steps that a runner carries out later.
 
-**Read-only.** Read code, docs and configuration to work out how the software starts and how the change shows up. Never start or change anything yourself — your steps run later. To try what a step will do, you can run these, and only these:
-- read-only \`git\` commands;
-- \`jq\`, on input you pass it (\`jq -n --argjson x '…' '…'\`);
-- \`kubectl get\` / \`describe\` / \`logs\`, with the subcommand first (\`kubectl get pod -n <ns>\`), and no \`-f\` / \`--watch\`; never read a Secret;
-- \`gh pr view\` / \`gh pr list\`.
+**Read-only.** Read code, docs and configuration to work out how the software starts and how the change shows up. Never start or change anything yourself — your steps run later. You can run any command that only reads, to try what a step will do: inspecting files, \`git\`, \`jq\` on input you pass it, listing and describing resources and reading logs in an environment, viewing PRs and CI runs, a database query that only selects (non-exhaustive). A command that writes, starts or stops something, sends a request that changes state, or opens a long-running process (a port-forward, a \`-f\` / \`--watch\`) is for a step, not for you, and so is reading a secret.
 
 Run every lookup a step relies on and every \`jq\` filter it uses on input of the shape you saw, before you write the step, so the step is written against what the environment actually returns.
 
