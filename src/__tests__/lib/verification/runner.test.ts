@@ -108,6 +108,22 @@ describe("verification runner", () => {
     expect(sc.steps.map((s) => s.status)).toEqual(["passed", "passed", "passed"]);
   });
 
+  it("gives every step the workspace variables passed to a run, refreshed on each run", async () => {
+    const id = await create([
+      { title: "Look up the PR", actor: "command", command: "test {{pr_widgets}} = 43" },
+    ]);
+    expect(await startRun(wsPath, id, {}, { pr_widgets: "42" })).toEqual({ ok: true });
+    await waitForRun(wsPath, id);
+    let sc = (await readScenario(wsPath, id))!;
+    expect(sc.steps[0].status).toBe("failed");
+
+    expect(await rerunFrom(wsPath, id, {}, sc.steps[0].id, { pr_widgets: "43" })).toEqual({ ok: true });
+    await waitForRun(wsPath, id);
+    sc = (await readScenario(wsPath, id))!;
+    expect(sc.steps[0].status).toBe("passed");
+    expect(sc.variables.pr_widgets).toBe("43");
+  });
+
   it("fails a step whose command names a variable nobody set, without running it", async () => {
     const id = await create([{ title: "Call", actor: "command", command: "curl /orders/{{order_id}}" }]);
     const sc = await run(id);

@@ -386,8 +386,12 @@ export interface VerificationPlannerInput {
   existingTitles: string[];
   /** What the person asked for, if anything. */
   instruction?: string;
-  /** Set to rewrite the remainder of this scenario instead of planning new ones. */
-  /** `finished`: the scenario passed or was aborted, so its teardown has run and every step is replaced. */
+  /** The variables every step gets (`workspaceVariables`), with their current values. */
+  variables: Record<string, string>;
+  /**
+   * Set to rewrite the remainder of this scenario instead of planning new ones.
+   * `finished`: the scenario passed or was aborted, so its teardown has run and every step is replaced.
+   */
   replan?: { scenarioJson: string; finished: boolean };
 }
 

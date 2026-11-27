@@ -9,7 +9,7 @@ import {
   startRun,
 } from "@/lib/verification/runner";
 import { deleteScenarioFiles, readScenario, SCENARIO_ID } from "@/lib/verification/store";
-import { workspacePathFor, worktreesFor } from "@/lib/verification/workspace";
+import { workspacePathFor, workspaceVariablesFor, worktreesFor } from "@/lib/verification/workspace";
 
 type Params = { params: Promise<{ name: string; id: string }> };
 
@@ -39,11 +39,12 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const worktrees = await worktreesFor(name);
+  const variables = workspaceVariablesFor(name, worktrees);
   const outcome =
-    body.action === "run" ? await startRun(wsPath, id, worktrees)
-    : body.action === "answer" ? await answerStep(wsPath, id, worktrees, body)
-    : body.action === "rerun" ? await rerunFrom(wsPath, id, worktrees, body.stepId)
-    : await skipStep(wsPath, id, worktrees, body.stepId);
+    body.action === "run" ? await startRun(wsPath, id, worktrees, variables)
+    : body.action === "answer" ? await answerStep(wsPath, id, worktrees, body, variables)
+    : body.action === "rerun" ? await rerunFrom(wsPath, id, worktrees, body.stepId, variables)
+    : await skipStep(wsPath, id, worktrees, body.stepId, variables);
   return outcome.ok ? Response.json(outcome) : Response.json(outcome, { status: 409 });
 }
 

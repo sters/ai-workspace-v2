@@ -56,6 +56,29 @@ export function extractOutputs(
   return { ok: true, values };
 }
 
+/**
+ * Variables every step can use: each worktree's path as `repo_<name>`, and its
+ * PR as `pr_<name>` (the number) and `pr_url_<name>`, where `<name>` is the
+ * worktree's directory name with anything but letters, digits and `_` made `_`.
+ */
+export function workspaceVariables(
+  worktrees: Record<string, string>,
+  prs: { repoName: string; prUrl: string }[],
+): Record<string, string> {
+  const vars: Record<string, string> = {};
+  for (const [repoName, worktreePath] of Object.entries(worktrees)) {
+    const key = repoName.replace(/[^A-Za-z0-9_]/g, "_");
+    vars[`repo_${key}`] = worktreePath;
+    const pr = prs.find((p) => p.repoName === repoName);
+    const number = pr?.prUrl.match(/\/pull\/(\d+)/)?.[1];
+    if (pr && number) {
+      vars[`pr_${key}`] = number;
+      vars[`pr_url_${key}`] = pr.prUrl;
+    }
+  }
+  return vars;
+}
+
 /** A passed or aborted scenario: its teardown has run and its background processes are stopped. */
 export function isFinished(sc: VerificationScenario): boolean {
   return sc.status === "passed" || sc.status === "aborted";

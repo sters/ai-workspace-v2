@@ -14,7 +14,8 @@ import {
   buildVerificationPlannerPrompt,
   VERIFICATION_PLAN_SCHEMA,
 } from "@/lib/templates/prompts/verification-planner";
-import { isFinished } from "@/lib/verification/model";
+import { listPrSnapshots } from "@/lib/db/pr-watch";
+import { isFinished, workspaceVariables } from "@/lib/verification/model";
 import { replaceRemainingSteps } from "@/lib/verification/runner";
 import { createScenarios, listScenarios, readScenario } from "@/lib/verification/store";
 import { detectBaseBranch, getRepoChanges, listWorkspaceRepos } from "@/lib/workspace";
@@ -67,6 +68,10 @@ export function buildPlanVerificationPipeline(input: {
           readmeContent,
           repos: repoInputs,
           existingTitles: scenario ? [] : (await listScenarios(wsPath)).map((s) => s.title),
+          variables: workspaceVariables(
+            Object.fromEntries(repos.map((r) => [r.repoName, r.worktreePath])),
+            listPrSnapshots(workspace),
+          ),
           instruction,
           ...(scenario && { replan: { scenarioJson: JSON.stringify(scenario, null, 2), finished: isFinished(scenario) } }),
         }),

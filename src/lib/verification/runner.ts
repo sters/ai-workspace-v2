@@ -321,8 +321,17 @@ async function advance(wsPath: string, id: string, worktrees: Worktrees, signal:
   }
 }
 
-/** Start advancing a scenario from its next pending step. Returns once the run has started. */
-export async function startRun(wsPath: string, id: string, worktrees: Worktrees): Promise<Outcome> {
+/**
+ * Start advancing a scenario from its next pending step. Returns once the run has started.
+ * `variables` (the workspace's, `workspaceVariables`) are set again on every start, so a
+ * PR opened since the last run is picked up.
+ */
+export async function startRun(
+  wsPath: string,
+  id: string,
+  worktrees: Worktrees,
+  variables: Record<string, string> = {},
+): Promise<Outcome> {
   const k = key(wsPath, id);
   if (active.has(k)) return { ok: false, error: "This scenario is already running" };
   const controller = new AbortController();
@@ -332,6 +341,7 @@ export async function startRun(wsPath: string, id: string, worktrees: Worktrees)
   try {
     await updateScenario(wsPath, id, (sc) => {
       sc.status = "running";
+      Object.assign(sc.variables, variables);
     });
   } catch (err) {
     active.delete(k);
@@ -362,6 +372,7 @@ export async function answerStep(
   id: string,
   worktrees: Worktrees,
   answer: { stepId: string; verdict: "ok" | "ng"; note?: string; values?: Record<string, string> },
+  variables?: Record<string, string>,
 ): Promise<Outcome> {
   const busy = idle(wsPath, id);
   if (busy) return busy;
@@ -388,10 +399,16 @@ export async function answerStep(
     return { ok: true };
   });
   if (!outcome.ok || answer.verdict === "ng") return outcome;
-  return startRun(wsPath, id, worktrees);
+  return startRun(wsPath, id, worktrees, variables);
 }
 
-export async function rerunFrom(wsPath: string, id: string, worktrees: Worktrees, stepId: string): Promise<Outcome> {
+export async function rerunFrom(
+  wsPath: string,
+  id: string,
+  worktrees: Worktrees,
+  stepId: string,
+  variables?: Record<string, string>,
+): Promise<Outcome> {
   const busy = idle(wsPath, id);
   if (busy) return busy;
   let repeated: VerificationProcess[] = [];
@@ -413,10 +430,16 @@ export async function rerunFrom(wsPath: string, id: string, worktrees: Worktrees
   });
   if (!outcome.ok) return outcome;
   await Promise.all(repeated.map(stopProcess));
-  return startRun(wsPath, id, worktrees);
+  return startRun(wsPath, id, worktrees, variables);
 }
 
-export async function skipStep(wsPath: string, id: string, worktrees: Worktrees, stepId: string): Promise<Outcome> {
+export async function skipStep(
+  wsPath: string,
+  id: string,
+  worktrees: Worktrees,
+  stepId: string,
+  variables?: Record<string, string>,
+): Promise<Outcome> {
   const busy = idle(wsPath, id);
   if (busy) return busy;
   const outcome = await updateScenario(wsPath, id, (sc): Outcome => {
@@ -428,7 +451,7 @@ export async function skipStep(wsPath: string, id: string, worktrees: Worktrees,
     sc.status = "ready";
     return { ok: true };
   });
-  return outcome.ok ? startRun(wsPath, id, worktrees) : outcome;
+  return outcome.ok ? startRun(wsPath, id, worktrees, variables) : outcome;
 }
 
 /**

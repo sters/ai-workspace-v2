@@ -6,6 +6,7 @@ import {
   expandText,
   extractOutputs,
   renderVerificationResults,
+  workspaceVariables,
 } from "@/lib/verification/model";
 import type { VerificationScenario, VerificationStep } from "@/types/verification";
 
@@ -148,5 +149,25 @@ describe("buildVerificationChatTopic", () => {
     expect(topic).not.toContain("stopped");
     expect(topic).toContain("artifacts/verification/orders.json");
     expect(topic).toContain("artifacts/verification/orders/");
+  });
+});
+
+describe("workspaceVariables", () => {
+  it("names each worktree's path and PR by a variable-safe form of its directory name", () => {
+    const vars = workspaceVariables(
+      { "acme-widgets": "/ws/github.com/acme/widgets", "api___v2": "/ws/github.com/acme/api___v2" },
+      [{ repoName: "acme-widgets", prUrl: "https://github.com/acme/widgets/pull/42" }],
+    );
+    expect(vars).toEqual({
+      repo_acme_widgets: "/ws/github.com/acme/widgets",
+      pr_acme_widgets: "42",
+      pr_url_acme_widgets: "https://github.com/acme/widgets/pull/42",
+      repo_api___v2: "/ws/github.com/acme/api___v2",
+    });
+    expect(expandCommand("gh pr view {{pr_acme_widgets}}", vars)).toEqual({ ok: true, command: "gh pr view '42'" });
+  });
+
+  it("leaves out a PR recorded for a directory that is no longer a worktree", () => {
+    expect(workspaceVariables({}, [{ repoName: "gone", prUrl: "https://github.com/acme/gone/pull/1" }])).toEqual({});
   });
 });

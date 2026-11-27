@@ -14,8 +14,12 @@ vi.mock("@/lib/workspace", () => ({
 }));
 vi.mock("@/lib/workspace/reader", () => ({ getReadme: vi.fn(async () => "# README") }));
 vi.mock("@/lib/workspace/prompts", () => ({ ensureSystemPrompt: vi.fn(async () => "/prompts/verification-planner.md") }));
+vi.mock("@/lib/db/pr-watch", () => ({
+  listPrSnapshots: vi.fn(() => [{ repoName: "widgets", prUrl: "https://github.com/acme/widgets/pull/42" }]),
+}));
 
 import { buildPlanVerificationPipeline } from "@/lib/pipelines/plan-verification";
+import { getRepoChanges, listWorkspaceRepos } from "@/lib/workspace";
 import { createScenarios, listScenarios, readScenario, updateScenario } from "@/lib/verification/store";
 
 const WS = "ws1";
@@ -65,6 +69,20 @@ describe("plan-verification pipeline", () => {
     const all = await listScenarios(path.join(root, WS));
     expect(all.map((s) => s.title).sort()).toEqual(["Admin", "Orders list"]);
     expect(all.every((s) => s.status === "ready" && s.steps.every((st) => st.status === "pending"))).toBe(true);
+  });
+
+  it("tells the planner the variables every step gets: each worktree's path and its PR", async () => {
+    (listWorkspaceRepos as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => [
+      { repoName: "widgets", repoPath: "github.com/acme/widgets", worktreePath: "/ws/github.com/acme/widgets" },
+    ]);
+    (getRepoChanges as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(async () => ({
+      currentBranch: "feature", changedFiles: "", diffStat: "", commitLog: "",
+    }));
+    const { ctx, runChild } = ctxAnswering({ scenarios: [] });
+    expect(await runPhase({ workspace: WS }, ctx)).toBe(true);
+    const prompt = runChild.mock.calls[0][1];
+    expect(prompt).toContain("`{{pr_widgets}}` = `42`");
+    expect(prompt).toContain("`{{repo_widgets}}` = `/ws/github.com/acme/widgets`");
   });
 
   it("rejects a plan with a Claude step that has no command, writing nothing", async () => {

@@ -134,6 +134,17 @@ export function buildVerificationPlannerPrompt(input: VerificationPlannerInput):
     ? input.repos.map((r) => `### ${r.repoName}\n\n- Worktree: \`${r.worktreePath}\`\n- Base branch: \`${r.baseBranch}\`\n\n${r.changes}`).join("\n\n")
     : "(no repositories on disk)";
 
+  const vars = Object.entries(input.variables);
+  const variables = vars.length > 0
+    ? `
+## Variables every step gets
+
+Set before each run, so use them instead of a step that looks these up: each worktree's path (\`repo_*\`) and its pull request (\`pr_*\` is the number, \`pr_url_*\` the URL), as last seen. A worktree with no PR yet has no \`pr_*\` variable.
+
+${vars.map(([k, v]) => `- \`{{${k}}}\` = \`${v}\``).join("\n")}
+`
+    : "";
+
   const task = input.replan?.finished
     ? `## Task: Rewrite a finished scenario
 
@@ -175,5 +186,5 @@ ${input.readmeContent}
 ## Repositories
 
 ${repos}
-`;
+${variables}`;
 }
