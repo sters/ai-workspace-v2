@@ -139,7 +139,7 @@ describe("buildExecutePipeline — skip repo when no actionable TODO items", () 
     expect(ctx.runChild).toHaveBeenCalledWith(
       "active-repo",
       expect.any(String),
-      expect.objectContaining({ addDirs: ["/ws/test-ws"] }),
+      expect.objectContaining({ addDirs: ["/ws/test-ws", "/repos/active-repo/worktrees/test-ws"] }),
     );
   });
 });

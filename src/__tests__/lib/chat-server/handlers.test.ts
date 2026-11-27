@@ -50,6 +50,7 @@ vi.mock("@/lib/config", () => ({
   ...realConfig,
   getConfig: () => mockGetConfig(),
   getResolvedWorkspaceRoot: () => tmpRoot,
+  getWorkspaceDir: () => path.join(tmpRoot, "workspace"),
 }));
 
 vi.mock("@/lib/templates", () => ({
@@ -182,6 +183,23 @@ describe("handleStart", () => {
     });
     // --mcp-config takes any number of values, so it must be followed by
     // another flag; otherwise the positional prompt is read as a config.
+    expect(opts.args[idx + 2]).toMatch(/^--/);
+  });
+
+  it("adds each of the workspace's worktrees, so their skills are listed", async () => {
+    const worktree = path.join(tmpRoot, "workspace", WITH_README, "acme", "widgets");
+    mkdirSync(worktree, { recursive: true });
+    writeFileSync(path.join(worktree, ".git"), "gitdir: /elsewhere\n");
+    try {
+      await startSession();
+    } finally {
+      rmSync(path.join(tmpRoot, "workspace", WITH_README, "acme"), { recursive: true, force: true });
+    }
+
+    const [opts] = mockSpawnClaudeTerminal.mock.calls[0];
+    const idx = opts.args.indexOf("--add-dir");
+    expect(opts.args.slice(idx, idx + 2)).toEqual(["--add-dir", worktree]);
+    // --add-dir takes any number of values; the positional prompt must not follow it.
     expect(opts.args[idx + 2]).toMatch(/^--/);
   });
 

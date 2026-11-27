@@ -231,8 +231,8 @@ export function knownFindingsSection(content: string | undefined): string {
 /**
  * Render a repository's discovered guidance (`artifacts/repo-guidance/`) as a
  * user-prompt section, or "" when there is none. These agents run from the
- * workspace root, so the repository's own skills never load as skills; this is
- * how they reach them. Shared so every consumer carries the same limit on what
+ * workspace root, so the repository's CLAUDE.md never loads and its skills are
+ * listed only where the worktree is in `addDirs`; this is how they reach both. Shared so every consumer carries the same limit on what
  * a skill may make it do.
  */
 export function repoGuidanceSection(input: {

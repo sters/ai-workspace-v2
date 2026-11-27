@@ -54,6 +54,7 @@ import {
   usesScope,
 } from "@/lib/workspace/constraint-scope";
 import { getCleanEnv } from "@/lib/env";
+import { writeGrants } from "@/lib/claude/read-only-tools";
 import { STEP_TYPES } from "@/types/pipeline";
 import type { PipelinePhase, GroupChild } from "@/types/pipeline";
 import type { CrossRepositoryReviewerInput } from "@/types/prompts";
@@ -156,7 +157,8 @@ export async function buildCompletionVerifierChild(input: {
         verificationResults: await readVerificationResults(input.wsPath),
       }),
       jsonSchema: COMPLETION_VERIFICATION_SCHEMA as unknown as Record<string, unknown>,
-      addDirs: [input.reviewDir],
+      addDirs: [input.reviewDir, repo.worktreePath],
+      allowedTools: writeGrants([input.reviewDir]),
       appendSystemPromptFile: await ensureSystemPrompt(input.wsPath, "completion-verifier"),
     },
   };
@@ -316,7 +318,8 @@ export async function buildReviewPipeline(
         repoGuidance,
         repoLessons,
       }),
-      addDirs: [reviewDir],
+      addDirs: [reviewDir, repo.worktreePath],
+      allowedTools: writeGrants([reviewDir]),
       appendSystemPromptFile: await ensureSystemPrompt(wsPath, "code-reviewer"),
     });
 
@@ -349,7 +352,8 @@ export async function buildReviewPipeline(
           sinceSha: reviewScope?.sinceSha,
           sinceTimestamp: reviewScope?.sinceTimestamp,
         }),
-        addDirs: [reviewDir],
+        addDirs: [reviewDir, repo.worktreePath],
+        allowedTools: writeGrants([reviewDir]),
         appendSystemPromptFile: await ensureSystemPrompt(wsPath, "fix-verifier"),
       });
     }
@@ -398,6 +402,7 @@ export async function buildReviewPipeline(
         knownFindings,
       }),
       addDirs: [reviewDir, ...boundaryRepos.map((r) => r.worktreePath)],
+      allowedTools: writeGrants([reviewDir]),
       appendSystemPromptFile: await ensureSystemPrompt(wsPath, "cross-repository-reviewer"),
     });
   }

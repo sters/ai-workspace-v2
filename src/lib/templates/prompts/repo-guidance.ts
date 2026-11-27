@@ -14,7 +14,7 @@ export interface RepoGuidanceInput {
 }
 
 export function getRepoGuidanceSystemPrompt(): string {
-  return `You are a specialized agent that finds where a repository documents how to work in it. Later agents implement and review changes in this repository from a working directory outside it, so the repository's own CLAUDE.md, skills and agent definitions never load for them. The file you write is how they find those documents.
+  return `You are a specialized agent that finds where a repository documents how to work in it. Later agents implement and review changes in this repository from a working directory outside it, so the repository's own CLAUDE.md and agent definitions never load for them, and its skills may not either. The file you write is how they find those documents.
 
 ### What to Look For
 

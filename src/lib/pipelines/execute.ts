@@ -371,7 +371,7 @@ async function executeRepoLane(
       repoLessons,
     });
     return ctx.runChild(repo.repoName, prompt, {
-      addDirs: [wsPath],
+      addDirs: [wsPath, repo.worktreePath],
       stepType: STEP_TYPES.EXECUTE,
       appendSystemPromptFile: await ensureSystemPrompt(wsPath, "executor"),
     });
@@ -428,7 +428,7 @@ async function executeRepoLane(
     const success = await ctx.runChild(
       `${repo.repoName} [batch ${i + 1}/${totalBatches}]`,
       prompt,
-      { addDirs: [wsPath], stepType: STEP_TYPES.EXECUTE, appendSystemPromptFile: await ensureSystemPrompt(wsPath, "executor") },
+      { addDirs: [wsPath, repo.worktreePath], stepType: STEP_TYPES.EXECUTE, appendSystemPromptFile: await ensureSystemPrompt(wsPath, "executor") },
     );
 
     if (!success) {

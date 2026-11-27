@@ -20,6 +20,7 @@ import { runGc } from "./gc";
 import { resolveSlackThread } from "./slack-thread";
 import { beginChatCost, settleChatCost } from "./cost";
 import { aiwMcpConfigArgs } from "@/lib/claude/aiw-mcp";
+import { listWorkspaceRepos } from "@/lib/workspace/git";
 
 type Ws = { send(data: string): void; data: WsData };
 
@@ -161,6 +162,9 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
   const config = getConfig();
   const modelArgs = config.chat.model ? ["--model", config.chat.model] : [];
   const mcpArgs = aiwMcpConfigArgs();
+  // The session runs from the root, which lists only the root's skills; each
+  // worktree has to be added for its repository's own skills to be listed.
+  const worktreeArgs = (await listWorkspaceRepos(msg.workspaceId)).flatMap((r) => ["--add-dir", r.worktreePath]);
 
   // The browser's xterm is the real viewport, so the PTY is born its size;
   // at any other size Claude's TUI draws boxes and status lines at a width the
@@ -171,7 +175,7 @@ export async function spawnSession(msg: StartMsg, ws: Ws | null): Promise<SpawnO
   let proc;
   try {
     proc = spawnClaudeTerminal({
-      args: [...opening.leadingArgs, ...mcpArgs, "--append-system-prompt-file", systemPromptFile, ...modelArgs, ...opening.trailingArgs],
+      args: [...opening.leadingArgs, ...mcpArgs, ...worktreeArgs, "--append-system-prompt-file", systemPromptFile, ...modelArgs, ...opening.trailingArgs],
       cwd: opening.cwd,
       listeners,
       ...(size && { cols: size.cols, rows: size.rows }),

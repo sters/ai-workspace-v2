@@ -12,6 +12,7 @@ import { getCleanEnv } from "../env";
 import { runProcess, type ProcessResult } from "../process/run";
 import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
 import { aiwMcpConfigArgs } from "./aiw-mcp";
+import { writeGrants } from "./read-only-tools";
 
 let _cliPath: string | null = null;
 
@@ -179,25 +180,10 @@ export function runClaude(
   function spawnAndStream(promptOrAnswer: string, resumeSessionId?: string) {
     // Always pass prompts via stdin to avoid exposing them in the process list.
 
-    // When explicit allowedTools are provided, use them directly.
-    // Otherwise, when addDirs are specified, auto-allow Edit/Write scoped to
-    // those directories plus Bash(git:*) so Claude can modify files and run
-    // git commands there in non-interactive (-p) mode.
     const addDirAllowedTools = options?.allowedTools?.length
       ? ["--allowedTools", options.allowedTools.join(",")]
       : options?.addDirs?.length
-        ? ["--allowedTools", [
-            ...options.addDirs.flatMap((dir) => {
-              // Claude CLI uses // prefix for absolute filesystem paths.
-              // /path means project-root-relative, //path means absolute.
-              const absPrefix = dir.startsWith("/") ? "/" : "//";
-              return [
-                `Edit(${absPrefix}${dir}/**)`,
-                `Write(${absPrefix}${dir}/**)`,
-              ];
-            }),
-            "Bash(git:*)",
-          ].join(",")]
+        ? ["--allowedTools", writeGrants(options.addDirs).join(",")]
         : [];
 
     const cliArgs = [

@@ -246,6 +246,29 @@ describe("buildReviewPipeline — cross-repository review", () => {
     expect(labels.length).toBeGreaterThan(1);
   });
 
+  it("lists each worktree's skills for the agents that read it, while letting them write only the review directory", async () => {
+    mockListWorkspaceRepos.mockReturnValue(twoRepos());
+
+    const phases = await buildReviewPipeline({ workspace: "test-ws", requestedFixes: ["handle the empty case"] });
+    const children = (phases[1] as PipelinePhaseGroup).children;
+    const reviewDir = "/ws/test-ws/artifacts/reviews/2026-04-08T00-00-00";
+
+    const byLabel = new Map(children.map((c) => [c.label, c]));
+    for (const repo of ["api", "web"]) {
+      for (const label of [`review-${repo}`, `verify-fixes-${repo}`, `verify-${repo}`]) {
+        expect(byLabel.get(label)?.addDirs).toContain(`/repos/${repo}/worktrees/test-ws`);
+      }
+    }
+    expect(byLabel.get("review-cross-repository")?.addDirs).toEqual(
+      expect.arrayContaining(["/repos/api/worktrees/test-ws", "/repos/web/worktrees/test-ws"]),
+    );
+    for (const child of children) {
+      const writes = (child.allowedTools ?? []).filter((t) => /^(Edit|Write)\(/.test(t));
+      expect(writes.length).toBeGreaterThan(0);
+      expect(writes.every((t) => t.includes(reviewDir))).toBe(true);
+    }
+  });
+
   it("hands both reviewers each repository's review guidance, not its implementation guidance", async () => {
     mockListWorkspaceRepos.mockReturnValue(twoRepos());
     mocked(readRepoGuidance).mockImplementation(async (_ws, repoName) => ({
