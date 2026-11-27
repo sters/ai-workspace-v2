@@ -86,7 +86,8 @@ A repository often documents how to run it, reach its environments and verify a 
 - A command runs in the worktree named by \`repo\`, or in the workspace directory without one. Each step is a fresh shell, so a \`cd\` or an \`export\` does not carry over; put it in the command that needs it.
 - A long-running process (dev server, docker compose in the foreground, a worker) is a \`background\` step with a \`readyCommand\` that exits 0 once it serves — e.g. \`curl -sf http://localhost:3000/health\`. It stays up through later steps, including human ones, and is stopped when the scenario ends, so it needs no stop step of its own. Something started detached (\`docker compose up -d\`) does need a \`teardown\` step (\`docker compose down\`).
 - Values pass between steps through variables. A \`command\` step lists \`outputs\` and prints them as one JSON object on stdout (\`... | jq -c '{order_id: .id}'\`); a \`human\` step lists \`inputs\`. Later steps use \`{{name}}\`. Use this for anything one step creates and another needs: an id, a port, a token. A step with \`outputs\` prints nothing else on stdout; send progress and diagnostics to stderr.
-- A check that matches on something outside the repository (an image tag, a resource label, a log line's format, a response field) matches on a form you have seen — in the repository's deploy configuration, its code, or a document — not on a form you assume. An image may be pinned by digest with the commit only in a label or an annotation; a log may be JSON. When you cannot see the form, have the failure path print what it found (\`kubectl get pod -o json | jq '.items[].metadata'\`, the raw response), so a rerun can be adjusted from the output.
+- A check that matches on something outside the repository (an image tag, a resource label, a log line's format, a response field) matches on a form you have seen it take, not on a form you assume. A deployment's configuration is what was submitted, not what runs: the platform may rewrite it on the way in, so a running resource is matched on what a previous run here printed or on a field the platform sets for that purpose. Where neither is known, the step prints what it found before failing, so a rerun can be adjusted from the output.
+- The workspace's other scenarios (\`artifacts/verification/*.json\` in the workspace directory) hold commands that have already run here, with their results. Read them first: a step that passed there is the known-good way to do the same thing, and one that failed, with its output, shows what does not work here.
 
 ### Who does what
 
@@ -94,7 +95,10 @@ Every human step stops the run until someone comes back to it, so a scenario aim
 - what a page shows: fetch it and assert on the HTML or the API behind it; for behaviour that needs a real browser, drive the headless browser or e2e tooling the repository already has (Playwright, Cypress, Puppeteer);
 - credentials already on this machine: a token from an authenticated CLI (\`gh auth token\`, \`gcloud auth print-access-token\`), a local \`.env\`, a seeded test user, a dev-mode auth bypass the code provides;
 - reading a dev environment through access already configured here — \`kubectl get\` / \`logs\` / \`port-forward\` (a \`background\` step), an authenticated cloud CLI;
-- whether something happened: a log line, a database row, a queued message, a file written.
+- whether something happened: a log line, a database row, a queued message, a file written;
+- a value the code resolves at run time (who the caller is, what they belong to, a flag's value): the code usually logs it or reads it from a service or a database, so a step after the call reads the log, or queries the same source the way the code does.
+
+Asking a person to look a value up is the last resort: before writing such a step, search the code for where the value comes from and where it is logged, and when no command can reach it, say why in the step's instructions.
 
 A human step is for what a command cannot do (non-exhaustive):
 - judging how something looks or feels — layout, wording, animation, a device;
