@@ -151,6 +151,7 @@ function ScenarioView({
   const startAndNavigate = useStartAndNavigate(workspaceName);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [replanText, setReplanText] = useState<string | null>(null);
   const url = `/api/workspaces/${encodeURIComponent(workspaceName)}/verification/${encodeURIComponent(sc.id)}`;
   const running = sc.status === "running";
@@ -226,11 +227,22 @@ function ScenarioView({
               Abort and tear down
             </Button>
           )}
-          {!running && (
-            <Button variant="destructive-sm" onClick={remove}>
+          {!running && !confirmingDelete && (
+            <Button variant="destructive-sm" onClick={() => setConfirmingDelete(true)}>
               <Trash2 className="h-3.5 w-3.5" />
               Delete
             </Button>
+          )}
+          {!running && confirmingDelete && (
+            <span className="flex items-center gap-1.5">
+              <span className="text-xs text-destructive">Delete this scenario and its results?</span>
+              <Button variant="destructive-sm" onClick={remove}>
+                Yes, delete
+              </Button>
+              <Button variant="outline" onClick={() => setConfirmingDelete(false)}>
+                Cancel
+              </Button>
+            </span>
           )}
         </div>
       </div>

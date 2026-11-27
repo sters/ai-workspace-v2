@@ -112,6 +112,21 @@ describe("VerificationBrowser", () => {
     expect(mockPush).toHaveBeenCalled();
   });
 
+  it("deletes a scenario only once the deletion is confirmed", async () => {
+    setScenarios([scenario({})]);
+    render(<VerificationBrowser workspaceName="ws" />);
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, delete" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("/api/workspaces/ws/verification/orders");
+    expect(init.method).toBe("DELETE");
+  });
+
   it("offers a replan of a passed scenario, which says it rewrites every step", () => {
     setScenarios([scenario({ status: "passed", steps: [step({ id: "a", title: "Call", status: "passed" })] })]);
     render(<VerificationBrowser workspaceName="ws" />);
