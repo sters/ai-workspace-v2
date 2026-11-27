@@ -226,7 +226,9 @@ export function parseStreamEvent(raw: string): LogEntry[] {
   // SDK result message: { type: "result", subtype: "success"|"error_*", ... }
   else if (parsed.type === "result") {
     const parts: string[] = [];
-    if (parsed.result) {
+    // With --json-schema, `result` is the structured output as JSON text: data
+    // for the pipeline, which reports what it did through its own result.
+    if (parsed.result && parsed.structured_output === undefined) {
       parts.push(parsed.result);
     }
     if (parsed.is_error && parsed.errors?.length) {

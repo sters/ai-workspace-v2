@@ -360,6 +360,24 @@ describe("parseStreamEvent", () => {
       }
     });
 
+    it("leaves out the JSON text of a structured-output result, keeping cost and duration", () => {
+      const msg = {
+        type: "result",
+        subtype: "success",
+        result: '{"scenarios":[{"title":"Orders"}]}',
+        structured_output: { scenarios: [{ title: "Orders" }] },
+        total_cost_usd: 0.32,
+        duration_ms: 34000,
+      };
+      const entries = parseStreamEvent(JSON.stringify(msg));
+      expect(entries).toHaveLength(1);
+      if (entries[0].kind === "result") {
+        expect(entries[0].content).toBe("Completed");
+        expect(entries[0].cost).toBe("$0.3200");
+        expect(entries[0].duration).toBe("34.0s");
+      }
+    });
+
     it("shows 'Completed' for success with no result text", () => {
       const msg = {
         type: "result",
