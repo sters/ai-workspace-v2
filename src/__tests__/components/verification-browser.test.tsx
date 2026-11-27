@@ -112,6 +112,19 @@ describe("VerificationBrowser", () => {
     expect(mockPush).toHaveBeenCalled();
   });
 
+  it("inserts a snippet into the plan's instruction", async () => {
+    setScenarios([]);
+    fetchMock.mockImplementation(async () =>
+      Response.json({ snippets: [{ id: 1, title: "PRRC", content: "verify on the PRRC pod", createdAt: "", updatedAt: "" }] }),
+    );
+    render(<VerificationBrowser workspaceName="ws" />);
+    fireEvent.click(screen.getByRole("button", { name: "Insert Snippet ▾" }));
+    fireEvent.click(await screen.findByText("PRRC"));
+    expect((screen.getByPlaceholderText("Optional: what to check, or how to start the app") as HTMLTextAreaElement).value)
+      .toBe("verify on the PRRC pod");
+    fetchMock.mockImplementation(async () => new Response("{}", { status: 200 }));
+  });
+
   it("deletes a scenario only once the deletion is confirmed", async () => {
     setScenarios([scenario({})]);
     render(<VerificationBrowser workspaceName="ws" />);

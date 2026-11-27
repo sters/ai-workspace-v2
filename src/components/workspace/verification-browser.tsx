@@ -23,6 +23,7 @@ import { MarkdownRenderer } from "../shared/content/markdown-renderer";
 import { StatusBadge } from "../shared/feedback/status-badge";
 import { StatusText } from "../shared/feedback/status-text";
 import { Input } from "../shared/forms/input";
+import { SnippetPicker } from "../shared/forms/snippet-picker";
 import { Textarea } from "../shared/forms/textarea";
 import { chatPagePath, stashChatHandoff } from "@/lib/chat-handoff";
 import { buildVerificationChatTopic, editableFrom, expandText, isFinished } from "@/lib/verification/model";
@@ -106,12 +107,19 @@ export function VerificationBrowser({ workspaceName }: { workspaceName: string }
   );
 }
 
+function appendSnippet(text: string, snippet: string): string {
+  return text.trim() ? `${text}\n\n${snippet}` : snippet;
+}
+
 function PlanForm({ workspaceName, hasScenarios }: { workspaceName: string; hasScenarios: boolean }) {
   const startAndNavigate = useStartAndNavigate(workspaceName);
   const [instruction, setInstruction] = useState("");
   return (
     <Card className="space-y-2">
-      <p className="text-sm font-medium">{hasScenarios ? "Plan more scenarios" : "Plan scenarios"}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-medium">{hasScenarios ? "Plan more scenarios" : "Plan scenarios"}</p>
+        <SnippetPicker onInsert={(content) => setInstruction((v) => appendSnippet(v, content))} />
+      </div>
       <Textarea
         value={instruction}
         onChange={(e) => setInstruction(e.target.value)}
@@ -256,6 +264,9 @@ function ScenarioView({
               ? "Claude rewrites every step from the results and notes of this run, and the scenario runs again from the start. This run's results and variables are replaced."
               : "Claude rewrites the steps from the first unfinished one on, from the results and notes so far. Finished steps, variables and running processes are kept."}
           </p>
+          <div className="flex justify-end">
+            <SnippetPicker onInsert={(content) => setReplanText((v) => appendSnippet(v ?? "", content))} />
+          </div>
           <Textarea
             value={replanText}
             onChange={(e) => setReplanText(e.target.value)}
