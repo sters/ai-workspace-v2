@@ -3,6 +3,7 @@ import { parsePrUrl } from "./github-pr-url";
 import { quickWorkspaceName } from "./naming";
 import { verificationStepDraftSchema } from "./runtime-schemas";
 import { SCHEDULED_TASK_KINDS, SCHEDULED_TASK_OVERLAPS } from "@/types/scheduled-task";
+import { SNIPPET_KINDS } from "@/types/snippet";
 
 /** Interaction level enum — shared between client and server. */
 export const interactionLevelEnum = z.enum(["low", "mid", "high"]);
@@ -298,6 +299,7 @@ export const pushUnsubscribeSchema = z.object({
 export const snippetCreateSchema = z.object({
   title: z.string().min(1, "title is required"),
   content: z.string().min(1, "content is required"),
+  kind: z.enum(SNIPPET_KINDS).default("init"),
 });
 
 export const snippetUpdateSchema = z.object({

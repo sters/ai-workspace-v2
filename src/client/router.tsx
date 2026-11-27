@@ -38,6 +38,7 @@ import ClaudeSettingsProjectPage from "@/app/(tools)/settings/claude/settings/pr
 import ClaudeSettingsUserPage from "@/app/(tools)/settings/claude/settings/user/page";
 import SnippetChatPage from "@/app/(tools)/settings/snippet/chat/page";
 import SnippetInitPage from "@/app/(tools)/settings/snippet/init/page";
+import SnippetVerifyPage from "@/app/(tools)/settings/snippet/verify/page";
 import SuggestionsLayout from "@/app/suggestions/layout";
 import SuggestionsPage from "@/app/suggestions/page";
 import SuggestionsAggregatePage from "@/app/suggestions/aggregate/page";
@@ -169,6 +170,7 @@ const routeTree = rootRoute.addChildren([
     ]),
     page(toolsRoute, "settings/snippet/chat", SnippetChatPage),
     page(toolsRoute, "settings/snippet/init", SnippetInitPage),
+    page(toolsRoute, "settings/snippet/verify", SnippetVerifyPage),
   ]),
   suggestionsRoute.addChildren([
     page(suggestionsRoute, "/", SuggestionsPage),

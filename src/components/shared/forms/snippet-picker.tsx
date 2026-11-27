@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import Link from "@/lib/router/link";
-import type { Snippet } from "@/types/snippet";
+import type { Snippet, SnippetKind } from "@/types/snippet";
 import { fetcher } from "@/lib/api";
 
 interface SnippetsResponse {
@@ -9,15 +9,16 @@ interface SnippetsResponse {
 }
 
 interface SnippetPickerProps {
+  kind: SnippetKind;
   onInsert: (content: string) => void;
   disabled?: boolean;
 }
 
-export function SnippetPicker({ onInsert, disabled }: SnippetPickerProps) {
+export function SnippetPicker({ kind, onInsert, disabled }: SnippetPickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { data } = useSWR<SnippetsResponse>(
-    open ? "/api/snippets" : null,
+    open ? `/api/snippets?kind=${kind}` : null,
     fetcher,
   );
 
@@ -50,7 +51,7 @@ export function SnippetPicker({ onInsert, disabled }: SnippetPickerProps) {
           {snippets.length === 0 ? (
             <div className="p-3 text-xs text-muted-foreground">
               No snippets yet.{" "}
-              <Link href="/settings/snippet/init" className="underline hover:text-foreground">
+              <Link href={`/settings/snippet/${kind}`} className="underline hover:text-foreground">
                 Create one
               </Link>
             </div>

@@ -453,6 +453,15 @@ const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 26,
+    up: (db) => {
+      const columns = db.query("SELECT name FROM pragma_table_info('snippets')").all() as { name: string }[];
+      if (!columns.some((c) => c.name === "kind")) {
+        db.exec("ALTER TABLE snippets ADD COLUMN kind TEXT NOT NULL DEFAULT 'init'");
+      }
+    },
+  },
 ];
 
 /**

@@ -1,9 +1,14 @@
 import { listSnippets, insertSnippet } from "@/lib/db";
 import { snippetCreateSchema } from "@/lib/schemas";
 import { parseBody } from "@/lib/validate";
+import { SNIPPET_KINDS, type SnippetKind } from "@/types/snippet";
 
-export async function GET() {
-  const snippets = listSnippets();
+export async function GET(request: Request) {
+  const kind = new URL(request.url).searchParams.get("kind") ?? "init";
+  if (!(SNIPPET_KINDS as readonly string[]).includes(kind)) {
+    return Response.json({ error: `Unknown snippet kind: ${kind}` }, { status: 400 });
+  }
+  const snippets = listSnippets(kind as SnippetKind);
   return Response.json({ snippets });
 }
 

@@ -29,6 +29,14 @@ describe("db/snippets", () => {
     expect(retrieved!.title).toBe("Auth context");
   });
 
+  it("keeps each kind's snippets apart, init being the default", () => {
+    insertSnippet({ title: "Init one", content: "a" });
+    insertSnippet({ title: "Verify one", content: "b", kind: "verify" });
+
+    expect(listSnippets().map((s) => s.title)).toEqual(["Init one"]);
+    expect(listSnippets("verify").map((s) => [s.title, s.kind])).toEqual([["Verify one", "verify"]]);
+  });
+
   it("lists all snippets ordered by updated_at DESC", () => {
     insertSnippet({ title: "First", content: "Content 1" });
     insertSnippet({ title: "Second", content: "Content 2" });

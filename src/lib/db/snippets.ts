@@ -1,6 +1,6 @@
 import type { Database, Statement } from "bun:sqlite";
 import { getDb, _onDbReset } from "./connection";
-import type { Snippet } from "@/types/snippet";
+import type { Snippet, SnippetKind } from "@/types/snippet";
 
 let _insert: Statement | null = null;
 let _update: Statement | null = null;
@@ -11,8 +11,8 @@ let _list: Statement | null = null;
 function stmts(db: Database) {
   if (!_insert) {
     _insert = db.prepare(`
-      INSERT INTO snippets (title, content)
-      VALUES ($title, $content)
+      INSERT INTO snippets (title, content, kind)
+      VALUES ($title, $content, $kind)
     `);
   }
   if (!_update) {
@@ -30,7 +30,7 @@ function stmts(db: Database) {
   }
   if (!_list) {
     _list = db.prepare(
-      "SELECT * FROM snippets ORDER BY updated_at DESC, id DESC",
+      "SELECT * FROM snippets WHERE kind = ? ORDER BY updated_at DESC, id DESC",
     );
   }
   return { insert: _insert, update: _update, delete: _delete, get: _get, list: _list };
@@ -49,6 +49,7 @@ _onDbReset(_resetSnippetStatements);
 
 interface SnippetRow {
   id: number;
+  kind: SnippetKind;
   title: string;
   content: string;
   created_at: string;
@@ -58,6 +59,7 @@ interface SnippetRow {
 function rowToDomain(row: SnippetRow): Snippet {
   return {
     id: row.id,
+    kind: row.kind,
     title: row.title,
     content: row.content,
     createdAt: row.created_at,
@@ -65,10 +67,10 @@ function rowToDomain(row: SnippetRow): Snippet {
   };
 }
 
-export function insertSnippet(s: { title: string; content: string }): Snippet {
+export function insertSnippet(s: { title: string; content: string; kind?: SnippetKind }): Snippet {
   const db = getDb();
   const st = stmts(db);
-  const result = st.insert.run({ $title: s.title, $content: s.content });
+  const result = st.insert.run({ $title: s.title, $content: s.content, $kind: s.kind ?? "init" });
   const row = st.get.get(Number(result.lastInsertRowid)) as SnippetRow;
   return rowToDomain(row);
 }
@@ -99,9 +101,9 @@ export function getSnippet(id: number): Snippet | null {
   return row ? rowToDomain(row) : null;
 }
 
-export function listSnippets(): Snippet[] {
+export function listSnippets(kind: SnippetKind = "init"): Snippet[] {
   const db = getDb();
   const st = stmts(db);
-  const rows = st.list.all() as SnippetRow[];
+  const rows = st.list.all(kind) as SnippetRow[];
   return rows.map(rowToDomain);
 }

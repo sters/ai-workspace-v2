@@ -92,6 +92,7 @@ export function NewWorkspaceForm({
             Task Description
           </label>
           <SnippetPicker
+            kind="init"
             onInsert={(content) =>
               describe(description.trim() ? `${description}\n\n${content}` : content)
             }

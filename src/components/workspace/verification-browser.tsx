@@ -118,7 +118,7 @@ function PlanForm({ workspaceName, hasScenarios }: { workspaceName: string; hasS
     <Card className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-medium">{hasScenarios ? "Plan more scenarios" : "Plan scenarios"}</p>
-        <SnippetPicker onInsert={(content) => setInstruction((v) => appendSnippet(v, content))} />
+        <SnippetPicker kind="verify" onInsert={(content) => setInstruction((v) => appendSnippet(v, content))} />
       </div>
       <Textarea
         value={instruction}
@@ -265,7 +265,7 @@ function ScenarioView({
               : "Claude rewrites the steps from the first unfinished one on, from the results and notes so far. Finished steps, variables and running processes are kept."}
           </p>
           <div className="flex justify-end">
-            <SnippetPicker onInsert={(content) => setReplanText((v) => appendSnippet(v ?? "", content))} />
+            <SnippetPicker kind="verify" onInsert={(content) => setReplanText((v) => appendSnippet(v ?? "", content))} />
           </div>
           <Textarea
             value={replanText}

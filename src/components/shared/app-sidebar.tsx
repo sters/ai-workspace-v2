@@ -62,6 +62,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: "AIW Settings", href: "/settings/aiw" },
       { label: "Snippet: Init", href: "/settings/snippet/init" },
       { label: "Snippet: Chat", href: "/settings/snippet/chat" },
+      { label: "Snippet: Verify", href: "/settings/snippet/verify" },
       { label: "Claude Auth", href: "/settings/claude/auth" },
       { label: "Claude Settings", href: "/settings/claude/settings" },
       { label: "Claude MCP Servers", href: "/settings/claude/mcp-servers" },

@@ -122,6 +122,7 @@ describe("VerificationBrowser", () => {
     fireEvent.click(await screen.findByText("PRRC"));
     expect((screen.getByPlaceholderText("Optional: what to check, or how to start the app") as HTMLTextAreaElement).value)
       .toBe("verify on the PRRC pod");
+    expect(fetchMock.mock.calls.map((c) => (c as unknown as [string])[0])).toContain("/api/snippets?kind=verify");
     fetchMock.mockImplementation(async () => new Response("{}", { status: 200 }));
   });
 
