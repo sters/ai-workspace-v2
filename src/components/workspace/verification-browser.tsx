@@ -300,6 +300,7 @@ function ScenarioView({
               variables={sc.variables}
               scenarioRunning={running}
               act={act}
+              onInvestigate={openChat}
             />
           ))}
         </ol>
@@ -314,12 +315,14 @@ function StepCard({
   variables,
   scenarioRunning,
   act,
+  onInvestigate,
 }: {
   index: number;
   step: VerificationStep;
   variables: Record<string, string>;
   scenarioRunning: boolean;
   act: (body: Action) => Promise<boolean>;
+  onInvestigate: () => void;
 }) {
   const Icon = step.actor === "human" ? User : SquareTerminal;
   const r = step.result;
@@ -394,7 +397,7 @@ function StepCard({
         {step.status === "waiting" && <HumanAnswer step={step} act={act} />}
 
         {!scenarioRunning && (step.status === "failed" || step.status === "waiting") && (
-          <div className="flex gap-1.5">
+          <div className="flex flex-wrap gap-1.5">
             <Button variant="outline" onClick={() => act({ action: "rerun", stepId: step.id })}>
               <RotateCcw className="h-3.5 w-3.5" />
               Rerun from here
@@ -402,6 +405,12 @@ function StepCard({
             <Button variant="outline" onClick={() => act({ action: "skip", stepId: step.id })}>
               Skip and continue
             </Button>
+            {step.status === "failed" && (
+              <Button variant="outline" onClick={onInvestigate}>
+                <MessageSquare className="h-3.5 w-3.5" />
+                Investigate in chat
+              </Button>
+            )}
           </div>
         )}
         {!scenarioRunning && (step.status === "passed" || step.status === "skipped") && !step.teardown && (

@@ -96,6 +96,22 @@ describe("VerificationBrowser", () => {
     expect(postedBody()).toEqual({ action: "answer", stepId: "b", verdict: "ok", note: "badge shown", values: { role: "admin" } });
   });
 
+  it("opens a chat about a failure from the failed step itself", () => {
+    setScenarios([scenario({
+      status: "failed",
+      steps: [
+        step({ id: "a", title: "Start", status: "passed" }),
+        step({ id: "b", title: "Call API", status: "failed", result: { at: "2026-01-01T00:00:00.000Z", exitCode: 1, output: "HTTP 500" } }),
+      ],
+    })]);
+    render(<VerificationBrowser workspaceName="ws" />);
+    const card = screen.getByText("Call API").closest("li")!;
+    const button = Array.from(card.querySelectorAll("button")).find((b) => b.textContent === "Investigate in chat");
+    expect(button).toBeDefined();
+    fireEvent.click(button!);
+    expect(mockPush).toHaveBeenCalled();
+  });
+
   it("offers a replan of a passed scenario, which says it rewrites every step", () => {
     setScenarios([scenario({ status: "passed", steps: [step({ id: "a", title: "Call", status: "passed" })] })]);
     render(<VerificationBrowser workspaceName="ws" />);
