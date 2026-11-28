@@ -311,76 +311,87 @@ describe("runClaude", () => {
     mockSpawn.mockReset();
   });
 
-  it("suppresses CLI auto-error for AskUserQuestion and kills process", async () => {
-    const mockKill = vi.fn();
-
-    mockSpawn.mockReturnValue({
-      stdout: createMockStdout([
-        { type: "system", subtype: "init", session_id: "test-session", model: "claude-3" },
-        {
-          type: "assistant",
-          message: {
-            content: [{
-              type: "tool_use",
-              name: "AskUserQuestion",
-              id: "ask-1",
-              input: {
-                questions: [{ question: "Which repo?", options: [{ label: "A", description: "Opt A" }], multiSelect: false }],
-              },
-            }],
-          },
-        },
-        {
-          type: "user",
-          message: {
-            content: [{
-              type: "tool_result",
-              tool_use_id: "ask-1",
-              content: "Answer questions?",
-              is_error: true,
-            }],
-          },
-        },
-        // This should NOT be emitted — process is killed before reaching it
-        { type: "assistant", message: { content: [{ type: "text", text: "Continuing without answer" }] } },
-      ]),
+  /** A stdout the test writes to line by line, and a stdin that records what was written. */
+  function controlledProcess() {
+    const encoder = new TextEncoder();
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const stdout = new ReadableStream<Uint8Array>({ start(c) { controller = c; } });
+    const written: string[] = [];
+    let exit!: (code: number) => void;
+    const proc = {
+      stdout,
       stderr: createEmptyStream(),
-      exited: Promise.resolve(0),
-      kill: mockKill,
-    });
+      stdin: { write: vi.fn((s: string) => { written.push(s); }), flush: vi.fn(), end: vi.fn() },
+      exited: new Promise<number>((r) => { exit = r; }),
+      kill: vi.fn(),
+    };
+    return {
+      proc,
+      emitLine: (line: object) => controller.enqueue(encoder.encode(JSON.stringify(line) + "\n")),
+      finish: () => { controller.close(); exit(0); },
+      sent: () => written.join("").split("\n").filter(Boolean).map((l) => JSON.parse(l)),
+    };
+  }
+
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
+  const ask = { questions: [{ question: "Which repo?", header: "Repo", options: [{ label: "A", description: "Opt A" }], multiSelect: false }] };
+
+  it("answers the CLI's AskUserQuestion permission request with the person's answers, in the same process", async () => {
+    const p = controlledProcess();
+    mockSpawn.mockReturnValue(p.proc);
 
     const claudeProcess = runClaude("test-op-ask", "test prompt");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const events: any[] = [];
     claudeProcess.onEvent((event) => events.push(event));
 
-    // Wait for async stream processing to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    const args: string[] = mockSpawn.mock.calls[0][0];
+    expect(args).toContain("--permission-prompt-tool");
+    expect(p.sent()[0]).toEqual({ type: "user", message: { role: "user", content: "test prompt" } });
 
-    expect(mockKill).toHaveBeenCalled();
+    p.emitLine({ type: "system", subtype: "init", session_id: "s1" });
+    p.emitLine({ type: "assistant", message: { content: [{ type: "tool_use", name: "AskUserQuestion", id: "ask-1", input: ask }] } });
+    p.emitLine({ type: "control_request", request_id: "req-1", request: { subtype: "can_use_tool", tool_name: "AskUserQuestion", input: ask, tool_use_id: "ask-1" } });
+    await tick();
+    expect(p.sent()).toHaveLength(1);
 
-    const outputEvents = events.filter((e) => e.type === "output");
-    const parsedOutputs = outputEvents.map((e) => JSON.parse(e.data));
+    expect(claudeProcess.submitAnswer("ask-1", { "Which repo?": "A" })).toBe(true);
+    expect(p.sent()[1]).toEqual({
+      type: "control_response",
+      response: { subtype: "success", request_id: "req-1", response: { behavior: "allow", updatedInput: { ...ask, answers: { "Which repo?": "A" } } } },
+    });
+    expect(mockSpawn).toHaveBeenCalledTimes(1);
+    expect(claudeProcess.submitAnswer("ask-1", { "Which repo?": "A" })).toBe(false);
 
-    expect(parsedOutputs.some((p) => p.type === "system")).toBe(true);
-
-    expect(parsedOutputs.some((p) =>
-      p.type === "assistant" &&
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      p.message?.content?.some((b: any) => b.name === "AskUserQuestion"),
-    )).toBe(true);
-
-    // The auto-error tool_result should NOT be emitted
-    expect(parsedOutputs.some((p) => p.type === "user")).toBe(false);
-
-    // The subsequent assistant message should NOT be emitted
-    expect(parsedOutputs.filter((p) => p.type === "assistant")).toHaveLength(1);
-
-    // No complete event — waiting for AskUserQuestion answer
-    expect(events.some((e) => e.type === "complete")).toBe(false);
+    p.emitLine({ type: "result", subtype: "success", result: "Done" });
+    await tick();
+    expect(p.proc.stdin.end).toHaveBeenCalled();
+    p.finish();
+    await tick();
+    expect(events.some((e) => e.type === "complete")).toBe(true);
+    expect(events.some((e) => e.type === "output" && JSON.parse(e.data).type === "control_request")).toBe(false);
   });
 
-  it("emits normal tool_result when not an AskUserQuestion auto-error", async () => {
+  it("denies a permission request for any other tool, as -p does", async () => {
+    const p = controlledProcess();
+    mockSpawn.mockReturnValue(p.proc);
+    runClaude("test-op-deny", "test prompt");
+
+    p.emitLine({ type: "control_request", request_id: "req-2", request: { subtype: "can_use_tool", tool_name: "Write", input: {}, tool_use_id: "w-1" } });
+    await tick();
+    expect(p.sent()[1].response).toMatchObject({ subtype: "success", request_id: "req-2", response: { behavior: "deny" } });
+    p.finish();
+  });
+
+  it("offers no AskUserQuestion to a child that must not ask", () => {
+    const p = controlledProcess();
+    mockSpawn.mockReturnValue(p.proc);
+    runClaude("test-op-skip", "test prompt", { skipAskUserQuestion: true });
+    expect(mockSpawn.mock.calls[0][0]).not.toContain("--permission-prompt-tool");
+    p.finish();
+  });
+
+  it("emits tool results and completes when the CLI exits", async () => {
     mockSpawn.mockReturnValue({
       stdout: createMockStdout([
         { type: "system", subtype: "init", session_id: "test-session-2", model: "claude-3" },

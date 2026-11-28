@@ -98,13 +98,6 @@ export const permissionDenialItemSchema = z.object({
   tool_input: z.record(z.string(), z.unknown()).optional(),
 });
 
-export const toolResultBlockSchema = z.object({
-  type: z.literal("tool_result"),
-  tool_use_id: z.string(),
-  is_error: z.boolean().optional(),
-  content: z.unknown().optional(),
-});
-
 export const modelUsageSchema = z.record(z.string(), z.object({
   inputTokens: z.number().default(0),
   outputTokens: z.number().default(0),

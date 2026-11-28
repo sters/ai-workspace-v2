@@ -124,9 +124,8 @@ function dismissPendingAsksForChild(
     });
   }
 
-  // Recompute the global flag from the full event stream: this child's ask may
-  // have been auto-answered (skipAskUserQuestion mode emits a synthetic
-  // tool_result), so whether it had an unanswered ask does not decide the flag.
+  // Recompute the global flag from the full event stream: another child may
+  // still be waiting on its own ask.
   recomputeHasPendingAsk(managed);
 }
 

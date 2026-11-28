@@ -1,5 +1,8 @@
 // Bun.spawn-based Claude CLI runner.
-// Spawns `claude -p` with `--output-format stream-json` and streams events.
+// Spawns `claude -p` speaking stream-json both ways and streams its events.
+// Permission prompts come back over stdio (`--permission-prompt-tool stdio`):
+// the only way `-p` offers AskUserQuestion, which is answered in place; every
+// other prompt is denied, as plain `-p` would.
 
 import type { Subprocess } from "bun";
 import type { ClaudeProcess, RunClaudeOptions, SpawnClaudeOptions, SpawnClaudeTerminalOptions, StreamEvent } from "@/types/claude";
@@ -10,7 +13,6 @@ import { spawnTerminal } from "../pty";
 import { realpathSync } from "node:fs";
 import { getCleanEnv } from "../env";
 import { runProcess, type ProcessResult } from "../process/run";
-import { permissionDenialItemSchema, toolResultBlockSchema } from "../runtime-schemas";
 import { aiwMcpConfigArgs } from "./aiw-mcp";
 import { writeGrants } from "./read-only-tools";
 
@@ -132,12 +134,10 @@ function log(operationId: string, ...args: unknown[]) {
 }
 
 /**
- * Extended ClaudeProcess that exposes a callback for tracking subprocess
- * changes (e.g., when submitAnswer spawns a new process). This is used
- * by wireChild to keep managed.childProcesses up to date.
+ * Extended ClaudeProcess that reports the subprocess it spawns, so wireChild
+ * can keep managed.childProcesses up to date.
  */
 export interface ClaudeProcessWithTracking extends ClaudeProcess {
-  /** Register a callback invoked when submitAnswer spawns a new subprocess. */
   onProcessSpawned: (callback: (proc: Subprocess) => void) => void;
 }
 
@@ -150,13 +150,10 @@ export function runClaude(
   const earlyEvents: OperationEvent[] = [];
 
   let sessionId: string | null = null;
-  let pendingAskToolUseId: string | null = null;
+  let pendingAsk: { toolUseId: string; requestId: string; input: Record<string, unknown> } | null = null;
   let currentProc: Subprocess | null = null;
   let killed = false;
 
-  // Callbacks invoked when submitAnswer spawns a new process, so
-  // external tracking structures (e.g., managed.childProcesses) can be
-  // updated with the new subprocess reference.
   const processSpawnedCallbacks: ((proc: Subprocess) => void)[] = [];
 
   const emit = (event: OperationEvent) => {
@@ -177,7 +174,7 @@ export function runClaude(
   // Whether resultText was set from a StructuredOutput tool_use (takes precedence over result event)
   let hasStructuredOutput = false;
 
-  function spawnAndStream(promptOrAnswer: string, resumeSessionId?: string) {
+  function spawnAndStream(prompt: string, resumeSessionId?: string) {
     // Always pass prompts via stdin to avoid exposing them in the process list.
 
     const addDirAllowedTools = options?.allowedTools?.length
@@ -187,8 +184,10 @@ export function runClaude(
         : [];
 
     const cliArgs = [
-      "-p", "-",
+      "-p",
+      "--input-format", "stream-json",
       "--output-format", "stream-json",
+      ...(options?.skipAskUserQuestion ? [] : ["--permission-prompt-tool", "stdio"]),
       ...(options?.aiwMcp ? aiwMcpConfigArgs() : []),
       "--verbose",
       ...(options?.model ? ["--model", options.model] : []),
@@ -220,17 +219,20 @@ export function runClaude(
     // Notify external tracking structures about the new subprocess
     for (const cb of processSpawnedCallbacks) cb(proc);
 
-    if (proc.stdin) {
+    send = (message: unknown) => {
+      if (!proc.stdin) return;
       try {
-        proc.stdin.write(promptOrAnswer);
-        proc.stdin.end();
+        proc.stdin.write(JSON.stringify(message) + "\n");
+        proc.stdin.flush();
       } catch (err) {
         log(operationId, "stdin write error (process may have already exited):", err);
       }
-    }
-
-    // Reset pending ask for the new process
-    pendingAskToolUseId = null;
+    };
+    const closeStdin = () => {
+      try { proc.stdin?.end(); } catch { /* already closed */ }
+    };
+    send({ type: "user", message: { role: "user", content: prompt } });
+    pendingAsk = null;
 
     (async () => {
       // Start reading stderr concurrently with stdout to avoid
@@ -241,10 +243,7 @@ export function runClaude(
         const reader = proc.stdout.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let askKilled = false;
-
         for (;;) {
-          if (askKilled) break;
           const { done, value } = await reader.read();
           if (done) break;
 
@@ -257,6 +256,13 @@ export function runClaude(
           }
 
           for (const parsed of result.values as StreamEvent[]) {
+            if (parsed.type === "control_request") {
+              handleControlRequest(parsed);
+              continue;
+            }
+            // The CLI reads stdin for further turns until it closes.
+            if (parsed.type === "result") closeStdin();
+
             // The CLI's init event reports the model but not the effort, so
             // stamp the level we passed via --effort to keep it visible in the log.
             if (parsed.type === "system" && parsed.subtype === "init" && options?.effort) {
@@ -281,51 +287,10 @@ export function runClaude(
                 if (block.type === "text" && typeof block.text === "string" && block.text.trim()) {
                   assistantTextParts.push(block.text);
                 }
-                if (block.type === "tool_use" && block.name === "AskUserQuestion") {
-                  pendingAskToolUseId = block.id;
-                }
                 // Capture structured output from --json-schema responses
                 if (block.type === "tool_use" && block.name === "StructuredOutput" && block.input) {
                   resultText = JSON.stringify(block.input);
                   hasStructuredOutput = true;
-                }
-              }
-            }
-
-            // Check result for AskUserQuestion permission denial
-            if (parsed.type === "result" && pendingAskToolUseId) {
-              const denials = Array.isArray(parsed.permission_denials) ? parsed.permission_denials : [];
-              const hasAskDenial = denials.some((d: unknown) => {
-                const r = permissionDenialItemSchema.safeParse(d);
-                return r.success && r.data.tool_name === "AskUserQuestion";
-              });
-              if (hasAskDenial) {
-                // permission denied — will wait for answer via submitAnswer
-              }
-            }
-
-            // Detect CLI's auto-error response to AskUserQuestion in -p mode.
-            // The CLI can't show interactive UI, so it auto-responds with
-            // tool_result { is_error: true, content: "Answer questions?" }.
-            // When skipAskUserQuestion is set, let the auto-error flow through
-            // so Claude continues without waiting for user input.
-            // Otherwise, suppress the event and kill the process so the UI
-            // can present the question to the user.
-            if (pendingAskToolUseId && parsed.type === "user" && parsed.message?.content) {
-              const blocks = Array.isArray(parsed.message.content)
-                ? parsed.message.content
-                : [];
-              const isAskAutoError = blocks.some((b: unknown) => {
-                const r = toolResultBlockSchema.safeParse(b);
-                return r.success && r.data.tool_use_id === pendingAskToolUseId && r.data.is_error;
-              });
-              if (isAskAutoError) {
-                if (options?.skipAskUserQuestion) {
-                  pendingAskToolUseId = null; // Clear so we don't wait for answer
-                } else {
-                  askKilled = true;
-                  proc.kill();
-                  break; // Stop processing this chunk; outer loop checks askKilled
                 }
               }
             }
@@ -405,17 +370,35 @@ export function runClaude(
         try { proc.kill(9); } catch { /* already exited */ }
         return 1;
       });
-      if (pendingAskToolUseId && !killed) {
-        // AskUserQuestion is pending — don't emit complete, wait for submitAnswer
-      } else {
-        emit({
-          type: "complete",
-          operationId,
-          data: JSON.stringify({ exitCode }),
-          timestamp: new Date().toISOString(),
-        });
-      }
+      pendingAsk = null;
+      emit({
+        type: "complete",
+        operationId,
+        data: JSON.stringify({ exitCode }),
+        timestamp: new Date().toISOString(),
+      });
     })();
+  }
+
+  let send: (message: unknown) => void = () => {};
+
+  function respond(requestId: string, response: unknown) {
+    send({ type: "control_response", response: { subtype: "success", request_id: requestId, response } });
+  }
+
+  /** AskUserQuestion waits for `submitAnswer`; any other tool the settings did not allow is refused. */
+  function handleControlRequest(message: StreamEvent) {
+    const requestId = String(message.request_id ?? "");
+    const request = (message.request ?? {}) as { subtype?: string; tool_name?: string; tool_use_id?: string; input?: Record<string, unknown> };
+    if (request.subtype !== "can_use_tool") {
+      send({ type: "control_response", response: { subtype: "error", request_id: requestId, error: `Unsupported control request: ${request.subtype}` } });
+      return;
+    }
+    if (request.tool_name === "AskUserQuestion" && request.tool_use_id) {
+      pendingAsk = { toolUseId: request.tool_use_id, requestId, input: request.input ?? {} };
+      return;
+    }
+    respond(requestId, { behavior: "deny", message: `${request.tool_name} is not allowed in this run.` });
   }
 
   // Initial spawn (resume an existing session when requested, for multi-turn conversations)
@@ -442,19 +425,14 @@ export function runClaude(
         }, 5000);
       }
     },
-    /** Register a callback invoked when submitAnswer spawns a new subprocess. */
     onProcessSpawned: (callback: (proc: Subprocess) => void) => {
       processSpawnedCallbacks.push(callback);
     },
     submitAnswer: (toolUseId, answers) => {
-      if (toolUseId !== pendingAskToolUseId || !sessionId) return false;
-      pendingAskToolUseId = null;
-
-      const answerText = Object.entries(answers)
-        .map(([q, a]) => `${q}: ${a}`)
-        .join("\n");
-
-      spawnAndStream(answerText, sessionId);
+      if (!pendingAsk || toolUseId !== pendingAsk.toolUseId) return false;
+      const { requestId, input } = pendingAsk;
+      pendingAsk = null;
+      respond(requestId, { behavior: "allow", updatedInput: { ...input, answers } });
       return true;
     },
     getResultText: () => resultText,
