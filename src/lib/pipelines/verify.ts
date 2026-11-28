@@ -87,12 +87,11 @@ export function buildVerifyPipeline(input: { workspace: string; instruction?: st
           appendSystemPromptFile: await ensureSystemPrompt(wsPath, "verifier"),
         },
       );
-      const report = Bun.file(reportPath);
-      if (!(await report.exists())) {
+      // The report is read in the Verify tab; the verifier's own closing message is the summary.
+      if (!(await Bun.file(reportPath).exists())) {
         ctx.emitResult(ok ? "The verifier finished without writing its report." : "The verifier failed.");
         return false;
       }
-      ctx.emitResult(await report.text());
       return ok;
     },
   }];

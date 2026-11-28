@@ -81,6 +81,8 @@ describe("verify pipeline", () => {
     expect(opts.addDirs).toContain("/ws/github.com/acme/widgets");
     expect(opts.skipAskUserQuestion).toBeFalsy();
     expect(runChild.mock.calls[0][1]).toContain(path.join(reportDir, "report.md"));
+    // The verifier's closing message already summarises it; the report itself is in the Verify tab.
+    expect(ctx.emitResult).not.toHaveBeenCalled();
   });
 
   it("hands the agent the request, the PRs, and the latest earlier report", async () => {
