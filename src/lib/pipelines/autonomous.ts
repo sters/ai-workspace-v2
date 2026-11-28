@@ -307,6 +307,7 @@ export function buildAutonomousPipeline(input: {
   const { startWith, description, workspace, instruction, draft, interactionLevel, repo } = input;
   const maxLoops = input.maxLoops ?? DEFAULT_MAX_LOOPS;
   const phases: PipelinePhase[] = [];
+  const skip = { skipAskUserQuestion: true } as const;
   const gateHistory: { cycle: number; reason: string; fixableIssues: string[] }[] = [];
   // The repositories later cycles still plan, execute and review, by worktree
   // directory; undefined means every one `repo` selects. Only a gate narrows it,
@@ -445,7 +446,7 @@ export function buildAutonomousPipeline(input: {
           commitResultMessage: `Workspace **${ws}** TODO analysis recovered.`,
         });
 
-        return runSubPhases(ctx, subPhases);
+        return runSubPhases(ctx, subPhases, skip);
       },
     };
   }
@@ -483,7 +484,7 @@ export function buildAutonomousPipeline(input: {
           instruction: instruction || DEFAULT_UPDATE_TODO_INSTRUCTION,
           repo,
         });
-        return runSubPhases(ctx, subPhases);
+        return runSubPhases(ctx, subPhases, skip);
       },
     });
   }
@@ -506,7 +507,7 @@ export function buildAutonomousPipeline(input: {
           repository: repo,
           repositories: unfinished,
         });
-        return runSubPhases(ctx, execPhases);
+        return runSubPhases(ctx, execPhases, skip);
       },
     };
   }
@@ -534,7 +535,7 @@ export function buildAutonomousPipeline(input: {
           repositories: unfinished,
           requestedFixes: previousAsks && previousAsks.length > 0 ? previousAsks : undefined,
         });
-        return runSubPhases(ctx, reviewPhases);
+        return runSubPhases(ctx, reviewPhases, skip);
       },
     };
   }
@@ -703,7 +704,7 @@ export function buildAutonomousPipeline(input: {
           repo,
           repositories: unfinished,
         });
-        return runSubPhases(ctx, updatePhases);
+        return runSubPhases(ctx, updatePhases, skip);
       },
     };
   }
@@ -807,7 +808,7 @@ export function buildAutonomousPipeline(input: {
           repository: repo,
           repositories,
         });
-        return runSubPhases(ctx, prPhases);
+        return runSubPhases(ctx, prPhases, skip);
       },
     };
   }
