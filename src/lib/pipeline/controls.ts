@@ -1,6 +1,6 @@
 import type { OperationEvent } from "@/types/operation";
 import { operations } from "./store";
-import { emitEvent } from "./events";
+import { emitEvent, setPendingAsk } from "./events";
 import { getOperation, updateOperationStatus } from "@/lib/db";
 
 export function killOperation(id: string): boolean {
@@ -75,7 +75,7 @@ export function submitAnswer(
   if (managed.operation.status !== "running") {
     // Operation finished — ask is moot, clear the stale flag and inject
     // a synthetic tool_result so it doesn't reappear after reload.
-    managed.hasPendingAsk = false;
+    setPendingAsk(managed, false);
     emitEvent(managed, {
       type: "output",
       operationId: managed.operation.id,
@@ -97,17 +97,17 @@ export function submitAnswer(
   const pendingResolver = managed.pendingAsks.get(toolUseId);
   if (pendingResolver) {
     managed.pendingAsks.delete(toolUseId);
-    managed.hasPendingAsk = false;
+    setPendingAsk(managed, false);
     pendingResolver(answers);
     return true;
   }
   if (managed.claudeProcess?.submitAnswer(toolUseId, answers)) {
-    managed.hasPendingAsk = false;
+    setPendingAsk(managed, false);
     return true;
   }
   for (const [, entry] of managed.childProcesses) {
     if (entry.process.submitAnswer(toolUseId, answers)) {
-      managed.hasPendingAsk = false;
+      setPendingAsk(managed, false);
       // Emit a synthetic tool_result so findPendingAsk() in the UI
       // immediately stops showing the ask input (before the resumed
       // process sends the real tool_result).
@@ -135,7 +135,7 @@ export function submitAnswer(
   // Ask not found in any process — it's stale (e.g. the child process
   // that emitted it has already finished). Emit a synthetic tool_result
   // so findPendingAsk() won't show it again, even after page reload.
-  managed.hasPendingAsk = false;
+  setPendingAsk(managed, false);
   emitEvent(managed, {
     type: "output",
     operationId: managed.operation.id,

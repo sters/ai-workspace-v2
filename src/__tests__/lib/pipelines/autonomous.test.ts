@@ -495,6 +495,15 @@ describe("buildAutonomousPipeline", () => {
       );
     });
 
+    it("lets the work phases' children ask a person", async () => {
+      mockBuildExecute.mockResolvedValue([{ kind: "single", label: "Executor", prompt: "p" }]);
+      const phases = buildAutonomousPipeline({ startWith: "execute", workspace: "test-ws" });
+
+      const execCtx = createMockCtx();
+      await phaseByLabel(phases, "Cycle 1: Execute").fn(execCtx);
+      expect(mocked(execCtx.runChild).mock.calls[0][2]?.skipAskUserQuestion).toBeFalsy();
+    });
+
     it("update-todo phase strips completed TODOs and runs update pipeline", async () => {
       mockGetReviewSessions.mockResolvedValue([{
         timestamp: "2024-01-01",

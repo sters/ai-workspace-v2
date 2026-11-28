@@ -4,7 +4,7 @@ import { insertClaudeRun } from "@/lib/db";
 import { parseRunUsage } from "@/lib/parsers/run-usage";
 import type { OperationEvent } from "@/types/operation";
 import type { ManagedOperation, WireChildResult } from "./types";
-import { emitEvent, emitStatus } from "./events";
+import { emitEvent, emitStatus, setPendingAsk } from "./events";
 
 /**
  * Recompute managed.hasPendingAsk from the event stream, mirroring the client's
@@ -65,7 +65,7 @@ export function recomputeHasPendingAsk(managed: ManagedOperation): void {
       break;
     }
   }
-  managed.hasPendingAsk = pending;
+  setPendingAsk(managed, pending);
 }
 
 /**

@@ -281,17 +281,12 @@ describe("pipeline-manager phase timeout", () => {
         timeoutMs: 50,
         maxRetries: 0,
         fn: async (ctx) => {
-          // Block on emitAsk which respects the abort signal
-          await ctx.emitAsk([
-            {
-              question: "Wait forever?",
-              options: [
-                { label: "Yes", description: "yes" },
-                { label: "No", description: "no" },
-              ],
-            },
-          ]);
-          return true;
+          // Work that respects the abort signal and outlasts the timeout.
+          await new Promise<void>((resolve) => {
+            const timer = setTimeout(resolve, 10_000);
+            ctx.signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
+          });
+          return !ctx.signal.aborted;
         },
       },
     ]);

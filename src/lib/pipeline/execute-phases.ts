@@ -2,7 +2,7 @@ import type { OperationPhaseInfo, OperationType } from "@/types/operation";
 import type { PipelinePhase, PipelineOptions } from "@/types/pipeline";
 import type { ManagedOperation } from "./types";
 import { getTimeoutDefaults } from "./constants";
-import { emitStatus, markComplete } from "./events";
+import { askPausedMs, emitStatus, markComplete } from "./events";
 import { delay, emitPhaseUpdate, getPhaseLabel } from "./phase-helpers";
 import { usageLimitPausedMs } from "./usage-limit-wait";
 import { runFunctionPhase, runSinglePhase, runGroupPhase } from "./phase-runners";
@@ -147,9 +147,11 @@ export async function executePipelinePhases(params: ExecutePhasesParams): Promis
           ? new AbortController()
           : undefined;
 
-        let pausedMsCredited = usageLimitPausedMs(managed);
+        // A usage-limit wait and a question waiting on a person may overlap; both are credited.
+        const totalPausedMs = () => usageLimitPausedMs(managed) + askPausedMs(managed);
+        let pausedMsCredited = totalPausedMs();
         const onTimeout = () => {
-          const pausedMs = usageLimitPausedMs(managed) - pausedMsCredited;
+          const pausedMs = totalPausedMs() - pausedMsCredited;
           if (pausedMs > 0) {
             pausedMsCredited += pausedMs;
             const info = phaseInfos[i];

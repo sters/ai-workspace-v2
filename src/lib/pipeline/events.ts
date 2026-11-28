@@ -4,6 +4,24 @@ import { sendAskNotification, sendCompletionNotification } from "@/lib/web-push"
 import { bufferEvent, stopAutoFlush } from "@/lib/db";
 import { extractResultSummary } from "@/lib/parsers/stream";
 
+/** Set whether the operation waits on a person's answer, timing the wait. */
+export function setPendingAsk(managed: ManagedOperation, pending: boolean) {
+  const pause = (managed.askPause ??= { totalMs: 0 });
+  if (pending && pause.since === undefined) pause.since = Date.now();
+  if (!pending && pause.since !== undefined) {
+    pause.totalMs += Date.now() - pause.since;
+    pause.since = undefined;
+  }
+  managed.hasPendingAsk = pending;
+}
+
+/** Total time the operation has waited on answers, including a wait still in progress. */
+export function askPausedMs(managed: ManagedOperation): number {
+  const pause = managed.askPause;
+  if (!pause) return 0;
+  return pause.totalMs + (pause.since !== undefined ? Date.now() - pause.since : 0);
+}
+
 export function emitEvent(managed: ManagedOperation, event: OperationEvent) {
   managed.events.push(event);
   if (managed.events.length > 5000) {
@@ -20,7 +38,7 @@ export function emitEvent(managed: ManagedOperation, event: OperationEvent) {
       if (parsed.type === "assistant" && Array.isArray(parsed.message?.content)) {
         for (const block of parsed.message.content) {
           if (block.type === "tool_use" && block.name === "AskUserQuestion") {
-            managed.hasPendingAsk = true;
+            setPendingAsk(managed, true);
             sendAskNotification(managed.operation.id, managed.operation.workspace ?? undefined);
             break;
           }

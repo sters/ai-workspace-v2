@@ -27,6 +27,8 @@ export interface ManagedOperation {
    * that point, so this is the only in-memory source for the listing.
    */
   resultSummary?: OperationResultSummary;
+  /** Time spent waiting for a person's answer, credited back to the phase timeout (`askPausedMs`). */
+  askPause?: { since?: number; totalMs: number };
   /** Time children spent waiting out a usage limit, credited back to the phase timeout. */
   usageLimitPause?: {
     active: number;
