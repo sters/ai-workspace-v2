@@ -186,7 +186,7 @@ const TYPE_OVERRIDE_HINT_LINES = [
   "#   #           update-readme, resolve-conflicts, suggest-workspace,",
   "#   #           ground-finding, review-todos, verify",
   "#   #   claude-sonnet-5-5 / high — autonomous-gate, distill-lessons,",
-  "#   #           plan-scheduled-task",
+  "#   #           plan-scheduled-task, verify-review",
   "#   #   claude-sonnet-5-5 / medium — run-scheduled-task",
   "#   #   claude-haiku-5-5 / high  — verify-completion",
   "#   #   claude-haiku-5-5 / xhigh — verify-fixes, criteria-feasibility,",

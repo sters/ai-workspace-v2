@@ -4,7 +4,7 @@
  * and writes what it did and saw as a report a person reads.
  */
 
-import type { VerifierInput } from "@/types/prompts";
+import type { VerifierInput, VerifyReviewerInput } from "@/types/prompts";
 import { LISTED_SKILLS, REPO_SEARCH_EFFICIENCY } from "./shared";
 
 export function getVerifierSystemPrompt(): string {
@@ -52,12 +52,16 @@ ${LISTED_SKILLS}
 ${REPO_SEARCH_EFFICIENCY}`;
 }
 
-export function buildVerifierPrompt(input: VerifierInput): string {
-  const repos = input.repos.length > 0
-    ? input.repos
+function renderRepos(repos: VerifierInput["repos"]): string {
+  return repos.length > 0
+    ? repos
       .map((r) => `### ${r.repoName}\n\n- Worktree: \`${r.worktreePath}\`\n- Base branch: \`${r.baseBranch}\`${r.prUrl ? `\n- Pull request: ${r.prUrl}` : ""}\n\n${r.changes}`)
       .join("\n\n")
     : "(no repositories on disk)";
+}
+
+export function buildVerifierPrompt(input: VerifierInput): string {
+  const repos = renderRepos(input.repos);
 
   const previous = input.previousReport
     ? `
@@ -72,7 +76,7 @@ ${input.previousReport}
   return `# Verify: ${input.workspaceName}
 
 Check that this workspace's change works in the running software, and write the report to \`${input.reportPath}\`.
-${input.instruction ? `\n## Request from the person\n\n${input.instruction}\n` : "\nThere is no request: check the README's acceptance criteria that a running check can show.\n"}
+${input.instruction ? `\n## Request from the person\n\n${input.instruction}\n` : "\nThere is no request: check the README's acceptance criteria. Give each criterion a check, or say in the report why running the software cannot show it.\n"}
 ## Workspace directory
 
 \`${input.workspacePath}\`
@@ -85,4 +89,60 @@ ${input.readmeContent}
 
 ${repos}
 ${previous}`;
+}
+
+export const VERIFY_REVIEW_SCHEMA = {
+  type: "object",
+  properties: {
+    gaps: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          item: { type: "string", description: "The criterion or check, as the README or the report names it." },
+          problem: { type: "string", description: "What the report leaves unshown, in one or two sentences." },
+          fix: { type: "string", description: "What the next run should do to show it: the environment, the entry point, the data, what to observe." },
+          needsPerson: { type: "boolean", description: "True when only a person can unblock it: their sign-in, a judgement only they can make, or their approval of a write outside this machine." },
+        },
+        required: ["item", "problem", "fix", "needsPerson"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["gaps"],
+  additionalProperties: false,
+} as const;
+
+export function getVerifyReviewerSystemPrompt(): string {
+  return `You review a verification report: another agent ran a code change in the running software and reported what it did and saw. You judge whether the report shows what it set out to show, so that what it missed goes back to it for another run. You change nothing and run nothing that changes anything.
+
+A gap is (non-exhaustive):
+- a criterion in scope with no check: with no request, every README acceptance criterion is in scope; with a request, what the request asks;
+- a check marked passed whose quoted output or screenshot does not show the criterion: it shows something else, shows only a size or a status, or would look the same if the change were broken (an empty result, every row, the input ignored);
+- a check marked not verified for a reason the next run can get past on its own: a command or entry point the repositories' docs give, data it may create on this machine, credentials already on this machine, another way to observe the same thing.
+
+A check stopped by what only a person can give — their sign-in, a judgement that is theirs, approval of a write outside this machine — is a gap with \`needsPerson\`, so it is reported rather than retried. A criterion that running the software cannot show, and the report says so, is no gap.
+
+Each \`fix\` says what the next run does, concretely enough to start on. Return no gaps when the report shows everything in scope. Look at a screenshot with Read when a pass rests on it; read the repositories' docs when judging whether a stop was avoidable.
+
+${REPO_SEARCH_EFFICIENCY}`;
+}
+
+export function buildVerifyReviewerPrompt(input: VerifyReviewerInput): string {
+  return `# Review the verification of: ${input.workspaceName}
+${input.instruction ? `\n## Request the verification was run for\n\n${input.instruction}\n` : "\nThere was no request: the README's acceptance criteria are in scope.\n"}
+## README
+
+${input.readmeContent}
+
+## Repositories
+
+${renderRepos(input.repos)}
+
+## The report
+
+Screenshots it links are in \`${input.reportDir}\`.
+
+${input.report}
+`;
 }

@@ -30,6 +30,7 @@ export const STEP_TYPES = {
   PRUNE_SUGGESTIONS: "prune-suggestions",
   SUGGEST_WORKSPACE: "suggest-workspace",
   VERIFY: "verify",
+  VERIFY_REVIEW: "verify-review",
   DISTILL_LESSONS: "distill-lessons",
   JUDGE_PR_TRIAGE: "judge-pr-triage",
   PLAN_SCHEDULED_TASK: "plan-scheduled-task",

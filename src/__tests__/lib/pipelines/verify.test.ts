@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach, afterEach } from "bun:test";
 import path from "node:path";
 import os from "node:os";
 import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
-import type { PhaseFunctionContext, PipelinePhaseFunction, RunChildOptions } from "@/types/pipeline";
+import type { PhaseFunctionContext, PipelinePhase, PipelinePhaseFunction, RunChildOptions } from "@/types/pipeline";
 
 let root: string;
 
@@ -24,9 +24,19 @@ import { buildVerifyPipeline } from "@/lib/pipelines/verify";
 
 const WS = "ws1";
 
-/** A child that writes `report` (when given) into the directory it was granted Write on. */
-function ctxWriting(report: string | null) {
+type Gap = { item: string; problem: string; fix: string; needsPerson: boolean };
+
+/**
+ * The verifier writes `report` (when given) into the directory it was granted
+ * Write on; the reviewer answers with `gaps`.
+ */
+function ctxWriting(report: string | null, gaps: Gap[] = []) {
+  const appended: PipelinePhase[] = [];
   const runChild = vi.fn(async (_label: string, _prompt: string, opts?: RunChildOptions) => {
+    if (opts?.jsonSchema) {
+      opts.onResultText?.(JSON.stringify({ gaps }));
+      return true;
+    }
     const grant = opts?.allowedTools?.find((t) => t.startsWith("Write("));
     if (report !== null && grant) {
       const dir = grant.slice("Write(/".length, -"/**)".length);
@@ -44,14 +54,20 @@ function ctxWriting(report: string | null) {
     runChildGroup: vi.fn(),
     emitTerminal: vi.fn(),
     signal: new AbortController().signal,
-    appendPhases: vi.fn(),
+    appendPhases: vi.fn((p: PipelinePhase[]) => { appended.push(...p); }),
   } as unknown as PhaseFunctionContext;
-  return { ctx, runChild };
+  return { ctx, runChild, appended };
 }
 
-async function runPhase(input: Parameters<typeof buildVerifyPipeline>[0], ctx: PhaseFunctionContext) {
-  const [phase] = buildVerifyPipeline(input);
-  return (phase as PipelinePhaseFunction).fn(ctx);
+async function runPhase(input: Parameters<typeof buildVerifyPipeline>[0], ctx: PhaseFunctionContext, index = 0) {
+  return (buildVerifyPipeline(input)[index] as PipelinePhaseFunction).fn(ctx);
+}
+
+const runReview = (input: Parameters<typeof buildVerifyPipeline>[0], ctx: PhaseFunctionContext) => runPhase(input, ctx, 1);
+
+async function writeReport(text: string) {
+  await mkdir(path.join(reportsDir(), "20260102-000000"), { recursive: true });
+  await Bun.write(path.join(reportsDir(), "20260102-000000", "report.md"), text);
 }
 
 const reportsDir = () => path.join(root, WS, "artifacts", "verification");
@@ -107,5 +123,51 @@ describe("verify pipeline", () => {
   it("fails when the agent finishes without writing its report", async () => {
     const { ctx } = ctxWriting(null);
     expect(await runPhase({ workspace: WS }, ctx)).toBe(false);
+  });
+
+  it("has the reviewer read the latest report against the README without changing anything", async () => {
+    await writeReport("# the report");
+    const { ctx, runChild } = ctxWriting(null);
+    expect(await runReview({ workspace: WS }, ctx)).toBe(true);
+
+    const [label, prompt, opts] = runChild.mock.calls[0];
+    expect(label).toBe("Verification reviewer");
+    expect(prompt).toContain("# the report");
+    expect(prompt).toContain("# README");
+    expect(opts?.allowedTools?.some((t) => /^(Write|Edit)\(|^Bash$/.test(t))).toBe(false);
+    expect(opts?.skipAskUserQuestion).toBe(true);
+  });
+
+  it("sends the gaps a run can close back to the verifier for one more round", async () => {
+    await writeReport("# the report");
+    const { ctx, appended } = ctxWriting(null, [
+      { item: "Orders page", problem: "Only the empty list was shown", fix: "Seed one order locally and reload", needsPerson: false },
+      { item: "SSO login", problem: "Needs the person's sign-in", fix: "Sign in", needsPerson: true },
+    ]);
+    await runReview({ workspace: WS, instruction: "check the orders page" }, ctx);
+
+    expect(appended.map((p) => (p as PipelinePhaseFunction).label)).toEqual(["Verify (round 2)", "Review verification (round 2)"]);
+
+    const next = ctxWriting("# round 2");
+    await (appended[0] as PipelinePhaseFunction).fn(next.ctx);
+    const prompt = next.runChild.mock.calls[0][1];
+    expect(prompt).toContain("check the orders page");
+    expect(prompt).toContain("Seed one order locally and reload");
+    expect(prompt).not.toContain("Sign in");
+  });
+
+  it("stops when every gap needs a person, or after the last round", async () => {
+    await writeReport("# the report");
+    const onlyPerson = ctxWriting(null, [{ item: "SSO login", problem: "Needs sign-in", fix: "Sign in", needsPerson: true }]);
+    await runReview({ workspace: WS }, onlyPerson.ctx);
+    expect(onlyPerson.appended).toEqual([]);
+
+    const gap = { item: "Orders page", problem: "Only the empty list", fix: "Seed one order", needsPerson: false };
+    const first = ctxWriting(null, [gap]);
+    await runReview({ workspace: WS }, first.ctx);
+    const last = ctxWriting(null, [gap]);
+    expect(await (first.appended[1] as PipelinePhaseFunction).fn(last.ctx)).toBe(true);
+    expect(last.appended).toEqual([]);
+    expect(last.ctx.emitResult).toHaveBeenCalledWith(expect.stringContaining("Orders page"));
   });
 });

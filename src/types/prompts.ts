@@ -386,6 +386,17 @@ export interface VerifierInput {
   previousReport?: string;
 }
 
+export interface VerifyReviewerInput {
+  workspaceName: string;
+  readmeContent: string;
+  repos: VerifierInput["repos"];
+  /** What the person asked the verification for, if anything. */
+  instruction?: string;
+  /** The report under review, and the directory its screenshots are in. */
+  report: string;
+  reportDir: string;
+}
+
 export interface ReadmeFollowUpInput {
   workspaceName: string;
   instruction: string;

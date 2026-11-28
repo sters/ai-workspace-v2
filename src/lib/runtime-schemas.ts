@@ -260,3 +260,13 @@ export const runtimeDistilledLessonsSchema = z.object({
     evidence: z.array(z.object({ url: z.string().optional(), note: z.string() })),
   })),
 });
+
+/** The verification reviewer's answer: what the report leaves unshown. */
+export const verifyReviewSchema = z.object({
+  gaps: z.array(z.object({
+    item: z.string(),
+    problem: z.string(),
+    fix: z.string(),
+    needsPerson: z.boolean(),
+  })),
+});

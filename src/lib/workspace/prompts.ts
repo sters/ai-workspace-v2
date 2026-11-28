@@ -52,6 +52,7 @@ import {
   getFindingGrounderSystemPrompt,
   getConflictResolverSystemPrompt,
   getVerifierSystemPrompt,
+  getVerifyReviewerSystemPrompt,
   getScheduledTaskPlannerSystemPrompt,
   getScheduledTaskRunnerSystemPrompt,
 } from "@/lib/templates/prompts";
@@ -88,6 +89,7 @@ const SYSTEM_PROMPTS: Record<string, () => string> = {
   "finding-grounder.md": getFindingGrounderSystemPrompt,
   "conflict-resolver.md": getConflictResolverSystemPrompt,
   "verifier.md": getVerifierSystemPrompt,
+  "verify-reviewer.md": getVerifyReviewerSystemPrompt,
   "create-todo-planner.md": getCreateTodoPlannerSystemPrompt,
   "workspace-suggester.md": getWorkspaceSuggesterSystemPrompt,
   "chat.md": getChatSystemPrompt,

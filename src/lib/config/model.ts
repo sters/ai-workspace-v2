@@ -65,6 +65,8 @@ export const STEP_DEFAULT_MODELS: Partial<Record<StepType, ClaudeModel>> = {
   [STEP_TYPES.VERIFY]: "opus",
 
   [STEP_TYPES.AUTONOMOUS_GATE]: CLAUDE_MODELS.SONNET_5_5,
+  // Reads a report against the README; reruns nothing itself.
+  [STEP_TYPES.VERIFY_REVIEW]: CLAUDE_MODELS.SONNET_5_5,
   [STEP_TYPES.DISTILL_LESSONS]: CLAUDE_MODELS.SONNET_5_5,
   [STEP_TYPES.PLAN_SCHEDULED_TASK]: CLAUDE_MODELS.SONNET_5_5,
   [STEP_TYPES.RUN_SCHEDULED_TASK]: CLAUDE_MODELS.SONNET_5_5,
@@ -96,6 +98,7 @@ export const STEP_DEFAULT_EFFORTS: Partial<Record<StepType, ClaudeEffort>> = {
   // Decides whether to run another cycle from an already-structured summary; a
   // wrong answer burns a cycle or stops with work unfinished.
   [STEP_TYPES.AUTONOMOUS_GATE]: "high",
+  [STEP_TYPES.VERIFY_REVIEW]: "high",
   // Once per archived workspace, and a human reads every candidate it writes.
   [STEP_TYPES.DISTILL_LESSONS]: "high",
   // Once per task, and a person reviews the task before enabling it.
