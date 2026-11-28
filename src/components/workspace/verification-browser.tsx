@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "@/lib/router/navigation";
 import { Play } from "lucide-react";
+import { useRunningOperations } from "@/hooks/use-running-operations";
 import { useStartAndNavigate } from "@/hooks/use-start-and-navigate";
 import { useArtifactFile, useArtifacts } from "@/hooks/use-workspace";
 import { Button } from "../shared/buttons/button";
@@ -91,6 +92,7 @@ function appendSnippet(text: string, snippet: string): string {
 
 function VerifyForm({ workspaceName }: { workspaceName: string }) {
   const startAndNavigate = useStartAndNavigate(workspaceName);
+  const { isWorkspaceRunning } = useRunningOperations();
   const [instruction, setInstruction] = useState("");
   return (
     <Card className="space-y-2">
@@ -105,6 +107,7 @@ function VerifyForm({ workspaceName }: { workspaceName: string }) {
         rows={3}
       />
       <Button
+        disabled={isWorkspaceRunning(workspaceName)}
         onClick={async () => {
           if (await startAndNavigate("verify", { workspace: workspaceName, instruction })) setInstruction("");
         }}
